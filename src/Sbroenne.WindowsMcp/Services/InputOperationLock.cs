@@ -1,10 +1,10 @@
 namespace Sbroenne.WindowsMcp.Services;
 
 /// <summary>
-/// Provides mutex-style serialization for mouse operations.
+/// Provides mutex-style serialization for input operations (mouse and keyboard).
 /// Ensures that concurrent MCP requests are serialized to prevent interleaved input sequences.
 /// </summary>
-public sealed class MouseOperationLock : IDisposable
+public sealed class InputOperationLock : IDisposable
 {
     private readonly SemaphoreSlim _semaphore = new(1, 1);
     private bool _disposed;

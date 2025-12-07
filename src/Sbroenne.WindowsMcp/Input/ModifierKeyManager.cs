@@ -37,6 +37,12 @@ public class ModifierKeyManager : IModifierKeyManager
             pressedKeys.Add(NativeConstants.VK_MENU);
         }
 
+        if (modifiers.HasFlag(ModifierKey.Win) && !IsKeyPressed(NativeConstants.VK_LWIN))
+        {
+            SendKeyInput(NativeConstants.VK_LWIN, keyUp: false);
+            pressedKeys.Add(NativeConstants.VK_LWIN);
+        }
+
         return pressedKeys;
     }
 

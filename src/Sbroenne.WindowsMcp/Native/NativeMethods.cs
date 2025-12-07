@@ -152,4 +152,32 @@ internal static partial class NativeMethods
     [LibraryImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool CloseHandle(nint hObject);
+
+    #region Keyboard Layout APIs
+
+    /// <summary>
+    /// Retrieves the active input locale identifier (keyboard layout) for the specified thread.
+    /// </summary>
+    /// <param name="idThread">The thread identifier. Use 0 for the current thread.</param>
+    /// <returns>The input locale identifier for the thread, or the default input locale for the system if the thread does not have an active keyboard layout.</returns>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetKeyboardLayout(uint idThread);
+
+    /// <summary>
+    /// Retrieves the name of the active keyboard layout for the calling thread.
+    /// </summary>
+    /// <param name="pwszKLID">Pointer to the buffer that receives the keyboard layout identifier string. The buffer must be at least KL_NAMELENGTH characters (9 characters).</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [LibraryImport("user32.dll", EntryPoint = "GetKeyboardLayoutNameW", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetKeyboardLayoutName([Out] char[] pwszKLID);
+
+    /// <summary>
+    /// Retrieves the handle to the foreground window.
+    /// </summary>
+    /// <returns>Handle to the foreground window, or NULL if there is no foreground window.</returns>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetForegroundWindow();
+
+    #endregion
 }

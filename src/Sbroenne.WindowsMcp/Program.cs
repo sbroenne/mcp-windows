@@ -28,12 +28,15 @@ try
 
     // Register configuration from environment variables
     builder.Services.AddSingleton(_ => MouseConfiguration.FromEnvironment());
+    builder.Services.AddSingleton(_ => KeyboardConfiguration.FromEnvironment());
 
     // Register application services
     builder.Services.AddSingleton<IMouseInputService, MouseInputService>();
+    builder.Services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
     builder.Services.AddSingleton<IElevationDetector, ElevationDetector>();
     builder.Services.AddSingleton<ISecureDesktopDetector, SecureDesktopDetector>();
     builder.Services.AddSingleton<MouseOperationLogger>();
+    builder.Services.AddSingleton<KeyboardOperationLogger>();
 
     // Configure MCP server with stdio transport
     builder.Services
@@ -44,10 +47,11 @@ try
                 Name = "sbroenne.windows-mcp",
                 Version = "1.0.0",
             };
-            options.ServerInstructions = "MCP server for Windows mouse control operations. Use the mouse_control tool to move the cursor, click, drag, and scroll.";
+            options.ServerInstructions = "MCP server for Windows mouse and keyboard control operations. Use the mouse_control tool to move the cursor, click, drag, and scroll. Use the keyboard_control tool to type text, press keys, and perform keyboard shortcuts.";
         })
         .WithStdioServerTransport()
-        .WithTools<MouseControlTool>();
+        .WithTools<MouseControlTool>()
+        .WithTools<KeyboardControlTool>();
 
     var host = builder.Build();
     await host.RunAsync();
