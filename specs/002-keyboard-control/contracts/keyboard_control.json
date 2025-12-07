@@ -1,0 +1,330 @@
+{
+  "tool": {
+    "name": "keyboard_control",
+    "description": "Control the keyboard - type text, press keys, execute key combinations and sequences",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["type", "press", "key_down", "key_up", "combo", "sequence", "release_all", "get_keyboard_layout"],
+          "description": "The keyboard action to perform. 'type' uses Unicode input (layout-independent). 'press' uses virtual key codes (physical keys)."
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "Text to type. Required for 'type' action. Supports Unicode including emoji. Layout-independent."
+        },
+        "key": {
+          "type": "string",
+          "description": "Key name to press. Required for 'press', 'key_down', 'key_up', 'combo' actions. Examples: 'enter', 'tab', 'f1', 'a', 'copilot', 'volumemute'."
+        },
+        "modifiers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["ctrl", "shift", "alt", "win"]
+          },
+          "description": "Modifier keys to hold during the operation. Optional for 'press', 'combo' actions."
+        },
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "description": "Key name to press"
+              },
+              "modifiers": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["ctrl", "shift", "alt", "win"]
+                },
+                "description": "Modifiers for this specific key"
+              },
+              "delayMs": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2000,
+                "description": "Custom delay after this key (ms)"
+              }
+            },
+            "required": ["key"]
+          },
+          "description": "Array of keys for 'sequence' action. Executed in order."
+        },
+        "interKeyDelayMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 50,
+          "description": "Default delay between keys in milliseconds. Applies to 'type' and 'sequence' actions."
+        },
+        "timeout": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 300,
+          "default": 30,
+          "description": "Operation timeout in seconds"
+        }
+      },
+      "required": ["action"]
+    }
+  },
+  "examples": [
+    {
+      "name": "Type text",
+      "description": "Type 'Hello, World!' using Unicode input",
+      "request": {
+        "action": "type",
+        "text": "Hello, World!"
+      },
+      "response": {
+        "success": true,
+        "charactersTyped": 13
+      }
+    },
+    {
+      "name": "Type with custom delay",
+      "description": "Type slowly for visibility",
+      "request": {
+        "action": "type",
+        "text": "Slow typing",
+        "interKeyDelayMs": 100
+      },
+      "response": {
+        "success": true,
+        "charactersTyped": 11
+      }
+    },
+    {
+      "name": "Press Enter",
+      "description": "Press the Enter key",
+      "request": {
+        "action": "press",
+        "key": "enter"
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Ctrl+S (Save)",
+      "description": "Execute Ctrl+S keyboard shortcut",
+      "request": {
+        "action": "press",
+        "key": "s",
+        "modifiers": ["ctrl"]
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Ctrl+Shift+P (Command Palette)",
+      "description": "Open VS Code command palette",
+      "request": {
+        "action": "combo",
+        "key": "p",
+        "modifiers": ["ctrl", "shift"]
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Win+L (Lock)",
+      "description": "Lock the workstation",
+      "request": {
+        "action": "press",
+        "key": "l",
+        "modifiers": ["win"]
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Copilot key",
+      "description": "Press the Copilot key on Windows 11 Copilot+ PCs",
+      "request": {
+        "action": "press",
+        "key": "copilot"
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Hold Shift",
+      "description": "Press and hold Shift key (for drag operations)",
+      "request": {
+        "action": "key_down",
+        "key": "shift"
+      },
+      "response": {
+        "success": true,
+        "heldKeys": ["shift"]
+      }
+    },
+    {
+      "name": "Release Shift",
+      "description": "Release previously held Shift key",
+      "request": {
+        "action": "key_up",
+        "key": "shift"
+      },
+      "response": {
+        "success": true,
+        "heldKeys": []
+      }
+    },
+    {
+      "name": "Key sequence",
+      "description": "Type a sequence of keys with custom timing",
+      "request": {
+        "action": "sequence",
+        "keys": [
+          { "key": "h" },
+          { "key": "i", "delayMs": 100 },
+          { "key": "enter" }
+        ],
+        "interKeyDelayMs": 50
+      },
+      "response": {
+        "success": true,
+        "keysPressed": 3
+      }
+    },
+    {
+      "name": "Navigation sequence",
+      "description": "Navigate with arrow keys and modifiers",
+      "request": {
+        "action": "sequence",
+        "keys": [
+          { "key": "home", "modifiers": ["ctrl"] },
+          { "key": "down" },
+          { "key": "down" },
+          { "key": "end", "modifiers": ["shift"] }
+        ]
+      },
+      "response": {
+        "success": true,
+        "keysPressed": 4
+      }
+    },
+    {
+      "name": "Release all held keys",
+      "description": "Safety cleanup of all held keys",
+      "request": {
+        "action": "release_all"
+      },
+      "response": {
+        "success": true,
+        "heldKeys": []
+      }
+    },
+    {
+      "name": "Get keyboard layout",
+      "description": "Query the current keyboard layout",
+      "request": {
+        "action": "get_keyboard_layout"
+      },
+      "response": {
+        "success": true,
+        "keyboardLayout": {
+          "languageTag": "en-US",
+          "displayName": "English (United States)",
+          "layoutId": "00000409"
+        }
+      }
+    },
+    {
+      "name": "Media control",
+      "description": "Play/pause media",
+      "request": {
+        "action": "press",
+        "key": "mediaplaypause"
+      },
+      "response": {
+        "success": true
+      }
+    },
+    {
+      "name": "Volume control",
+      "description": "Mute volume",
+      "request": {
+        "action": "press",
+        "key": "volumemute"
+      },
+      "response": {
+        "success": true
+      }
+    }
+  ],
+  "errors": {
+    "InvalidAction": {
+      "description": "Unknown action specified",
+      "example": {
+        "success": false,
+        "error": "Invalid action: 'unknown'. Valid actions: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout",
+        "errorCode": "InvalidAction"
+      }
+    },
+    "InvalidKey": {
+      "description": "Key name not recognized",
+      "example": {
+        "success": false,
+        "error": "Invalid key name: 'xyz'. See documentation for valid key names.",
+        "errorCode": "InvalidKey"
+      }
+    },
+    "TextTooLong": {
+      "description": "Text exceeds maximum length",
+      "example": {
+        "success": false,
+        "error": "Text length 15000 exceeds maximum of 10000 characters",
+        "errorCode": "TextTooLong"
+      }
+    },
+    "ElevatedWindowActive": {
+      "description": "Cannot send input to elevated window",
+      "example": {
+        "success": false,
+        "error": "Cannot send keyboard input - foreground window 'Administrator: Command Prompt' is running elevated",
+        "errorCode": "ElevatedWindowActive"
+      }
+    },
+    "SecureDesktopActive": {
+      "description": "Cannot send input during UAC or lock screen",
+      "example": {
+        "success": false,
+        "error": "Cannot send keyboard input - secure desktop (UAC prompt or lock screen) is active",
+        "errorCode": "SecureDesktopActive"
+      }
+    },
+    "KeyNotHeld": {
+      "description": "Attempted to release a key that isn't held",
+      "example": {
+        "success": false,
+        "error": "Cannot release key 'shift' - key is not currently held",
+        "errorCode": "KeyNotHeld"
+      }
+    }
+  },
+  "validKeys": {
+    "letters": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
+    "numbers": ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+    "functionKeys": ["f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15", "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23", "f24"],
+    "navigation": ["up", "down", "left", "right", "home", "end", "pageup", "pagedown", "insert", "delete"],
+    "control": ["enter", "return", "tab", "escape", "esc", "space", "backspace", "capslock", "numlock", "scrolllock", "printscreen", "pause"],
+    "modifiers": ["ctrl", "control", "shift", "alt", "menu", "win", "windows", "lwin", "rwin"],
+    "numpad": ["numpad0", "numpad1", "numpad2", "numpad3", "numpad4", "numpad5", "numpad6", "numpad7", "numpad8", "numpad9", "numpadmultiply", "numpadadd", "numpadsubtract", "numpaddecimal", "numpaddivide"],
+    "media": ["volumemute", "volumedown", "volumeup", "medianexttrack", "mediaprevtrack", "mediastop", "mediaplaypause"],
+    "browser": ["browserback", "browserforward", "browserrefresh", "browserstop", "browsersearch", "browserfavorites", "browserhome"],
+    "special": ["copilot", "launchmail", "launchmediaselect", "launchapp1", "launchapp2"],
+    "punctuation": ["semicolon", "equals", "comma", "minus", "period", "slash", "backtick", "openbracket", "backslash", "closebracket", "quote"]
+  }
+}

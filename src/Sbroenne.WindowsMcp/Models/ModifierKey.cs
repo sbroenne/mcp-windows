@@ -1,7 +1,7 @@
 namespace Sbroenne.WindowsMcp.Models;
 
 /// <summary>
-/// Keyboard modifier keys that can be held during click operations.
+/// Keyboard modifier keys that can be held during input operations.
 /// </summary>
 [Flags]
 public enum ModifierKey
@@ -16,5 +16,8 @@ public enum ModifierKey
     Shift = 2,
 
     /// <summary>Alt key.</summary>
-    Alt = 4
+    Alt = 4,
+
+    /// <summary>Windows key (Win/Super key).</summary>
+    Win = 8
 }
