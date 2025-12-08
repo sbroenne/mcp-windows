@@ -1,14 +1,18 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.0.1 → 2.1.0
+Version change: 2.1.0 → 2.2.0
 Modified principles:
-  - XIV. xUnit Testing Best Practices (removed FluentAssertions reference, use xUnit native assertions)
-Added sections:
-  - XXII. Open Source Dependencies Only (NON-NEGOTIABLE) - new principle prohibiting commercial libraries
+  - XI. Observability & Diagnostics (removed structured JSON requirement, simplified stderr logging)
+  - XXI. Modern .NET CLI Application Architecture (removed Serilog reference)
+Added sections: None
 Removed sections: None
-Templates requiring updates: ✅ No updates required (no structural template changes)
+Technology Stack changes:
+  - Logging: Changed from "Microsoft.Extensions.Logging + Serilog" to "Microsoft.Extensions.Logging"
+Templates requiring updates: ✅ No updates required
 Follow-up TODOs: None
+Rationale: Serilog produced verbose JSON logs to stderr that VS Code displayed as warnings.
+           The built-in console logger is simpler and sufficient for MCP server needs.
 -->
 
 # mcp-windows Constitution
@@ -106,9 +110,10 @@ This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 ### XI. Observability & Diagnostics
 
 - Use `Microsoft.Extensions.Logging` with structured messages and correlation IDs
-- Log to stderr as structured JSON (one object per line) to preserve stdout for MCP protocol
-- Log every tool invocation (name, sanitized parameters, duration, outcome)
-- Support `--verbose` flag; implement health check tool for server status
+- Log to stderr to preserve stdout for MCP protocol (use console logger with `LogToStandardErrorThreshold`)
+- Default log level SHOULD be Warning to avoid noise in VS Code output panel
+- Log every tool invocation (name, sanitized parameters, duration, outcome) at Debug level
+- Support `--verbose` flag to enable Debug/Trace logging; implement health check tool for server status
 - Do NOT log: screenshot image data, credentials, stack traces at Info level
 
 ### XII. Graceful Lifecycle Management
@@ -187,7 +192,7 @@ This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 - Register ALL services via `IServiceCollection` at startup; avoid service locator anti-pattern
 - Use `IConfiguration` with layered providers: appsettings.json → environment variables → CLI args
 - Validate options at startup with `ValidateOnStart()`
-- Use `ILogger<T>` injected via constructor with Serilog for structured output
+- Use `ILogger<T>` injected via constructor for logging
 - Use `System.CommandLine` for argument parsing; support `--help`, `--version`, `--verbose`
 - Handle `IHostApplicationLifetime.ApplicationStopping` for cleanup; set `HostOptions.ShutdownTimeout`
 
@@ -210,7 +215,7 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 | Language | C# 12+ (latest stable) |
 | Runtime | .NET 8.0 (or latest LTS) |
 | Test Framework | xUnit 2.6+ with native assertions, Bogus, NSubstitute |
-| Logging | Microsoft.Extensions.Logging + Serilog |
+| Logging | Microsoft.Extensions.Logging (built-in console provider) |
 | Resilience | Polly |
 | MCP SDK | Official C# MCP SDK (latest) |
 | Windows APIs | System.Windows.Automation, Windows.Graphics.Capture, DWM/Shell32 P/Invoke |
@@ -256,4 +261,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.1.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-07
+**Version**: 2.2.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-08

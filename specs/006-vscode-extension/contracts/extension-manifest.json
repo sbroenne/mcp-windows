@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VS Code Extension Manifest Contract",
+  "description": "Contract for Windows MCP Server VS Code Extension package.json",
+  "type": "object",
+  "required": [
+    "name",
+    "displayName",
+    "version",
+    "publisher",
+    "engines",
+    "activationEvents",
+    "main",
+    "contributes"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "const": "sbroenne-windowsmcp",
+      "description": "Extension identifier (lowercase, no spaces)"
+    },
+    "displayName": {
+      "type": "string",
+      "const": "Windows MCP Server",
+      "description": "Human-readable name for marketplace"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version"
+    },
+    "publisher": {
+      "type": "string",
+      "const": "sbroenne",
+      "description": "VS Code Marketplace publisher ID"
+    },
+    "engines": {
+      "type": "object",
+      "properties": {
+        "vscode": {
+          "type": "string",
+          "const": "^1.106.0",
+          "description": "Minimum VS Code version for MCP server definition provider API"
+        }
+      },
+      "required": ["vscode"]
+    },
+    "os": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "const": "win32"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "description": "Windows-only extension"
+    },
+    "extensionDependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "const": "ms-dotnettools.vscode-dotnet-runtime"
+      },
+      "minItems": 1,
+      "description": ".NET runtime provider dependency"
+    },
+    "activationEvents": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "const": "onStartupFinished"
+      },
+      "description": "Activate after VS Code startup"
+    },
+    "main": {
+      "type": "string",
+      "const": "./out/extension.js",
+      "description": "Extension entry point"
+    },
+    "contributes": {
+      "type": "object",
+      "properties": {
+        "languageModelToolReferences": {
+          "type": "object",
+          "properties": {
+            "windows-mcp-server": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "const": "Windows MCP Server"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": ["label", "description"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

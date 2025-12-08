@@ -1,0 +1,85 @@
+{
+  "name": "windows-mcp",
+  "displayName": "Windows MCP Server",
+  "description": "Windows automation for AI assistants - control mouse, keyboard, windows, and capture screenshots",
+  "version": "1.0.0",
+  "publisher": "sbroenne",
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sbroenne/mcp-windows"
+  },
+  "bugs": {
+    "url": "https://github.com/sbroenne/mcp-windows/issues"
+  },
+  "homepage": "https://github.com/sbroenne/mcp-windows",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "os": [
+    "win32"
+  ],
+  "categories": [
+    "AI",
+    "Chat",
+    "Other"
+  ],
+  "keywords": [
+    "mcp",
+    "model context protocol",
+    "windows",
+    "automation",
+    "mouse",
+    "keyboard",
+    "screenshot",
+    "window management",
+    "copilot",
+    "ai",
+    "github copilot",
+    "rpa",
+    "ui automation"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "ms-dotnettools.vscode-dotnet-runtime"
+  ],
+  "main": "./out/extension.js",
+  "files": [
+    "out/**",
+    "bin/**",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "icon.png"
+  ],
+  "contributes": {
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "windows-mcp",
+        "label": "Windows MCP"
+      }
+    ]
+  },
+  "scripts": {
+    "clean": "cd .. && dotnet clean src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release",
+    "build:mcp-server": "npm run clean && cd .. && dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release --no-self-contained -o vscode-extension/bin --verbosity minimal",
+    "vscode:prepublish": "npm run build:mcp-server && npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npm run build:mcp-server && vsce package",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "@types/vscode": "^1.106.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.2",
+    "@typescript-eslint/parser": "^8.46.2",
+    "@vscode/vsce": "^3.7.1",
+    "eslint": "^9.39.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0"
+  }
+}
