@@ -33,6 +33,16 @@ A Model Context Protocol (MCP) server providing Windows automation capabilities 
 - **UWP/Store apps** - proper detection and handling
 - **Cloaking detection** - filter out virtual desktop and shell-managed windows
 
+### 📸 Screenshot Capture
+- **Capture primary screen** - full screenshot of the main display
+- **Capture specific monitor** - screenshot any connected display by index
+- **Capture window** - screenshot a specific window (even if partially obscured)
+- **Capture region** - screenshot an arbitrary rectangular area
+- **Cursor inclusion** - optionally include mouse cursor in captures
+- **Base64 PNG output** - images returned as base64-encoded PNG data
+- **Multi-monitor aware** - supports extended desktop configurations
+- **DPI aware** - correct pixel dimensions on high-DPI displays
+
 ## Prerequisites
 
 - Windows 10/11
@@ -127,6 +137,30 @@ Control windows on the Windows desktop.
 | `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
 
+### screenshot_control
+
+Capture screenshots on Windows.
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `capture` | Capture screenshot | `target` |
+| `list_monitors` | List all connected monitors | none |
+
+**Capture Targets:**
+
+| Target | Description | Additional Parameters |
+|--------|-------------|----------------------|
+| `primary_screen` | Capture primary monitor | none |
+| `monitor` | Capture specific monitor | `monitor_index` |
+| `window` | Capture specific window | `window_handle` |
+| `region` | Capture rectangular region | `x`, `y`, `width`, `height` |
+
+**Optional Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_cursor` | boolean | `false` | Include mouse cursor in capture |
+
 ## Examples
 
 ### Mouse Control
@@ -210,6 +244,28 @@ Control windows on the Windows desktop.
 { "action": "wait_for", "title": "Notepad", "timeout_ms": 10000 }
 ```
 
+### Screenshot Control
+
+```json
+// Capture primary screen
+{ "action": "capture", "target": "primary_screen" }
+
+// List all monitors
+{ "action": "list_monitors" }
+
+// Capture specific monitor by index
+{ "action": "capture", "target": "monitor", "monitor_index": 1 }
+
+// Capture window by handle
+{ "action": "capture", "target": "window", "window_handle": 131844 }
+
+// Capture screen region
+{ "action": "capture", "target": "region", "x": 100, "y": 100, "width": 800, "height": 600 }
+
+// Capture with mouse cursor included
+{ "action": "capture", "target": "primary_screen", "include_cursor": true }
+```
+
 ## Supported Keys
 
 ### Function Keys
@@ -244,6 +300,13 @@ The server handles common Windows security scenarios:
 | `InvalidKey` | Unrecognized key name |
 | `InputBlocked` | Input was blocked by UIPI |
 | `Timeout` | Operation timed out |
+| `InvalidMonitorIndex` | Monitor index out of range |
+| `InvalidWindowHandle` | Window handle is invalid or window no longer exists |
+| `WindowMinimized` | Cannot capture minimized window |
+| `WindowNotVisible` | Window is not visible |
+| `InvalidRegion` | Capture region has invalid dimensions |
+| `CaptureFailed` | Screenshot capture operation failed |
+| `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
 
 ## Configuration
 
@@ -261,6 +324,8 @@ The server handles common Windows security scenarios:
 | `MCP_WINDOW_PROPERTY_TIMEOUT_MS` | `100` | Timeout for querying window properties |
 | `MCP_WINDOW_POLLING_INTERVAL_MS` | `250` | Polling interval for wait_for |
 | `MCP_WINDOW_ACTIVATION_MAX_RETRIES` | `3` | Max retries for window activation |
+| `MCP_SCREENSHOT_TIMEOUT_MS` | `5000` | Screenshot operation timeout |
+| `MCP_SCREENSHOT_MAX_PIXELS` | `33177600` | Maximum capture size (default 8K) |
 
 ## Testing
 
@@ -282,10 +347,16 @@ src/Sbroenne.WindowsMcp/
 ├── Automation/             # Desktop automation helpers
 │   ├── ElevationDetector.cs
 │   └── SecureDesktopDetector.cs
+├── Capture/                # Screenshot capture services
+│   ├── IMonitorService.cs
+│   ├── IScreenshotService.cs
+│   ├── MonitorService.cs
+│   └── ScreenshotService.cs
 ├── Configuration/          # Environment-based configuration
 │   ├── MouseConfiguration.cs
 │   ├── KeyboardConfiguration.cs
-│   └── WindowConfiguration.cs
+│   ├── WindowConfiguration.cs
+│   └── ScreenshotConfiguration.cs
 ├── Input/                  # Input service implementations
 │   ├── MouseInputService.cs
 │   ├── KeyboardInputService.cs
@@ -293,11 +364,13 @@ src/Sbroenne.WindowsMcp/
 ├── Logging/                # Structured logging helpers
 │   ├── MouseOperationLogger.cs
 │   ├── KeyboardOperationLogger.cs
-│   └── WindowOperationLogger.cs
+│   ├── WindowOperationLogger.cs
+│   └── ScreenshotOperationLogger.cs
 ├── Models/                 # Request/response models
 │   ├── MouseControlRequest.cs
 │   ├── KeyboardControlRequest.cs
 │   ├── WindowManagementRequest.cs
+│   ├── ScreenshotControlRequest.cs
 │   └── ...
 ├── Native/                 # Windows API interop
 │   ├── NativeMethods.cs
@@ -307,7 +380,8 @@ src/Sbroenne.WindowsMcp/
 ├── Tools/                  # MCP tool implementations
 │   ├── MouseControlTool.cs
 │   ├── KeyboardControlTool.cs
-│   └── WindowManagementTool.cs
+│   ├── WindowManagementTool.cs
+│   └── ScreenshotControlTool.cs
 ├── Window/                 # Window management services
 │   ├── IWindowService.cs
 │   ├── WindowService.cs

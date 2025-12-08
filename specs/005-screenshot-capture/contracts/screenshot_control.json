@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "screenshot_control",
+  "description": "Windows screenshot capture MCP tool for capturing screens, monitors, windows, and regions",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["capture", "list_monitors"],
+      "default": "capture",
+      "description": "The screenshot operation to perform. 'capture' captures a screenshot, 'list_monitors' returns available display devices."
+    },
+    "target": {
+      "type": "string",
+      "enum": ["primary_screen", "monitor", "window", "region"],
+      "default": "primary_screen",
+      "description": "What to capture. Required when action is 'capture'."
+    },
+    "monitor_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Zero-based index of the monitor to capture. Required when target is 'monitor'. Use 'list_monitors' to see available monitors."
+    },
+    "window_handle": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Window handle (HWND) to capture. Required when target is 'window'. Obtain handles from window enumeration tools."
+    },
+    "x": {
+      "type": "integer",
+      "description": "Left edge X coordinate for region capture. Required when target is 'region'. Can be negative for multi-monitor setups."
+    },
+    "y": {
+      "type": "integer",
+      "description": "Top edge Y coordinate for region capture. Required when target is 'region'. Can be negative for multi-monitor setups."
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Width in pixels for region capture. Required when target is 'region'."
+    },
+    "height": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Height in pixels for region capture. Required when target is 'region'."
+    },
+    "include_cursor": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether to include the mouse cursor in the captured image. Default is false."
+    }
+  },
+  "required": [],
+  "allOf": [
+    {
+      "if": {
+        "properties": { "action": { "const": "capture" }, "target": { "const": "monitor" } },
+        "required": ["target"]
+      },
+      "then": {
+        "required": ["monitor_index"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "capture" }, "target": { "const": "window" } },
+        "required": ["target"]
+      },
+      "then": {
+        "required": ["window_handle"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "action": { "const": "capture" }, "target": { "const": "region" } },
+        "required": ["target"]
+      },
+      "then": {
+        "required": ["x", "y", "width", "height"]
+      }
+    }
+  ],
+  "examples": [
+    {
+      "description": "Capture primary monitor",
+      "value": {
+        "action": "capture",
+        "target": "primary_screen"
+      }
+    },
+    {
+      "description": "Capture second monitor with cursor",
+      "value": {
+        "action": "capture",
+        "target": "monitor",
+        "monitor_index": 1,
+        "include_cursor": true
+      }
+    },
+    {
+      "description": "Capture specific window",
+      "value": {
+        "action": "capture",
+        "target": "window",
+        "window_handle": 123456
+      }
+    },
+    {
+      "description": "Capture 800x600 region at coordinates (100, 100)",
+      "value": {
+        "action": "capture",
+        "target": "region",
+        "x": 100,
+        "y": 100,
+        "width": 800,
+        "height": 600
+      }
+    },
+    {
+      "description": "List all available monitors",
+      "value": {
+        "action": "list_monitors"
+      }
+    }
+  ],
+  "responses": {
+    "capture_success": {
+      "description": "Successful screenshot capture",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "error_code": { "type": "string", "const": "success" },
+        "message": { "type": "string" },
+        "image_data": { "type": "string", "description": "Base64-encoded PNG image" },
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "format": { "type": "string", "const": "png" }
+      },
+      "required": ["success", "error_code", "message", "image_data", "width", "height", "format"]
+    },
+    "list_monitors_success": {
+      "description": "Successful monitor listing",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "error_code": { "type": "string", "const": "success" },
+        "message": { "type": "string" },
+        "monitors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "index": { "type": "integer" },
+              "device_name": { "type": "string" },
+              "width": { "type": "integer" },
+              "height": { "type": "integer" },
+              "x": { "type": "integer" },
+              "y": { "type": "integer" },
+              "is_primary": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "required": ["success", "error_code", "message", "monitors"]
+    },
+    "error": {
+      "description": "Error response",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "error_code": { 
+          "type": "string",
+          "enum": [
+            "secure_desktop_active",
+            "invalid_window_handle",
+            "window_minimized",
+            "window_capture_failed",
+            "invalid_monitor_index",
+            "invalid_region",
+            "image_too_large",
+            "timeout",
+            "capture_error",
+            "invalid_request"
+          ]
+        },
+        "message": { "type": "string" },
+        "available_monitors": {
+          "type": "array",
+          "description": "Provided on invalid_monitor_index to help user select valid monitor"
+        }
+      },
+      "required": ["success", "error_code", "message"]
+    }
+  }
+}

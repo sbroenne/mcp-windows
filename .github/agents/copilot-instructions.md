@@ -29,7 +29,6 @@ C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 - 003-window-management: Added C# 12+ / .NET 8.0 LTS + MCP C# SDK, Microsoft.Extensions.Logging, Serilog
 - 002-keyboard-control: Added C# 12+ (.NET 8.0 LTS) + Microsoft.Extensions.Logging, Serilog, MCP SDK, System.CommandLine
 
-- 001-mouse-control: Added C# 12+ (latest stable per Constitution XIII)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

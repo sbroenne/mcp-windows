@@ -243,3 +243,45 @@ internal struct MONITORINFO
     /// </summary>
     public readonly bool IsPrimary => (DwFlags & MONITORINFOF_PRIMARY) != 0;
 }
+
+/// <summary>
+/// Contains global cursor information.
+/// </summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct CURSORINFO
+{
+    /// <summary>The size of the structure, in bytes.</summary>
+    public int CbSize;
+
+    /// <summary>The cursor state (0 = hidden, CURSOR_SHOWING = visible).</summary>
+    public int Flags;
+
+    /// <summary>Handle to the cursor.</summary>
+    public nint HCursor;
+
+    /// <summary>Screen coordinates of the cursor.</summary>
+    public POINT PtScreenPos;
+
+    /// <summary>Cursor is visible.</summary>
+    public const int CURSOR_SHOWING = 0x00000001;
+
+    /// <summary>Cursor is suppressed (touch/pen mode).</summary>
+    public const int CURSOR_SUPPRESSED = 0x00000002;
+
+    /// <summary>Gets the size of the structure.</summary>
+    public static int Size => Marshal.SizeOf<CURSORINFO>();
+
+    /// <summary>
+    /// Creates a new CURSORINFO structure with the cbSize field initialized.
+    /// </summary>
+    /// <returns>An initialized CURSORINFO structure.</returns>
+    public static CURSORINFO Create()
+    {
+        return new CURSORINFO { CbSize = Size };
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the cursor is visible.
+    /// </summary>
+    public readonly bool IsVisible => (Flags & CURSOR_SHOWING) != 0;
+}

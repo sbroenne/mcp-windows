@@ -1,0 +1,236 @@
+using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Capture;
+using Sbroenne.WindowsMcp.Configuration;
+using Sbroenne.WindowsMcp.Logging;
+using Sbroenne.WindowsMcp.Models;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace Sbroenne.WindowsMcp.Tests.Integration;
+
+/// <summary>
+/// Integration tests for region capture via <see cref="ScreenshotService"/>.
+/// </summary>
+public sealed class ScreenshotRegionTests
+{
+    private readonly ScreenshotService _screenshotService;
+
+    public ScreenshotRegionTests()
+    {
+        var monitorService = new MonitorService();
+        var secureDesktopDetector = new SecureDesktopDetector();
+        var configuration = ScreenshotConfiguration.FromEnvironment();
+        var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
+
+        _screenshotService = new ScreenshotService(
+            monitorService,
+            secureDesktopDetector,
+            configuration,
+            logger);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_ValidRegion_ReturnsSuccess()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, 400, 300)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.True(result.Success, $"Region capture failed: {result.Message}");
+        Assert.NotNull(result.ImageData);
+        Assert.Equal("png", result.Format);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_ReturnsExactDimensions()
+    {
+        // Arrange
+        const int expectedWidth = 400;
+        const int expectedHeight = 300;
+
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, expectedWidth, expectedHeight)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(expectedWidth, result.Width);
+        Assert.Equal(expectedHeight, result.Height);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_ReturnsValidPng()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(0, 0, 200, 150)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.ImageData);
+
+        var imageBytes = Convert.FromBase64String(result.ImageData);
+
+        // PNG signature check
+        Assert.True(imageBytes.Length >= 8);
+        Assert.Equal(0x89, imageBytes[0]);
+        Assert.Equal(0x50, imageBytes[1]); // 'P'
+        Assert.Equal(0x4E, imageBytes[2]); // 'N'
+        Assert.Equal(0x47, imageBytes[3]); // 'G'
+    }
+
+    [Fact]
+    public async Task CaptureRegion_ZeroWidth_ReturnsInvalidRegionError()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, 0, 150) // Zero width
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("invalid_region", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_ZeroHeight_ReturnsInvalidRegionError()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, 400, 0) // Zero height
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("invalid_region", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_NegativeWidth_ReturnsInvalidRegionError()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, -400, 300)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("invalid_region", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_NegativeHeight_ReturnsInvalidRegionError()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, 400, -300)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("invalid_region", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_NullRegion_ReturnsInvalidRegionError()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = null
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Equal("invalid_region", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_WithIncludeCursor_ReturnsSuccess()
+    {
+        // Arrange
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(0, 0, 200, 150),
+            IncludeCursor = true
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.True(result.Success, $"Region capture with cursor failed: {result.Message}");
+        Assert.NotNull(result.ImageData);
+    }
+
+    [Fact]
+    public async Task CaptureRegion_SmallRegion_ReturnsSuccess()
+    {
+        // Arrange - 1x1 pixel region
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = new CaptureRegion(100, 100, 1, 1)
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(1, result.Width);
+        Assert.Equal(1, result.Height);
+    }
+}

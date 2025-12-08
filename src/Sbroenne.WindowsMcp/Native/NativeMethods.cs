@@ -429,4 +429,52 @@ internal static partial class NativeMethods
     internal static partial int DwmGetWindowAttributeInt(nint hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
 
     #endregion
+
+    #region Screenshot Capture APIs
+
+    /// <summary>
+    /// Copies the visual representation of a window into the specified device context.
+    /// </summary>
+    /// <param name="hwnd">Handle to the window to copy.</param>
+    /// <param name="hdcBlt">Handle to the device context to copy into.</param>
+    /// <param name="nFlags">Drawing options (PW_CLIENTONLY or PW_RENDERFULLCONTENT).</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    /// <remarks>
+    /// Use PW_RENDERFULLCONTENT (0x00000002) for Windows 8.1+ to capture the full window content.
+    /// </remarks>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool PrintWindow(nint hwnd, nint hdcBlt, uint nFlags);
+
+    /// <summary>
+    /// Retrieves information about the global cursor.
+    /// </summary>
+    /// <param name="pci">Pointer to a CURSORINFO structure that receives the information.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool GetCursorInfo(ref CURSORINFO pci);
+
+    /// <summary>
+    /// Draws an icon or cursor into the specified device context.
+    /// </summary>
+    /// <param name="hDC">Handle to the device context.</param>
+    /// <param name="X">X-coordinate of the upper-left corner of the icon.</param>
+    /// <param name="Y">Y-coordinate of the upper-left corner of the icon.</param>
+    /// <param name="hIcon">Handle to the icon to be drawn.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DrawIcon(nint hDC, int X, int Y, nint hIcon);
+
+    /// <summary>
+    /// Determines whether the specified window handle identifies an existing window.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window to test.</param>
+    /// <returns>True if the window handle identifies an existing window, false otherwise.</returns>
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(nint hWnd);
+
+    #endregion
 }

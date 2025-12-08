@@ -19,19 +19,7 @@
     </application>
   </compatibility>
 
-  <!-- Per-Monitor V2 DPI Awareness declaration -->
-  <!-- This ensures accurate screen coordinates without Windows virtualization/scaling -->
-  <application xmlns="urn:schemas-microsoft-com:asm.v3">
-    <windowsSettings>
-      <!-- Per-Monitor V2 DPI Awareness (Windows 10 1703+) -->
-      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">
-        PerMonitorV2
-      </dpiAwareness>
-      <!-- Fallback for older Windows 10 versions -->
-      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">
-        true/pm
-      </dpiAware>
-    </windowsSettings>
-  </application>
+  <!-- Note: Per-Monitor V2 DPI Awareness is configured via ApplicationHighDpiMode
+       project property in the .csproj file when UseWindowsForms is enabled -->
 
 </assembly>
