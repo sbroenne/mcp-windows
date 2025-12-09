@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
@@ -15,6 +16,7 @@ public sealed class WindowService : IWindowService
 {
     private readonly IWindowEnumerator _enumerator;
     private readonly IWindowActivator _activator;
+    private readonly IMonitorService _monitorService;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly WindowConfiguration _configuration;
     private readonly WindowOperationLogger? _logger;
@@ -24,23 +26,27 @@ public sealed class WindowService : IWindowService
     /// </summary>
     /// <param name="enumerator">Window enumerator service.</param>
     /// <param name="activator">Window activator service.</param>
+    /// <param name="monitorService">Monitor service for multi-monitor support.</param>
     /// <param name="secureDesktopDetector">Secure desktop detector.</param>
     /// <param name="configuration">Window configuration.</param>
     /// <param name="logger">Optional operation logger.</param>
     public WindowService(
         IWindowEnumerator enumerator,
         IWindowActivator activator,
+        IMonitorService monitorService,
         ISecureDesktopDetector secureDesktopDetector,
         WindowConfiguration configuration,
         WindowOperationLogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(enumerator);
         ArgumentNullException.ThrowIfNull(activator);
+        ArgumentNullException.ThrowIfNull(monitorService);
         ArgumentNullException.ThrowIfNull(secureDesktopDetector);
         ArgumentNullException.ThrowIfNull(configuration);
 
         _enumerator = enumerator;
         _activator = activator;
+        _monitorService = monitorService;
         _secureDesktopDetector = secureDesktopDetector;
         _configuration = configuration;
         _logger = logger;
@@ -486,6 +492,88 @@ public sealed class WindowService : IWindowService
 
         string actionName = action.ToString().ToLowerInvariant();
         _logger?.LogWindowOperation(actionName, success: true, handle: handle, windowTitle: windowInfo.Title);
+
+        return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
+    }
+
+    /// <inheritdoc/>
+    public async Task<WindowManagementResult> MoveToMonitorAsync(
+        nint handle,
+        int monitorIndex,
+        CancellationToken cancellationToken = default)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.InvalidHandle,
+                "Invalid window handle (zero)");
+        }
+
+        // Get target monitor info
+        var targetMonitor = _monitorService.GetMonitor(monitorIndex);
+        if (targetMonitor == null)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.InvalidCoordinates,
+                $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
+        }
+
+        // Get current window info
+        var windowInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+        if (windowInfo is null)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.WindowNotFound,
+                $"Window with handle {handle} not found");
+        }
+
+        // Calculate new position: center the window on the target monitor
+        // while preserving the window size
+        int newX = targetMonitor.X + (targetMonitor.Width - windowInfo.Bounds.Width) / 2;
+        int newY = targetMonitor.Y + (targetMonitor.Height - windowInfo.Bounds.Height) / 2;
+
+        // Ensure the window fits within the monitor bounds
+        if (newX < targetMonitor.X)
+        {
+            newX = targetMonitor.X;
+        }
+
+        if (newY < targetMonitor.Y)
+        {
+            newY = targetMonitor.Y;
+        }
+
+        // If window is larger than monitor, position at monitor origin
+        if (windowInfo.Bounds.Width > targetMonitor.Width)
+        {
+            newX = targetMonitor.X;
+        }
+
+        if (windowInfo.Bounds.Height > targetMonitor.Height)
+        {
+            newY = targetMonitor.Y;
+        }
+
+        // Move the window
+        bool success = NativeMethods.SetWindowPos(
+            handle,
+            IntPtr.Zero,
+            newX, newY,
+            0, 0,  // Don't change size
+            NativeConstants.SWP_NOSIZE | NativeConstants.SWP_NOZORDER | NativeConstants.SWP_NOACTIVATE);
+
+        if (!success)
+        {
+            _logger?.LogWindowOperation("move_to_monitor", success: false, handle: handle, errorMessage: "SetWindowPos failed");
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MoveFailed,
+                "Failed to move window to target monitor");
+        }
+
+        // Get updated window info
+        var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+
+        _logger?.LogWindowOperation("move_to_monitor", success: true, handle: handle, windowTitle: windowInfo.Title);
 
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
