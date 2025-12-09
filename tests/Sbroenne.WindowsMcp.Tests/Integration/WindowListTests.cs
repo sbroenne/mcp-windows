@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Window;
@@ -270,12 +271,14 @@ public class WindowTestFixture : IDisposable
         var configuration = WindowConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var monitorService = new MonitorService();
 
         WindowEnumerator = new WindowEnumerator(elevationDetector, configuration);
         WindowActivator = new WindowActivator(configuration);
         WindowService = new WindowService(
             WindowEnumerator,
             WindowActivator,
+            monitorService,
             secureDesktopDetector,
             configuration);
     }

@@ -56,6 +56,24 @@ public sealed record WindowInfo
     public required int MonitorIndex { get; init; }
 
     /// <summary>
+    /// Gets the device name of the monitor the window is on (e.g., "\\\\.\\DISPLAY1").
+    /// </summary>
+    [JsonPropertyName("monitor_name")]
+    public string? MonitorName { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the window is on the primary monitor.
+    /// </summary>
+    [JsonPropertyName("monitor_is_primary")]
+    public bool MonitorIsPrimary { get; init; }
+
+    /// <summary>
+    /// Gets the bounds of the monitor the window is on.
+    /// </summary>
+    [JsonPropertyName("monitor_bounds")]
+    public WindowBounds? MonitorBounds { get; init; }
+
+    /// <summary>
     /// Gets a value indicating whether the window is on the current virtual desktop.
     /// </summary>
     [JsonPropertyName("on_current_desktop")]

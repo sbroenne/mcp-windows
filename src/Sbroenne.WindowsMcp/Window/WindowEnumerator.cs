@@ -146,8 +146,8 @@ public sealed class WindowEnumerator : IWindowEnumerator
         // Get window state
         WindowState state = GetWindowState(hwnd);
 
-        // Get monitor index
-        int monitorIndex = GetMonitorIndex(hwnd);
+        // Get monitor info
+        var (monitorIndex, monitorName, monitorIsPrimary, monitorBounds) = GetMonitorInfo(hwnd);
 
         // Check if elevated
         bool isElevated = IsWindowElevated(hwnd, processId);
@@ -171,6 +171,9 @@ public sealed class WindowEnumerator : IWindowEnumerator
             Bounds = bounds,
             State = state,
             MonitorIndex = monitorIndex,
+            MonitorName = monitorName,
+            MonitorIsPrimary = monitorIsPrimary,
+            MonitorBounds = monitorBounds,
             IsElevated = isElevated,
             IsResponding = isResponding,
             IsUwp = isUwp,
@@ -261,23 +264,53 @@ public sealed class WindowEnumerator : IWindowEnumerator
         return WindowState.Normal;
     }
 
-    private static int GetMonitorIndex(nint hwnd)
+    private static (int Index, string? Name, bool IsPrimary, WindowBounds? Bounds) GetMonitorInfo(nint hwnd)
     {
         var hMonitor = NativeMethods.MonitorFromWindow(hwnd, NativeConstants.MONITOR_DEFAULTTONEAREST);
         if (hMonitor == IntPtr.Zero)
         {
-            return 0;
+            return (0, null, false, null);
         }
 
-        // Enumerate monitors to find index
+        // Get monitor info for name, primary status, and bounds
+        var monitorInfo = MONITORINFO.Create();
+        string? monitorName = null;
+        bool isPrimary = false;
+        WindowBounds? monitorBounds = null;
+
+        if (NativeMethods.GetMonitorInfo(hMonitor, ref monitorInfo))
+        {
+            isPrimary = monitorInfo.IsPrimary;
+            monitorBounds = new WindowBounds
+            {
+                X = monitorInfo.RcMonitor.Left,
+                Y = monitorInfo.RcMonitor.Top,
+                Width = monitorInfo.RcMonitor.Right - monitorInfo.RcMonitor.Left,
+                Height = monitorInfo.RcMonitor.Bottom - monitorInfo.RcMonitor.Top
+            };
+        }
+
+        // Enumerate monitors to find index and device name
         int index = 0;
         int resultIndex = 0;
+
+        // Use Screen.AllScreens to get device names (more reliable than MONITORINFOEX)
+        var screens = Screen.AllScreens;
 
         bool EnumMonitorCallback(nint hMon, nint hdcMonitor, ref RECT lprcMonitor, nint dwData)
         {
             if (hMon == hMonitor)
             {
                 resultIndex = index;
+                // Match with Screen by position
+                foreach (var screen in screens)
+                {
+                    if (screen.Bounds.X == lprcMonitor.Left && screen.Bounds.Y == lprcMonitor.Top)
+                    {
+                        monitorName = screen.DeviceName;
+                        break;
+                    }
+                }
             }
             index++;
             return true;
@@ -285,7 +318,7 @@ public sealed class WindowEnumerator : IWindowEnumerator
 
         NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, EnumMonitorCallback, IntPtr.Zero);
 
-        return resultIndex;
+        return (resultIndex, monitorName, isPrimary, monitorBounds);
     }
 
     private bool IsWindowElevated(nint hwnd, uint processId)

@@ -39,5 +39,8 @@ public enum WindowAction
     SetBounds,
 
     /// <summary>Wait for window to appear.</summary>
-    WaitFor
+    WaitFor,
+
+    /// <summary>Move window to a specific monitor by index.</summary>
+    MoveToMonitor
 }

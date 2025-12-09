@@ -50,8 +50,8 @@ public sealed class WindowManagementTool
     /// <summary>
     /// Manages windows with various actions.
     /// </summary>
-    /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, or wait_for.</param>
-    /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds).</param>
+    /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
+    /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor).</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
@@ -61,13 +61,14 @@ public sealed class WindowManagementTool
     /// <param name="width">Width for resize or set_bounds action.</param>
     /// <param name="height">Height for resize or set_bounds action.</param>
     /// <param name="timeoutMs">Timeout in milliseconds for wait_for action.</param>
+    /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation as JSON.</returns>
     [McpServerTool(Name = "window_management")]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, and wait_for actions.")]
+    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.")]
     public async Task<string> ExecuteAsync(
-        [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, or wait_for")] string action,
-        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds)")] string? handle = null,
+        [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
+        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor)")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
         [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
@@ -77,6 +78,7 @@ public sealed class WindowManagementTool
         [Description("Width for resize or set_bounds action")] int? width = null,
         [Description("Height for resize or set_bounds action")] int? height = null,
         [Description("Timeout in milliseconds for wait_for action")] int? timeoutMs = null,
+        [Description("Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.")] int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -98,7 +100,7 @@ public sealed class WindowManagementTool
             {
                 var result = WindowManagementResult.CreateFailure(
                     WindowManagementErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for");
+                    $"Unknown action: '{action}'. Valid actions are: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor");
                 _logger?.LogWindowOperation(action, success: false, errorMessage: result.Error);
                 return SerializeResult(result);
             }
@@ -153,6 +155,10 @@ public sealed class WindowManagementTool
 
                 case WindowAction.WaitFor:
                     operationResult = await HandleWaitForAsync(title, regex, timeoutMs, cancellationToken);
+                    break;
+
+                case WindowAction.MoveToMonitor:
+                    operationResult = await HandleMoveToMonitorAsync(handle, monitorIndex, cancellationToken);
                     break;
 
                 default:
@@ -387,6 +393,28 @@ public sealed class WindowManagementTool
         return await _windowService.WaitForWindowAsync(title, useRegex, timeoutMs, cancellationToken);
     }
 
+    private async Task<WindowManagementResult> HandleMoveToMonitorAsync(
+        string? handleString,
+        int? monitorIndex,
+        CancellationToken cancellationToken)
+    {
+        if (!TryParseHandle(handleString, out nint handle))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Valid handle is required for move_to_monitor action");
+        }
+
+        if (!monitorIndex.HasValue)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "monitorIndex is required for move_to_monitor action");
+        }
+
+        return await _windowService.MoveToMonitorAsync(handle, monitorIndex.Value, cancellationToken);
+    }
+
     private static bool TryParseHandle(string? handleString, out nint handle)
     {
         handle = IntPtr.Zero;
@@ -421,6 +449,7 @@ public sealed class WindowManagementTool
             "resize" => WindowAction.Resize,
             "set_bounds" => WindowAction.SetBounds,
             "wait_for" => WindowAction.WaitFor,
+            "move_to_monitor" => WindowAction.MoveToMonitor,
             _ => null,
         };
     }
