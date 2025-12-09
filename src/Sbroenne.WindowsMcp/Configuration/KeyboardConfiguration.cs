@@ -8,17 +8,17 @@ public sealed class KeyboardConfiguration
     /// <summary>
     /// The environment variable name for configuring operation timeout.
     /// </summary>
-    public const string TimeoutEnvironmentVariable = "MCP_KEYBOARD_TIMEOUT_MS";
+    public const string TimeoutEnvironmentVariable = "MCP_WINDOWS_KEYBOARD_TIMEOUT_MS";
 
     /// <summary>
     /// The environment variable name for configuring inter-key delay.
     /// </summary>
-    public const string InterKeyDelayEnvironmentVariable = "MCP_KEYBOARD_INTER_KEY_DELAY_MS";
+    public const string InterKeyDelayEnvironmentVariable = "MCP_WINDOWS_KEYBOARD_KEY_DELAY_MS";
 
     /// <summary>
     /// The environment variable name for configuring chunk delay for long text.
     /// </summary>
-    public const string ChunkDelayEnvironmentVariable = "MCP_KEYBOARD_CHUNK_DELAY_MS";
+    public const string ChunkDelayEnvironmentVariable = "MCP_WINDOWS_KEYBOARD_CHUNK_DELAY_MS";
 
     /// <summary>
     /// The default operation timeout in milliseconds.
