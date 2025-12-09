@@ -31,8 +31,10 @@ jobs:
       shell: pwsh
 
     - name: Update Version in Project
+      env:
+        VERSION: ${{ env.VERSION }}
       run: |
-        $version = "${{ env.VERSION }}"
+        $version = $env:VERSION
         $csprojPath = "src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj"
         $content = Get-Content $csprojPath -Raw
         $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
@@ -49,11 +51,15 @@ jobs:
       run: dotnet test --filter "Category!=Integration" --no-restore
 
     - name: Publish (Portable)
+      env:
+        VERSION: ${{ env.VERSION }}
       run: dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -o publish --no-self-contained
 
     - name: Create Release Archive
+      env:
+        VERSION: ${{ env.VERSION }}
       run: |
-        $version = "${{ env.VERSION }}"
+        $version = $env:VERSION
 
         Compress-Archive -Path "publish/*" -DestinationPath "windows-mcp-server-$version.zip"
 
@@ -62,9 +68,11 @@ jobs:
       shell: pwsh
 
     - name: Create GitHub Release
+      env:
+        VERSION: ${{ env.VERSION }}
       run: |
         $tagName = "${{ github.ref_name }}"
-        $version = "${{ env.VERSION }}"
+        $version = $env:VERSION
 
         $notes = @"
         ## Windows MCP Server $tagName
