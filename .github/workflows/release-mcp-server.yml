@@ -7,6 +7,8 @@ on:
   push:
     tags:
       - 'mcp-v*'
+    branches-ignore:
+      - main
 
 jobs:
   release-mcp-server:

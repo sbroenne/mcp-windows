@@ -7,6 +7,8 @@ on:
   push:
     tags:
       - 'vscode-v*'
+    branches-ignore:
+      - main
 
 jobs:
   release-vscode-extension:
