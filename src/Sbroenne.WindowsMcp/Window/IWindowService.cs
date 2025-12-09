@@ -144,4 +144,16 @@ public interface IWindowService
         bool useRegex = false,
         int? timeoutMs = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Moves a window to a specific monitor by index.
+    /// </summary>
+    /// <param name="handle">Window handle to move.</param>
+    /// <param name="monitorIndex">Target monitor index (0-based).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Result with window info after move or error.</returns>
+    Task<WindowManagementResult> MoveToMonitorAsync(
+        nint handle,
+        int monitorIndex,
+        CancellationToken cancellationToken = default);
 }

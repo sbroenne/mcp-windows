@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
@@ -24,6 +25,7 @@ public sealed class MouseControlTool
     };
 
     private readonly IMouseInputService _mouseInputService;
+    private readonly IMonitorService _monitorService;
     private readonly IElevationDetector _elevationDetector;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly MouseOperationLogger _logger;
@@ -33,18 +35,21 @@ public sealed class MouseControlTool
     /// Initializes a new instance of the <see cref="MouseControlTool"/> class.
     /// </summary>
     /// <param name="mouseInputService">The mouse input service.</param>
+    /// <param name="monitorService">The monitor service.</param>
     /// <param name="elevationDetector">The elevation detector.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="logger">The operation logger.</param>
     /// <param name="configuration">The mouse configuration.</param>
     public MouseControlTool(
         IMouseInputService mouseInputService,
+        IMonitorService monitorService,
         IElevationDetector elevationDetector,
         ISecureDesktopDetector secureDesktopDetector,
         MouseOperationLogger logger,
         MouseConfiguration configuration)
     {
         _mouseInputService = mouseInputService ?? throw new ArgumentNullException(nameof(mouseInputService));
+        _monitorService = monitorService ?? throw new ArgumentNullException(nameof(monitorService));
         _elevationDetector = elevationDetector ?? throw new ArgumentNullException(nameof(elevationDetector));
         _secureDesktopDetector = secureDesktopDetector ?? throw new ArgumentNullException(nameof(secureDesktopDetector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -63,20 +68,22 @@ public sealed class MouseControlTool
     /// <param name="amount">Number of scroll clicks (default: 1).</param>
     /// <param name="modifiers">Modifier keys to hold during action: ctrl, shift, alt (comma-separated).</param>
     /// <param name="button">Mouse button for drag: left, right, or middle (default: left).</param>
+    /// <param name="monitorIndex">Monitor index (0-based, default: 0). All x/y coordinates are relative to this monitor's origin.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation as JSON.</returns>
     [McpServerTool(Name = "mouse_control")]
-    [Description("Control the mouse cursor on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions.")]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: All x/y coordinates are relative to the specified monitor (default: monitor 0 = primary). Example: x=100, y=50 clicks 100px from left, 50px from top of the monitor. For secondary monitor, use monitorIndex=1.")]
     public async Task<string> ExecuteAsync(
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll")] string action,
-        [Description("Target x-coordinate (required for move, optional for clicks to move before clicking)")] int? x = null,
-        [Description("Target y-coordinate (required for move, optional for clicks to move before clicking)")] int? y = null,
-        [Description("End x-coordinate (required for drag action)")] int? endX = null,
-        [Description("End y-coordinate (required for drag action)")] int? endY = null,
+        [Description("X-coordinate relative to the monitor's left edge (required for move, optional for clicks).")] int? x = null,
+        [Description("Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).")] int? y = null,
+        [Description("End x-coordinate relative to the monitor (required for drag action).")] int? endX = null,
+        [Description("End y-coordinate relative to the monitor (required for drag action).")] int? endY = null,
         [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
         [Description("Number of scroll clicks (default: 1)")] int amount = 1,
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
         [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
+        [Description("Monitor index (0-based, default: 0 = primary monitor). All coordinates are relative to this monitor.")] int monitorIndex = 0,
         CancellationToken cancellationToken = default)
     {
         var correlationId = MouseOperationLogger.GenerateCorrelationId();
@@ -111,36 +118,69 @@ public sealed class MouseControlTool
                 return SerializeResult(result);
             }
 
+            // Translate monitor-relative coordinates to absolute screen coordinates
+            int? absoluteX = x, absoluteY = y, absoluteEndX = endX, absoluteEndY = endY;
+            var monitor = _monitorService.GetMonitor(monitorIndex);
+            if (monitor == null)
+            {
+                var result = MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.InvalidCoordinates,
+                    $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
+                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                return SerializeResult(result);
+            }
+
+            // Translate coordinates relative to monitor origin
+            if (x.HasValue)
+            {
+                absoluteX = monitor.X + x.Value;
+            }
+
+            if (y.HasValue)
+            {
+                absoluteY = monitor.Y + y.Value;
+            }
+
+            if (endX.HasValue)
+            {
+                absoluteEndX = monitor.X + endX.Value;
+            }
+
+            if (endY.HasValue)
+            {
+                absoluteEndY = monitor.Y + endY.Value;
+            }
+
             MouseControlResult operationResult;
 
             switch (mouseAction.Value)
             {
                 case MouseAction.Move:
-                    operationResult = await HandleMoveAsync(x, y, linkedToken);
+                    operationResult = await HandleMoveAsync(absoluteX, absoluteY, linkedToken);
                     break;
 
                 case MouseAction.Click:
-                    operationResult = await HandleClickAsync(x, y, modifiers, linkedToken);
+                    operationResult = await HandleClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
                     break;
 
                 case MouseAction.DoubleClick:
-                    operationResult = await HandleDoubleClickAsync(x, y, modifiers, linkedToken);
+                    operationResult = await HandleDoubleClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
                     break;
 
                 case MouseAction.RightClick:
-                    operationResult = await HandleRightClickAsync(x, y, modifiers, linkedToken);
+                    operationResult = await HandleRightClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
                     break;
 
                 case MouseAction.MiddleClick:
-                    operationResult = await HandleMiddleClickAsync(x, y, linkedToken);
+                    operationResult = await HandleMiddleClickAsync(absoluteX, absoluteY, linkedToken);
                     break;
 
                 case MouseAction.Drag:
-                    operationResult = await HandleDragAsync(x, y, endX, endY, button, linkedToken);
+                    operationResult = await HandleDragAsync(absoluteX, absoluteY, absoluteEndX, absoluteEndY, button, linkedToken);
                     break;
 
                 case MouseAction.Scroll:
-                    operationResult = await HandleScrollAsync(x, y, direction, amount, linkedToken);
+                    operationResult = await HandleScrollAsync(absoluteX, absoluteY, direction, amount, linkedToken);
                     break;
 
                 default:
