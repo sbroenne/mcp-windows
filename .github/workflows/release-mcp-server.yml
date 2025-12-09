@@ -1,0 +1,121 @@
+name: Release MCP Server
+
+# This workflow builds and releases the standalone Windows MCP Server
+# Triggered by pushing tags matching 'mcp-v*'
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+
+jobs:
+  release-mcp-server:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    - name: Extract Version
+      run: |
+        $tagName = "${{ github.ref_name }}"
+        $version = $tagName -replace '^mcp-v', ''
+        Write-Output "Version: $version"
+        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+
+    - name: Update Version in Project
+      run: |
+        $version = "${{ env.VERSION }}"
+        $csprojPath = "src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj"
+        $content = Get-Content $csprojPath -Raw
+        $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[\d\.]+\.[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[\d\.]+\.[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+        Set-Content $csprojPath $content
+        Write-Output "Updated project to version $version"
+      shell: pwsh
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Run Tests
+      run: dotnet test --filter "Category!=Integration" --no-restore
+
+    - name: Publish (Portable)
+      run: dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -o publish --no-self-contained
+
+    - name: Create Release Archive
+      run: |
+        $version = "${{ env.VERSION }}"
+
+        Compress-Archive -Path "publish/*" -DestinationPath "windows-mcp-server-$version.zip"
+
+        Write-Output "Created release archive"
+        Get-ChildItem *.zip | Format-Table Name, Length
+      shell: pwsh
+
+    - name: Create GitHub Release
+      run: |
+        $tagName = "${{ github.ref_name }}"
+        $version = "${{ env.VERSION }}"
+
+        $notes = @"
+        ## Windows MCP Server $tagName
+
+        MCP server for Windows automation - control mouse, keyboard, windows, and capture screenshots.
+
+        ### Download
+
+        | File | Description |
+        |------|-------------|
+        | windows-mcp-server-$version.zip | Cross-platform .NET 8, requires [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) |
+
+        ### Available Tools
+
+        | Tool | Description |
+        |------|-------------|
+        | mouse_control | Click, double-click, right-click, move, drag, scroll |
+        | keyboard_control | Type text, press keys, combinations, sequences |
+        | window_management | List, find, activate, minimize, maximize, move, resize windows |
+        | screenshot_control | Capture screens, monitors, windows, or regions |
+
+        ### Installation
+
+        1. Install [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+        2. Extract the zip to a folder
+        3. Run with ``dotnet Sbroenne.WindowsMcp.dll`` or add to your MCP client config
+
+        ### MCP Client Configuration
+
+        ```json
+        {
+          "mcpServers": {
+            "windows-mcp": {
+              "command": "dotnet",
+              "args": ["path/to/Sbroenne.WindowsMcp.dll"]
+            }
+          }
+        }
+        ```
+
+        See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
+        "@
+
+        $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
+
+        gh release create "$tagName" `
+          "windows-mcp-server-$version.zip" `
+          --title "Windows MCP Server $tagName" `
+          --notes-file release_notes.md
+
+        Write-Output "Released Windows MCP Server $version"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh

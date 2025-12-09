@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MCP Server Release Workflow",
+  "description": "GitHub Actions workflow trigger and output schema for MCP server releases",
+  "type": "object",
+  "properties": {
+    "trigger": {
+      "type": "object",
+      "description": "Workflow trigger configuration",
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "push"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^mcp-v.*$"
+          },
+          "minItems": 1,
+          "description": "Tag patterns that trigger the workflow"
+        }
+      },
+      "required": ["event", "tags"]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Workflow inputs derived from trigger",
+      "properties": {
+        "tag_name": {
+          "type": "string",
+          "pattern": "^mcp-v\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$",
+          "description": "Full tag name (e.g., mcp-v1.2.3)"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$",
+          "description": "Extracted version (e.g., 1.2.3)"
+        }
+      },
+      "required": ["tag_name", "version"]
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Workflow outputs",
+      "properties": {
+        "release_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the created GitHub release"
+        },
+        "artifact_name": {
+          "type": "string",
+          "pattern": "^windows-mcp-server-\\d+\\.\\d+\\.\\d+(-[\\w.]+)?\\.zip$",
+          "description": "Name of the release artifact"
+        },
+        "artifact_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Direct download URL for the artifact"
+        }
+      },
+      "required": ["release_url", "artifact_name"]
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of workflow steps",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "required": { "type": "boolean", "default": true }
+        },
+        "required": ["name"]
+      },
+      "contains": {
+        "properties": { "name": { "const": "Extract Version" } }
+      }
+    }
+  },
+  "required": ["trigger", "inputs", "outputs", "steps"],
+  "examples": [
+    {
+      "trigger": {
+        "event": "push",
+        "tags": ["mcp-v*"]
+      },
+      "inputs": {
+        "tag_name": "mcp-v1.2.3",
+        "version": "1.2.3"
+      },
+      "outputs": {
+        "release_url": "https://github.com/sbroenne/mcp-windows/releases/tag/mcp-v1.2.3",
+        "artifact_name": "windows-mcp-server-1.2.3.zip",
+        "artifact_url": "https://github.com/sbroenne/mcp-windows/releases/download/mcp-v1.2.3/windows-mcp-server-1.2.3.zip"
+      },
+      "steps": [
+        { "name": "Checkout" },
+        { "name": "Setup .NET" },
+        { "name": "Extract Version" },
+        { "name": "Update Version in Project" },
+        { "name": "Restore Dependencies" },
+        { "name": "Run Tests" },
+        { "name": "Publish (Portable)" },
+        { "name": "Create Release Archive" },
+        { "name": "Create GitHub Release" }
+      ]
+    }
+  ]
+}

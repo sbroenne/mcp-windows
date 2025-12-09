@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <!-- Simple Windows logo shape with MCP -->
-  
+
   <!-- Windows-style four-pane grid -->
   <rect x="12" y="12" width="46" height="46" rx="4" fill="#0078D4"/>
   <rect x="70" y="12" width="46" height="46" rx="4" fill="#0078D4"/>
   <rect x="12" y="70" width="46" height="46" rx="4" fill="#0078D4"/>
   <rect x="70" y="70" width="46" height="46" rx="4" fill="#0078D4"/>
-  
+
   <!-- MCP text centered -->
   <text x="64" y="78" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MCP</text>
 </svg>

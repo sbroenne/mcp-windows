@@ -16,9 +16,14 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>Sbroenne.WindowsMcp</RootNamespace>
     <AssemblyName>Sbroenne.WindowsMcp</AssemblyName>
-    <Description>MCP server for Windows mouse control operations</Description>
+    <Description>MCP server for Windows automation - mouse, keyboard, window management, and screenshots</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <!-- Version properties - updated by release workflow -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VS Code Extension Release Workflow",
+  "description": "GitHub Actions workflow trigger and output schema for VS Code extension releases",
+  "type": "object",
+  "properties": {
+    "trigger": {
+      "type": "object",
+      "description": "Workflow trigger configuration",
+      "properties": {
+        "event": {
+          "type": "string",
+          "const": "push"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^vscode-v.*$"
+          },
+          "minItems": 1,
+          "description": "Tag patterns that trigger the workflow"
+        }
+      },
+      "required": ["event", "tags"]
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Workflow inputs derived from trigger",
+      "properties": {
+        "tag_name": {
+          "type": "string",
+          "pattern": "^vscode-v\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$",
+          "description": "Full tag name (e.g., vscode-v1.2.3)"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^\\d+\\.\\d+\\.\\d+(-[\\w.]+)?$",
+          "description": "Extracted version (e.g., 1.2.3)"
+        }
+      },
+      "required": ["tag_name", "version"]
+    },
+    "outputs": {
+      "type": "object",
+      "description": "Workflow outputs",
+      "properties": {
+        "release_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to the created GitHub release"
+        },
+        "artifact_name": {
+          "type": "string",
+          "pattern": "^windows-mcp-\\d+\\.\\d+\\.\\d+(-[\\w.]+)?\\.vsix$",
+          "description": "Name of the VSIX artifact"
+        },
+        "artifact_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Direct download URL for the VSIX"
+        },
+        "marketplace_status": {
+          "type": "string",
+          "enum": ["success", "failed", "skipped"],
+          "description": "Status of Marketplace publishing"
+        },
+        "marketplace_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to extension on VS Code Marketplace (if published)"
+        }
+      },
+      "required": ["release_url", "artifact_name", "marketplace_status"]
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Required repository secrets",
+      "properties": {
+        "VSCE_TOKEN": {
+          "type": "string",
+          "description": "Azure DevOps PAT with Marketplace > Manage scope"
+        },
+        "GITHUB_TOKEN": {
+          "type": "string",
+          "description": "Auto-provided token with contents:write permission"
+        }
+      },
+      "required": ["VSCE_TOKEN", "GITHUB_TOKEN"]
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of workflow steps",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "required": { "type": "boolean", "default": true },
+          "continue_on_error": { "type": "boolean", "default": false }
+        },
+        "required": ["name"]
+      }
+    }
+  },
+  "required": ["trigger", "inputs", "outputs", "secrets", "steps"],
+  "examples": [
+    {
+      "trigger": {
+        "event": "push",
+        "tags": ["vscode-v*"]
+      },
+      "inputs": {
+        "tag_name": "vscode-v1.2.3",
+        "version": "1.2.3"
+      },
+      "outputs": {
+        "release_url": "https://github.com/sbroenne/mcp-windows/releases/tag/vscode-v1.2.3",
+        "artifact_name": "windows-mcp-1.2.3.vsix",
+        "artifact_url": "https://github.com/sbroenne/mcp-windows/releases/download/vscode-v1.2.3/windows-mcp-1.2.3.vsix",
+        "marketplace_status": "success",
+        "marketplace_url": "https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"
+      },
+      "secrets": {
+        "VSCE_TOKEN": "***",
+        "GITHUB_TOKEN": "***"
+      },
+      "steps": [
+        { "name": "Checkout" },
+        { "name": "Setup Node.js" },
+        { "name": "Setup .NET" },
+        { "name": "Update MCP Server Version" },
+        { "name": "Update Extension Version" },
+        { "name": "Install Dependencies" },
+        { "name": "Build and Package Extension" },
+        { "name": "Publish to VS Code Marketplace", "continue_on_error": true },
+        { "name": "Create GitHub Release" }
+      ]
+    }
+  ]
+}
