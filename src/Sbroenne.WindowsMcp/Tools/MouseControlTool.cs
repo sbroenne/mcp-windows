@@ -68,22 +68,22 @@ public sealed class MouseControlTool
     /// <param name="amount">Number of scroll clicks (default: 1).</param>
     /// <param name="modifiers">Modifier keys to hold during action: ctrl, shift, alt (comma-separated).</param>
     /// <param name="button">Mouse button for drag: left, right, or middle (default: left).</param>
-    /// <param name="monitorIndex">Optional monitor index (0-based). When provided, x/y coordinates become relative to that monitor's origin instead of absolute screen coordinates.</param>
+    /// <param name="monitorIndex">Monitor index (0-based, default: 0). All x/y coordinates are relative to this monitor's origin.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation as JSON.</returns>
     [McpServerTool(Name = "mouse_control")]
-    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: By default uses absolute screen coordinates. Use 'monitorIndex' parameter for easier multi-monitor targeting - when set, x/y become relative to that monitor (e.g., monitorIndex=1, x=100, y=50 clicks 100px from left edge of monitor 1).")]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: All x/y coordinates are relative to the specified monitor (default: monitor 0 = primary). Example: x=100, y=50 clicks 100px from left, 50px from top of the monitor. For secondary monitor, use monitorIndex=1.")]
     public async Task<string> ExecuteAsync(
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll")] string action,
-        [Description("Target x-coordinate (required for move, optional for clicks). When monitorIndex is set, this is relative to that monitor's left edge.")] int? x = null,
-        [Description("Target y-coordinate (required for move, optional for clicks). When monitorIndex is set, this is relative to that monitor's top edge.")] int? y = null,
-        [Description("End x-coordinate (required for drag action). When monitorIndex is set, this is relative to that monitor.")] int? endX = null,
-        [Description("End y-coordinate (required for drag action). When monitorIndex is set, this is relative to that monitor.")] int? endY = null,
+        [Description("X-coordinate relative to the monitor's left edge (required for move, optional for clicks).")] int? x = null,
+        [Description("Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).")] int? y = null,
+        [Description("End x-coordinate relative to the monitor (required for drag action).")] int? endX = null,
+        [Description("End y-coordinate relative to the monitor (required for drag action).")] int? endY = null,
         [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
         [Description("Number of scroll clicks (default: 1)")] int amount = 1,
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
         [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Optional monitor index (0-based). When provided, x/y/endX/endY become relative to that monitor's origin instead of absolute screen coordinates.")] int? monitorIndex = null,
+        [Description("Monitor index (0-based, default: 0 = primary monitor). All coordinates are relative to this monitor.")] int monitorIndex = 0,
         CancellationToken cancellationToken = default)
     {
         var correlationId = MouseOperationLogger.GenerateCorrelationId();
@@ -118,40 +118,37 @@ public sealed class MouseControlTool
                 return SerializeResult(result);
             }
 
-            // Translate monitor-relative coordinates to absolute screen coordinates if monitorIndex is provided
+            // Translate monitor-relative coordinates to absolute screen coordinates
             int? absoluteX = x, absoluteY = y, absoluteEndX = endX, absoluteEndY = endY;
-            if (monitorIndex.HasValue)
+            var monitor = _monitorService.GetMonitor(monitorIndex);
+            if (monitor == null)
             {
-                var monitor = _monitorService.GetMonitor(monitorIndex.Value);
-                if (monitor == null)
-                {
-                    var result = MouseControlResult.CreateFailure(
-                        MouseControlErrorCode.InvalidCoordinates,
-                        $"Invalid monitor index: {monitorIndex.Value}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
-                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                    return SerializeResult(result);
-                }
+                var result = MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.InvalidCoordinates,
+                    $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
+                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                return SerializeResult(result);
+            }
 
-                // Translate coordinates relative to monitor origin
-                if (x.HasValue)
-                {
-                    absoluteX = monitor.X + x.Value;
-                }
+            // Translate coordinates relative to monitor origin
+            if (x.HasValue)
+            {
+                absoluteX = monitor.X + x.Value;
+            }
 
-                if (y.HasValue)
-                {
-                    absoluteY = monitor.Y + y.Value;
-                }
+            if (y.HasValue)
+            {
+                absoluteY = monitor.Y + y.Value;
+            }
 
-                if (endX.HasValue)
-                {
-                    absoluteEndX = monitor.X + endX.Value;
-                }
+            if (endX.HasValue)
+            {
+                absoluteEndX = monitor.X + endX.Value;
+            }
 
-                if (endY.HasValue)
-                {
-                    absoluteEndY = monitor.Y + endY.Value;
-                }
+            if (endY.HasValue)
+            {
+                absoluteEndY = monitor.Y + endY.Value;
             }
 
             MouseControlResult operationResult;
