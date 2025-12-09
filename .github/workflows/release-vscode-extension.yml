@@ -60,9 +60,17 @@ jobs:
 
         Write-Output "Updating VS Code extension to version $version"
 
-        # Update package.json version
+        # Update package.json version - check if already set
         cd vscode-extension
-        npm version "$version" --no-git-tag-version
+        $packageJsonPath = 'package.json'
+        $packageJsonContent = Get-Content $packageJsonPath | ConvertFrom-Json
+        
+        if ($packageJsonContent.version -ne $version) {
+          npm version "$version" --no-git-tag-version
+          Write-Output "Updated package.json to version $version"
+        } else {
+          Write-Output "package.json version is already $version, skipping npm version"
+        }
 
         # Update CHANGELOG.md - replace the first version number and date
         $date = Get-Date -Format 'yyyy-MM-dd'
