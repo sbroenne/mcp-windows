@@ -31,7 +31,6 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Polly" />
-    <PackageReference Include="Serilog.Extensions.Hosting" />
     <PackageReference Include="System.Drawing.Common" />
   </ItemGroup>
 

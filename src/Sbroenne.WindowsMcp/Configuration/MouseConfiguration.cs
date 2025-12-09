@@ -8,7 +8,7 @@ public sealed class MouseConfiguration
     /// <summary>
     /// The environment variable name for configuring operation timeout.
     /// </summary>
-    public const string TimeoutEnvironmentVariable = "MCP_MOUSE_TIMEOUT_MS";
+    public const string TimeoutEnvironmentVariable = "MCP_WINDOWS_MOUSE_TIMEOUT_MS";
 
     /// <summary>
     /// The default operation timeout in milliseconds.

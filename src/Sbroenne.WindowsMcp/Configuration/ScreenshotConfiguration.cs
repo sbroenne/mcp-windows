@@ -8,12 +8,12 @@ public sealed class ScreenshotConfiguration
     /// <summary>
     /// Environment variable name for timeout configuration.
     /// </summary>
-    public const string TimeoutEnvVar = "MCP_SCREENSHOT_TIMEOUT_MS";
+    public const string TimeoutEnvVar = "MCP_WINDOWS_SCREENSHOT_TIMEOUT_MS";
 
     /// <summary>
     /// Environment variable name for maximum pixels configuration.
     /// </summary>
-    public const string MaxPixelsEnvVar = "MCP_SCREENSHOT_MAX_PIXELS";
+    public const string MaxPixelsEnvVar = "MCP_WINDOWS_SCREENSHOT_MAX_PIXELS";
 
     /// <summary>
     /// Default timeout in milliseconds.

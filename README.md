@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server providing Windows automation capabilities for LLM agents. Built on .NET 8 with native Windows API integration.
 
+> **🤖 Co-designed with Claude Sonnet 4.5 via GitHub Copilot** - This project was developed in collaboration with AI pair programming, leveraging Claude Opus 4.5's capabilities through GitHub Copilot to design, create & test a robust, production-ready Windows automation solution. 
+
 ## Features
 
 ### 🖱️ Mouse Control
@@ -43,6 +45,22 @@ A Model Context Protocol (MCP) server providing Windows automation capabilities 
 - **Multi-monitor aware** - supports extended desktop configurations
 - **DPI aware** - correct pixel dimensions on high-DPI displays
 
+## Why Choose Windows MCP?
+
+**Comprehensive Windows Automation** - Unlike generic computer control tools, Windows MCP is purpose-built for Windows with native API integration. It handles Windows-specific challenges (UIPI elevation blocks, secure desktop restrictions, virtual desktops) that generic solutions miss.
+
+**Multi-Monitor & DPI-Aware** - Correctly handles multi-monitor setups, DPI scaling, and virtual desktops—critical for modern Windows environments. Most alternatives struggle with coordinate translation and DPI awareness.
+
+**Full Windows API Coverage** - Direct P/Invoke to Windows APIs (SendInput, SetWindowPos, GetWindowText, GdiPlus) provides reliable, low-level control. No browser automation tricks or approximate solutions.
+
+**Security-Conscious Design** - Detects and gracefully handles elevated windows (UIPI), UAC prompts, and lock screens. Respects Windows security model instead of bypassing it.
+
+**Performance** - Synchronous I/O on dedicated thread pool prevents blocking the LLM. Configurable delays for stability without sacrificing speed.
+
+**Active Development** - Release workflows, comprehensive testing, VS Code extension, and clear contribution guidelines show this is a maintained project, not abandoned.
+
+### Key Advantages of Windows MCP
+
 ## Prerequisites
 
 - Windows 10/11
@@ -51,41 +69,48 @@ A Model Context Protocol (MCP) server providing Windows automation capabilities 
 
 ## Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/your-org/mcp-windows.git
-cd mcp-windows
+### Option 1: VS Code Extension (Recommended)
 
-# Build the project
-dotnet build
+Install the Windows MCP extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp) for one-click deployment:
 
-# Run tests
-dotnet test
-```
+1. Open VS Code
+2. Go to Extensions (Ctrl+Shift+X)
+3. Search for "Windows MCP"
+4. Click Install
+
+The extension automatically configures the MCP server and makes it available to GitHub Copilot.
+
+### Option 2: Download from Releases
+
+Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases):
+
+1. Download the latest `mcp-windows-v*.zip`
+2. Extract to your preferred location
+3. Add to your MCP client configuration (see [MCP Configuration](#mcp-configuration))
 
 ## Usage
 
-### Running the Server
+### VS Code Extension
 
-```bash
-dotnet run --project src/Sbroenne.WindowsMcp
-```
+If you installed via the VS Code extension, the MCP server is automatically configured. No manual setup required.
 
-### MCP Configuration
+### Manual Configuration (For Downloaded Releases)
 
-Add to your MCP client configuration:
+If you downloaded from the releases page, add to your MCP client configuration:
 
 ```json
 {
   "servers": {
     "windows": {
       "command": "dotnet",
-      "args": ["run", "--project", "path/to/src/Sbroenne.WindowsMcp"],
+      "args": ["path/to/extracted/Sbroenne.WindowsMcp.dll"],
       "env": {}
     }
   }
 }
 ```
+
+> **Note:** Releases are framework-dependent and require [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) to be installed.
 
 ## Tools
 
@@ -161,111 +186,6 @@ Capture screenshots on Windows.
 |-----------|------|---------|-------------|
 | `include_cursor` | boolean | `false` | Include mouse cursor in capture |
 
-## Examples
-
-### Mouse Control
-
-```json
-// Click at coordinates
-{ "action": "click", "x": 100, "y": 200 }
-
-// Ctrl+click
-{ "action": "click", "x": 100, "y": 200, "modifiers": ["ctrl"] }
-
-// Scroll down
-{ "action": "scroll", "x": 500, "y": 300, "direction": "down", "amount": 3 }
-```
-
-### Keyboard Control
-
-```json
-// Type text (layout-independent)
-{ "action": "type", "text": "Hello, World! 🚀" }
-
-// Press Enter
-{ "action": "press", "key": "enter" }
-
-// Save file (Ctrl+S)
-{ "action": "press", "key": "s", "modifiers": ["ctrl"] }
-
-// Open Command Palette (Ctrl+Shift+P)
-{ "action": "combo", "key": "p", "modifiers": ["ctrl", "shift"] }
-
-// Lock workstation (Win+L)
-{ "action": "combo", "key": "l", "modifiers": ["win"] }
-
-// Play/Pause media
-{ "action": "press", "key": "mediaplaypause" }
-```
-
-### Window Management
-
-```json
-// List all windows
-{ "action": "list" }
-
-// List with filter
-{ "action": "list", "filter": "Chrome" }
-
-// Find windows by title (substring match)
-{ "action": "find", "title": "Notepad" }
-
-// Find windows by regex
-{ "action": "find", "title": ".*Visual Studio.*", "regex": true }
-
-// Activate a window (bring to foreground)
-{ "action": "activate", "handle": "12345678" }
-
-// Get current foreground window
-{ "action": "get_foreground" }
-
-// Minimize a window
-{ "action": "minimize", "handle": "12345678" }
-
-// Maximize a window
-{ "action": "maximize", "handle": "12345678" }
-
-// Restore from minimized/maximized
-{ "action": "restore", "handle": "12345678" }
-
-// Close a window
-{ "action": "close", "handle": "12345678" }
-
-// Move window to position
-{ "action": "move", "handle": "12345678", "x": 100, "y": 100 }
-
-// Resize window
-{ "action": "resize", "handle": "12345678", "width": 800, "height": 600 }
-
-// Move and resize atomically
-{ "action": "set_bounds", "handle": "12345678", "x": 100, "y": 100, "width": 800, "height": 600 }
-
-// Wait for window to appear (with timeout)
-{ "action": "wait_for", "title": "Notepad", "timeout_ms": 10000 }
-```
-
-### Screenshot Control
-
-```json
-// Capture primary screen
-{ "action": "capture", "target": "primary_screen" }
-
-// List all monitors
-{ "action": "list_monitors" }
-
-// Capture specific monitor by index
-{ "action": "capture", "target": "monitor", "monitor_index": 1 }
-
-// Capture window by handle
-{ "action": "capture", "target": "window", "window_handle": 131844 }
-
-// Capture screen region
-{ "action": "capture", "target": "region", "x": 100, "y": 100, "width": 800, "height": 600 }
-
-// Capture with mouse cursor included
-{ "action": "capture", "target": "primary_screen", "include_cursor": true }
-```
-
 ## Supported Keys
 
 ### Function Keys
@@ -314,18 +234,18 @@ The server handles common Windows security scenarios:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `KEYBOARD_CHUNK_DELAY_MS` | `10` | Delay between text chunks |
-| `KEYBOARD_KEY_DELAY_MS` | `10` | Delay between key presses |
-| `KEYBOARD_SEQUENCE_DELAY_MS` | `50` | Delay between sequence keys |
-| `MOUSE_MOVE_DELAY_MS` | `10` | Delay after mouse move |
-| `MOUSE_CLICK_DELAY_MS` | `50` | Delay after mouse click |
-| `MCP_WINDOW_TIMEOUT_MS` | `5000` | Default window operation timeout |
-| `MCP_WINDOW_WAITFOR_TIMEOUT_MS` | `30000` | Default wait_for timeout |
-| `MCP_WINDOW_PROPERTY_TIMEOUT_MS` | `100` | Timeout for querying window properties |
-| `MCP_WINDOW_POLLING_INTERVAL_MS` | `250` | Polling interval for wait_for |
-| `MCP_WINDOW_ACTIVATION_MAX_RETRIES` | `3` | Max retries for window activation |
-| `MCP_SCREENSHOT_TIMEOUT_MS` | `5000` | Screenshot operation timeout |
-| `MCP_SCREENSHOT_MAX_PIXELS` | `33177600` | Maximum capture size (default 8K) |
+| `MCP_WINDOWS_KEYBOARD_CHUNK_DELAY_MS` | `10` | Delay between text chunks |
+| `MCP_WINDOWS_KEYBOARD_KEY_DELAY_MS` | `10` | Delay between key presses |
+| `MCP_WINDOWS_KEYBOARD_SEQUENCE_DELAY_MS` | `50` | Delay between sequence keys |
+| `MCP_WINDOWS_MOUSE_MOVE_DELAY_MS` | `10` | Delay after mouse move |
+| `MCP_WINDOWS_MOUSE_CLICK_DELAY_MS` | `50` | Delay after mouse click |
+| `MCP_WINDOWS_WINDOW_TIMEOUT_MS` | `5000` | Default window operation timeout |
+| `MCP_WINDOWS_WINDOW_WAITFOR_TIMEOUT_MS` | `30000` | Default wait_for timeout |
+| `MCP_WINDOWS_WINDOW_PROPERTY_TIMEOUT_MS` | `100` | Timeout for querying window properties |
+| `MCP_WINDOWS_WINDOW_POLLING_INTERVAL_MS` | `250` | Polling interval for wait_for |
+| `MCP_WINDOWS_WINDOW_ACTIVATION_MAX_RETRIES` | `3` | Max retries for window activation |
+| `MCP_WINDOWS_SCREENSHOT_TIMEOUT_MS` | `5000` | Screenshot operation timeout |
+| `MCP_WINDOWS_SCREENSHOT_MAX_PIXELS` | `33177600` | Maximum capture size (default 8K) |
 
 ## Testing
 
@@ -340,58 +260,6 @@ dotnet test --filter "FullyQualifiedName~Unit"
 dotnet test --filter "FullyQualifiedName~Integration"
 ```
 
-## Architecture
-
-```
-src/Sbroenne.WindowsMcp/
-├── Automation/             # Desktop automation helpers
-│   ├── ElevationDetector.cs
-│   └── SecureDesktopDetector.cs
-├── Capture/                # Screenshot capture services
-│   ├── IMonitorService.cs
-│   ├── IScreenshotService.cs
-│   ├── MonitorService.cs
-│   └── ScreenshotService.cs
-├── Configuration/          # Environment-based configuration
-│   ├── MouseConfiguration.cs
-│   ├── KeyboardConfiguration.cs
-│   ├── WindowConfiguration.cs
-│   └── ScreenshotConfiguration.cs
-├── Input/                  # Input service implementations
-│   ├── MouseInputService.cs
-│   ├── KeyboardInputService.cs
-│   └── ModifierKeyManager.cs
-├── Logging/                # Structured logging helpers
-│   ├── MouseOperationLogger.cs
-│   ├── KeyboardOperationLogger.cs
-│   ├── WindowOperationLogger.cs
-│   └── ScreenshotOperationLogger.cs
-├── Models/                 # Request/response models
-│   ├── MouseControlRequest.cs
-│   ├── KeyboardControlRequest.cs
-│   ├── WindowManagementRequest.cs
-│   ├── ScreenshotControlRequest.cs
-│   └── ...
-├── Native/                 # Windows API interop
-│   ├── NativeMethods.cs
-│   ├── NativeConstants.cs
-│   ├── NativeStructs.cs
-│   └── IVirtualDesktopManager.cs
-├── Tools/                  # MCP tool implementations
-│   ├── MouseControlTool.cs
-│   ├── KeyboardControlTool.cs
-│   ├── WindowManagementTool.cs
-│   └── ScreenshotControlTool.cs
-├── Window/                 # Window management services
-│   ├── IWindowService.cs
-│   ├── WindowService.cs
-│   ├── IWindowEnumerator.cs
-│   ├── WindowEnumerator.cs
-│   ├── IWindowActivator.cs
-│   └── WindowActivator.cs
-└── Program.cs              # Server entry point
-```
-
 ## Security Considerations
 
 - **UIPI**: Windows User Interface Privilege Isolation blocks input to elevated windows from non-elevated processes
@@ -400,8 +268,17 @@ src/Sbroenne.WindowsMcp/
 
 ## License
 
-[Add your license here]
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Contributing
 
-[Add contribution guidelines here]
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
+- Setting up the development environment
+- Branch naming and commit conventions
+- Testing requirements
+- Pull request process
+- Code style standards
+- Release procedures
+
+Start with [Getting Started](CONTRIBUTING.md#getting-started) if you're new to the project.

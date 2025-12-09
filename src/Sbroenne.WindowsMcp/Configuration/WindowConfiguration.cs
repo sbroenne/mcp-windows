@@ -8,17 +8,17 @@ public sealed record WindowConfiguration
     /// <summary>
     /// The environment variable name for configuring default operation timeout.
     /// </summary>
-    public const string TimeoutEnvironmentVariable = "MCP_WINDOW_TIMEOUT_MS";
+    public const string TimeoutEnvironmentVariable = "MCP_WINDOWS_WINDOW_TIMEOUT_MS";
 
     /// <summary>
     /// The environment variable name for configuring wait_for timeout.
     /// </summary>
-    public const string WaitForTimeoutEnvironmentVariable = "MCP_WINDOW_WAITFOR_TIMEOUT_MS";
+    public const string WaitForTimeoutEnvironmentVariable = "MCP_WINDOWS_WINDOW_WAITFOR_TIMEOUT_MS";
 
     /// <summary>
     /// The environment variable name for configuring property query timeout.
     /// </summary>
-    public const string PropertyQueryTimeoutEnvironmentVariable = "MCP_WINDOW_PROPERTY_TIMEOUT_MS";
+    public const string PropertyQueryTimeoutEnvironmentVariable = "MCP_WINDOWS_WINDOW_PROPERTY_TIMEOUT_MS";
 
     /// <summary>
     /// The default operation timeout in milliseconds.
