@@ -66,11 +66,11 @@ public sealed class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation as JSON.</returns>
     [McpServerTool(Name = "mouse_control")]
-    [Description("Control the mouse cursor on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions.")]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: Use ABSOLUTE SCREEN coordinates (not window-relative). For multi-monitor setups, use window_management to get window bounds first. Example: if window is at bounds.x=2560, bounds.y=100 and you want to click 200px from left edge and 50px from top, use x=2760, y=150 (2560+200, 100+50).")]
     public async Task<string> ExecuteAsync(
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll")] string action,
-        [Description("Target x-coordinate (required for move, optional for clicks to move before clicking)")] int? x = null,
-        [Description("Target y-coordinate (required for move, optional for clicks to move before clicking)")] int? y = null,
+        [Description("Target x-coordinate (required for move, optional for clicks to move before clicking). Can be negative for multi-monitor setups.")] int? x = null,
+        [Description("Target y-coordinate (required for move, optional for clicks to move before clicking). Can be negative for multi-monitor setups.")] int? y = null,
         [Description("End x-coordinate (required for drag action)")] int? endX = null,
         [Description("End y-coordinate (required for drag action)")] int? endY = null,
         [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,

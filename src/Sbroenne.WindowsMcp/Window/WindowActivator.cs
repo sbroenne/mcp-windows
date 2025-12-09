@@ -39,11 +39,22 @@ public sealed class WindowActivator : IWindowActivator
             return false;
         }
 
+        // Save current window bounds before any operations that might change position
+        // This is critical for multi-monitor setups where SW_RESTORE can move windows
+        RECT savedBounds = default;
+        bool hasSavedBounds = NativeMethods.GetWindowRect(handle, out savedBounds);
+
         // If window is minimized, restore it first
         if (NativeMethods.IsIconic(handle))
         {
             NativeMethods.ShowWindow(handle, NativeConstants.SW_RESTORE);
             await Task.Delay(50, cancellationToken);
+
+            // Restore saved bounds since SW_RESTORE may have moved the window
+            if (hasSavedBounds)
+            {
+                RestoreWindowBounds(handle, savedBounds);
+            }
         }
 
         // Strategy 1: Simple SetForegroundWindow
@@ -76,7 +87,7 @@ public sealed class WindowActivator : IWindowActivator
         }
 
         // Strategy 5: Minimize and restore
-        if (await TryWithMinimizeRestoreAsync(handle, cancellationToken))
+        if (await TryWithMinimizeRestoreAsync(handle, savedBounds, hasSavedBounds, cancellationToken))
         {
             return true;
         }
@@ -198,34 +209,42 @@ public sealed class WindowActivator : IWindowActivator
     /// <summary>
     /// Strategy 5: Minimize then restore the window.
     /// </summary>
-    private async Task<bool> TryWithMinimizeRestoreAsync(nint handle, CancellationToken cancellationToken)
+    private async Task<bool> TryWithMinimizeRestoreAsync(
+        nint handle,
+        RECT savedBounds,
+        bool hasSavedBounds,
+        CancellationToken cancellationToken)
     {
         // This is a last-resort strategy that briefly minimizes the window
-        // Save the current window bounds before minimizing to restore them later
-        // (Windows may not restore the window to its original position)
-        RECT originalBounds = default;
-        bool hasBounds = NativeMethods.GetWindowRect(handle, out originalBounds);
-
         NativeMethods.ShowWindow(handle, NativeConstants.SW_MINIMIZE);
         await Task.Delay(50, cancellationToken);
         NativeMethods.ShowWindow(handle, NativeConstants.SW_RESTORE);
         await Task.Delay(50, cancellationToken);
 
         // Restore the original bounds if we saved them
-        if (hasBounds)
+        // This is critical for multi-monitor setups
+        if (hasSavedBounds)
         {
-            int width = originalBounds.Right - originalBounds.Left;
-            int height = originalBounds.Bottom - originalBounds.Top;
-            NativeMethods.SetWindowPos(
-                handle,
-                IntPtr.Zero,
-                originalBounds.Left,
-                originalBounds.Top,
-                width,
-                height,
-                NativeConstants.SWP_NOZORDER | NativeConstants.SWP_NOACTIVATE);
+            RestoreWindowBounds(handle, savedBounds);
         }
 
         return NativeMethods.SetForegroundWindow(handle) && IsForegroundWindow(handle);
+    }
+
+    /// <summary>
+    /// Restores window to saved bounds without changing Z-order.
+    /// </summary>
+    private static void RestoreWindowBounds(nint handle, RECT bounds)
+    {
+        int width = bounds.Right - bounds.Left;
+        int height = bounds.Bottom - bounds.Top;
+        NativeMethods.SetWindowPos(
+            handle,
+            IntPtr.Zero,
+            bounds.Left,
+            bounds.Top,
+            width,
+            height,
+            NativeConstants.SWP_NOZORDER | NativeConstants.SWP_NOACTIVATE);
     }
 }
