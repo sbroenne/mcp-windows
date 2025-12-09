@@ -1,17 +1,17 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.2.0 → 2.3.0
+Version change: 2.3.0 → 2.4.0
 Modified principles:
-  - XIV. xUnit Testing Best Practices (added secondary monitor requirement for integration tests)
+  - IV. Windows 11 Target Platform (changed to architecture-independent builds)
 Added sections: None
 Removed sections: None
-Technology Stack changes: None
-Templates requiring updates: ✅ No updates required
+Technology Stack changes: Removed RuntimeIdentifiers row (now portable)
+Templates requiring updates: ✅ No updates required (plan-template and tasks-template are structure-agnostic)
 Follow-up TODOs: None
-Rationale: Integration tests that interact with the Windows desktop (mouse, keyboard, screenshots)
-           MUST use the secondary monitor when available to avoid interference with active VS Code
-           session and developer workflow on the primary monitor.
+Rationale: MINOR version bump - builds MUST be architecture-independent (portable) to simplify
+           distribution. Users run via `dotnet` command which handles architecture automatically.
+           This eliminates the need for multiple architecture-specific release artifacts.
 -->
 
 # mcp-windows Constitution
@@ -51,6 +51,8 @@ Rationale: Integration tests that interact with the Windows desktop (mouse, keyb
 ### IV. Windows 11 Target Platform
 
 - Windows 11 is the sole supported platform—no compatibility shims for older versions
+- **Builds MUST be architecture-independent (portable)**: Published as framework-dependent assemblies that run on any Windows architecture via the `dotnet` runtime
+- Users MUST have .NET 8.0 runtime installed; the runtime handles x64/ARM64 automatically
 - **.NET APIs MUST be preferred over COM** where equivalent functionality exists
 - COM interop permitted only when no .NET equivalent exists (e.g., `IVirtualDesktopManager`)
 
@@ -214,6 +216,7 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 |-----------|-------------|
 | Language | C# 12+ (latest stable) |
 | Runtime | .NET 8.0 (or latest LTS) |
+| Build Mode | Framework-dependent (portable), no RuntimeIdentifier |
 | Test Framework | xUnit 2.6+ with native assertions, Bogus, NSubstitute |
 | Logging | Microsoft.Extensions.Logging (built-in console provider) |
 | Resilience | Polly |
@@ -261,4 +264,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.3.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-08
+**Version**: 2.4.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-09

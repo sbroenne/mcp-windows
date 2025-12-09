@@ -46,7 +46,7 @@ A Model Context Protocol (MCP) server providing Windows automation capabilities 
 ## Prerequisites
 
 - Windows 10/11
-- .NET 8.0 SDK or later
+- .NET 8.0 Runtime or later
 - Visual Studio 2022 or VS Code with C# extension
 
 ## Installation
