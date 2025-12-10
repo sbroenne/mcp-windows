@@ -3,6 +3,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
@@ -244,10 +245,17 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
 
 /// <summary>
 /// Test fixture for window management tests.
+/// Creates a dedicated test harness window on the secondary monitor to avoid
+/// interfering with the user's active work.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public class WindowTestFixture : IDisposable
+public class WindowTestFixture : IAsyncLifetime, IDisposable
 {
+    private Thread? _uiThread;
+    private TestHarnessForm? _form;
+    private readonly ManualResetEventSlim _formReady = new(false);
+    private readonly ManualResetEventSlim _formClosed = new(false);
+
     /// <summary>
     /// Gets the window service instance for testing.
     /// </summary>
@@ -262,6 +270,26 @@ public class WindowTestFixture : IDisposable
     /// Gets the window activator instance for testing.
     /// </summary>
     public IWindowActivator WindowActivator { get; }
+
+    /// <summary>
+    /// Gets the handle of the test window.
+    /// </summary>
+    public nint TestWindowHandle { get; private set; }
+
+    /// <summary>
+    /// Gets the bounds of the test window.
+    /// </summary>
+    public Rectangle TestWindowBounds { get; private set; }
+
+    /// <summary>
+    /// Gets the test harness form (if available).
+    /// </summary>
+    public TestHarnessForm? Form => _form;
+
+    /// <summary>
+    /// Unique identifier for the test window title to avoid conflicts.
+    /// </summary>
+    public static string TestWindowTitle => "MCP Windows Test Harness";
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowTestFixture"/> class.
@@ -283,20 +311,169 @@ public class WindowTestFixture : IDisposable
             configuration);
     }
 
+    /// <inheritdoc />
+    public async Task InitializeAsync()
+    {
+        // Create UI thread for the test harness
+        _uiThread = new Thread(RunMessageLoop)
+        {
+            Name = "WindowTestFixtureUIThread",
+            IsBackground = true,
+        };
+        _uiThread.SetApartmentState(ApartmentState.STA);
+        _uiThread.Start();
+
+        // Wait for the form to be ready
+        var ready = await Task.Run(() => _formReady.Wait(TimeSpan.FromSeconds(10)));
+        if (!ready || _form == null)
+        {
+            throw new TimeoutException("Test harness window did not appear within timeout");
+        }
+
+        // Get window handle and bounds on UI thread
+        _form.Invoke(() =>
+        {
+            TestWindowHandle = _form.Handle;
+            TestWindowBounds = new Rectangle(
+                _form.Location.X,
+                _form.Location.Y,
+                _form.Width,
+                _form.Height);
+        });
+
+        // Give the window time to settle
+        await Task.Delay(100);
+    }
+
+    private void RunMessageLoop()
+    {
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+
+        _form = new TestHarnessForm();
+
+        // Position on secondary monitor if available
+        var testScreen = TestMonitorHelper.GetPreferredTestMonitor();
+        _form.PositionOnMonitor(testScreen);
+
+        _form.Load += (s, e) =>
+        {
+            _form.Activate();
+            _formReady.Set();
+        };
+
+        _form.FormClosed += (s, e) =>
+        {
+            _formClosed.Set();
+        };
+
+        Application.Run(_form);
+    }
+
+    /// <inheritdoc />
+    public Task DisposeAsync()
+    {
+        if (_form != null && !_form.IsDisposed)
+        {
+            try
+            {
+                _form.Invoke(() => _form.Close());
+                _formClosed.Wait(TimeSpan.FromSeconds(5));
+            }
+            catch
+            {
+                // Ignore errors during cleanup
+            }
+        }
+
+        _formReady.Dispose();
+        _formClosed.Dispose();
+
+        return Task.CompletedTask;
+    }
+
     /// <summary>
     /// Disposes resources.
     /// </summary>
     public void Dispose()
     {
-        // No resources to dispose for now
+        DisposeAsync().GetAwaiter().GetResult();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Gets coordinates within the test window at the specified offset from top-left.
+    /// </summary>
+    /// <param name="offsetX">X offset from window left edge (default: 50).</param>
+    /// <param name="offsetY">Y offset from window top edge (default: 50).</param>
+    /// <returns>Absolute screen coordinates within the test window.</returns>
+    public (int X, int Y) GetTestWindowCoordinates(int offsetX = 50, int offsetY = 50)
+    {
+        // Ensure we're within window bounds
+        var safeOffsetX = Math.Min(offsetX, TestWindowBounds.Width - 10);
+        var safeOffsetY = Math.Min(offsetY, TestWindowBounds.Height - 10);
+
+        return (TestWindowBounds.X + safeOffsetX, TestWindowBounds.Y + safeOffsetY);
+    }
+
+    /// <summary>
+    /// Gets coordinates at the center of the test window.
+    /// </summary>
+    /// <returns>Absolute screen coordinates at the center of the test window.</returns>
+    public (int X, int Y) GetTestWindowCenter()
+    {
+        return (
+            TestWindowBounds.X + TestWindowBounds.Width / 2,
+            TestWindowBounds.Y + TestWindowBounds.Height / 2
+        );
+    }
+
+    /// <summary>
+    /// Ensures the test window is in the foreground before a test operation.
+    /// </summary>
+    public void EnsureTestWindowForeground()
+    {
+        if (_form != null && !_form.IsDisposed)
+        {
+            _form.Invoke(() =>
+            {
+                _form.Activate();
+                _form.BringToFront();
+            });
+        }
+    }
+
+    /// <summary>
+    /// Resets the test harness state (clears event log, counters, etc.).
+    /// </summary>
+    public void Reset()
+    {
+        if (_form != null && !_form.IsDisposed)
+        {
+            _form.Invoke(() => _form.Reset());
+        }
+    }
+
+    /// <summary>
+    /// Gets a value from the test harness form on the UI thread.
+    /// </summary>
+    public T GetValue<T>(Func<TestHarnessForm, T> getter)
+    {
+        if (_form == null || _form.IsDisposed)
+        {
+            throw new InvalidOperationException("Test harness form is not available");
+        }
+
+        return (T)_form.Invoke(() => getter(_form));
     }
 }
 
 /// <summary>
 /// Collection definition for window management tests to ensure sequential execution.
+/// Parallelization is disabled because all tests share the same test harness window.
 /// </summary>
-[CollectionDefinition("WindowManagement")]
+[CollectionDefinition("WindowManagement", DisableParallelization = true)]
 public class WindowManagementTests : ICollectionFixture<WindowTestFixture>
 {
     // This class has no code, and is never created. Its purpose is simply

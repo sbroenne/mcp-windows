@@ -6,12 +6,14 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for window move and resize operations.
+/// Uses the dedicated test harness window to avoid interfering with user's active work.
 /// </summary>
 [Collection("WindowManagement")]
 [SupportedOSPlatform("windows")]
 public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
 {
     private readonly IWindowService _windowService;
+    private readonly WindowTestFixture _fixture;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowMoveResizeTests"/> class.
@@ -20,137 +22,92 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     public WindowMoveResizeTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
+        _fixture = fixture;
         _windowService = fixture.WindowService;
     }
 
     [Fact]
     public async Task MoveWindow_RepositionsWindow()
     {
-        // Arrange - Get a window that is not minimized and not elevated
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+        var originalBounds = _fixture.TestWindowBounds;
 
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Normal && !w.IsElevated && w.Bounds is not null);
-
-        if (targetWindow is null)
-        {
-            // No suitable window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
-
-        // Store original position for cleanup
-        var originalX = targetWindow.Bounds!.X;
-        var originalY = targetWindow.Bounds!.Y;
-
-        // Act - Move to a new position on secondary monitor if available
-        var (newX, newY) = TestMonitorHelper.GetTestCoordinates(150, 150);
+        // Act - Move to a new position (stay on the same monitor)
+        int newX = originalBounds.X + 50;
+        int newY = originalBounds.Y + 50;
         var result = await _windowService.MoveWindowAsync(handle, newX, newY);
 
-        // Assert - operation completes (actual position may vary due to DPI, window restrictions, etc.)
+        // Assert - operation completes
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.NotNull(result.Window.Bounds);
-            // Just verify we got valid bounds back - exact position may vary
-            Assert.True(result.Window.Bounds.Width > 0);
-            Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Success, $"Move failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.NotNull(result.Window.Bounds);
+        Assert.True(result.Window.Bounds.Width > 0);
+        Assert.True(result.Window.Bounds.Height > 0);
 
-            // Clean up - move back
-            await _windowService.MoveWindowAsync(handle, originalX, originalY);
-        }
+        // Clean up - move back to original position
+        await _windowService.MoveWindowAsync(handle, originalBounds.X, originalBounds.Y);
     }
 
     [Fact]
     public async Task ResizeWindow_ChangesWindowDimensions()
     {
-        // Arrange - Get a window that is not minimized and not elevated
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
-
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Normal && !w.IsElevated && w.Bounds is not null);
-
-        if (targetWindow is null)
-        {
-            // No suitable window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
-
-        // Store original size for cleanup
-        var originalWidth = targetWindow.Bounds!.Width;
-        var originalHeight = targetWindow.Bounds!.Height;
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+        var originalBounds = _fixture.TestWindowBounds;
 
         // Act - Resize to new dimensions
-        int newWidth = 800;
-        int newHeight = 600;
+        int newWidth = 700;
+        int newHeight = 500;
         var result = await _windowService.ResizeWindowAsync(handle, newWidth, newHeight);
 
-        // Assert - operation completes (actual size may vary due to window constraints)
+        // Assert - operation completes
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.NotNull(result.Window.Bounds);
-            // Just verify we got valid bounds back - exact size may vary
-            Assert.True(result.Window.Bounds.Width > 0);
-            Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Success, $"Resize failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.NotNull(result.Window.Bounds);
+        Assert.True(result.Window.Bounds.Width > 0);
+        Assert.True(result.Window.Bounds.Height > 0);
 
-            // Clean up - restore original size
-            await _windowService.ResizeWindowAsync(handle, originalWidth, originalHeight);
-        }
+        // Clean up - restore original size
+        await _windowService.ResizeWindowAsync(handle, originalBounds.Width, originalBounds.Height);
     }
 
     [Fact]
     public async Task SetBoundsWindow_ChangesPositionAndSizeAtomically()
     {
-        // Arrange - Get a window that is not minimized and not elevated
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+        var originalBounds = _fixture.TestWindowBounds;
 
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Normal && !w.IsElevated && w.Bounds is not null);
-
-        if (targetWindow is null)
+        // Act - Set new bounds (stay on the same monitor)
+        var newBounds = new WindowBounds
         {
-            // No suitable window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
-
-        // Store original bounds for cleanup
-        var original = targetWindow.Bounds!;
-
-        // Act - Set new bounds on secondary monitor if available
-        var (newX, newY) = TestMonitorHelper.GetTestCoordinates(200, 200);
-        var newBounds = new WindowBounds { X = newX, Y = newY, Width = 1024, Height = 768 };
+            X = originalBounds.X + 30,
+            Y = originalBounds.Y + 30,
+            Width = 750,
+            Height = 550
+        };
         var result = await _windowService.SetBoundsAsync(handle, newBounds);
 
-        // Assert - operation completes (actual bounds may vary due to window constraints)
+        // Assert - operation completes
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.NotNull(result.Window.Bounds);
-            // Just verify we got valid bounds back
-            Assert.True(result.Window.Bounds.Width > 0);
-            Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Success, $"SetBounds failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.NotNull(result.Window.Bounds);
+        Assert.True(result.Window.Bounds.Width > 0);
+        Assert.True(result.Window.Bounds.Height > 0);
 
-            // Clean up - restore original bounds
-            await _windowService.SetBoundsAsync(handle, original);
-        }
+        // Clean up - restore original bounds
+        var restoreBounds = new WindowBounds
+        {
+            X = originalBounds.X,
+            Y = originalBounds.Y,
+            Width = originalBounds.Width,
+            Height = originalBounds.Height
+        };
+        await _windowService.SetBoundsAsync(handle, restoreBounds);
     }
 
     [Fact]
@@ -246,51 +203,37 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task MoveWindow_MaximizedWindow_CompletesWithoutError()
     {
-        // Arrange - Get a maximized window
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window and maximize it
+        nint handle = _fixture.TestWindowHandle;
+        var originalBounds = _fixture.TestWindowBounds;
 
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Maximized && !w.IsElevated);
+        var maximizeResult = await _windowService.MaximizeWindowAsync(handle);
+        Assert.True(maximizeResult.Success, $"Setup maximize failed: {maximizeResult.Error}");
+        await Task.Delay(100); // Give window time to maximize
 
-        if (targetWindow is null)
-        {
-            // No maximized window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
-
-        // Act - Try to move a maximized window to test monitor coordinates
+        // Act - Try to move a maximized window
         var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var result = await _windowService.MoveWindowAsync(handle, x, y);
 
         // Assert - operation completes (behavior may vary - may succeed, fail, or restore first)
         Assert.NotNull(result);
         // We just verify the operation doesn't throw and returns a valid result
+
+        // Clean up - restore window to original position
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+        await _windowService.MoveWindowAsync(handle, originalBounds.X, originalBounds.Y);
     }
 
     [Fact]
     public async Task ResizeWindow_MinimizedWindow_FailsOrRestores()
     {
-        // Arrange - Find a minimized window
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window and minimize it
+        nint handle = _fixture.TestWindowHandle;
 
-        var minimizedWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Minimized && !w.IsElevated);
-
-        if (minimizedWindow is null)
-        {
-            // No minimized window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(minimizedWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        var minimizeResult = await _windowService.MinimizeWindowAsync(handle);
+        Assert.True(minimizeResult.Success, $"Setup minimize failed: {minimizeResult.Error}");
+        await Task.Delay(100); // Give window time to minimize
 
         // Act - Try to resize a minimized window
         var result = await _windowService.ResizeWindowAsync(handle, 800, 600);
@@ -298,5 +241,9 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         // Assert - operation completes (may fail or restore first)
         Assert.NotNull(result);
         // The behavior may vary - either fails or restores and resizes
+
+        // Clean up - restore the window
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
     }
 }

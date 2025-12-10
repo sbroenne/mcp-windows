@@ -175,6 +175,11 @@ public sealed class MouseInputService : IMouseInputService
     /// <param name="x">The x-coordinate.</param>
     /// <param name="y">The y-coordinate.</param>
     /// <returns>The window title, or null if no window or no title.</returns>
+    /// <remarks>
+    /// This method uses GetAncestor with GA_ROOT to retrieve the top-level window title.
+    /// Without this, WindowFromPoint may return child windows like "Chrome Legacy Window"
+    /// for Electron-based apps (VS Code, Slack, etc.) instead of the actual application window.
+    /// </remarks>
     internal static string? GetWindowTitleAtPoint(int x, int y)
     {
         var point = new POINT(x, y);
@@ -183,6 +188,14 @@ public sealed class MouseInputService : IMouseInputService
         if (hwnd == IntPtr.Zero)
         {
             return null;
+        }
+
+        // Get the top-level window (root ancestor) to avoid returning child window names
+        // like "Chrome Legacy Window" for Electron apps (VS Code, Teams, Slack, etc.)
+        var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeConstants.GA_ROOT);
+        if (rootHwnd != IntPtr.Zero)
+        {
+            hwnd = rootHwnd;
         }
 
         const int maxTitleLength = 256;

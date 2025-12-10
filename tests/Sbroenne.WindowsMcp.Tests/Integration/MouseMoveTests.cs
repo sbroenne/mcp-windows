@@ -5,37 +5,36 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for mouse cursor movement operations.
-/// These tests interact with the actual Windows input system.
+/// These tests use a dedicated Notepad window to avoid interfering with user's work.
 /// </summary>
 [Collection("MouseIntegrationTests")]
 public class MouseMoveTests : IDisposable
 {
     private readonly Coordinates _originalPosition;
-    private readonly MouseInputService _mouseInputService;
+    private readonly MouseTestFixture _fixture;
 
-    public MouseMoveTests()
+    public MouseMoveTests(MouseTestFixture fixture)
     {
+        _fixture = fixture;
         // Save original cursor position to restore after each test
-        var currentPos = Coordinates.FromCurrent();
-        _originalPosition = currentPos;
-        _mouseInputService = new MouseInputService();
+        _originalPosition = Coordinates.FromCurrent();
     }
 
     public void Dispose()
     {
         // Restore original cursor position after each test
-        _mouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
+        _fixture.MouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
         GC.SuppressFinalize(this);
     }
 
     [Fact]
     public async Task MoveAsync_ValidCoordinates_ReturnsSuccessWithFinalPosition()
     {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        // Arrange - use test window coordinates
+        var (targetX, targetY) = _fixture.GetTestWindowCoordinates(100, 100);
 
         // Act
-        var result = await _mouseInputService.MoveAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.MoveAsync(targetX, targetY);
 
         // Assert
         Assert.True(result.Success);
@@ -62,7 +61,7 @@ public class MouseMoveTests : IDisposable
         var targetY = bounds.Top + 50;
 
         // Act
-        var result = await _mouseInputService.MoveAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.MoveAsync(targetX, targetY);
 
         // Assert - allow 1 pixel tolerance due to DPI scaling
         Assert.True(result.Success);
@@ -80,7 +79,7 @@ public class MouseMoveTests : IDisposable
         var targetY = bounds.Bottom + 1000;
 
         // Act
-        var result = await _mouseInputService.MoveAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.MoveAsync(targetX, targetY);
 
         // Assert
         Assert.False(result.Success);
@@ -95,20 +94,20 @@ public class MouseMoveTests : IDisposable
     [Fact]
     public async Task MoveAsync_PositionAccuracy_MatchesRequestedCoordinatesWithin1Pixel()
     {
-        // Arrange - use test monitor for DPI consistency
-        var bounds = TestMonitorHelper.GetTestMonitorBounds();
-        // Test multiple positions across the test monitor
+        // Arrange - use test window for DPI consistency
+        var bounds = _fixture.TestWindowBounds;
+        // Test multiple positions within the test window
         var testCoordinates = new[]
         {
-            TestMonitorHelper.GetTestCoordinates(100, 100),
-            TestMonitorHelper.GetTestMonitorCenter(),
-            (X: bounds.Right - 100, Y: bounds.Bottom - 100),
+            _fixture.GetTestWindowCoordinates(50, 50),
+            _fixture.GetTestWindowCenter(),
+            _fixture.GetTestWindowCoordinates(bounds.Width - 50, bounds.Height - 50),
         };
 
         foreach (var (targetX, targetY) in testCoordinates)
         {
             // Act
-            var result = await _mouseInputService.MoveAsync(targetX, targetY);
+            var result = await _fixture.MouseInputService.MoveAsync(targetX, targetY);
 
             // Assert - verify position is within 1 pixel of target (DPI rounding tolerance)
             Assert.True(result.Success, $"Move to ({targetX}, {targetY}) should succeed");
@@ -123,35 +122,36 @@ public class MouseMoveTests : IDisposable
     }
 
     [Fact]
-    public async Task MoveAsync_BoundaryCoordinates_WorksAtScreenEdges()
+    public async Task MoveAsync_BoundaryCoordinates_WorksAtWindowEdges()
     {
-        // Arrange - use preferred test monitor
-        var bounds = TestMonitorHelper.GetTestMonitorBounds();
+        // Arrange - use test window edges
+        var bounds = _fixture.TestWindowBounds;
 
-        // Test top-left corner
-        var result1 = await _mouseInputService.MoveAsync(bounds.Left, bounds.Top);
+        // Test top-left corner of window
+        var result1 = await _fixture.MouseInputService.MoveAsync(bounds.Left + 5, bounds.Top + 5);
         Assert.True(result1.Success);
 
-        // Test bottom-right corner (minus 1 to stay on screen)
-        var result2 = await _mouseInputService.MoveAsync(bounds.Right - 1, bounds.Bottom - 1);
+        // Test bottom-right corner of window (minus margin to stay in window)
+        var result2 = await _fixture.MouseInputService.MoveAsync(bounds.Right - 5, bounds.Bottom - 5);
         Assert.True(result2.Success);
     }
 
     [Fact]
     public async Task MoveAsync_RapidMoves_AllSucceed()
     {
-        // Arrange - test 10 rapid move operations on preferred test monitor
-        var bounds = TestMonitorHelper.GetTestMonitorBounds();
+        // Arrange - test 10 rapid move operations within test window
+        var bounds = _fixture.TestWindowBounds;
         var random = new Random(42); // Fixed seed for reproducibility
         var moveCount = 10;
 
         // Act & Assert
         for (int i = 0; i < moveCount; i++)
         {
-            var targetX = random.Next(bounds.Left, bounds.Right);
-            var targetY = random.Next(bounds.Top, bounds.Bottom);
+            // Stay within window bounds with 10px margin
+            var targetX = random.Next(bounds.Left + 10, bounds.Right - 10);
+            var targetY = random.Next(bounds.Top + 10, bounds.Bottom - 10);
 
-            var result = await _mouseInputService.MoveAsync(targetX, targetY);
+            var result = await _fixture.MouseInputService.MoveAsync(targetX, targetY);
             Assert.True(result.Success, $"Move {i + 1} to ({targetX}, {targetY}) should succeed");
         }
     }

@@ -1,16 +1,19 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.6.0 → 2.6.1
+Version change: 2.6.1 → 2.6.2
 Modified principles:
-  - XIV. xUnit Testing Best Practices (added TestMonitorHelper pattern requirement)
+  - III. MCP Protocol Compliance & SDK Maximization (corrected [Description] attribute guidance)
 Added sections: None
 Removed sections: None
 Technology Stack changes: None
 Templates requiring updates: ✅ No updates required
 Follow-up TODOs: None
-Rationale: PATCH version bump - clarifies implementation pattern for secondary monitor preference
-           by requiring a shared TestMonitorHelper class for consistent coordinate generation.
+Rationale: PATCH version bump - corrects SDK feature documentation. The MCP SDK's 
+           XmlToDescriptionGenerator source generator has a limitation: it only adds
+           two using statements to generated files, causing compile errors when tool
+           methods use custom return types. Manual [Description] attributes are required
+           as a workaround until SDK fix is available.
 -->
 
 # mcp-windows Constitution
@@ -50,14 +53,15 @@ This project serves as a **reference implementation** for the MCP C# SDK:
 - All Windows operations MUST be exposed as discrete, composable MCP tools
 
 **Required SDK Features**:
-- Tool methods MUST use `partial` keyword with XML documentation comments for automatic `[Description]` generation
 - Tools MUST specify semantic annotations: `Title` (human-readable name), `ReadOnly` (no side effects), `Destructive` (has side effects), `OpenWorld` (interacts with external systems)
 - Tools returning complex data MUST use structured output (`UseStructuredContent = true`) with `OutputSchema` and `[return: Description]`
 - Long-running operations (>1 second) MUST report progress via `IProgress<ProgressNotificationValue>`
 - Server MUST use MCP client logging (`AsClientLoggerProvider()`) for operational logs sent to clients
 - Server MUST expose MCP Resources for discoverable system information (monitors, keyboard layout)
 - Server MUST implement Completions handler for parameter autocomplete (actions, keys)
-- All tool parameters MUST have XML `<param>` documentation
+- All tool parameters MUST have XML `<param>` documentation AND explicit `[Description]` attributes
+
+**SDK Limitation Note**: The MCP SDK's `XmlToDescriptionGenerator` source generator requires `partial` methods to convert XML docs to `[Description]` attributes, but it has a bug where generated files only include `using System.ComponentModel;` and `using ModelContextProtocol.Server;`. This causes compile errors when tool methods use custom types (e.g., `WindowManagementResult`). Until fixed, use manual `[Description]` attributes on parameters.
 
 ### IV. Windows 11 Target Platform
 
@@ -286,4 +290,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.6.1 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-10
+**Version**: 2.6.2 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-10

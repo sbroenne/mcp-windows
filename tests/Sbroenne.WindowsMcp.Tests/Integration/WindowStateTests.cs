@@ -6,12 +6,14 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for window state control operations (minimize, maximize, restore, close).
+/// Uses the dedicated test harness window to avoid interfering with user's active work.
 /// </summary>
 [Collection("WindowManagement")]
 [SupportedOSPlatform("windows")]
 public class WindowStateTests : IClassFixture<WindowTestFixture>
 {
     private readonly IWindowService _windowService;
+    private readonly WindowTestFixture _fixture;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowStateTests"/> class.
@@ -20,149 +22,88 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
     public WindowStateTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
+        _fixture = fixture;
         _windowService = fixture.WindowService;
     }
 
     [Fact]
     public async Task MinimizeWindow_MinimizesWindow()
     {
-        // Arrange - Get a window that is not minimized and not elevated
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
-
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State != WindowState.Minimized && !w.IsElevated);
-
-        if (targetWindow is null)
-        {
-            // No suitable window, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
 
         // Act
         var result = await _windowService.MinimizeWindowAsync(handle);
 
-        // Assert - operation completes, may fail due to permissions
+        // Assert
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.Equal(WindowState.Minimized, result.Window.State);
+        Assert.True(result.Success, $"Minimize failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Minimized, result.Window.State);
 
-            // Clean up - restore the window
-            await _windowService.RestoreWindowAsync(handle);
-        }
+        // Clean up - restore the window for other tests
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100); // Give window time to restore
     }
 
     [Fact]
     public async Task MaximizeWindow_MaximizesWindow()
     {
-        // Arrange - Get a window that is not maximized and not elevated
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
-
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State != WindowState.Maximized && !w.IsElevated);
-
-        if (targetWindow is null)
-        {
-            // No suitable window, skip test
-            return;
-        }
-
-        var originalState = targetWindow.State;
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
 
         // Act
         var result = await _windowService.MaximizeWindowAsync(handle);
 
-        // Assert - operation completes, may fail due to permissions
+        // Assert
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.Equal(WindowState.Maximized, result.Window.State);
+        Assert.True(result.Success, $"Maximize failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Maximized, result.Window.State);
 
-            // Clean up - restore original state
-            if (originalState == WindowState.Minimized)
-            {
-                await _windowService.MinimizeWindowAsync(handle);
-            }
-            else
-            {
-                await _windowService.RestoreWindowAsync(handle);
-            }
-        }
+        // Clean up - restore the window for other tests
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100); // Give window time to restore
     }
 
     [Fact]
     public async Task RestoreWindow_RestoresMinimizedWindow()
     {
-        // Arrange - Find a minimized window
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window and minimize it first
+        nint handle = _fixture.TestWindowHandle;
 
-        var minimizedWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Minimized && !w.IsElevated);
-
-        if (minimizedWindow is null)
-        {
-            // No minimized windows, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(minimizedWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        var minimizeResult = await _windowService.MinimizeWindowAsync(handle);
+        Assert.True(minimizeResult.Success, $"Setup minimize failed: {minimizeResult.Error}");
+        await Task.Delay(100); // Give window time to minimize
 
         // Act
         var result = await _windowService.RestoreWindowAsync(handle);
 
-        // Assert - operation completes (success may vary based on window and environment)
+        // Assert
         Assert.NotNull(result);
-        // Note: Restore may not always work depending on the window and system state
-        // We just verify the operation completes without crashing
+        Assert.True(result.Success, $"Restore failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Normal, result.Window.State);
     }
 
     [Fact]
     public async Task RestoreWindow_RestoresMaximizedWindow()
     {
-        // Arrange - Find a maximized window or maximize one
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window and maximize it first
+        nint handle = _fixture.TestWindowHandle;
 
-        var targetWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Maximized && !w.IsElevated);
-
-        if (targetWindow is null)
-        {
-            // No maximized windows, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        var maximizeResult = await _windowService.MaximizeWindowAsync(handle);
+        Assert.True(maximizeResult.Success, $"Setup maximize failed: {maximizeResult.Error}");
+        await Task.Delay(100); // Give window time to maximize
 
         // Act
         var result = await _windowService.RestoreWindowAsync(handle);
 
-        // Assert - operation completes
+        // Assert
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.Equal(WindowState.Normal, result.Window.State);
-
-            // Clean up - re-maximize
-            await _windowService.MaximizeWindowAsync(handle);
-        }
+        Assert.True(result.Success, $"Restore failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Normal, result.Window.State);
     }
 
     [Fact]

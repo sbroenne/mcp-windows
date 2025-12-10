@@ -60,6 +60,15 @@ internal static partial class NativeMethods
     internal static partial nint WindowFromPoint(POINT Point);
 
     /// <summary>
+    /// Retrieves the handle to the ancestor of the specified window.
+    /// </summary>
+    /// <param name="hwnd">Handle to the window whose ancestor is to be retrieved.</param>
+    /// <param name="gaFlags">The ancestor to be retrieved (GA_PARENT, GA_ROOT, GA_ROOTOWNER).</param>
+    /// <returns>Handle to the ancestor window, or NULL if no ancestor exists.</returns>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetAncestor(nint hwnd, uint gaFlags);
+
+    /// <summary>
     /// Retrieves the thread and process IDs for the specified window.
     /// </summary>
     /// <param name="hWnd">Handle to the window.</param>
