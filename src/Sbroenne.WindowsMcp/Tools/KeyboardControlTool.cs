@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Configuration;
@@ -15,7 +16,7 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// MCP tool for controlling keyboard input on Windows.
 /// </summary>
 [McpServerToolType]
-public sealed class KeyboardControlTool : IDisposable
+public sealed partial class KeyboardControlTool : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -54,31 +55,39 @@ public sealed class KeyboardControlTool : IDisposable
     }
 
     /// <summary>
-    /// Controls the keyboard with various actions.
+    /// Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions.
     /// </summary>
+    /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout.</param>
     /// <param name="text">Text to type (required for type action).</param>
-    /// <param name="key">Key name to press (required for press, key_down, key_up, combo actions).</param>
+    /// <param name="key">Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot.</param>
     /// <param name="modifiers">Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions).</param>
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
-    /// <param name="sequence">JSON array of key sequence items for sequence action.</param>
+    /// <param name="sequence">JSON array of key sequence items, e.g., [{"key":"ctrl"},{"key":"c"}] (for sequence action).</param>
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the keyboard operation as JSON.</returns>
-    [McpServerTool(Name = "keyboard_control")]
-    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions.")]
-    public async Task<string> ExecuteAsync(
-        [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout")] string action,
-        [Description("Text to type (required for type action)")] string? text = null,
-        [Description("Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
-        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions)")] string? modifiers = null,
-        [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
-        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
-        [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
+    /// <returns>The result of the keyboard operation including success status and operation details.</returns>
+    [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, UseStructuredContent = true)]
+    [return: Description("The result of the keyboard operation including success status, characters typed, key pressed, keyboard layout info, and error details if failed.")]
+    public async Task<KeyboardControlResult> ExecuteAsync(
+        RequestContext<CallToolRequestParams> context,
+        string action,
+        string? text = null,
+        string? key = null,
+        string? modifiers = null,
+        int repeat = 1,
+        string? sequence = null,
+        int? interKeyDelayMs = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var correlationId = KeyboardOperationLogger.GenerateCorrelationId();
         var stopwatch = Stopwatch.StartNew();
+
+        // Create MCP client logger for observability
+        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("KeyboardControl");
+        clientLogger?.LogKeyboardOperationStarted(action ?? "null");
 
         _logger.LogOperationStart(correlationId, action ?? "null");
 
@@ -96,7 +105,7 @@ public sealed class KeyboardControlTool : IDisposable
                     KeyboardControlErrorCode.InvalidAction,
                     "Action parameter is required");
                 _logger.LogOperationFailure(correlationId, "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return SerializeResult(result);
+                return result;
             }
 
             var keyboardAction = ParseAction(action);
@@ -106,7 +115,7 @@ public sealed class KeyboardControlTool : IDisposable
                     KeyboardControlErrorCode.InvalidAction,
                     $"Unknown action: '{action}'. Valid actions are: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return SerializeResult(result);
+                return result;
             }
 
             KeyboardControlResult operationResult;
@@ -163,7 +172,7 @@ public sealed class KeyboardControlTool : IDisposable
                 _logger.LogOperationFailure(correlationId, action, operationResult.ErrorCode.ToString(), operationResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             }
 
-            return SerializeResult(operationResult);
+            return operationResult;
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
@@ -172,7 +181,7 @@ public sealed class KeyboardControlTool : IDisposable
                 KeyboardControlErrorCode.OperationTimeout,
                 $"Operation timed out after {_configuration.TimeoutMs}ms");
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-            return SerializeResult(errorResult);
+            return errorResult;
         }
         catch (OperationCanceledException)
         {
@@ -182,7 +191,7 @@ public sealed class KeyboardControlTool : IDisposable
                 KeyboardControlErrorCode.UnexpectedError,
                 "Operation was cancelled");
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-            return SerializeResult(errorResult);
+            return errorResult;
         }
         catch (Exception ex)
         {
@@ -191,7 +200,7 @@ public sealed class KeyboardControlTool : IDisposable
             var errorResult = KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.UnexpectedError,
                 $"An unexpected error occurred: {ex.Message}");
-            return SerializeResult(errorResult);
+            return errorResult;
         }
     }
 
@@ -438,11 +447,6 @@ public sealed class KeyboardControlTool : IDisposable
             // For release_all or other operations
             _logger.LogPressSuccess(correlationId, action, null, durationMs);
         }
-    }
-
-    private static string SerializeResult(KeyboardControlResult result)
-    {
-        return JsonSerializer.Serialize(result, JsonOptions);
     }
 
     /// <summary>

@@ -1,27 +1,26 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.3.0 → 2.4.0
+Version change: 2.6.0 → 2.6.1
 Modified principles:
-  - IV. Windows 11 Target Platform (changed to architecture-independent builds)
+  - XIV. xUnit Testing Best Practices (added TestMonitorHelper pattern requirement)
 Added sections: None
 Removed sections: None
-Technology Stack changes: Removed RuntimeIdentifiers row (now portable)
-Templates requiring updates: ✅ No updates required (plan-template and tasks-template are structure-agnostic)
+Technology Stack changes: None
+Templates requiring updates: ✅ No updates required
 Follow-up TODOs: None
-Rationale: MINOR version bump - builds MUST be architecture-independent (portable) to simplify
-           distribution. Users run via `dotnet` command which handles architecture automatically.
-           This eliminates the need for multiple architecture-specific release artifacts.
+Rationale: PATCH version bump - clarifies implementation pattern for secondary monitor preference
+           by requiring a shared TestMonitorHelper class for consistent coordinate generation.
 -->
 
 # mcp-windows Constitution
 
-**Project**: mcp-windows  
-**Display Name**: MCP Server for Windows GUI  
-**Namespace**: `Sbroenne.WindowsMcp`  
-**VS Code Extension ID**: mcp-windows  
-**Repository**: [github.com/sbroenne/mcp-windows](https://github.com/sbroenne/mcp-windows)  
-**License**: MIT  
+**Project**: mcp-windows
+**Display Name**: MCP Server for Windows GUI
+**Namespace**: `Sbroenne.WindowsMcp`
+**VS Code Extension ID**: mcp-windows
+**Repository**: [github.com/sbroenne/mcp-windows](https://github.com/sbroenne/mcp-windows)
+**License**: MIT
 **Description**: MCP Server enabling LLMs to control the Windows Desktop
 
 ---
@@ -41,12 +40,24 @@ Rationale: MINOR version bump - builds MUST be architecture-independent (portabl
 - Breaking changes MUST be addressed immediately, not deferred
 - Security updates MUST be applied within 48 hours of release
 
-### III. MCP Protocol Compliance & SDK Maximization
+### III. MCP Protocol Compliance & SDK Maximization (Reference Implementation)
+
+This project serves as a **reference implementation** for the MCP C# SDK:
 
 - All tools MUST conform to the Model Context Protocol specification
-- C# MCP SDK features MUST be used to their fullest extent (attributes, serialization, transports, DI patterns)
+- C# MCP SDK features MUST be used to their fullest extent
 - Custom protocol handling MUST NOT duplicate SDK functionality
 - All Windows operations MUST be exposed as discrete, composable MCP tools
+
+**Required SDK Features**:
+- Tool methods MUST use `partial` keyword with XML documentation comments for automatic `[Description]` generation
+- Tools MUST specify semantic annotations: `Title` (human-readable name), `ReadOnly` (no side effects), `Destructive` (has side effects), `OpenWorld` (interacts with external systems)
+- Tools returning complex data MUST use structured output (`UseStructuredContent = true`) with `OutputSchema` and `[return: Description]`
+- Long-running operations (>1 second) MUST report progress via `IProgress<ProgressNotificationValue>`
+- Server MUST use MCP client logging (`AsClientLoggerProvider()`) for operational logs sent to clients
+- Server MUST expose MCP Resources for discoverable system information (monitors, keyboard layout)
+- Server MUST implement Completions handler for parameter autocomplete (actions, keys)
+- All tool parameters MUST have XML `<param>` documentation
 
 ### IV. Windows 11 Target Platform
 
@@ -87,11 +98,21 @@ This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 
 ### VIII. Security Best Practices (NON-NEGOTIABLE)
 
+**Build-Time Security**:
 - Roslyn analyzers and .NET security analyzers MUST be enabled
 - ALL compiler/analyzer warnings MUST be treated as errors (`<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`)
 - Suppressions require documented justification and code review approval
 - Input validation MUST be performed on all tool parameters
-- Dependency vulnerability scanning MUST run on every build
+
+**GitHub Advanced Security** (REQUIRED):
+- **CodeQL**: Workflow MUST run on all PRs and pushes to main using `security-extended` query suite
+- **Secret Scanning**: MUST be enabled to detect accidentally committed credentials
+- **Dependabot**: MUST be enabled for security alerts and automated update PRs
+- **Dependency Review**: MUST be enabled to block PRs introducing vulnerable dependencies
+
+**Dependency Scanning**:
+- `dotnet list package --vulnerable` MUST pass on every build
+- Vulnerable dependencies MUST be updated within 48 hours of alert
 
 ### IX. Resilient Error Handling
 
@@ -139,6 +160,7 @@ This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 - Use `TheoryData<T>` and Bogus for test data; NSubstitute for rare mocking scenarios
 - Tests MUST be independent—clean up Windows state (close test windows, restore clipboard)
 - **Secondary Monitor Preference**: Integration tests that interact with the Windows desktop (mouse movements, keyboard input, window management, screenshots) MUST target the secondary monitor when available; this prevents interference with the developer's active VS Code session on the primary monitor; tests MUST detect available monitors at startup and select the secondary monitor if present, falling back to primary only when no secondary exists
+- **TestMonitorHelper Pattern**: A shared static helper class (`TestMonitorHelper`) MUST be used for all test coordinate generation; tests MUST NOT use hardcoded pixel coordinates; the helper provides `GetTestCoordinates(offsetX, offsetY)` for offset-based positioning, `GetTestMonitorBounds()` for boundary detection, and `GetTestMonitorCenter()` for centered operations; this ensures consistent monitor targeting across all integration tests
 
 ### XV. Input Simulation Best Practices (NON-NEGOTIABLE)
 
@@ -264,4 +286,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.4.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-09
+**Version**: 2.6.1 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-10

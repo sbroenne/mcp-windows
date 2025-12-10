@@ -107,12 +107,13 @@ public sealed class ScreenshotCursorTests
     [Fact]
     public async Task CaptureRegion_WithCursor_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(0, 0, 200, 150),
+            Region = new CaptureRegion(x, y, 200, 150),
             IncludeCursor = true
         };
 
@@ -130,12 +131,13 @@ public sealed class ScreenshotCursorTests
         // We can't easily verify the cursor is in the image without image analysis,
         // but we can verify that the operation succeeds and produces valid output.
 
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
         var requestWithCursor = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(0, 0, 100, 100),
+            Region = new CaptureRegion(x, y, 100, 100),
             IncludeCursor = true
         };
 
@@ -143,7 +145,7 @@ public sealed class ScreenshotCursorTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(0, 0, 100, 100),
+            Region = new CaptureRegion(x, y, 100, 100),
             IncludeCursor = false
         };
 

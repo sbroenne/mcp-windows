@@ -47,9 +47,8 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         var originalX = targetWindow.Bounds!.X;
         var originalY = targetWindow.Bounds!.Y;
 
-        // Act - Move to a new position
-        int newX = 150;
-        int newY = 150;
+        // Act - Move to a new position on secondary monitor if available
+        var (newX, newY) = TestMonitorHelper.GetTestCoordinates(150, 150);
         var result = await _windowService.MoveWindowAsync(handle, newX, newY);
 
         // Assert - operation completes (actual position may vary due to DPI, window restrictions, etc.)
@@ -134,8 +133,9 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         // Store original bounds for cleanup
         var original = targetWindow.Bounds!;
 
-        // Act - Set new bounds (position + size)
-        var newBounds = new WindowBounds { X = 200, Y = 200, Width = 1024, Height = 768 };
+        // Act - Set new bounds on secondary monitor if available
+        var (newX, newY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var newBounds = new WindowBounds { X = newX, Y = newY, Width = 1024, Height = 768 };
         var result = await _windowService.SetBoundsAsync(handle, newBounds);
 
         // Assert - operation completes (actual bounds may vary due to window constraints)
@@ -156,11 +156,12 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task MoveWindow_InvalidHandle_ReturnsError()
     {
-        // Arrange - Use an invalid handle
+        // Arrange - Use an invalid handle and test monitor coordinates
         nint invalidHandle = (nint)0x12345678;
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
 
         // Act
-        var result = await _windowService.MoveWindowAsync(invalidHandle, 100, 100);
+        var result = await _windowService.MoveWindowAsync(invalidHandle, x, y);
 
         // Assert
         Assert.False(result.Success);
@@ -184,9 +185,10 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task SetBoundsWindow_InvalidHandle_ReturnsError()
     {
-        // Arrange - Use an invalid handle
+        // Arrange - Use an invalid handle and test monitor coordinates
         nint invalidHandle = (nint)0x12345678;
-        var bounds = new WindowBounds { X = 100, Y = 100, Width = 800, Height = 600 };
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        var bounds = new WindowBounds { X = x, Y = y, Width = 800, Height = 600 };
 
         // Act
         var result = await _windowService.SetBoundsAsync(invalidHandle, bounds);
@@ -199,11 +201,12 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task MoveWindow_ZeroHandle_ReturnsError()
     {
-        // Arrange
+        // Arrange - use test monitor coordinates
         nint zeroHandle = IntPtr.Zero;
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
 
         // Act
-        var result = await _windowService.MoveWindowAsync(zeroHandle, 100, 100);
+        var result = await _windowService.MoveWindowAsync(zeroHandle, x, y);
 
         // Assert
         Assert.False(result.Success);
@@ -227,9 +230,10 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task SetBoundsWindow_ZeroHandle_ReturnsError()
     {
-        // Arrange
+        // Arrange - use test monitor coordinates
         nint zeroHandle = IntPtr.Zero;
-        var bounds = new WindowBounds { X = 100, Y = 100, Width = 800, Height = 600 };
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        var bounds = new WindowBounds { X = x, Y = y, Width = 800, Height = 600 };
 
         // Act
         var result = await _windowService.SetBoundsAsync(zeroHandle, bounds);
@@ -259,8 +263,9 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
         nint handle = (nint)handleValue;
 
-        // Act - Try to move a maximized window
-        var result = await _windowService.MoveWindowAsync(handle, 100, 100);
+        // Act - Try to move a maximized window to test monitor coordinates
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        var result = await _windowService.MoveWindowAsync(handle, x, y);
 
         // Assert - operation completes (behavior may vary - may succeed, fail, or restore first)
         Assert.NotNull(result);

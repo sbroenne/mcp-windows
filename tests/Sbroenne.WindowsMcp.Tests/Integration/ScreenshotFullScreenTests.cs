@@ -242,12 +242,13 @@ public sealed class ScreenshotFullScreenTests
     [Fact]
     public async Task CaptureRegion_ValidRegion_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 200, 150)
+            Region = new CaptureRegion(x, y, 200, 150)
         };
 
         // Act
@@ -262,12 +263,13 @@ public sealed class ScreenshotFullScreenTests
     [Fact]
     public async Task CaptureRegion_InvalidDimensions_ReturnsError()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 0, 150) // Zero width
+            Region = new CaptureRegion(x, y, 0, 150) // Zero width
         };
 
         // Act

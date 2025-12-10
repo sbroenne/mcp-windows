@@ -30,10 +30,8 @@ public class MouseMiddleClickTests : IDisposable
     [Fact]
     public async Task MiddleClickAsync_AtCurrentPosition_ReturnsSuccessOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var safeX = bounds.Left + 100;
-        var safeY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (safeX, safeY) = TestMonitorHelper.GetTestCoordinates(100, 100);
         await _mouseInputService.MoveAsync(safeX, safeY);
 
         // Act
@@ -53,10 +51,8 @@ public class MouseMiddleClickTests : IDisposable
     [Fact]
     public async Task MiddleClickAsync_WithCoordinates_MovesCursorFirst()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 175;
-        var targetY = bounds.Top + 175;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(175, 175);
 
         // Act
         var result = await _mouseInputService.MiddleClickAsync(targetX, targetY);

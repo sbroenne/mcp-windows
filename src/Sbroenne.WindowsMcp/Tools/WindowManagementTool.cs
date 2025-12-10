@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
@@ -15,7 +16,7 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// </summary>
 [McpServerToolType]
 [SupportedOSPlatform("windows")]
-public sealed class WindowManagementTool
+public sealed partial class WindowManagementTool
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -48,8 +49,12 @@ public sealed class WindowManagementTool
     }
 
     /// <summary>
-    /// Manages windows with various actions.
+    /// Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions.
     /// </summary>
+    /// <remarks>
+    /// Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.
+    /// </remarks>
+    /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
     /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor).</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
@@ -61,27 +66,34 @@ public sealed class WindowManagementTool
     /// <param name="width">Width for resize or set_bounds action.</param>
     /// <param name="height">Height for resize or set_bounds action.</param>
     /// <param name="timeoutMs">Timeout in milliseconds for wait_for action.</param>
-    /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based).</param>
+    /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the window operation as JSON.</returns>
-    [McpServerTool(Name = "window_management")]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.")]
-    public async Task<string> ExecuteAsync(
-        [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
-        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor)")] string? handle = null,
-        [Description("Window title to search for (required for find and wait_for)")] string? title = null,
-        [Description("Filter windows by title or process name (for list action)")] string? filter = null,
-        [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
-        [Description("Include windows on other virtual desktops (default: false)")] bool includeAllDesktops = false,
-        [Description("X-coordinate for move or set_bounds action")] int? x = null,
-        [Description("Y-coordinate for move or set_bounds action")] int? y = null,
-        [Description("Width for resize or set_bounds action")] int? width = null,
-        [Description("Height for resize or set_bounds action")] int? height = null,
-        [Description("Timeout in milliseconds for wait_for action")] int? timeoutMs = null,
-        [Description("Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.")] int? monitorIndex = null,
+    /// <returns>The result of the window operation including success status and window information.</returns>
+    [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, UseStructuredContent = true)]
+    [return: Description("The result of the window operation including success status, window list or single window info, and error details if failed.")]
+    public async Task<WindowManagementResult> ExecuteAsync(
+        RequestContext<CallToolRequestParams> context,
+        string action,
+        string? handle = null,
+        string? title = null,
+        string? filter = null,
+        bool regex = false,
+        bool includeAllDesktops = false,
+        int? x = null,
+        int? y = null,
+        int? width = null,
+        int? height = null,
+        int? timeoutMs = null,
+        int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var stopwatch = Stopwatch.StartNew();
+
+        // Create MCP client logger for observability
+        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("WindowManagement");
+        clientLogger?.LogWindowOperationStarted(action ?? "null");
 
         try
         {
@@ -92,7 +104,7 @@ public sealed class WindowManagementTool
                     WindowManagementErrorCode.InvalidAction,
                     "Action parameter is required");
                 _logger?.LogWindowOperation("null", success: false, errorMessage: result.Error);
-                return SerializeResult(result);
+                return result;
             }
 
             var windowAction = ParseAction(action);
@@ -102,7 +114,7 @@ public sealed class WindowManagementTool
                     WindowManagementErrorCode.InvalidAction,
                     $"Unknown action: '{action}'. Valid actions are: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor");
                 _logger?.LogWindowOperation(action, success: false, errorMessage: result.Error);
-                return SerializeResult(result);
+                return result;
             }
 
             WindowManagementResult operationResult;
@@ -177,7 +189,7 @@ public sealed class WindowManagementTool
                 windowTitle: operationResult.Window?.Title,
                 errorMessage: operationResult.Error);
 
-            return SerializeResult(operationResult);
+            return operationResult;
         }
         catch (OperationCanceledException)
         {
@@ -186,7 +198,7 @@ public sealed class WindowManagementTool
                 WindowManagementErrorCode.Timeout,
                 "Operation was cancelled");
             _logger?.LogWindowOperation(action ?? "null", success: false, errorMessage: errorResult.Error);
-            return SerializeResult(errorResult);
+            return errorResult;
         }
         catch (Exception ex)
         {
@@ -195,7 +207,7 @@ public sealed class WindowManagementTool
             var errorResult = WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SystemError,
                 $"An unexpected error occurred: {ex.Message}");
-            return SerializeResult(errorResult);
+            return errorResult;
         }
     }
 
@@ -454,8 +466,4 @@ public sealed class WindowManagementTool
         };
     }
 
-    private static string SerializeResult(WindowManagementResult result)
-    {
-        return JsonSerializer.Serialize(result, JsonOptions);
-    }
 }

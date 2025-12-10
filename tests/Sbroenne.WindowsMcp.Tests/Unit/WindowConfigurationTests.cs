@@ -40,9 +40,9 @@ public class WindowConfigurationTests
     public void FromEnvironment_WithNoVariables_ReturnsDefaults()
     {
         // Arrange - Clear any existing environment variables
-        Environment.SetEnvironmentVariable("MCP_WINDOW_TIMEOUT_MS", null);
-        Environment.SetEnvironmentVariable("MCP_WINDOW_WAITFOR_TIMEOUT_MS", null);
-        Environment.SetEnvironmentVariable("MCP_WINDOW_PROPERTY_TIMEOUT_MS", null);
+        Environment.SetEnvironmentVariable(WindowConfiguration.TimeoutEnvironmentVariable, null);
+        Environment.SetEnvironmentVariable(WindowConfiguration.WaitForTimeoutEnvironmentVariable, null);
+        Environment.SetEnvironmentVariable(WindowConfiguration.PropertyQueryTimeoutEnvironmentVariable, null);
 
         // Act
         var config = WindowConfiguration.FromEnvironment();
@@ -57,9 +57,9 @@ public class WindowConfigurationTests
     public void FromEnvironment_WithVariables_ParsesValues()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("MCP_WINDOW_TIMEOUT_MS", "7500");
-        Environment.SetEnvironmentVariable("MCP_WINDOW_WAITFOR_TIMEOUT_MS", "45000");
-        Environment.SetEnvironmentVariable("MCP_WINDOW_PROPERTY_TIMEOUT_MS", "200");
+        Environment.SetEnvironmentVariable(WindowConfiguration.TimeoutEnvironmentVariable, "7500");
+        Environment.SetEnvironmentVariable(WindowConfiguration.WaitForTimeoutEnvironmentVariable, "45000");
+        Environment.SetEnvironmentVariable(WindowConfiguration.PropertyQueryTimeoutEnvironmentVariable, "200");
 
         try
         {
@@ -74,9 +74,9 @@ public class WindowConfigurationTests
         finally
         {
             // Cleanup
-            Environment.SetEnvironmentVariable("MCP_WINDOW_TIMEOUT_MS", null);
-            Environment.SetEnvironmentVariable("MCP_WINDOW_WAITFOR_TIMEOUT_MS", null);
-            Environment.SetEnvironmentVariable("MCP_WINDOW_PROPERTY_TIMEOUT_MS", null);
+            Environment.SetEnvironmentVariable(WindowConfiguration.TimeoutEnvironmentVariable, null);
+            Environment.SetEnvironmentVariable(WindowConfiguration.WaitForTimeoutEnvironmentVariable, null);
+            Environment.SetEnvironmentVariable(WindowConfiguration.PropertyQueryTimeoutEnvironmentVariable, null);
         }
     }
 
@@ -84,7 +84,7 @@ public class WindowConfigurationTests
     public void FromEnvironment_WithInvalidValue_ReturnsDefault()
     {
         // Arrange
-        Environment.SetEnvironmentVariable("MCP_WINDOW_TIMEOUT_MS", "not-a-number");
+        Environment.SetEnvironmentVariable(WindowConfiguration.TimeoutEnvironmentVariable, "not-a-number");
 
         try
         {
@@ -97,7 +97,7 @@ public class WindowConfigurationTests
         finally
         {
             // Cleanup
-            Environment.SetEnvironmentVariable("MCP_WINDOW_TIMEOUT_MS", null);
+            Environment.SetEnvironmentVariable(WindowConfiguration.TimeoutEnvironmentVariable, null);
         }
     }
 

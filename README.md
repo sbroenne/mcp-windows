@@ -1,6 +1,8 @@
 # Windows MCP Server
 
-A Model Context Protocol (MCP) server providing Windows automation capabilities for LLM agents. Built on .NET 8 with native Windows API integration.
+A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to use the Windows 11 with mouse, keyboard and windows tools. Take screenshots to allow the LLM to see what it is doing.
+
+Designed for computer use, QA and RPA scenarios.
 
 > **🤖 Co-designed with Claude Sonnet 4.5 via GitHub Copilot** - This project was developed in collaboration with AI pair programming, leveraging Claude Opus 4.5's capabilities through GitHub Copilot to design, create & test a robust, production-ready Windows automation solution. 
 
@@ -58,14 +60,6 @@ A Model Context Protocol (MCP) server providing Windows automation capabilities 
 **Performance** - Synchronous I/O on dedicated thread pool prevents blocking the LLM. Configurable delays for stability without sacrificing speed.
 
 **Active Development** - Release workflows, comprehensive testing, VS Code extension, and clear contribution guidelines show this is a maintained project, not abandoned.
-
-### Key Advantages of Windows MCP
-
-## Prerequisites
-
-- Windows 10/11
-- .NET 8.0 Runtime or later
-- Visual Studio 2022 or VS Code with C# extension
 
 ## Installation
 

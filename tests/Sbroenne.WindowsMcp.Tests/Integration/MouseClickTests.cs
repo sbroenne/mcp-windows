@@ -35,11 +35,8 @@ public class MouseClickTests : IDisposable
     [Fact]
     public async Task ClickAsync_AtCurrentPosition_ReturnsSuccessOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Move to a safe position first
-        var safeX = bounds.Left + 100;
-        var safeY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (safeX, safeY) = TestMonitorHelper.GetTestCoordinates(100, 100);
         await _mouseInputService.MoveAsync(safeX, safeY);
 
         // Act
@@ -61,10 +58,8 @@ public class MouseClickTests : IDisposable
     [Fact]
     public async Task ClickAsync_WithCoordinates_ReturnsSuccessOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 200;
-        var targetY = bounds.Top + 200;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _mouseInputService.ClickAsync(targetX, targetY);
@@ -85,11 +80,8 @@ public class MouseClickTests : IDisposable
     [Fact]
     public void ElevationDetector_CanDetectElevatedProcessTarget()
     {
-        // Arrange
-        // Move to a known position to test elevation detection
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var testX = bounds.Left + 100;
-        var testY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (testX, testY) = TestMonitorHelper.GetTestCoordinates(100, 100);
 
         // Act
         // This test validates the elevation detector works
@@ -117,11 +109,8 @@ public class MouseClickTests : IDisposable
     [Fact]
     public async Task ClickAsync_ReturnsWindowTitleOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Move to center of screen where there's likely a window
-        var targetX = bounds.Left + bounds.Width / 2;
-        var targetY = bounds.Top + bounds.Height / 2;
+        // Arrange - use center of preferred test monitor
+        var (targetX, targetY) = TestMonitorHelper.GetTestMonitorCenter();
 
         // Act
         var result = await _mouseInputService.ClickAsync(targetX, targetY);
@@ -157,9 +146,8 @@ public class MouseClickTests : IDisposable
     {
         // This test verifies the click mechanism at the input service level
         // by checking that the result includes a valid window title when available
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Target desktop area where there might not be an elevated window
+        // Arrange - target corner of preferred test monitor
+        var bounds = TestMonitorHelper.GetTestMonitorBounds();
         var targetX = bounds.Right - 50;
         var targetY = bounds.Bottom - 50;
 

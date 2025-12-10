@@ -209,8 +209,8 @@ public class KeyboardConfigurationTests
     public void EnvironmentVariableNames_AreCorrect()
     {
         // Assert
-        Assert.Equal("MCP_KEYBOARD_TIMEOUT_MS", KeyboardConfiguration.TimeoutEnvironmentVariable);
-        Assert.Equal("MCP_KEYBOARD_INTER_KEY_DELAY_MS", KeyboardConfiguration.InterKeyDelayEnvironmentVariable);
-        Assert.Equal("MCP_KEYBOARD_CHUNK_DELAY_MS", KeyboardConfiguration.ChunkDelayEnvironmentVariable);
+        Assert.Equal("MCP_WINDOWS_KEYBOARD_TIMEOUT_MS", KeyboardConfiguration.TimeoutEnvironmentVariable);
+        Assert.Equal("MCP_WINDOWS_KEYBOARD_KEY_DELAY_MS", KeyboardConfiguration.InterKeyDelayEnvironmentVariable);
+        Assert.Equal("MCP_WINDOWS_KEYBOARD_CHUNK_DELAY_MS", KeyboardConfiguration.ChunkDelayEnvironmentVariable);
     }
 }

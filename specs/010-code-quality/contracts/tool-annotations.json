@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Tool Semantic Annotations Contract",
+  "description": "MCP tool semantic annotations for Windows MCP server tools",
+  "tools": {
+    "mouse_control": {
+      "name": "mouse_control",
+      "title": "Mouse Control",
+      "readOnly": false,
+      "destructive": true,
+      "openWorld": true,
+      "useStructuredContent": true,
+      "description": "Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions."
+    },
+    "keyboard_control": {
+      "name": "keyboard_control",
+      "title": "Keyboard Control",
+      "readOnly": false,
+      "destructive": true,
+      "openWorld": true,
+      "useStructuredContent": true,
+      "description": "Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions."
+    },
+    "window_management": {
+      "name": "window_management",
+      "title": "Window Management",
+      "readOnly": false,
+      "destructive": true,
+      "openWorld": true,
+      "useStructuredContent": true,
+      "description": "Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, and wait_for actions."
+    },
+    "screenshot_control": {
+      "name": "screenshot_control",
+      "title": "Screenshot Capture",
+      "readOnly": true,
+      "destructive": false,
+      "openWorld": true,
+      "useStructuredContent": true,
+      "description": "Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded PNG image data."
+    }
+  },
+  "completions": {
+    "mouse_control": {
+      "action": ["move", "click", "double_click", "right_click", "middle_click", "drag", "scroll"],
+      "direction": ["up", "down", "left", "right"],
+      "button": ["left", "right", "middle"]
+    },
+    "keyboard_control": {
+      "action": ["type", "press", "key_down", "key_up", "combo", "sequence", "release_all", "get_keyboard_layout"],
+      "key": [
+        "enter", "tab", "escape", "backspace", "delete", "space",
+        "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f11", "f12",
+        "up", "down", "left", "right",
+        "home", "end", "pageup", "pagedown", "insert",
+        "ctrl", "shift", "alt", "win", "copilot",
+        "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+        "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"
+      ]
+    },
+    "window_management": {
+      "action": ["list", "find", "activate", "get_foreground", "minimize", "maximize", "restore", "close", "move", "resize", "set_bounds", "wait_for"]
+    },
+    "screenshot_control": {
+      "action": ["capture", "list_monitors"],
+      "target": ["primary_screen", "monitor", "window", "region", "all_monitors"],
+      "imageFormat": ["png", "jpg"]
+    }
+  }
+}

@@ -31,11 +31,8 @@ public class MouseMoveTests : IDisposable
     [Fact]
     public async Task MoveAsync_ValidCoordinates_ReturnsSuccessWithFinalPosition()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Use a coordinate safely inside the screen
-        var targetX = bounds.Left + 100;
-        var targetY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(100, 100);
 
         // Act
         var result = await _mouseInputService.MoveAsync(targetX, targetY);
@@ -98,13 +95,13 @@ public class MouseMoveTests : IDisposable
     [Fact]
     public async Task MoveAsync_PositionAccuracy_MatchesRequestedCoordinatesWithin1Pixel()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Test multiple positions across the screen
+        // Arrange - use test monitor for DPI consistency
+        var bounds = TestMonitorHelper.GetTestMonitorBounds();
+        // Test multiple positions across the test monitor
         var testCoordinates = new[]
         {
-            (X: bounds.Left + 100, Y: bounds.Top + 100),
-            (X: bounds.Left + bounds.Width / 2, Y: bounds.Top + bounds.Height / 2),
+            TestMonitorHelper.GetTestCoordinates(100, 100),
+            TestMonitorHelper.GetTestMonitorCenter(),
             (X: bounds.Right - 100, Y: bounds.Bottom - 100),
         };
 
@@ -128,8 +125,8 @@ public class MouseMoveTests : IDisposable
     [Fact]
     public async Task MoveAsync_BoundaryCoordinates_WorksAtScreenEdges()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
+        // Arrange - use preferred test monitor
+        var bounds = TestMonitorHelper.GetTestMonitorBounds();
 
         // Test top-left corner
         var result1 = await _mouseInputService.MoveAsync(bounds.Left, bounds.Top);
@@ -143,8 +140,8 @@ public class MouseMoveTests : IDisposable
     [Fact]
     public async Task MoveAsync_RapidMoves_AllSucceed()
     {
-        // Arrange - test 10 rapid move operations
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
+        // Arrange - test 10 rapid move operations on preferred test monitor
+        var bounds = TestMonitorHelper.GetTestMonitorBounds();
         var random = new Random(42); // Fixed seed for reproducibility
         var moveCount = 10;
 

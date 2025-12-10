@@ -14,9 +14,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task ClickAsync_WithControlModifier_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.ClickAsync(x, y, ModifierKey.Ctrl);
@@ -31,9 +30,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task ClickAsync_WithShiftModifier_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.ClickAsync(x, y, ModifierKey.Shift);
@@ -48,9 +46,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task ClickAsync_WithAltModifier_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.ClickAsync(x, y, ModifierKey.Alt);
@@ -65,9 +62,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task ClickAsync_WithMultipleModifiers_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
         var modifiers = ModifierKey.Ctrl | ModifierKey.Shift;
 
         // Act
@@ -83,9 +79,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task ClickAsync_WithAllModifiers_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
         var modifiers = ModifierKey.Ctrl | ModifierKey.Shift | ModifierKey.Alt;
 
         // Act
@@ -101,9 +96,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task DoubleClickAsync_WithControlModifier_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.DoubleClickAsync(x, y, ModifierKey.Ctrl);
@@ -118,9 +112,8 @@ public sealed class ModifierKeyTests
     [Fact]
     public async Task RightClickAsync_WithShiftModifier_Succeeds()
     {
-        // Arrange - use center of primary screen
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.RightClickAsync(x, y, ModifierKey.Shift);
