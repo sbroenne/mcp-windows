@@ -19,12 +19,14 @@ public sealed class ScreenshotFullScreenTests
     {
         _monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             _monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
@@ -50,13 +52,15 @@ public sealed class ScreenshotFullScreenTests
     }
 
     [Fact]
-    public async Task CapturePrimaryScreen_ReturnsValidPngDimensions()
+    public async Task CapturePrimaryScreen_WithPngFormat_ReturnsValidDimensions()
     {
-        // Arrange
+        // Arrange - explicitly request PNG and no scaling for backward compatibility
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.PrimaryScreen
+            Target = CaptureTarget.PrimaryScreen,
+            ImageFormat = ImageFormat.Png,
+            MaxWidth = 0 // Disable auto-scaling
         };
         var primaryMonitor = _monitorService.GetPrimaryMonitor();
 
@@ -70,13 +74,14 @@ public sealed class ScreenshotFullScreenTests
     }
 
     [Fact]
-    public async Task CapturePrimaryScreen_IncludesMetadata()
+    public async Task CapturePrimaryScreen_WithPngFormat_IncludesMetadata()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.PrimaryScreen
+            Target = CaptureTarget.PrimaryScreen,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -115,13 +120,14 @@ public sealed class ScreenshotFullScreenTests
     }
 
     [Fact]
-    public async Task CapturePrimaryScreen_ImageDataStartsWithPngSignature()
+    public async Task CapturePrimaryScreen_WithPngFormat_ImageDataStartsWithPngSignature()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.PrimaryScreen
+            Target = CaptureTarget.PrimaryScreen,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act

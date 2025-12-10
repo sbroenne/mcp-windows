@@ -1,3 +1,5 @@
+using Sbroenne.WindowsMcp.Models;
+
 namespace Sbroenne.WindowsMcp.Configuration;
 
 /// <summary>
@@ -24,6 +26,32 @@ public sealed class ScreenshotConfiguration
     /// Default maximum pixels (8K resolution: 7680 × 4320).
     /// </summary>
     public const int DefaultMaxPixels = 33_177_600;
+
+    /// <summary>
+    /// Default image format for LLM-optimized captures.
+    /// </summary>
+    public const ImageFormat DefaultImageFormat = ImageFormat.Jpeg;
+
+    /// <summary>
+    /// Default JPEG quality (1-100). 85 provides optimal balance between size and quality.
+    /// </summary>
+    public const int DefaultQuality = 85;
+
+    /// <summary>
+    /// Default maximum width for auto-scaling. 1568 is Claude's high-res native limit.
+    /// Set to 0 to disable scaling.
+    /// </summary>
+    public const int DefaultMaxWidth = 1568;
+
+    /// <summary>
+    /// Default maximum height for auto-scaling. 0 means no height constraint.
+    /// </summary>
+    public const int DefaultMaxHeight = 0;
+
+    /// <summary>
+    /// Default output mode (inline base64).
+    /// </summary>
+    public const OutputMode DefaultOutputMode = OutputMode.Inline;
 
     /// <summary>
     /// Gets the operation timeout in milliseconds.

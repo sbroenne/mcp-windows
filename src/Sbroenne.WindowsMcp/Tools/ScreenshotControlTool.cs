@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 
@@ -35,7 +36,9 @@ public sealed partial class ScreenshotControlTool
     /// Captures screenshots of screens, monitors, windows, or regions on Windows.
     /// </summary>
     /// <remarks>
-    /// Returns base64-encoded PNG image data. Use action 'list_monitors' to enumerate available monitors.
+    /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
+    /// LLM-optimized defaults: JPEG format at quality 85, auto-scaled to 1568px width.
+    /// Use action 'list_monitors' to enumerate available monitors.
     /// Use target 'all_monitors' to capture all connected monitors as a single composite image.
     /// Respects secure desktop (UAC/lock screen) restrictions.
     /// </remarks>
@@ -49,10 +52,16 @@ public sealed partial class ScreenshotControlTool
     /// <param name="regionWidth">Width in pixels for 'region' target. Must be positive.</param>
     /// <param name="regionHeight">Height in pixels for 'region' target. Must be positive.</param>
     /// <param name="includeCursor">Include mouse cursor in capture. Default: false.</param>
+    /// <param name="imageFormat">Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).</param>
+    /// <param name="quality">Image compression quality 1-100. Default: 85. Only affects JPEG format.</param>
+    /// <param name="maxWidth">Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 1568 (Claude's high-res native limit). Set to 0 to disable scaling.</param>
+    /// <param name="maxHeight">Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).</param>
+    /// <param name="outputMode">How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.</param>
+    /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result containing base64-encoded PNG image data or monitor list.</returns>
+    /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, UseStructuredContent = true)]
-    [return: Description("The result of the screenshot operation including success status, base64-encoded PNG image data, monitor list, and error details if failed.")]
+    [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, monitor list, and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         string? action = null,
@@ -64,6 +73,12 @@ public sealed partial class ScreenshotControlTool
         int? regionWidth = null,
         int? regionHeight = null,
         bool includeCursor = false,
+        string? imageFormat = null,
+        int? quality = null,
+        int? maxWidth = null,
+        int? maxHeight = null,
+        string? outputMode = null,
+        string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -90,6 +105,61 @@ public sealed partial class ScreenshotControlTool
                 $"Invalid target: '{target}'. Valid values: 'primary_screen', 'monitor', 'window', 'region', 'all_monitors'");
         }
 
+        // Parse and validate image format
+        var parsedImageFormat = ParseImageFormat(imageFormat);
+        if (parsedImageFormat == null && imageFormat != null)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                $"Invalid imageFormat: '{imageFormat}'. Valid values: 'jpeg', 'jpg', 'png'");
+        }
+
+        // Validate quality
+        var parsedQuality = quality ?? ScreenshotConfiguration.DefaultQuality;
+        if (parsedQuality < 1 || parsedQuality > 100)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                $"Quality must be between 1 and 100, got: {parsedQuality}");
+        }
+
+        // Validate maxWidth/maxHeight
+        var parsedMaxWidth = maxWidth ?? ScreenshotConfiguration.DefaultMaxWidth;
+        var parsedMaxHeight = maxHeight ?? ScreenshotConfiguration.DefaultMaxHeight;
+        if (parsedMaxWidth < 0)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                "maxWidth cannot be negative");
+        }
+        if (parsedMaxHeight < 0)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                "maxHeight cannot be negative");
+        }
+
+        // Parse and validate output mode
+        var parsedOutputMode = ParseOutputMode(outputMode);
+        if (parsedOutputMode == null && outputMode != null)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                $"Invalid outputMode: '{outputMode}'. Valid values: 'inline', 'file'");
+        }
+
+        // Validate output path if provided
+        if (outputPath != null)
+        {
+            var directory = Path.GetDirectoryName(outputPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+            {
+                return ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.InvalidRequest,
+                    $"Output directory does not exist: '{directory}'");
+            }
+        }
+
         // Build region if target is region
         CaptureRegion? region = null;
         if (captureTarget == CaptureTarget.Region)
@@ -104,7 +174,7 @@ public sealed partial class ScreenshotControlTool
             region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
         }
 
-        // Build request
+        // Build request with all parameters
         var request = new ScreenshotControlRequest
         {
             Action = screenshotAction.Value,
@@ -112,7 +182,13 @@ public sealed partial class ScreenshotControlTool
             MonitorIndex = monitorIndex,
             WindowHandle = windowHandle,
             Region = region,
-            IncludeCursor = includeCursor
+            IncludeCursor = includeCursor,
+            ImageFormat = parsedImageFormat ?? ScreenshotConfiguration.DefaultImageFormat,
+            Quality = parsedQuality,
+            MaxWidth = parsedMaxWidth,
+            MaxHeight = parsedMaxHeight,
+            OutputMode = parsedOutputMode ?? ScreenshotConfiguration.DefaultOutputMode,
+            OutputPath = outputPath
         };
 
         // Execute and return result
@@ -159,4 +235,39 @@ public sealed partial class ScreenshotControlTool
         };
     }
 
+    /// <summary>
+    /// Parses the image format string to enum.
+    /// </summary>
+    private static Models.ImageFormat? ParseImageFormat(string? format)
+    {
+        if (string.IsNullOrWhiteSpace(format))
+        {
+            return null; // Will use default
+        }
+
+        return format.ToLowerInvariant() switch
+        {
+            "jpeg" or "jpg" => Models.ImageFormat.Jpeg,
+            "png" => Models.ImageFormat.Png,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Parses the output mode string to enum.
+    /// </summary>
+    private static OutputMode? ParseOutputMode(string? mode)
+    {
+        if (string.IsNullOrWhiteSpace(mode))
+        {
+            return null; // Will use default
+        }
+
+        return mode.ToLowerInvariant() switch
+        {
+            "inline" => OutputMode.Inline,
+            "file" => OutputMode.File,
+            _ => null
+        };
+    }
 }

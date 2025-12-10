@@ -39,18 +39,20 @@ public sealed class ScreenshotWindowTests
     {
         var monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
 
     [Fact]
-    public async Task CaptureWindow_DesktopWindow_ReturnsSuccess()
+    public async Task CaptureWindow_DesktopWindow_WithPngFormat_ReturnsSuccess()
     {
         // Arrange - use the desktop window which always exists
         var windowHandle = GetDesktopWindow();
@@ -60,7 +62,8 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = windowHandle.ToInt64()
+            WindowHandle = windowHandle.ToInt64(),
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -75,9 +78,9 @@ public sealed class ScreenshotWindowTests
     }
 
     [Fact]
-    public async Task CaptureWindow_DesktopWindow_ReturnsValidPng()
+    public async Task CaptureWindow_DesktopWindow_WithPngFormat_ReturnsValidPng()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var windowHandle = GetDesktopWindow();
         Assert.NotEqual(IntPtr.Zero, windowHandle);
 
@@ -85,7 +88,8 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = windowHandle.ToInt64()
+            WindowHandle = windowHandle.ToInt64(),
+            ImageFormat = ImageFormat.Png
         };
 
         // Act

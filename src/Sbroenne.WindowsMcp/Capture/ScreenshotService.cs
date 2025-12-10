@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Drawing.Imaging;
-using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
@@ -14,7 +12,8 @@ namespace Sbroenne.WindowsMcp.Capture;
 public sealed class ScreenshotService : IScreenshotService
 {
     private readonly IMonitorService _monitorService;
-    private readonly ISecureDesktopDetector _secureDesktopDetector;
+    private readonly Automation.ISecureDesktopDetector _secureDesktopDetector;
+    private readonly IImageProcessor _imageProcessor;
     private readonly ScreenshotConfiguration _configuration;
     private readonly ScreenshotOperationLogger _logger;
 
@@ -23,16 +22,19 @@ public sealed class ScreenshotService : IScreenshotService
     /// </summary>
     /// <param name="monitorService">The monitor enumeration service.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
+    /// <param name="imageProcessor">The image processor for scaling and encoding.</param>
     /// <param name="configuration">The screenshot configuration.</param>
     /// <param name="logger">The operation logger.</param>
     public ScreenshotService(
         IMonitorService monitorService,
-        ISecureDesktopDetector secureDesktopDetector,
+        Automation.ISecureDesktopDetector secureDesktopDetector,
+        IImageProcessor imageProcessor,
         ScreenshotConfiguration configuration,
         ScreenshotOperationLogger logger)
     {
         _monitorService = monitorService;
         _secureDesktopDetector = secureDesktopDetector;
+        _imageProcessor = imageProcessor;
         _configuration = configuration;
         _logger = logger;
     }
@@ -124,7 +126,7 @@ public sealed class ScreenshotService : IScreenshotService
     {
         var primary = _monitorService.GetPrimaryMonitor();
         var region = new CaptureRegion(primary.X, primary.Y, primary.Width, primary.Height);
-        return CaptureRegionInternalAsync(region, request.IncludeCursor, cancellationToken);
+        return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
 
     /// <summary>
@@ -148,7 +150,7 @@ public sealed class ScreenshotService : IScreenshotService
         }
 
         var region = new CaptureRegion(monitor.X, monitor.Y, monitor.Width, monitor.Height);
-        return CaptureRegionInternalAsync(region, request.IncludeCursor, cancellationToken);
+        return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
 
     /// <summary>
@@ -230,7 +232,7 @@ public sealed class ScreenshotService : IScreenshotService
         cancellationToken.ThrowIfCancellationRequested();
 
         // Try PrintWindow first (can capture occluded windows)
-        var result = CaptureWindowUsingPrintWindow(windowHandle, width, height, request.IncludeCursor, windowRect);
+        var result = CaptureWindowUsingPrintWindow(windowHandle, width, height, request, windowRect);
         if (result.Success)
         {
             return Task.FromResult(result);
@@ -239,7 +241,7 @@ public sealed class ScreenshotService : IScreenshotService
         // Fallback to screen region capture (works when PrintWindow fails, but window must be visible)
         _logger.LogOperationError("PrintWindowFailed", "Falling back to screen region capture");
         var region = new CaptureRegion(windowRect.Left, windowRect.Top, width, height);
-        return CaptureRegionInternalAsync(region, request.IncludeCursor, cancellationToken);
+        return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
 
     /// <summary>
@@ -249,14 +251,14 @@ public sealed class ScreenshotService : IScreenshotService
         IntPtr windowHandle,
         int width,
         int height,
-        bool includeCursor,
+        ScreenshotControlRequest request,
         RECT windowRect)
     {
         const uint PW_RENDERFULLCONTENT = 0x00000002;
 
         try
         {
-            using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+            using var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
             using var graphics = Graphics.FromImage(bitmap);
 
             var hdc = graphics.GetHdc();
@@ -271,23 +273,23 @@ public sealed class ScreenshotService : IScreenshotService
             }
 
             // Optionally include cursor (relative to window position)
-            if (includeCursor)
+            if (request.IncludeCursor)
             {
                 DrawCursor(graphics, windowRect.Left, windowRect.Top);
             }
 
-            // Encode to PNG and convert to base64
-            using var memoryStream = new MemoryStream();
-            bitmap.Save(memoryStream, ImageFormat.Png);
-            var base64 = Convert.ToBase64String(memoryStream.ToArray());
+            // Process the image (scale + encode)
+            var processed = _imageProcessor.Process(
+                bitmap,
+                request.ImageFormat,
+                request.Quality,
+                request.MaxWidth,
+                request.MaxHeight);
 
-            _logger.LogCaptureSuccess(width, height);
+            _logger.LogCaptureSuccess(processed.Width, processed.Height);
 
-            return ScreenshotControlResult.CaptureSuccess(
-                base64,
-                width,
-                height,
-                "png");
+            // Handle output mode
+            return BuildCaptureResult(processed, request, $"Captured window: {processed.Width}x{processed.Height} {processed.Format}");
         }
         catch (Exception ex)
         {
@@ -319,7 +321,7 @@ public sealed class ScreenshotService : IScreenshotService
                 "Region dimensions must be positive integers"));
         }
 
-        return CaptureRegionInternalAsync(request.Region, request.IncludeCursor, cancellationToken);
+        return CaptureRegionInternalAsync(request.Region, request, cancellationToken);
     }
 
     /// <summary>
@@ -348,7 +350,7 @@ public sealed class ScreenshotService : IScreenshotService
         cancellationToken.ThrowIfCancellationRequested();
 
         // Create bitmap and capture the entire virtual screen
-        using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
+        using var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(bitmap);
 
         // CopyFromScreen handles negative coordinates correctly for multi-monitor setups
@@ -375,6 +377,15 @@ public sealed class ScreenshotService : IScreenshotService
             .Select(m => MonitorRegion.FromMonitorInfo(m, virtualScreen.X, virtualScreen.Y))
             .ToList();
 
+        // Process the image (scale + encode)
+        var processed = _imageProcessor.Process(
+            bitmap,
+            request.ImageFormat,
+            request.Quality,
+            request.MaxWidth,
+            request.MaxHeight);
+
+        // Update metadata with actual output dimensions
         var metadata = new CompositeScreenshotMetadata
         {
             CaptureTime = DateTimeOffset.UtcNow,
@@ -386,23 +397,17 @@ public sealed class ScreenshotService : IScreenshotService
                 Height = height
             },
             Monitors = monitorRegions,
-            ImageWidth = width,
-            ImageHeight = height,
+            ImageWidth = processed.Width,
+            ImageHeight = processed.Height,
             IncludedCursor = request.IncludeCursor,
             CursorPosition = cursorPosition
         };
 
-        // Encode to PNG and convert to base64
-        using var memoryStream = new MemoryStream();
-        bitmap.Save(memoryStream, ImageFormat.Png);
-        var base64 = Convert.ToBase64String(memoryStream.ToArray());
+        _logger.LogCaptureSuccess(processed.Width, processed.Height);
 
-        _logger.LogCaptureSuccess(width, height);
-
-        return Task.FromResult(ScreenshotControlResult.CompositeSuccess(
-            base64,
-            metadata,
-            $"Captured all {monitors.Count} monitor(s): {width}x{height} pixels"));
+        // Handle output mode
+        return Task.FromResult(BuildCompositeResult(processed, metadata, request,
+            $"Captured all {monitors.Count} monitor(s): {processed.Width}x{processed.Height} {processed.Format}"));
     }
 
     /// <summary>
@@ -440,11 +445,11 @@ public sealed class ScreenshotService : IScreenshotService
     }
 
     /// <summary>
-    /// Internal method to capture a screen region and encode to base64 PNG.
+    /// Internal method to capture a screen region with LLM optimization.
     /// </summary>
     private Task<ScreenshotControlResult> CaptureRegionInternalAsync(
         CaptureRegion region,
-        bool includeCursor,
+        ScreenshotControlRequest request,
         CancellationToken cancellationToken)
     {
         // Check size limit
@@ -459,7 +464,7 @@ public sealed class ScreenshotService : IScreenshotService
         cancellationToken.ThrowIfCancellationRequested();
 
         // Create bitmap and capture
-        using var bitmap = new Bitmap(region.Width, region.Height, PixelFormat.Format32bppArgb);
+        using var bitmap = new Bitmap(region.Width, region.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
         using var graphics = Graphics.FromImage(bitmap);
 
         // Capture the screen region
@@ -472,25 +477,105 @@ public sealed class ScreenshotService : IScreenshotService
             CopyPixelOperation.SourceCopy);
 
         // Optionally include cursor
-        if (includeCursor)
+        if (request.IncludeCursor)
         {
             DrawCursor(graphics, region.X, region.Y);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Encode to PNG and convert to base64
-        using var memoryStream = new MemoryStream();
-        bitmap.Save(memoryStream, ImageFormat.Png);
-        var base64 = Convert.ToBase64String(memoryStream.ToArray());
+        // Process the image (scale + encode)
+        var processed = _imageProcessor.Process(
+            bitmap,
+            request.ImageFormat,
+            request.Quality,
+            request.MaxWidth,
+            request.MaxHeight);
 
-        _logger.LogCaptureSuccess(region.Width, region.Height);
+        _logger.LogCaptureSuccess(processed.Width, processed.Height);
 
-        return Task.FromResult(ScreenshotControlResult.CaptureSuccess(
-            base64,
-            region.Width,
-            region.Height,
-            "png"));
+        // Handle output mode
+        return Task.FromResult(BuildCaptureResult(processed, request,
+            $"Captured {processed.Width}x{processed.Height} {processed.Format}"));
+    }
+
+    /// <summary>
+    /// Builds a capture result based on output mode (inline or file).
+    /// </summary>
+    private static ScreenshotControlResult BuildCaptureResult(
+        ProcessedImage processed,
+        ScreenshotControlRequest request,
+        string message)
+    {
+        string? filePath = null;
+
+        if (request.OutputMode == OutputMode.File)
+        {
+            filePath = GetOutputFilePath(request.OutputPath, processed.Format);
+            File.WriteAllBytes(filePath, processed.Data);
+        }
+
+        return ScreenshotControlResult.CaptureSuccess(processed, message, filePath);
+    }
+
+    /// <summary>
+    /// Builds a composite capture result based on output mode (inline or file).
+    /// </summary>
+    private static ScreenshotControlResult BuildCompositeResult(
+        ProcessedImage processed,
+        CompositeScreenshotMetadata metadata,
+        ScreenshotControlRequest request,
+        string message)
+    {
+        string? filePath = null;
+
+        if (request.OutputMode == OutputMode.File)
+        {
+            filePath = GetOutputFilePath(request.OutputPath, processed.Format);
+            File.WriteAllBytes(filePath, processed.Data);
+        }
+
+        return ScreenshotControlResult.CompositeSuccess(processed, metadata, message, filePath);
+    }
+
+    /// <summary>
+    /// Generates a unique temporary file path for screenshots.
+    /// </summary>
+    /// <param name="format">The image format extension (e.g., "jpeg", "png").</param>
+    /// <returns>Full path to the temp file.</returns>
+    private static string GenerateTempFilePath(string format)
+    {
+        var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+        var extension = format == "jpeg" ? "jpg" : format;
+        var filename = $"screenshot_{timestamp}.{extension}";
+        return Path.Combine(Path.GetTempPath(), filename);
+    }
+
+    /// <summary>
+    /// Gets the output file path, handling both directory and file path scenarios.
+    /// </summary>
+    /// <param name="outputPath">The output path (directory or file) from the request, or null for temp directory.</param>
+    /// <param name="format">The image format extension (e.g., "jpeg", "png").</param>
+    /// <returns>Full path to the output file.</returns>
+    private static string GetOutputFilePath(string? outputPath, string format)
+    {
+        if (string.IsNullOrWhiteSpace(outputPath))
+        {
+            return GenerateTempFilePath(format);
+        }
+
+        // Check if outputPath is a directory
+        if (Directory.Exists(outputPath))
+        {
+            // It's a directory - generate filename within it
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss_fff", System.Globalization.CultureInfo.InvariantCulture);
+            var extension = format == "jpeg" ? "jpg" : format;
+            var filename = $"screenshot_{timestamp}.{extension}";
+            return Path.Combine(outputPath, filename);
+        }
+
+        // It's a full file path - use it directly
+        return outputPath;
     }
 
     /// <summary>

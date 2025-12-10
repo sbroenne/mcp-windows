@@ -18,12 +18,14 @@ public sealed class ScreenshotCursorTests
     {
         var monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }

@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Screenshot Control Parameters (LLM Optimized)",
+  "description": "Extended parameters for screenshot_control MCP tool with LLM optimization options",
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "description": "The action to perform",
+      "enum": ["capture", "list_monitors"],
+      "default": "capture"
+    },
+    "target": {
+      "type": "string",
+      "description": "Capture target type",
+      "enum": ["primary_screen", "monitor", "window", "region", "all_monitors"],
+      "default": "primary_screen"
+    },
+    "monitorIndex": {
+      "type": ["integer", "null"],
+      "description": "Monitor index for 'monitor' target (0-based)",
+      "minimum": 0
+    },
+    "windowHandle": {
+      "type": ["integer", "null"],
+      "description": "Window handle (IntPtr value) for 'window' target"
+    },
+    "regionX": {
+      "type": ["integer", "null"],
+      "description": "X coordinate (left) for 'region' target"
+    },
+    "regionY": {
+      "type": ["integer", "null"],
+      "description": "Y coordinate (top) for 'region' target"
+    },
+    "regionWidth": {
+      "type": ["integer", "null"],
+      "description": "Width in pixels for 'region' target",
+      "minimum": 1
+    },
+    "regionHeight": {
+      "type": ["integer", "null"],
+      "description": "Height in pixels for 'region' target",
+      "minimum": 1
+    },
+    "includeCursor": {
+      "type": "boolean",
+      "description": "Include mouse cursor in capture",
+      "default": false
+    },
+    "imageFormat": {
+      "type": "string",
+      "description": "Output image format. JPEG recommended for LLM consumption (smaller files). PNG for pixel-perfect capture.",
+      "enum": ["jpeg", "png"],
+      "default": "jpeg"
+    },
+    "quality": {
+      "type": ["integer", "null"],
+      "description": "JPEG quality (1-100). Only applies when imageFormat is 'jpeg'. Higher = better quality, larger file.",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 85
+    },
+    "maxWidth": {
+      "type": ["integer", "null"],
+      "description": "Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default 1568 is Claude's high-res native limit. Set to 0 to disable scaling.",
+      "minimum": 0,
+      "default": 1568
+    },
+    "maxHeight": {
+      "type": ["integer", "null"],
+      "description": "Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Set to 0 for no height constraint.",
+      "minimum": 0,
+      "default": 0
+    },
+    "outputMode": {
+      "type": "string",
+      "description": "How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path.",
+      "enum": ["inline", "file"],
+      "default": "inline"
+    },
+    "outputPath": {
+      "type": ["string", "null"],
+      "description": "Custom output file path when outputMode is 'file'. If null, generates temp file automatically.",
+      "default": null
+    }
+  },
+  "required": [],
+  "additionalProperties": false,
+  "examples": [
+    {
+      "description": "Capture primary screen with LLM-optimized defaults (JPEG, scaled to 1568px)",
+      "value": {
+        "action": "capture"
+      }
+    },
+    {
+      "description": "Capture full resolution PNG (backward compatible)",
+      "value": {
+        "action": "capture",
+        "imageFormat": "png",
+        "maxWidth": 0
+      }
+    },
+    {
+      "description": "Capture specific monitor with high quality JPEG",
+      "value": {
+        "action": "capture",
+        "target": "monitor",
+        "monitorIndex": 1,
+        "imageFormat": "jpeg",
+        "quality": 95
+      }
+    },
+    {
+      "description": "Capture to file for large screenshots",
+      "value": {
+        "action": "capture",
+        "target": "all_monitors",
+        "outputMode": "file"
+      }
+    },
+    {
+      "description": "Capture region with custom output path",
+      "value": {
+        "action": "capture",
+        "target": "region",
+        "regionX": 100,
+        "regionY": 100,
+        "regionWidth": 800,
+        "regionHeight": 600,
+        "outputMode": "file",
+        "outputPath": "C:/Screenshots/capture.jpg"
+      }
+    }
+  ]
+}

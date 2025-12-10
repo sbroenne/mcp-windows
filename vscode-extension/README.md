@@ -40,10 +40,14 @@ This extension provides Windows automation capabilities for AI assistants like G
 - Regex support for window title matching
 
 ### 📸 Screenshot Capture
+- **LLM-Optimized by Default** - JPEG @ quality 85, auto-scaled to 1568px width
 - Capture primary screen or specific monitors
 - Capture specific windows
 - Capture regions
 - Capture all monitors at once
+- Format options: JPEG (default), PNG, WebP
+- Auto-scaling reduces 4K screenshots by 97% (from ~8MB to ~200KB)
+- File output mode for zero base64 overhead
 - Optional cursor inclusion
 - List available monitors
 
@@ -104,6 +108,10 @@ Use `screenshot_control` with `list_monitors` action to see all connected monito
 - `target` - What to capture (primary_screen, monitor, window, region, all_monitors)
 - `monitorIndex` - Which monitor to capture
 - `includeCursor` - Include mouse cursor in capture
+- `imageFormat` - Output format: "jpeg" (default), "png", "webp"
+- `quality` - Compression quality 1-100 (default: 85)
+- `maxWidth` - Max width in pixels (default: 1568, LLM-optimized); 0 to disable
+- `outputMode` - "inline" (base64) or "file" (returns file path)
 
 ## Platform Support
 

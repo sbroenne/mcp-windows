@@ -20,12 +20,14 @@ public sealed class AllMonitorsCaptureTests
     {
         _monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             _monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
@@ -51,13 +53,14 @@ public sealed class AllMonitorsCaptureTests
     }
 
     [Fact]
-    public async Task CaptureAllMonitors_ReturnsValidPngData()
+    public async Task CaptureAllMonitors_WithPngFormat_ReturnsValidPngData()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -80,11 +83,12 @@ public sealed class AllMonitorsCaptureTests
     [Fact]
     public async Task CaptureAllMonitors_ReturnsDimensionsMatchingVirtualScreen()
     {
-        // Arrange
+        // Arrange - disable auto-scaling to verify exact dimensions
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            MaxWidth = 0 // Disable auto-scaling
         };
 
         // Get virtual screen bounds (bounding rectangle of all monitors)
@@ -295,13 +299,14 @@ public sealed class AllMonitorsCaptureTests
     }
 
     [Fact]
-    public async Task CaptureAllMonitors_FormatIsPng()
+    public async Task CaptureAllMonitors_WithPngFormat_FormatIsPng()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act

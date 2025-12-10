@@ -38,12 +38,16 @@ Designed for computer use, QA and RPA scenarios.
 - **Cloaking detection** - filter out virtual desktop and shell-managed windows
 
 ### 📸 Screenshot Capture
+- **LLM-Optimized by Default** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
 - **Capture primary screen** - full screenshot of the main display
 - **Capture specific monitor** - screenshot any connected display by index
 - **Capture window** - screenshot a specific window (even if partially obscured)
 - **Capture region** - screenshot an arbitrary rectangular area
+- **Capture all monitors** - composite screenshot of entire virtual desktop
+- **Format options** - JPEG (default), PNG, WebP with configurable quality (1-100)
+- **Auto-scaling** - defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
+- **Output modes** - inline base64 (default) or file path for zero-overhead file workflows
 - **Cursor inclusion** - optionally include mouse cursor in captures
-- **Base64 PNG output** - images returned as base64-encoded PNG data
 - **Multi-monitor aware** - supports extended desktop configurations
 - **DPI aware** - correct pixel dimensions on high-DPI displays
 
@@ -179,6 +183,12 @@ Capture screenshots on Windows.
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `include_cursor` | boolean | `false` | Include mouse cursor in capture |
+| `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png", "webp" |
+| `quality` | integer | `85` | Compression quality for JPEG/WebP (1-100) |
+| `maxWidth` | integer | `1568` | Max width in pixels (LLM-optimized); 0 to disable scaling |
+| `maxHeight` | integer | `null` | Max height in pixels (optional) |
+| `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
+| `outputPath` | string | `null` | Custom file path when using file output mode |
 
 ## Supported Keys
 

@@ -14,6 +14,9 @@ Auto-generated from all feature plans. Last updated: 2025-12-07
 - N/A (returns base64-encoded PNG via MCP) (008-all-monitors-screenshot)
 - C# 12 / .NET 8.0 + MCP C# SDK (latest), Microsoft.Extensions.*, System.Text.Json (010-code-quality)
 - N/A (stateless tool server) (010-code-quality)
+- C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace (011-screenshot-llm-optimization)
+- File output to `System.IO.Path.GetTempPath()` with unique naming (011-screenshot-llm-optimization)
+- File output to `System.IO.Path.GetTempPath()` with timestamp naming (011-screenshot-llm-optimization)
 
 - C# 12+ (latest stable per Constitution XIII) (001-mouse-control)
 
@@ -33,9 +36,9 @@ tests/
 C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 
 ## Recent Changes
+- 011-screenshot-llm-optimization: Added C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace
+- 011-screenshot-llm-optimization: Added C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace
 - 010-code-quality: Added C# 12 / .NET 8.0 + MCP C# SDK (latest), Microsoft.Extensions.*, System.Text.Json
-- 008-all-monitors-screenshot: Added `CaptureTarget.AllMonitors` to screenshot_control tool for capturing entire virtual screen spanning all monitors. Uses existing `CoordinateNormalizer.GetVirtualScreenBounds()` and `CaptureRegionInternalAsync()`. Also added `VirtualScreen` property to `list_monitors` response.
-- 007-llm-integration-testing: Added C# 12+ (.NET 8.0 LTS) + Microsoft.Extensions.Logging, System.Drawing, existing MCP tools (mouse_control, keyboard_control, window_management, screenshot_control)
 
 
 <!-- MANUAL ADDITIONS START -->

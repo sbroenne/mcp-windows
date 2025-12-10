@@ -18,18 +18,20 @@ public sealed class ScreenshotRegionTests
     {
         var monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
 
     [Fact]
-    public async Task CaptureRegion_ValidRegion_ReturnsSuccess()
+    public async Task CaptureRegion_ValidRegion_WithPngFormat_ReturnsSuccess()
     {
         // Arrange - use secondary monitor if available for DPI consistency
         var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
@@ -37,7 +39,8 @@ public sealed class ScreenshotRegionTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(x, y, 400, 300)
+            Region = new CaptureRegion(x, y, 400, 300),
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -74,7 +77,7 @@ public sealed class ScreenshotRegionTests
     }
 
     [Fact]
-    public async Task CaptureRegion_ReturnsValidPng()
+    public async Task CaptureRegion_WithPngFormat_ReturnsValidPng()
     {
         // Arrange - use secondary monitor if available for DPI consistency
         var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
@@ -82,7 +85,8 @@ public sealed class ScreenshotRegionTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(x, y, 200, 150)
+            Region = new CaptureRegion(x, y, 200, 150),
+            ImageFormat = ImageFormat.Png
         };
 
         // Act

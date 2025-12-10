@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Drawing.Imaging;
 using Sbroenne.WindowsMcp.Models;
+using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace Sbroenne.WindowsMcp.Capture;
 
@@ -225,7 +226,7 @@ public sealed class VisualDiffService : IVisualDiffService
             if (diffBitmap is not null && changedPixels > 0)
             {
                 using var memoryStream = new MemoryStream();
-                diffBitmap.Save(memoryStream, ImageFormat.Png);
+                diffBitmap.Save(memoryStream, DrawingImageFormat.Png);
                 diffImageBase64 = Convert.ToBase64String(memoryStream.ToArray());
             }
 

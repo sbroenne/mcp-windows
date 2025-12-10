@@ -22,12 +22,14 @@ public sealed class ScreenshotAllMonitorsTests
     {
         _monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             _monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
@@ -35,11 +37,12 @@ public sealed class ScreenshotAllMonitorsTests
     [Fact]
     public async Task CaptureAllMonitors_ReturnsVirtualScreenDimensions()
     {
-        // Arrange
+        // Arrange - disable auto-scaling to verify exact dimensions
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            MaxWidth = 0 // Disable auto-scaling
         };
         var virtualBounds = CoordinateNormalizer.GetVirtualScreenBounds();
 
@@ -83,15 +86,18 @@ public sealed class ScreenshotAllMonitorsTests
         // On multi-monitor systems, the dimensions will differ
         if (monitors.Count == 1)
         {
+            // Disable auto-scaling to verify exact dimensions
             var allMonitorsRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.AllMonitors
+                Target = CaptureTarget.AllMonitors,
+                MaxWidth = 0 // Disable auto-scaling
             };
             var primaryRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.PrimaryScreen
+                Target = CaptureTarget.PrimaryScreen,
+                MaxWidth = 0 // Disable auto-scaling
             };
 
             // Act
@@ -107,15 +113,18 @@ public sealed class ScreenshotAllMonitorsTests
         else
         {
             // Multi-monitor system: verify all_monitors captures a larger area
+            // Disable auto-scaling to verify exact dimensions
             var allMonitorsRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.AllMonitors
+                Target = CaptureTarget.AllMonitors,
+                MaxWidth = 0 // Disable auto-scaling
             };
             var primaryRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.PrimaryScreen
+                Target = CaptureTarget.PrimaryScreen,
+                MaxWidth = 0 // Disable auto-scaling
             };
 
             var allMonitorsResult = await _screenshotService.ExecuteAsync(allMonitorsRequest);
@@ -134,13 +143,14 @@ public sealed class ScreenshotAllMonitorsTests
     }
 
     [Fact]
-    public async Task CaptureAllMonitors_ReturnsValidPng()
+    public async Task CaptureAllMonitors_WithPngFormat_ReturnsValidPng()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -161,13 +171,14 @@ public sealed class ScreenshotAllMonitorsTests
     }
 
     [Fact]
-    public async Task CaptureAllMonitors_IncludesMetadata()
+    public async Task CaptureAllMonitors_WithPngFormat_IncludesMetadata()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -190,10 +201,12 @@ public sealed class ScreenshotAllMonitorsTests
         // has negative coordinates (e.g., monitor to the left of primary)
         var virtualBounds = CoordinateNormalizer.GetVirtualScreenBounds();
 
+        // Disable auto-scaling to verify exact dimensions
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            MaxWidth = 0 // Disable auto-scaling
         };
 
         // Act
@@ -232,7 +245,7 @@ public sealed class ScreenshotAllMonitorsTests
     }
 
     [Fact]
-    public async Task CaptureAllMonitors_BeforeAfterComparison_DetectsChange()
+    public async Task CaptureAllMonitors_BeforeAfterComparison_WithPngFormat_DetectsChange()
     {
         // Arrange
         // This test captures two screenshots of all monitors to verify
@@ -240,7 +253,8 @@ public sealed class ScreenshotAllMonitorsTests
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors
+            Target = CaptureTarget.AllMonitors,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act - capture two screenshots in sequence

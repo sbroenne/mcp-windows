@@ -19,25 +19,29 @@ public sealed class ScreenshotMonitorTests
     {
         _monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
+        var imageProcessor = new ImageProcessor();
         var configuration = ScreenshotConfiguration.FromEnvironment();
         var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
 
         _screenshotService = new ScreenshotService(
             _monitorService,
             secureDesktopDetector,
+            imageProcessor,
             configuration,
             logger);
     }
 
     [Fact]
-    public async Task CaptureMonitor_Index0_ReturnsSuccessWithValidDimensions()
+    public async Task CaptureMonitor_Index0_WithPngFormat_ReturnsSuccessWithValidDimensions()
     {
-        // Arrange
+        // Arrange - explicitly request PNG and no scaling for backward compatibility
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Monitor,
-            MonitorIndex = 0
+            MonitorIndex = 0,
+            ImageFormat = ImageFormat.Png,
+            MaxWidth = 0 // Disable auto-scaling
         };
         var monitor0 = _monitorService.GetMonitor(0);
         Assert.NotNull(monitor0);
@@ -54,14 +58,15 @@ public sealed class ScreenshotMonitorTests
     }
 
     [Fact]
-    public async Task CaptureMonitor_Index0_ReturnsValidPng()
+    public async Task CaptureMonitor_Index0_WithPngFormat_ReturnsValidPng()
     {
-        // Arrange
+        // Arrange - explicitly request PNG format
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Monitor,
-            MonitorIndex = 0
+            MonitorIndex = 0,
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
@@ -84,12 +89,13 @@ public sealed class ScreenshotMonitorTests
     [Fact]
     public async Task CaptureMonitor_NullIndex_DefaultsToIndex0()
     {
-        // Arrange
+        // Arrange - disable auto-scaling to verify exact dimensions
         var requestWithNull = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Monitor,
-            MonitorIndex = null
+            MonitorIndex = null,
+            MaxWidth = 0 // Disable auto-scaling
         };
         var monitor0 = _monitorService.GetMonitor(0);
         Assert.NotNull(monitor0);
@@ -160,11 +166,13 @@ public sealed class ScreenshotMonitorTests
             var monitor = _monitorService.GetMonitor(i);
             Assert.NotNull(monitor);
 
+            // Disable auto-scaling to verify exact dimensions
             var request = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
                 Target = CaptureTarget.Monitor,
-                MonitorIndex = i
+                MonitorIndex = i,
+                MaxWidth = 0 // Disable auto-scaling
             };
 
             // Act
@@ -203,7 +211,7 @@ public sealed class ScreenshotMonitorTests
         // Skip if only one monitor
         Skip.If(_monitorService.MonitorCount < 2, "Test requires multiple monitors");
 
-        // Arrange
+        // Arrange - disable auto-scaling to verify exact dimensions
         var monitor1 = _monitorService.GetMonitor(1);
         Assert.NotNull(monitor1);
 
@@ -211,7 +219,8 @@ public sealed class ScreenshotMonitorTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Monitor,
-            MonitorIndex = 1
+            MonitorIndex = 1,
+            MaxWidth = 0 // Disable auto-scaling
         };
 
         // Act
