@@ -3,7 +3,7 @@ layout: default
 title: "Windows MCP Server - AI-Powered Windows Automation via GitHub Copilot & Claude"
 description: "Control Windows with natural language through AI assistants like GitHub Copilot and Claude. Automate mouse, keyboard, windows, and screenshots. One-click install for Visual Studio Code."
 keywords: "Windows automation, MCP server, AI Windows, mouse control, keyboard control, window management, screenshot capture, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
-canonical_url: "https://sbroenne.github.io/mcp-windows/"
+canonical_url: "https://windowsmcpserver.dev/"
 ---
 
 <div class="hero">
@@ -64,7 +64,7 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 </div>
 </div>
 
-<p><a href="/mcp-windows/features/">See all tools and operations →</a></p>
+<p><a href="/features/">See all tools and operations →</a></p>
 
 ## Why Choose Windows MCP?
 
@@ -139,14 +139,14 @@ Download pre-built binaries from the [GitHub Releases page](https://github.com/s
 
 ## Documentation
 
-📖 **[Complete Feature Reference](/mcp-windows/features/)** — All tools and operations
+📖 **[Complete Feature Reference](/features/)** — All tools and operations
 
-📋 **[Changelog](/mcp-windows/changelog/)** — Release notes and version history
+📋 **[Changelog](/changelog/)** — Release notes and version history
 
 ## More Information
 
 - [GitHub Repository](https://github.com/sbroenne/mcp-windows) — Source code, issues, and contributions
-- [Contributing Guide](/mcp-windows/contributing/) — How to contribute
+- [Contributing Guide](/contributing/) — How to contribute
 
 ## Related Projects
 
