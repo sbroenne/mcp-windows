@@ -70,21 +70,22 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, UseStructuredContent = true)]
+    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.")]
     [return: Description("The result of the window operation including success status, window list or single window info, and error details if failed.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        string action,
-        string? handle = null,
-        string? title = null,
-        string? filter = null,
-        bool regex = false,
-        bool includeAllDesktops = false,
-        int? x = null,
-        int? y = null,
-        int? width = null,
-        int? height = null,
-        int? timeoutMs = null,
-        int? monitorIndex = null,
+        [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
+        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor)")] string? handle = null,
+        [Description("Window title to search for (required for find and wait_for)")] string? title = null,
+        [Description("Filter windows by title or process name (for list action)")] string? filter = null,
+        [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
+        [Description("Include windows on other virtual desktops (default: false)")] bool includeAllDesktops = false,
+        [Description("X-coordinate for move or set_bounds action")] int? x = null,
+        [Description("Y-coordinate for move or set_bounds action")] int? y = null,
+        [Description("Width for resize or set_bounds action")] int? width = null,
+        [Description("Height for resize or set_bounds action")] int? height = null,
+        [Description("Timeout in milliseconds for wait_for action")] int? timeoutMs = null,
+        [Description("Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.")] int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

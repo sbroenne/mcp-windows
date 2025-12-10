@@ -61,24 +61,25 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, UseStructuredContent = true)]
+    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter). LLM-optimized defaults: JPEG format at quality 85, auto-scaled to 1568px width. Use action 'list_monitors' to enumerate available monitors. Use target 'all_monitors' to capture all connected monitors as a single composite image. Respects secure desktop (UAC/lock screen) restrictions.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, monitor list, and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        string? action = null,
-        string? target = null,
-        int? monitorIndex = null,
-        long? windowHandle = null,
-        int? regionX = null,
-        int? regionY = null,
-        int? regionWidth = null,
-        int? regionHeight = null,
-        bool includeCursor = false,
-        string? imageFormat = null,
-        int? quality = null,
-        int? maxWidth = null,
-        int? maxHeight = null,
-        string? outputMode = null,
-        string? outputPath = null,
+        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
+        [Description("Capture target. Valid values: 'primary_screen', 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
+        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
+        [Description("Window handle (IntPtr value) for 'window' target. Get from window_management tool.")] long? windowHandle = null,
+        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int? regionX = null,
+        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")] int? regionY = null,
+        [Description("Width in pixels for 'region' target. Must be positive.")] int? regionWidth = null,
+        [Description("Height in pixels for 'region' target. Must be positive.")] int? regionHeight = null,
+        [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
+        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
+        [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
+        [Description("Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 1568 (Claude's high-res native limit). Set to 0 to disable scaling.")] int? maxWidth = null,
+        [Description("Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).")] int? maxHeight = null,
+        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
+        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

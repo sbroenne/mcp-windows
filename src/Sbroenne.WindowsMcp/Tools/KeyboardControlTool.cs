@@ -68,16 +68,17 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, UseStructuredContent = true)]
+    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions.")]
     [return: Description("The result of the keyboard operation including success status, characters typed, key pressed, keyboard layout info, and error details if failed.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        string action,
-        string? text = null,
-        string? key = null,
-        string? modifiers = null,
-        int repeat = 1,
-        string? sequence = null,
-        int? interKeyDelayMs = null,
+        [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout")] string action,
+        [Description("Text to type (required for type action)")] string? text = null,
+        [Description("Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
+        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions)")] string? modifiers = null,
+        [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
+        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
+        [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

@@ -79,19 +79,20 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, cursor position, and any errors.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, UseStructuredContent = true)]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: All x/y coordinates are relative to the specified monitor (default: monitor 0 = primary). Example: x=100, y=50 clicks 100px from left, 50px from top of the monitor. For secondary monitor, use monitorIndex=1.")]
     [return: Description("The result of the mouse operation including success status, final cursor position, window title at cursor, and error details if failed.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        string action,
-        int? x = null,
-        int? y = null,
-        int? endX = null,
-        int? endY = null,
-        string? direction = null,
-        int amount = 1,
-        string? modifiers = null,
-        string? button = null,
-        int monitorIndex = 0,
+        [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll")] string action,
+        [Description("X-coordinate relative to the monitor's left edge (required for move, optional for clicks).")] int? x = null,
+        [Description("Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).")] int? y = null,
+        [Description("End x-coordinate relative to the monitor (required for drag action).")] int? endX = null,
+        [Description("End y-coordinate relative to the monitor (required for drag action).")] int? endY = null,
+        [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
+        [Description("Number of scroll clicks (default: 1)")] int amount = 1,
+        [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
+        [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
+        [Description("Monitor index (0-based, default: 0 = primary monitor). All coordinates are relative to this monitor.")] int monitorIndex = 0,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
