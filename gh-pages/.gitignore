@@ -1,0 +1,11 @@
+# Jekyll build output
+_site/
+
+# Ruby/Bundler
+vendor/
+.bundle/
+Gemfile.lock
+
+# Generated content files (copied by build.sh from project root)
+_includes/contributing.md
+_includes/changelog.md

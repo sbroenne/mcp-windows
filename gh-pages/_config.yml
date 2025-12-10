@@ -1,0 +1,55 @@
+# Jekyll configuration for GitHub Pages
+# https://jekyllrb.com/docs/configuration/
+
+# Site settings
+title: "Windows MCP Server"
+description: "AI-powered Windows automation through GitHub Copilot & Claude"
+url: "https://sbroenne.github.io"
+baseurl: "/mcp-windows"
+repository: "sbroenne/mcp-windows"
+
+# Theme
+theme: jekyll-theme-cayman
+
+# Plugins
+plugins:
+  - jekyll-sitemap
+  - jekyll-seo-tag
+  - jekyll-feed
+
+# Feed settings
+feed:
+  path: feed.xml
+
+# SEO settings
+author: "Stefan Broenne"
+twitter:
+  card: summary_large_image
+social:
+  name: Stefan Broenne
+  links:
+    - https://github.com/sbroenne
+
+logo: /assets/images/icon.png
+
+# Additional SEO settings
+defaults:
+  - scope:
+      path: ""
+    values:
+      image: /assets/images/icon.png
+
+# Build settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+# Exclude files from processing
+exclude:
+  - README.md
+  - LICENSE
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .bundle
