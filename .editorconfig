@@ -263,3 +263,8 @@ dotnet_diagnostic.IDE0058.severity = suggestion
 
 # IDE1006: Naming rules - allow primary constructor parameters without underscore
 # This is handled by the naming rules section with specific scopes
+
+# Test project settings - allow underscore naming convention for test methods
+[*Tests/**/*.cs]
+dotnet_naming_rule.test_methods_should_allow_underscores.severity = none
+dotnet_diagnostic.IDE1006.severity = none
