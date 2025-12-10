@@ -1,84 +1,131 @@
-using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for mouse scroll operations.
+/// These tests use a dedicated test harness window to verify scroll events are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class MouseScrollTests
+public sealed class MouseScrollTests : IDisposable
 {
-    private readonly MouseInputService _service = new();
+    private readonly Coordinates _originalPosition;
+    private readonly MouseTestFixture _fixture;
 
-    [Fact]
-    public async Task ScrollAsync_DownAtCurrentPosition_Succeeds()
+    public MouseScrollTests(MouseTestFixture fixture)
     {
-        // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Down, 1, null, null);
+        _fixture = fixture;
+        _originalPosition = Coordinates.FromCurrent();
 
-        // Assert - operation should succeed even if target is elevated
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        // Reset harness state before each test
+        _fixture.Reset();
+    }
+
+    public void Dispose()
+    {
+        _fixture.MouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
     }
 
     [Fact]
-    public async Task ScrollAsync_UpAtCurrentPosition_Succeeds()
+    public async Task ScrollAsync_DownOnScrollPanel_VerifiedByHarness()
     {
-        // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Up, 1, null, null);
+        // Arrange - scroll on the scroll panel
+        var panelCenter = _fixture.GetScrollPanelCenter();
+        _fixture.EnsureTestWindowForeground();
 
-        // Assert
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        // Focus the scroll panel first
+        await _fixture.MouseInputService.ClickAsync(panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        _fixture.Reset(); // Reset after the click
+
+        // Act
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+
+        // Assert - harness received the scroll event
+        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
+        Assert.True(scrollReceived, "Test harness did not receive the scroll event");
+        _fixture.AssertScrollDetected(1);
+
+        // Assert - scroll delta should be negative (down)
+        var scrollDelta = _fixture.GetTotalScrollDelta();
+        Assert.True(scrollDelta < 0, $"Expected negative scroll delta for down scroll, got {scrollDelta}");
     }
 
     [Fact]
-    public async Task ScrollAsync_LeftAtCurrentPosition_Succeeds()
+    public async Task ScrollAsync_UpOnScrollPanel_VerifiedByHarness()
     {
-        // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Left, 1, null, null);
+        // Arrange - scroll on the scroll panel
+        var panelCenter = _fixture.GetScrollPanelCenter();
+        _fixture.EnsureTestWindowForeground();
 
-        // Assert
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        // Focus the scroll panel first
+        await _fixture.MouseInputService.ClickAsync(panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        _fixture.Reset(); // Reset after the click
+
+        // Act
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Up, 1, panelCenter.X, panelCenter.Y);
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+
+        // Assert - harness received the scroll event
+        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
+        Assert.True(scrollReceived, "Test harness did not receive the scroll event");
+
+        // Assert - scroll delta should be positive (up)
+        var scrollDelta = _fixture.GetTotalScrollDelta();
+        Assert.True(scrollDelta > 0, $"Expected positive scroll delta for up scroll, got {scrollDelta}");
     }
 
     [Fact]
-    public async Task ScrollAsync_RightAtCurrentPosition_Succeeds()
+    public async Task ScrollAsync_LeftInTestWindow_Succeeds()
     {
+        // Arrange - scroll inside the dedicated test window
+        // Note: Horizontal scroll events may not be captured by the basic scroll panel
+        var (x, y) = _fixture.GetTestWindowCenter();
+        _fixture.EnsureTestWindowForeground();
+
         // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Right, 1, null, null);
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Left, 1, x, y);
 
         // Assert
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+    }
+
+    [Fact]
+    public async Task ScrollAsync_RightInTestWindow_Succeeds()
+    {
+        // Arrange - scroll inside the dedicated test window
+        // Note: Horizontal scroll events may not be captured by the basic scroll panel
+        var (x, y) = _fixture.GetTestWindowCenter();
+        _fixture.EnsureTestWindowForeground();
+
+        // Act
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Right, 1, x, y);
+
+        // Assert
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
     [Fact]
     public async Task ScrollAsync_WithCoordinates_MovesCursorFirst()
     {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        // Arrange - scroll on the scroll panel with specific coordinates
+        var panelCenter = _fixture.GetScrollPanelCenter();
+        _fixture.EnsureTestWindowForeground();
 
         // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Down, 1, x, y);
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
 
-        // Assert - if successful, cursor should be at specified position
-        if (result.Success)
-        {
-            Assert.NotNull(result.FinalPosition);
-            Assert.InRange(result.FinalPosition.X, x - 1, x + 1);
-            Assert.InRange(result.FinalPosition.Y, y - 1, y + 1);
-        }
+        // Assert - cursor should be at specified position
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+        Assert.NotNull(result.FinalPosition);
+        Assert.InRange(result.FinalPosition.X, panelCenter.X - 2, panelCenter.X + 2);
+        Assert.InRange(result.FinalPosition.Y, panelCenter.Y - 2, panelCenter.Y + 2);
     }
 
     [Fact]
@@ -89,7 +136,7 @@ public sealed class MouseScrollTests
         var y = -99999;
 
         // Act
-        var result = await _service.ScrollAsync(ScrollDirection.Down, 1, x, y);
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, x, y);
 
         // Assert
         Assert.False(result.Success);
@@ -97,28 +144,73 @@ public sealed class MouseScrollTests
     }
 
     [Fact]
-    public async Task ScrollAsync_MultipleClicks_Succeeds()
+    public async Task ScrollAsync_MultipleClicks_VerifiedByHarness()
     {
-        // Act - scroll 5 clicks
-        var result = await _service.ScrollAsync(ScrollDirection.Down, 5, null, null);
+        // Arrange - scroll 5 clicks on the scroll panel
+        var panelCenter = _fixture.GetScrollPanelCenter();
+        _fixture.EnsureTestWindowForeground();
 
-        // Assert
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        // Focus the scroll panel first
+        await _fixture.MouseInputService.ClickAsync(panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        _fixture.Reset(); // Reset after the click
+
+        // Act
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 5, panelCenter.X, panelCenter.Y);
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+
+        // Assert - harness received scroll events
+        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
+        Assert.True(scrollReceived, "Test harness did not receive any scroll events");
+
+        // Assert - total scroll delta should be significant
+        var scrollDelta = _fixture.GetTotalScrollDelta();
+        Assert.True(scrollDelta != 0, "Scroll delta should not be zero after 5 scroll clicks");
     }
 
     [Fact]
     public async Task ScrollAsync_ZeroAmount_Succeeds()
     {
-        // Act - scroll 0 clicks (effectively no scroll)
-        var result = await _service.ScrollAsync(ScrollDirection.Down, 0, null, null);
+        // Arrange - scroll 0 clicks (effectively no scroll)
+        var (x, y) = _fixture.GetTestWindowCenter();
+        _fixture.EnsureTestWindowForeground();
+
+        // Act
+        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 0, x, y);
 
         // Assert - should succeed even with 0 amount
-        Assert.True(
-            result.ErrorCode == MouseControlErrorCode.Success ||
-            result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
+
+        // Harness should not receive any scroll events for 0 amount
+        await Task.Delay(100);
+        var scrollCount = _fixture.GetScrollEventCount();
+        Assert.Equal(0, scrollCount);
+    }
+
+    [Fact]
+    public async Task ScrollAsync_AccumulatesScrollDelta()
+    {
+        // Arrange - scroll multiple times and verify delta accumulates
+        var panelCenter = _fixture.GetScrollPanelCenter();
+        _fixture.EnsureTestWindowForeground();
+
+        // Focus the scroll panel first
+        await _fixture.MouseInputService.ClickAsync(panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        _fixture.Reset();
+
+        // Act - scroll down twice, then up once
+        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Up, 1, panelCenter.X, panelCenter.Y);
+        await Task.Delay(100);
+
+        // Assert - scroll count should reflect 3 events
+        var scrollCount = _fixture.GetScrollEventCount();
+        Assert.True(scrollCount >= 3, $"Expected at least 3 scroll events, got {scrollCount}");
     }
 }

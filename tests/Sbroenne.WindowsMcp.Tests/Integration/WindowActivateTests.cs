@@ -6,6 +6,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for window activation operations.
+/// Uses the dedicated test harness window to avoid interfering with user's active work.
 /// </summary>
 [Collection("WindowManagement")]
 [SupportedOSPlatform("windows")]
@@ -13,6 +14,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
 {
     private readonly IWindowService _windowService;
     private readonly IWindowActivator _windowActivator;
+    private readonly WindowTestFixture _fixture;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowActivateTests"/> class.
@@ -21,6 +23,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
     public WindowActivateTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
+        _fixture = fixture;
         _windowService = fixture.WindowService;
         _windowActivator = fixture.WindowActivator;
     }
@@ -28,110 +31,57 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task ActivateWindow_BringsWindowToForeground()
     {
-        // Arrange - Get a list of windows
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
-
-        if (listResult.Windows.Count == 0)
-        {
-            // No windows available, skip test
-            return;
-        }
-
-        // Find a window that is not currently foreground and not elevated
-        var targetWindow = listResult.Windows.FirstOrDefault(w => !w.IsForeground && !w.IsElevated);
-        if (targetWindow is null)
-        {
-            // All windows are either foreground or elevated, skip test
-            return;
-        }
-
-        // Parse handle
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
 
         // Act
         var result = await _windowService.ActivateWindowAsync(handle);
 
-        // Assert - in a test environment, activation may fail due to focus restrictions
-        // We just verify the operation completes without exception and returns a result
+        // Assert
         Assert.NotNull(result);
-        // Note: result.Success may be false due to Windows focus stealing prevention
+        Assert.True(result.Success, $"Activate failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.True(result.Window.IsForeground, "Window should be foreground after activation");
     }
 
     [Fact]
     public async Task ActivateWindow_RestoresMinimizedWindow()
     {
-        // Arrange - Get a list of windows
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
+        // Arrange - Use the test harness window and minimize it first
+        nint handle = _fixture.TestWindowHandle;
 
-        // Find a minimized window
-        var minimizedWindow = listResult.Windows.FirstOrDefault(w =>
-            w.State == WindowState.Minimized && !w.IsElevated);
-
-        if (minimizedWindow is null)
-        {
-            // No minimized windows, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(minimizedWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        var minimizeResult = await _windowService.MinimizeWindowAsync(handle);
+        Assert.True(minimizeResult.Success, $"Setup minimize failed: {minimizeResult.Error}");
+        await Task.Delay(100); // Give window time to minimize
 
         // Act
         var result = await _windowService.ActivateWindowAsync(handle);
 
-        // Assert - in a test environment, activation may fail
-        // We verify the operation completes without exception
+        // Assert
         Assert.NotNull(result);
-        // Note: Due to Windows focus restrictions, we may not always succeed
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            // After activation, window should not be minimized
-            Assert.NotEqual(WindowState.Minimized, result.Window.State);
-        }
+        Assert.True(result.Success, $"Activate failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        // After activation, window should not be minimized
+        Assert.NotEqual(WindowState.Minimized, result.Window.State);
     }
 
     [Fact]
     public async Task ActivateWindow_ReturnsWindowInfo()
     {
-        // Arrange - Get a window to activate
-        var listResult = await _windowService.ListWindowsAsync();
-        Assert.True(listResult.Success);
-        Assert.NotNull(listResult.Windows);
-
-        if (listResult.Windows.Count == 0)
-        {
-            // No windows available, skip test
-            return;
-        }
-
-        var targetWindow = listResult.Windows.FirstOrDefault(w => !w.IsElevated);
-        if (targetWindow is null)
-        {
-            // All windows elevated, skip test
-            return;
-        }
-
-        Assert.True(long.TryParse(targetWindow.Handle, out long handleValue));
-        nint handle = (nint)handleValue;
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
 
         // Act
         var result = await _windowService.ActivateWindowAsync(handle);
 
-        // Assert - operation completes, success may vary due to focus restrictions
+        // Assert
         Assert.NotNull(result);
-        if (result.Success)
-        {
-            Assert.NotNull(result.Window);
-            Assert.Equal(targetWindow.Handle, result.Window.Handle);
-            Assert.NotNull(result.Window.Title);
-            Assert.NotNull(result.Window.Bounds);
-        }
+        Assert.True(result.Success, $"Activate failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.NotNull(result.Window.Title);
+        Assert.NotNull(result.Window.Bounds);
+        Assert.True(result.Window.Bounds.Width > 0);
+        Assert.True(result.Window.Bounds.Height > 0);
     }
 
     [Fact]

@@ -6,91 +6,86 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for mouse click operations.
-/// These tests interact with the actual Windows input system.
+/// These tests use a dedicated test harness window to verify clicks are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
 public class MouseClickTests : IDisposable
 {
     private readonly Coordinates _originalPosition;
-    private readonly MouseInputService _mouseInputService;
+    private readonly MouseTestFixture _fixture;
     private readonly ElevationDetector _elevationDetector;
     private readonly SecureDesktopDetector _secureDesktopDetector;
 
-    public MouseClickTests()
+    public MouseClickTests(MouseTestFixture fixture)
     {
+        _fixture = fixture;
         // Save original cursor position to restore after each test
         _originalPosition = Coordinates.FromCurrent();
-        _mouseInputService = new MouseInputService();
         _elevationDetector = new ElevationDetector();
         _secureDesktopDetector = new SecureDesktopDetector();
+
+        // Reset harness state before each test
+        _fixture.Reset();
     }
 
     public void Dispose()
     {
         // Restore original cursor position after each test
-        _mouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
+        _fixture.MouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
         GC.SuppressFinalize(this);
     }
 
     [Fact]
-    public async Task ClickAsync_AtCurrentPosition_ReturnsSuccessOrElevatedError()
+    public async Task ClickAsync_OnButton_VerifiedByHarness()
     {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (safeX, safeY) = TestMonitorHelper.GetTestCoordinates(100, 100);
-        await _mouseInputService.MoveAsync(safeX, safeY);
+        // Arrange - click on the test button
+        var buttonCenter = _fixture.GetTestButtonCenter();
+        _fixture.EnsureTestWindowForeground();
+        var initialClickCount = _fixture.GetButtonClickCount();
 
         // Act
-        var result = await _mouseInputService.ClickAsync(null, null);
+        var result = await _fixture.MouseInputService.ClickAsync(buttonCenter.X, buttonCenter.Y);
 
-        // Assert
-        // The click either succeeds or fails due to elevated target (depends on what's under cursor)
-        Assert.True(result.Success || result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or ElevatedProcessTarget, got {result.ErrorCode}: {result.Error}");
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.Error}");
 
-        if (result.Success)
-        {
-            // Cursor should remain at the same position (within tolerance)
-            Assert.InRange(result.FinalPosition.X, safeX - 1, safeX + 1);
-            Assert.InRange(result.FinalPosition.Y, safeY - 1, safeY + 1);
-        }
+        // Assert - harness actually received the click
+        var clickReceived = await _fixture.WaitForButtonClickAsync(initialClickCount + 1);
+        Assert.True(clickReceived, "Test harness did not receive the button click");
+        _fixture.AssertButtonClicked(initialClickCount + 1);
     }
 
     [Fact]
-    public async Task ClickAsync_WithCoordinates_ReturnsSuccessOrElevatedError()
+    public async Task ClickAsync_WithCoordinates_MovesAndClicks()
     {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        // Arrange - click on the test button using coordinates
+        var buttonCenter = _fixture.GetTestButtonCenter();
+        _fixture.EnsureTestWindowForeground();
 
         // Act
-        var result = await _mouseInputService.ClickAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.ClickAsync(buttonCenter.X, buttonCenter.Y);
 
-        // Assert
-        // The click either succeeds or fails due to elevated target
-        Assert.True(result.Success || result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or ElevatedProcessTarget, got {result.ErrorCode}: {result.Error}");
+        // Assert - API returns success and cursor is at expected position
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.Error}");
+        Assert.InRange(result.FinalPosition.X, buttonCenter.X - 2, buttonCenter.X + 2);
+        Assert.InRange(result.FinalPosition.Y, buttonCenter.Y - 2, buttonCenter.Y + 2);
 
-        if (result.Success)
-        {
-            // Cursor should be at the target position (within tolerance)
-            Assert.InRange(result.FinalPosition.X, targetX - 1, targetX + 1);
-            Assert.InRange(result.FinalPosition.Y, targetY - 1, targetY + 1);
-        }
+        // Assert - harness verifies click was received
+        var clickReceived = await _fixture.WaitForButtonClickAsync(1);
+        Assert.True(clickReceived, "Test harness did not receive the button click");
     }
 
     [Fact]
     public void ElevationDetector_CanDetectElevatedProcessTarget()
     {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (testX, testY) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        // Arrange - test against the known non-elevated test window
+        var (testX, testY) = _fixture.GetTestWindowCenter();
 
         // Act
-        // This test validates the elevation detector works
-        // It does not verify any specific elevated state since it depends on what's under the cursor
         var isElevated = _elevationDetector.IsTargetElevated(testX, testY);
 
-        // Assert - just verify it doesn't throw
-        // The actual value depends on what window is under the cursor
-        Assert.True(isElevated || !isElevated); // Always passes, validates no exception
+        // Assert - test harness window is not elevated
+        Assert.False(isElevated, "Test harness window should not be detected as elevated");
     }
 
     [Fact]
@@ -107,20 +102,19 @@ public class MouseClickTests : IDisposable
     }
 
     [Fact]
-    public async Task ClickAsync_ReturnsWindowTitleOrElevatedError()
+    public async Task ClickAsync_ReturnsTestWindowTitle()
     {
-        // Arrange - use center of preferred test monitor
-        var (targetX, targetY) = TestMonitorHelper.GetTestMonitorCenter();
+        // Arrange - click at center of test window
+        var (targetX, targetY) = _fixture.GetTestWindowCenter();
+        _fixture.EnsureTestWindowForeground();
 
         // Act
-        var result = await _mouseInputService.ClickAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.ClickAsync(targetX, targetY);
 
         // Assert
-        // Either succeeds (with or without window title) or fails due to elevation
-        Assert.True(result.Success || result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget,
-            $"Expected success or ElevatedProcessTarget, got {result.ErrorCode}: {result.Error}");
-        // WindowTitle may be null if no window is found or it has no title
-        // Just verify the operation completes without throwing
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.Error}");
+        Assert.NotNull(result.WindowTitle);
+        Assert.Contains(MouseTestFixture.TestWindowTitle, result.WindowTitle);
     }
 
     [Fact]
@@ -132,7 +126,7 @@ public class MouseClickTests : IDisposable
         var targetY = bounds.Bottom + 1000;
 
         // Act
-        var result = await _mouseInputService.ClickAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.ClickAsync(targetX, targetY);
 
         // Assert
         Assert.False(result.Success);
@@ -142,23 +136,41 @@ public class MouseClickTests : IDisposable
     }
 
     [Fact]
-    public async Task ClickAsync_SendInputSequence_Works()
+    public async Task ClickAsync_MultipleClicks_AllVerifiedByHarness()
     {
-        // This test verifies the click mechanism at the input service level
-        // by checking that the result includes a valid window title when available
-        // Arrange - target corner of preferred test monitor
-        var bounds = TestMonitorHelper.GetTestMonitorBounds();
-        var targetX = bounds.Right - 50;
-        var targetY = bounds.Bottom - 50;
+        // Arrange - click the button 3 times
+        var buttonCenter = _fixture.GetTestButtonCenter();
+        _fixture.EnsureTestWindowForeground();
+
+        // Act - click 3 times
+        for (var i = 0; i < 3; i++)
+        {
+            var result = await _fixture.MouseInputService.ClickAsync(buttonCenter.X, buttonCenter.Y);
+            Assert.True(result.Success, $"Click {i + 1} failed: {result.ErrorCode}: {result.Error}");
+            await Task.Delay(50); // Small delay between clicks
+        }
+
+        // Assert - harness received all 3 clicks
+        var allClicksReceived = await _fixture.WaitForButtonClickAsync(3);
+        Assert.True(allClicksReceived, $"Expected 3 clicks but harness received {_fixture.GetButtonClickCount()}");
+    }
+
+    [Fact]
+    public async Task ClickAsync_OnTextBox_ReturnsSuccess()
+    {
+        // Arrange - click on the text box
+        var textBoxCenter = _fixture.GetTextBoxCenter();
+        _fixture.EnsureTestWindowForeground();
 
         // Act
-        var result = await _mouseInputService.ClickAsync(targetX, targetY);
+        var result = await _fixture.MouseInputService.ClickAsync(textBoxCenter.X, textBoxCenter.Y);
 
-        // Assert
-        // Just verify the operation completes (success or elevation block is fine)
-        Assert.NotNull(result);
-        Assert.True(result.Success || result.ErrorCode == MouseControlErrorCode.ElevatedProcessTarget ||
-                   result.ErrorCode == MouseControlErrorCode.CoordinatesOutOfBounds,
-            $"Unexpected error: {result.ErrorCode}: {result.Error}");
+        // Assert - API returns success and cursor is at expected position
+        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.Error}");
+        Assert.InRange(result.FinalPosition.X, textBoxCenter.X - 2, textBoxCenter.X + 2);
+        Assert.InRange(result.FinalPosition.Y, textBoxCenter.Y - 2, textBoxCenter.Y + 2);
+
+        // Verify window title confirms we clicked on the test harness
+        Assert.Contains(MouseTestFixture.TestWindowTitle, result.WindowTitle);
     }
 }
