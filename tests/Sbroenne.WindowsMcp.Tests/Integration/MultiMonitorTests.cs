@@ -47,12 +47,9 @@ public sealed class MultiMonitorTests
     [Fact]
     public async Task DragAsync_AcrossVirtualDesktop_HandlesCorrectly()
     {
-        // Arrange - start at one position, end at another
-        // This tests coordinate normalization across the virtual desktop
-        var startX = 100;
-        var startY = 100;
-        var endX = 500;
-        var endY = 500;
+        // Arrange - start and end on secondary monitor if available for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(400, 400);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY);
@@ -79,18 +76,22 @@ public sealed class MultiMonitorTests
         Assert.True(bounds.Bottom >= bounds.Top, "Bottom should be >= Top");
     }
 
-    [Theory]
-    [InlineData(0, 0)]
-    [InlineData(100, 100)]
-    [InlineData(500, 500)]
-    public void ValidateCoordinates_WithinPrimaryMonitor_ReturnsTrue(int x, int y)
+    [Fact]
+    public void ValidateCoordinates_WithinTestMonitor_ReturnsTrue()
     {
-        // Act
-        var (isValid, _) = CoordinateNormalizer.ValidateCoordinates(x, y);
+        // Arrange - test coordinates on secondary monitor if available
+        var (x1, y1) = TestMonitorHelper.GetTestCoordinates(0, 0);
+        var (x2, y2) = TestMonitorHelper.GetTestCoordinates(100, 100);
+        var (x3, y3) = TestMonitorHelper.GetTestCoordinates(400, 400);
 
-        // Assert - coordinates within primary monitor should typically be valid
-        // Note: This might fail if primary monitor has unusual positioning
-        Assert.True(isValid, $"Coordinates ({x}, {y}) should be valid on primary monitor");
+        // Act & Assert - all test coordinates should be valid
+        var (isValid1, _) = CoordinateNormalizer.ValidateCoordinates(x1, y1);
+        var (isValid2, _) = CoordinateNormalizer.ValidateCoordinates(x2, y2);
+        var (isValid3, _) = CoordinateNormalizer.ValidateCoordinates(x3, y3);
+
+        Assert.True(isValid1, $"Coordinates ({x1}, {y1}) should be valid on test monitor");
+        Assert.True(isValid2, $"Coordinates ({x2}, {y2}) should be valid on test monitor");
+        Assert.True(isValid3, $"Coordinates ({x3}, {y3}) should be valid on test monitor");
     }
 
     [Fact]

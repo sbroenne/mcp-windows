@@ -8,5 +8,5 @@
   <rect x="70" y="70" width="46" height="46" rx="4" fill="#0078D4"/>
 
   <!-- MCP text centered -->
-  <text x="64" y="78" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="bold" fill="#FFFFFF" text-anchor="middle">MCP</text>
+  <text x="64" y="78" font-family="Segoe UI, Arial, sans-serif" font-size="32" font-weight="bold" fill="#FFB900" text-anchor="middle">MCP</text>
 </svg>

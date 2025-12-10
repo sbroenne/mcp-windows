@@ -28,17 +28,17 @@ public sealed class MouseConfigurationTests
     public void TimeoutEnvironmentVariable_ShouldBeCorrectName()
     {
         // Assert
-        Assert.Equal("MCP_MOUSE_TIMEOUT_MS", MouseConfiguration.TimeoutEnvironmentVariable);
+        Assert.Equal("MCP_WINDOWS_MOUSE_TIMEOUT_MS", MouseConfiguration.TimeoutEnvironmentVariable);
     }
 
     [Fact]
     public void FromEnvironment_WithNoEnvVar_ShouldReturnDefaultTimeout()
     {
         // Arrange - Ensure env var is not set
-        var previousValue = Environment.GetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS");
+        var previousValue = Environment.GetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable);
         try
         {
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", null);
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, null);
 
             // Act
             var config = MouseConfiguration.FromEnvironment();
@@ -49,7 +49,7 @@ public sealed class MouseConfigurationTests
         finally
         {
             // Restore previous value
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", previousValue);
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, previousValue);
         }
     }
 
@@ -57,10 +57,10 @@ public sealed class MouseConfigurationTests
     public void FromEnvironment_WithValidEnvVar_ShouldReturnConfiguredTimeout()
     {
         // Arrange
-        var previousValue = Environment.GetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS");
+        var previousValue = Environment.GetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable);
         try
         {
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", "10000");
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, "10000");
 
             // Act
             var config = MouseConfiguration.FromEnvironment();
@@ -71,7 +71,7 @@ public sealed class MouseConfigurationTests
         finally
         {
             // Restore previous value
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", previousValue);
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, previousValue);
         }
     }
 
@@ -83,10 +83,10 @@ public sealed class MouseConfigurationTests
     public void FromEnvironment_WithInvalidEnvVar_ShouldReturnDefaultTimeout(string invalidValue)
     {
         // Arrange
-        var previousValue = Environment.GetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS");
+        var previousValue = Environment.GetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable);
         try
         {
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", invalidValue);
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, invalidValue);
 
             // Act
             var config = MouseConfiguration.FromEnvironment();
@@ -97,7 +97,7 @@ public sealed class MouseConfigurationTests
         finally
         {
             // Restore previous value
-            Environment.SetEnvironmentVariable("MCP_MOUSE_TIMEOUT_MS", previousValue);
+            Environment.SetEnvironmentVariable(MouseConfiguration.TimeoutEnvironmentVariable, previousValue);
         }
     }
 }

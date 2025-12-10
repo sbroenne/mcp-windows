@@ -30,10 +30,8 @@ public class MouseRightClickTests : IDisposable
     [Fact]
     public async Task RightClickAsync_AtCurrentPosition_ReturnsSuccessOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var safeX = bounds.Left + 100;
-        var safeY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (safeX, safeY) = TestMonitorHelper.GetTestCoordinates(100, 100);
         await _mouseInputService.MoveAsync(safeX, safeY);
 
         // Act
@@ -53,10 +51,8 @@ public class MouseRightClickTests : IDisposable
     [Fact]
     public async Task RightClickAsync_WithCoordinates_MovesCursorFirst()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 150;
-        var targetY = bounds.Top + 150;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(150, 150);
 
         // Act
         var result = await _mouseInputService.RightClickAsync(targetX, targetY);

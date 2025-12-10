@@ -30,11 +30,8 @@ public class MouseDoubleClickTests : IDisposable
     [Fact]
     public async Task DoubleClickAsync_AtCurrentPosition_ReturnsSuccessOrElevatedError()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        // Move to a safe position first
-        var safeX = bounds.Left + 100;
-        var safeY = bounds.Top + 100;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (safeX, safeY) = TestMonitorHelper.GetTestCoordinates(100, 100);
         await _mouseInputService.MoveAsync(safeX, safeY);
 
         // Act
@@ -56,10 +53,8 @@ public class MouseDoubleClickTests : IDisposable
     [Fact]
     public async Task DoubleClickAsync_WithCoordinates_MovesCursorFirst()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 250;
-        var targetY = bounds.Top + 250;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(250, 250);
 
         // Act
         var result = await _mouseInputService.DoubleClickAsync(targetX, targetY);
@@ -79,10 +74,8 @@ public class MouseDoubleClickTests : IDisposable
     [Fact]
     public async Task DoubleClickAsync_BothClicksAtSamePosition_CursorDoesNotMove()
     {
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 300;
-        var targetY = bounds.Top + 300;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(300, 300);
         await _mouseInputService.MoveAsync(targetX, targetY);
 
         // Get position before double-click
@@ -110,10 +103,8 @@ public class MouseDoubleClickTests : IDisposable
         // This test verifies that the double-click sends all 4 events (2x down+up)
         // The implementation sends events via SendInput which processes them atomically
         // so they are guaranteed to be within the system's double-click time threshold
-        // Arrange
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
-        var targetX = bounds.Left + 150;
-        var targetY = bounds.Top + 150;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (targetX, targetY) = TestMonitorHelper.GetTestCoordinates(150, 150);
 
         // Act
         var result = await _mouseInputService.DoubleClickAsync(targetX, targetY);

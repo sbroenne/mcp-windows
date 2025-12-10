@@ -31,12 +31,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_ValidRegion_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 400, 300)
+            Region = new CaptureRegion(x, y, 400, 300)
         };
 
         // Act
@@ -51,15 +52,16 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_ReturnsExactDimensions()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
         const int expectedWidth = 400;
         const int expectedHeight = 300;
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
 
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, expectedWidth, expectedHeight)
+            Region = new CaptureRegion(x, y, expectedWidth, expectedHeight)
         };
 
         // Act
@@ -74,12 +76,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_ReturnsValidPng()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(0, 0, 200, 150)
+            Region = new CaptureRegion(x, y, 200, 150)
         };
 
         // Act
@@ -102,12 +105,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_ZeroWidth_ReturnsInvalidRegionError()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 0, 150) // Zero width
+            Region = new CaptureRegion(x, y, 0, 150) // Zero width
         };
 
         // Act
@@ -121,12 +125,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_ZeroHeight_ReturnsInvalidRegionError()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 400, 0) // Zero height
+            Region = new CaptureRegion(x, y, 400, 0) // Zero height
         };
 
         // Act
@@ -140,12 +145,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_NegativeWidth_ReturnsInvalidRegionError()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, -400, 300)
+            Region = new CaptureRegion(x, y, -400, 300)
         };
 
         // Act
@@ -159,12 +165,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_NegativeHeight_ReturnsInvalidRegionError()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 400, -300)
+            Region = new CaptureRegion(x, y, 400, -300)
         };
 
         // Act
@@ -197,12 +204,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_WithIncludeCursor_ReturnsSuccess()
     {
-        // Arrange
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(0, 0, 200, 150),
+            Region = new CaptureRegion(x, y, 200, 150),
             IncludeCursor = true
         };
 
@@ -217,12 +225,13 @@ public sealed class ScreenshotRegionTests
     [Fact]
     public async Task CaptureRegion_SmallRegion_ReturnsSuccess()
     {
-        // Arrange - 1x1 pixel region
+        // Arrange - 1x1 pixel region on secondary monitor
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(100, 100);
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Region,
-            Region = new CaptureRegion(100, 100, 1, 1)
+            Region = new CaptureRegion(x, y, 1, 1)
         };
 
         // Act

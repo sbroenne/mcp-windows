@@ -14,11 +14,9 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_LeftButton_ReturnsSuccessOrElevatedError()
     {
-        // Arrange - drag from one point to another
-        var startX = 500;
-        var startY = 500;
-        var endX = 600;
-        var endY = 600;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(300, 300);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY, MouseButton.Left);
@@ -33,11 +31,9 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_RightButton_ReturnsSuccessOrElevatedError()
     {
-        // Arrange - drag from one point to another with right button
-        var startX = 500;
-        var startY = 500;
-        var endX = 600;
-        var endY = 600;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(300, 300);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY, MouseButton.Right);
@@ -52,11 +48,9 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_MiddleButton_ReturnsSuccessOrElevatedError()
     {
-        // Arrange - drag from one point to another with middle button
-        var startX = 500;
-        var startY = 500;
-        var endX = 600;
-        var endY = 600;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(300, 300);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY, MouseButton.Middle);
@@ -71,11 +65,10 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_OutOfBoundsStart_ReturnsError()
     {
-        // Arrange - start coordinates outside screen bounds
+        // Arrange - start coordinates outside screen bounds, end on test monitor
         var startX = -99999;
         var startY = -99999;
-        var endX = 500;
-        var endY = 500;
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY);
@@ -88,9 +81,8 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_OutOfBoundsEnd_ReturnsError()
     {
-        // Arrange - end coordinates outside screen bounds
-        var startX = 500;
-        var startY = 500;
+        // Arrange - start on test monitor, end coordinates outside screen bounds
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
         var endX = 999999;
         var endY = 999999;
 
@@ -105,11 +97,9 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_CursorEndsAtEndPosition()
     {
-        // Arrange
-        var startX = 500;
-        var startY = 500;
-        var endX = 700;
-        var endY = 700;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(400, 400);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY);
@@ -127,9 +117,8 @@ public sealed class MouseDragTests
     [Fact]
     public async Task DragAsync_SameStartAndEnd_Succeeds()
     {
-        // Arrange - drag to same position (click in place)
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.DragAsync(x, y, x, y);

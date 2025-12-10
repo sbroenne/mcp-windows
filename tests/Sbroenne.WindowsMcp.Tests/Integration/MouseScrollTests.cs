@@ -66,9 +66,8 @@ public sealed class MouseScrollTests
     [Fact]
     public async Task ScrollAsync_WithCoordinates_MovesCursorFirst()
     {
-        // Arrange
-        var x = 500;
-        var y = 500;
+        // Arrange - use secondary monitor if available for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.ScrollAsync(ScrollDirection.Down, 1, x, y);

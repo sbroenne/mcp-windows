@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -10,7 +12,7 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// MCP tool for capturing screenshots of screens, monitors, windows, and regions.
 /// </summary>
 [McpServerToolType]
-public sealed class ScreenshotControlTool
+public sealed partial class ScreenshotControlTool
 {
     private readonly Capture.IScreenshotService _screenshotService;
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -30,58 +32,62 @@ public sealed class ScreenshotControlTool
     }
 
     /// <summary>
-    /// Captures screenshots of screens, monitors, windows, or regions.
+    /// Captures screenshots of screens, monitors, windows, or regions on Windows.
     /// </summary>
-    /// <param name="action">The action to perform: 'capture' (default) or 'list_monitors'.</param>
-    /// <param name="target">Capture target: 'primary_screen' (default), 'monitor', 'window', 'region', or 'all_monitors'.</param>
-    /// <param name="monitorIndex">Monitor index for 'monitor' target (0-based).</param>
-    /// <param name="windowHandle">Window handle for 'window' target.</param>
-    /// <param name="regionX">X coordinate for 'region' target.</param>
-    /// <param name="regionY">Y coordinate for 'region' target.</param>
-    /// <param name="regionWidth">Width for 'region' target.</param>
-    /// <param name="regionHeight">Height for 'region' target.</param>
-    /// <param name="includeCursor">Whether to include the cursor in the capture (default: false).</param>
+    /// <remarks>
+    /// Returns base64-encoded PNG image data. Use action 'list_monitors' to enumerate available monitors.
+    /// Use target 'all_monitors' to capture all connected monitors as a single composite image.
+    /// Respects secure desktop (UAC/lock screen) restrictions.
+    /// </remarks>
+    /// <param name="context">The MCP request context for logging and server access.</param>
+    /// <param name="action">The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'.</param>
+    /// <param name="target">Capture target. Valid values: 'primary_screen', 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.</param>
+    /// <param name="monitorIndex">Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.</param>
+    /// <param name="windowHandle">Window handle (IntPtr value) for 'window' target. Get from window_management tool.</param>
+    /// <param name="regionX">X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.</param>
+    /// <param name="regionY">Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.</param>
+    /// <param name="regionWidth">Width in pixels for 'region' target. Must be positive.</param>
+    /// <param name="regionHeight">Height in pixels for 'region' target. Must be positive.</param>
+    /// <param name="includeCursor">Include mouse cursor in capture. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>JSON result with base64-encoded PNG image data or monitor list.</returns>
-    [McpServerTool(Name = "screenshot_control")]
-    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded PNG image data. Use action 'list_monitors' to enumerate available monitors. Use target 'all_monitors' to capture all connected monitors as a single composite image. Respects secure desktop (UAC/lock screen) restrictions.")]
-    public async Task<string> ExecuteAsync(
-        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")]
+    /// <returns>The result containing base64-encoded PNG image data or monitor list.</returns>
+    [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, UseStructuredContent = true)]
+    [return: Description("The result of the screenshot operation including success status, base64-encoded PNG image data, monitor list, and error details if failed.")]
+    public async Task<ScreenshotControlResult> ExecuteAsync(
+        RequestContext<CallToolRequestParams> context,
         string? action = null,
-        [Description("Capture target. Valid values: 'primary_screen', 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")]
         string? target = null,
-        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")]
         int? monitorIndex = null,
-        [Description("Window handle (IntPtr value) for 'window' target. Get from window_management tool.")]
         long? windowHandle = null,
-        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")]
         int? regionX = null,
-        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")]
         int? regionY = null,
-        [Description("Width in pixels for 'region' target. Must be positive.")]
         int? regionWidth = null,
-        [Description("Height in pixels for 'region' target. Must be positive.")]
         int? regionHeight = null,
-        [Description("Include mouse cursor in capture. Default: false")]
         bool includeCursor = false,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
+        // Create MCP client logger for observability
+        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("ScreenshotControl");
+        clientLogger?.LogScreenshotOperationStarted(action ?? "capture", target ?? "primary_screen");
+
         // Parse action
         var screenshotAction = ParseAction(action);
         if (screenshotAction == null)
         {
-            return SerializeResult(ScreenshotControlResult.Error(
+            return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
-                $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'"));
+                $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'");
         }
 
         // Parse target
         var captureTarget = ParseTarget(target);
         if (captureTarget == null && screenshotAction == ScreenshotAction.Capture)
         {
-            return SerializeResult(ScreenshotControlResult.Error(
+            return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
-                $"Invalid target: '{target}'. Valid values: 'primary_screen', 'monitor', 'window', 'region', 'all_monitors'"));
+                $"Invalid target: '{target}'. Valid values: 'primary_screen', 'monitor', 'window', 'region', 'all_monitors'");
         }
 
         // Build region if target is region
@@ -90,9 +96,9 @@ public sealed class ScreenshotControlTool
         {
             if (regionX == null || regionY == null || regionWidth == null || regionHeight == null)
             {
-                return SerializeResult(ScreenshotControlResult.Error(
+                return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.InvalidRegion,
-                    "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters"));
+                    "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters");
             }
 
             region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
@@ -111,7 +117,7 @@ public sealed class ScreenshotControlTool
 
         // Execute and return result
         var result = await _screenshotService.ExecuteAsync(request, cancellationToken);
-        return SerializeResult(result);
+        return result;
     }
 
     /// <summary>
@@ -153,11 +159,4 @@ public sealed class ScreenshotControlTool
         };
     }
 
-    /// <summary>
-    /// Serializes the result to JSON.
-    /// </summary>
-    private static string SerializeResult(ScreenshotControlResult result)
-    {
-        return JsonSerializer.Serialize(result, JsonOptions);
-    }
 }

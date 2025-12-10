@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SystemResources MCP Resource Contract",
+  "description": "MCP Resources exposed by the Windows MCP server for system information discovery",
+  "definitions": {
+    "MonitorInfo": {
+      "type": "object",
+      "description": "Information about a connected monitor",
+      "properties": {
+        "index": { "type": "integer", "description": "0-based monitor index" },
+        "name": { "type": "string", "description": "Device name" },
+        "isPrimary": { "type": "boolean", "description": "Whether this is the primary monitor" },
+        "x": { "type": "integer", "description": "Left edge in virtual screen coordinates" },
+        "y": { "type": "integer", "description": "Top edge in virtual screen coordinates" },
+        "width": { "type": "integer", "description": "Monitor width in pixels" },
+        "height": { "type": "integer", "description": "Monitor height in pixels" },
+        "workAreaX": { "type": "integer", "description": "Work area left edge" },
+        "workAreaY": { "type": "integer", "description": "Work area top edge" },
+        "workAreaWidth": { "type": "integer", "description": "Work area width" },
+        "workAreaHeight": { "type": "integer", "description": "Work area height" },
+        "scaleFactor": { "type": "number", "description": "DPI scale factor (e.g., 1.25 for 125%)" },
+        "dpiX": { "type": "integer", "description": "Horizontal DPI" }
+      },
+      "required": ["index", "name", "isPrimary", "x", "y", "width", "height"]
+    },
+    "KeyboardLayoutInfo": {
+      "type": "object",
+      "description": "Information about the current keyboard layout",
+      "properties": {
+        "layoutId": { "type": "string", "description": "Hex layout ID (e.g., '00000409')" },
+        "languageTag": { "type": "string", "description": "BCP-47 language tag (e.g., 'en-US')" },
+        "localeName": { "type": "string", "description": "Display name (e.g., 'English (United States)')" },
+        "keyboardName": { "type": "string", "description": "Keyboard name (e.g., 'US')" }
+      },
+      "required": ["layoutId", "languageTag"]
+    }
+  },
+  "resources": {
+    "system://monitors": {
+      "description": "List of all connected monitors with bounds, DPI, and primary flag",
+      "response": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/MonitorInfo" }
+      }
+    },
+    "system://keyboard/layout": {
+      "description": "Current keyboard layout information",
+      "response": { "$ref": "#/definitions/KeyboardLayoutInfo" }
+    }
+  }
+}

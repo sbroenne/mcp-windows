@@ -1,0 +1,14 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "sbroenne"
+    commit-message:
+      prefix: "deps"

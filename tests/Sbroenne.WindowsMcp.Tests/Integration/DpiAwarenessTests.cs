@@ -15,12 +15,12 @@ public sealed class DpiAwarenessTests
     [Fact]
     public async Task MoveAsync_PositionAccuracy_IsWithin1PixelAtAnyDpi()
     {
-        // Arrange - test at multiple positions
+        // Arrange - test at multiple positions on secondary monitor for DPI consistency
         var testPositions = new[]
         {
-            (x: 100, y: 100),
-            (x: 500, y: 300),
-            (x: 800, y: 600),
+            TestMonitorHelper.GetTestCoordinates(100, 100),
+            TestMonitorHelper.GetTestCoordinates(300, 200),
+            TestMonitorHelper.GetTestCoordinates(500, 400),
         };
 
         foreach (var (x, y) in testPositions)
@@ -40,9 +40,8 @@ public sealed class DpiAwarenessTests
     [Fact]
     public async Task ClickAsync_CursorPosition_AccurateAfterClick()
     {
-        // Arrange
-        var x = 400;
-        var y = 400;
+        // Arrange - use secondary monitor for DPI consistency
+        var (x, y) = TestMonitorHelper.GetTestCoordinates(200, 200);
 
         // Act
         var result = await _service.ClickAsync(x, y);
@@ -57,10 +56,10 @@ public sealed class DpiAwarenessTests
     }
 
     [Fact]
-    public void VirtualScreenBounds_HasReasonableSize()
+    public void TestMonitorBounds_HasReasonableSize()
     {
-        // Act
-        var bounds = CoordinateNormalizer.GetVirtualScreenBounds();
+        // Act - use test monitor bounds for consistency
+        var bounds = TestMonitorHelper.GetTestMonitorBounds();
 
         // Assert - modern monitors have at least 640x480 resolution
         Assert.True(bounds.Width >= 640, $"Screen width {bounds.Width} seems too small");
@@ -74,11 +73,9 @@ public sealed class DpiAwarenessTests
     [Fact]
     public async Task DragAsync_EndPosition_AccurateAtAnyDpi()
     {
-        // Arrange
-        var startX = 300;
-        var startY = 300;
-        var endX = 600;
-        var endY = 600;
+        // Arrange - use secondary monitor for DPI consistency
+        var (startX, startY) = TestMonitorHelper.GetTestCoordinates(200, 200);
+        var (endX, endY) = TestMonitorHelper.GetTestCoordinates(400, 400);
 
         // Act
         var result = await _service.DragAsync(startX, startY, endX, endY);

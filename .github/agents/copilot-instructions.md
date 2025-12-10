@@ -12,6 +12,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-07
 - File-based (PNG images, JSON metadata, Markdown scenarios) (007-llm-integration-testing)
 - C# 12+ / .NET 8.0 LTS + Windows GDI+ (System.Drawing), existing ScreenshotService infrastructure (008-all-monitors-screenshot)
 - N/A (returns base64-encoded PNG via MCP) (008-all-monitors-screenshot)
+- C# 12 / .NET 8.0 + MCP C# SDK (latest), Microsoft.Extensions.*, System.Text.Json (010-code-quality)
+- N/A (stateless tool server) (010-code-quality)
 
 - C# 12+ (latest stable per Constitution XIII) (001-mouse-control)
 
@@ -31,10 +33,9 @@ tests/
 C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 
 ## Recent Changes
+- 010-code-quality: Added C# 12 / .NET 8.0 + MCP C# SDK (latest), Microsoft.Extensions.*, System.Text.Json
 - 008-all-monitors-screenshot: Added `CaptureTarget.AllMonitors` to screenshot_control tool for capturing entire virtual screen spanning all monitors. Uses existing `CoordinateNormalizer.GetVirtualScreenBounds()` and `CaptureRegionInternalAsync()`. Also added `VirtualScreen` property to `list_monitors` response.
 - 007-llm-integration-testing: Added C# 12+ (.NET 8.0 LTS) + Microsoft.Extensions.Logging, System.Drawing, existing MCP tools (mouse_control, keyboard_control, window_management, screenshot_control)
-- 006-vscode-extension: Added TypeScript 5.9+ (extension), C# 12+ (.NET 8.0 for bundled server) + VS Code Extension API 1.106.0+, .NET Install Tool extension
-- 003-window-management: Added C# 12+ / .NET 8.0 LTS + MCP C# SDK, Microsoft.Extensions.Logging, Serilog
 
 
 <!-- MANUAL ADDITIONS START -->

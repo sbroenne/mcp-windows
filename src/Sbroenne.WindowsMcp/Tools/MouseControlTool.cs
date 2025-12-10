@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
@@ -15,7 +16,7 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// MCP tool for controlling the mouse cursor on Windows.
 /// </summary>
 [McpServerToolType]
-public sealed class MouseControlTool
+public sealed partial class MouseControlTool
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -57,37 +58,50 @@ public sealed class MouseControlTool
     }
 
     /// <summary>
-    /// Controls the mouse cursor with various actions.
+    /// Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions.
     /// </summary>
+    /// <remarks>
+    /// COORDINATES: All x/y coordinates are relative to the specified monitor (default: monitor 0 = primary).
+    /// Example: x=100, y=50 clicks 100px from left, 50px from top of the monitor.
+    /// For secondary monitor, use monitorIndex=1.
+    /// </remarks>
+    /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll.</param>
-    /// <param name="x">Target x-coordinate (required for move and drag_start).</param>
-    /// <param name="y">Target y-coordinate (required for move and drag_start).</param>
-    /// <param name="endX">End x-coordinate (required for drag action).</param>
-    /// <param name="endY">End y-coordinate (required for drag action).</param>
+    /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
+    /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>
+    /// <param name="endX">End x-coordinate relative to the monitor (required for drag action).</param>
+    /// <param name="endY">End y-coordinate relative to the monitor (required for drag action).</param>
     /// <param name="direction">Scroll direction: up, down, left, or right (required for scroll action).</param>
     /// <param name="amount">Number of scroll clicks (default: 1).</param>
     /// <param name="modifiers">Modifier keys to hold during action: ctrl, shift, alt (comma-separated).</param>
     /// <param name="button">Mouse button for drag: left, right, or middle (default: left).</param>
-    /// <param name="monitorIndex">Monitor index (0-based, default: 0). All x/y coordinates are relative to this monitor's origin.</param>
+    /// <param name="monitorIndex">Monitor index (0-based, default: 0 = primary monitor). All coordinates are relative to this monitor.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the mouse operation as JSON.</returns>
-    [McpServerTool(Name = "mouse_control")]
-    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, and scroll actions. COORDINATES: All x/y coordinates are relative to the specified monitor (default: monitor 0 = primary). Example: x=100, y=50 clicks 100px from left, 50px from top of the monitor. For secondary monitor, use monitorIndex=1.")]
-    public async Task<string> ExecuteAsync(
-        [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, or scroll")] string action,
-        [Description("X-coordinate relative to the monitor's left edge (required for move, optional for clicks).")] int? x = null,
-        [Description("Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).")] int? y = null,
-        [Description("End x-coordinate relative to the monitor (required for drag action).")] int? endX = null,
-        [Description("End y-coordinate relative to the monitor (required for drag action).")] int? endY = null,
-        [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
-        [Description("Number of scroll clicks (default: 1)")] int amount = 1,
-        [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
-        [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Monitor index (0-based, default: 0 = primary monitor). All coordinates are relative to this monitor.")] int monitorIndex = 0,
+    /// <returns>The result of the mouse operation including success status, cursor position, and any errors.</returns>
+    [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, UseStructuredContent = true)]
+    [return: Description("The result of the mouse operation including success status, final cursor position, window title at cursor, and error details if failed.")]
+    public async Task<MouseControlResult> ExecuteAsync(
+        RequestContext<CallToolRequestParams> context,
+        string action,
+        int? x = null,
+        int? y = null,
+        int? endX = null,
+        int? endY = null,
+        string? direction = null,
+        int amount = 1,
+        string? modifiers = null,
+        string? button = null,
+        int monitorIndex = 0,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(context);
+
         var correlationId = MouseOperationLogger.GenerateCorrelationId();
         var stopwatch = Stopwatch.StartNew();
+
+        // Create MCP client logger for observability
+        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("MouseControl");
+        clientLogger?.LogMouseOperationStarted(action ?? "null");
 
         _logger.LogOperationStart(correlationId, action ?? "null");
 
@@ -105,7 +119,7 @@ public sealed class MouseControlTool
                     MouseControlErrorCode.InvalidAction,
                     "Action parameter is required");
                 _logger.LogOperationFailure(correlationId, "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return SerializeResult(result);
+                return result;
             }
 
             var mouseAction = ParseAction(action);
@@ -115,7 +129,7 @@ public sealed class MouseControlTool
                     MouseControlErrorCode.InvalidAction,
                     $"Unknown action: '{action}'. Valid actions are: move, click, double_click, right_click, middle_click, drag, scroll");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return SerializeResult(result);
+                return result;
             }
 
             // Translate monitor-relative coordinates to absolute screen coordinates
@@ -127,7 +141,7 @@ public sealed class MouseControlTool
                     MouseControlErrorCode.InvalidCoordinates,
                     $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return SerializeResult(result);
+                return result;
             }
 
             // Translate coordinates relative to monitor origin
@@ -201,7 +215,7 @@ public sealed class MouseControlTool
                 _logger.LogOperationFailure(correlationId, action, operationResult.ErrorCode.ToString(), operationResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             }
 
-            return SerializeResult(operationResult);
+            return operationResult;
         }
         catch (OperationCanceledException) when (timeoutCts.IsCancellationRequested)
         {
@@ -210,7 +224,7 @@ public sealed class MouseControlTool
                 MouseControlErrorCode.OperationTimeout,
                 $"Operation timed out after {_configuration.TimeoutMs}ms");
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-            return SerializeResult(errorResult);
+            return errorResult;
         }
         catch (OperationCanceledException)
         {
@@ -220,7 +234,7 @@ public sealed class MouseControlTool
                 MouseControlErrorCode.UnexpectedError,
                 "Operation was cancelled");
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-            return SerializeResult(errorResult);
+            return errorResult;
         }
         catch (Exception ex)
         {
@@ -229,7 +243,7 @@ public sealed class MouseControlTool
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.UnexpectedError,
                 $"An unexpected error occurred: {ex.Message}");
-            return SerializeResult(errorResult);
+            return errorResult;
         }
     }
 
@@ -563,8 +577,4 @@ public sealed class MouseControlTool
         };
     }
 
-    private static string SerializeResult(MouseControlResult result)
-    {
-        return JsonSerializer.Serialize(result, JsonOptions);
-    }
 }
