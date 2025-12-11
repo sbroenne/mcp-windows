@@ -24,5 +24,8 @@ public enum MouseAction
     Drag,
 
     /// <summary>Mouse wheel scroll.</summary>
-    Scroll
+    Scroll,
+
+    /// <summary>Get current cursor position with monitor context.</summary>
+    GetPosition
 }

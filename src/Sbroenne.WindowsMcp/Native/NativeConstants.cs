@@ -678,4 +678,17 @@ internal static class NativeConstants
     public const uint DESKTOP_WRITEOBJECTS = 0x0080;
 
     #endregion
+
+    #region DrawIconEx Flags (DI_*)
+
+    /// <summary>Draws the icon using its mask (DI_MASK | DI_IMAGE).</summary>
+    public const uint DI_NORMAL = 0x0003;
+
+    /// <summary>Draws the icon using the image.</summary>
+    public const uint DI_IMAGE = 0x0002;
+
+    /// <summary>Draws the icon using the mask.</summary>
+    public const uint DI_MASK = 0x0001;
+
+    #endregion
 }

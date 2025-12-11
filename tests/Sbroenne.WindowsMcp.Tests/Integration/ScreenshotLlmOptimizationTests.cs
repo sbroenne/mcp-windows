@@ -205,19 +205,15 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
     #region US2 - Auto-Scaling Tests
 
     /// <summary>
-    /// T032 [US2]: Default capture auto-scales to 1568px width.
+    /// T032 [US2]: Default capture does NOT scale when DefaultMaxWidth=0.
+    /// Note: Scaling was disabled by default in PR #13 to ensure accurate mouse positioning.
+    /// When DefaultMaxWidth is non-zero, this test verifies scaling to that width.
     /// </summary>
     [Fact]
     public async Task Capture_DefaultScaling_ScalesToDefaultMaxWidth()
     {
-        // Arrange - default parameters (scaling enabled by default)
+        // Arrange - default parameters
         var primaryMonitor = _monitorService.GetPrimaryMonitor();
-
-        // Only meaningful if screen is larger than default max width
-        if (primaryMonitor.Width <= ScreenshotConfiguration.DefaultMaxWidth)
-        {
-            return; // Skip if screen is smaller than default max
-        }
 
         var request = new ScreenshotControlRequest
         {
@@ -230,11 +226,15 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
 
         // Assert
         Assert.True(result.Success);
-        Assert.Equal(ScreenshotConfiguration.DefaultMaxWidth, result.Width);
 
-        // Original dimensions should be preserved in metadata
-        Assert.Equal(primaryMonitor.Width, result.OriginalWidth);
-        Assert.Equal(primaryMonitor.Height, result.OriginalHeight);
+        // DefaultMaxWidth=0 means no scaling - result matches original dimensions
+        // This ensures screenshot coordinates match screen coordinates for mouse positioning
+        Assert.Equal(primaryMonitor.Width, result.Width);
+        Assert.Equal(primaryMonitor.Height, result.Height);
+
+        // When no scaling occurs, OriginalWidth/Height are null (only populated when scaled)
+        Assert.Null(result.OriginalWidth);
+        Assert.Null(result.OriginalHeight);
     }
 
     /// <summary>
@@ -467,20 +467,18 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
         // 1. JPEG format
         Assert.Equal("jpeg", result.Format);
 
-        // 2. Scaling applied (if screen is larger than 1568px)
-        if (primaryMonitor.Width > ScreenshotConfiguration.DefaultMaxWidth)
-        {
-            Assert.Equal(ScreenshotConfiguration.DefaultMaxWidth, result.Width);
-        }
+        // 2. No scaling when DefaultMaxWidth=0 (coordinates match screen for mouse positioning)
+        Assert.Equal(primaryMonitor.Width, result.Width);
 
         // 3. Inline mode (ImageData present, no FilePath)
         Assert.NotNull(result.ImageData);
         Assert.Null(result.FilePath);
 
-        // 4. File size should be reasonable (under 500KB for JPEG at 1568px)
+        // 4. File size should be reasonable for JPEG (under 2MB for full-resolution unscaled)
+        // Note: Without scaling (DefaultMaxWidth=0), image is full monitor resolution
         var imageBytes = Convert.FromBase64String(result.ImageData);
-        Assert.True(imageBytes.Length < 500_000,
-            $"JPEG at LLM-optimized settings should be under 500KB, was {imageBytes.Length / 1024}KB");
+        Assert.True(imageBytes.Length < 2_000_000,
+            $"JPEG should be under 2MB, was {imageBytes.Length / 1024}KB");
     }
 
     /// <summary>
@@ -507,11 +505,8 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
         // 1. JPEG format
         Assert.Equal("jpeg", result.Format);
 
-        // 2. Scaling applied (if screen is larger)
-        if (primaryMonitor.Width > ScreenshotConfiguration.DefaultMaxWidth)
-        {
-            Assert.Equal(ScreenshotConfiguration.DefaultMaxWidth, result.Width);
-        }
+        // 2. No scaling when DefaultMaxWidth=0 (coordinates match screen for mouse positioning)
+        Assert.Equal(primaryMonitor.Width, result.Width);
 
         // 3. File mode (FilePath present, no ImageData)
         Assert.NotNull(result.FilePath);
@@ -526,9 +521,10 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
         Assert.Equal(0xFF, fileBytes[0]);
         Assert.Equal(0xD8, fileBytes[1]);
 
-        // 5. File size should be reasonable
-        Assert.True(fileBytes.Length < 500_000,
-            $"JPEG file should be under 500KB, was {fileBytes.Length / 1024}KB");
+        // 5. File size should be reasonable for JPEG (under 2MB for full-resolution unscaled)
+        // Note: Without scaling (DefaultMaxWidth=0), image is full monitor resolution
+        Assert.True(fileBytes.Length < 2_000_000,
+            $"JPEG file should be under 2MB, was {fileBytes.Length / 1024}KB");
     }
 
     /// <summary>

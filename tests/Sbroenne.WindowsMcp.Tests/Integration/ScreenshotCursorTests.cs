@@ -4,6 +4,7 @@ using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Runtime.InteropServices;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -167,4 +168,47 @@ public sealed class ScreenshotCursorTests
         Assert.NotNull(resultWithCursor.ImageData);
         Assert.NotNull(resultWithoutCursor.ImageData);
     }
+
+    [Fact]
+    public async Task CaptureRegion_WithCursor_CapturesRegionSuccessfully()
+    {
+        // Arrange: position cursor to a known location, then capture a tight region around it
+        var monitor = new MonitorService().GetMonitor(0) ?? throw new InvalidOperationException("No monitors available");
+        var targetX = monitor.X + monitor.Width / 2;
+        var targetY = monitor.Y + monitor.Height / 2;
+
+        // Move cursor using native API for deterministic positioning
+        SetCursorPos(targetX, targetY);
+        await Task.Delay(100); // allow cursor to settle
+
+        var region = new CaptureRegion(targetX - 10, targetY - 10, 20, 20);
+        var request = new ScreenshotControlRequest
+        {
+            Action = ScreenshotAction.Capture,
+            Target = CaptureTarget.Region,
+            Region = region,
+            IncludeCursor = true,
+            ImageFormat = ImageFormat.Jpeg,
+            Quality = 90
+        };
+
+        // Act
+        var result = await _screenshotService.ExecuteAsync(request);
+
+        // Assert - capture succeeded and produced valid image data
+        Assert.True(result.Success, $"Capture with cursor failed: {result.Message}");
+        Assert.NotNull(result.ImageData);
+
+        // Verify the image can be decoded
+        var bytes = Convert.FromBase64String(result.ImageData!);
+        using var ms = new MemoryStream(bytes);
+        using var bitmap = new Bitmap(ms);
+
+        // Verify dimensions match the requested region
+        Assert.Equal(20, bitmap.Width);
+        Assert.Equal(20, bitmap.Height);
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int X, int Y);
 }

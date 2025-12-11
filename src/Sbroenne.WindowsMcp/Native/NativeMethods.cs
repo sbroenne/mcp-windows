@@ -405,6 +405,29 @@ internal static partial class NativeMethods
     internal delegate bool MonitorEnumProc(nint hMonitor, nint hdcMonitor, ref RECT lprcMonitor, nint dwData);
 
     /// <summary>
+    /// Retrieves the DPI for a display monitor.
+    /// </summary>
+    /// <param name="hMonitor">Handle to the monitor.</param>
+    /// <param name="dpiType">The type of DPI being queried (MDT_EFFECTIVE_DPI = 0, MDT_ANGULAR_DPI = 1, MDT_RAW_DPI = 2).</param>
+    /// <param name="dpiX">Receives the horizontal DPI.</param>
+    /// <param name="dpiY">Receives the vertical DPI.</param>
+    /// <returns>S_OK if successful, or an error code.</returns>
+    [LibraryImport("shcore.dll")]
+    internal static partial int GetDpiForMonitor(nint hMonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+    /// <summary>
+    /// Retrieves information about one of the graphics modes for a display device.
+    /// With ENUM_CURRENT_SETTINGS (-1), retrieves the current physical resolution.
+    /// </summary>
+    /// <param name="lpszDeviceName">Display device name (e.g., \\.\DISPLAY1). Can be null for primary.</param>
+    /// <param name="iModeNum">Mode number or ENUM_CURRENT_SETTINGS (-1).</param>
+    /// <param name="lpDevMode">Pointer to DEVMODE structure to receive settings.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumDisplaySettingsW(string? lpszDeviceName, int iModeNum, ref DEVMODE lpDevMode);
+
+    /// <summary>
     /// Retrieves the identifier of the thread that created the specified window.
     /// </summary>
     /// <returns>Thread identifier of the calling thread.</returns>
@@ -475,6 +498,23 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool DrawIcon(nint hDC, int X, int Y, nint hIcon);
+
+    /// <summary>
+    /// Draws an icon or cursor into the specified device context, performing the specified raster operations.
+    /// </summary>
+    /// <param name="hdc">Handle to the device context.</param>
+    /// <param name="xLeft">X-coordinate of the upper-left corner of the icon.</param>
+    /// <param name="yTop">Y-coordinate of the upper-left corner of the icon.</param>
+    /// <param name="hIcon">Handle to the icon to be drawn.</param>
+    /// <param name="cxWidth">Width of the icon. If 0, uses the system metric SM_CXICON.</param>
+    /// <param name="cyWidth">Height of the icon. If 0, uses the system metric SM_CYICON.</param>
+    /// <param name="istepIfAniCur">Index of the frame if animated cursor. Ignored if not animated.</param>
+    /// <param name="hbrFlickerFreeDraw">Handle to a brush for flicker-free drawing. Can be IntPtr.Zero.</param>
+    /// <param name="diFlags">Drawing flags (DI_NORMAL, DI_IMAGE, DI_MASK, DI_COMPAT, DI_DEFAULTSIZE).</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DrawIconEx(nint hdc, int xLeft, int yTop, nint hIcon, int cxWidth, int cyWidth, uint istepIfAniCur, nint hbrFlickerFreeDraw, uint diFlags);
 
     /// <summary>
     /// Determines whether the specified window handle identifies an existing window.

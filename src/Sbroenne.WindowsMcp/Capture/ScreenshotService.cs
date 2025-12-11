@@ -593,13 +593,26 @@ public sealed class ScreenshotService : IScreenshotService
                 var cursorX = cursorInfo.PtScreenPos.X - regionX;
                 var cursorY = cursorInfo.PtScreenPos.Y - regionY;
 
-                NativeMethods.DrawIcon(
-                    graphics.GetHdc(),
-                    cursorX,
-                    cursorY,
-                    cursorInfo.HCursor);
-
-                graphics.ReleaseHdc();
+                // Use DrawIconEx with explicit HDC and ensure the DC is always released.
+                var hdc = graphics.GetHdc();
+                try
+                {
+                    // DI_NORMAL draws the icon using its mask and image.
+                    NativeMethods.DrawIconEx(
+                        hdc,
+                        cursorX,
+                        cursorY,
+                        cursorInfo.HCursor,
+                        0,
+                        0,
+                        0,
+                        IntPtr.Zero,
+                        NativeConstants.DI_NORMAL);
+                }
+                finally
+                {
+                    graphics.ReleaseHdc(hdc);
+                }
             }
         }
         catch
