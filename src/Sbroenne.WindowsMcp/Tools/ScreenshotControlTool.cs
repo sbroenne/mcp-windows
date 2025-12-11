@@ -37,7 +37,8 @@ public sealed partial class ScreenshotControlTool
     /// </summary>
     /// <remarks>
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
-    /// LLM-optimized defaults: JPEG format at quality 85, auto-scaled to 1568px width.
+    /// Default: JPEG format at quality 85, no scaling (coordinates match screen for accurate mouse clicks).
+    /// Set maxWidth=1568 for LLM-optimized smaller images.
     /// Use action 'list_monitors' to enumerate available monitors.
     /// Use target 'all_monitors' to capture all connected monitors as a single composite image.
     /// Respects secure desktop (UAC/lock screen) restrictions.
@@ -54,14 +55,14 @@ public sealed partial class ScreenshotControlTool
     /// <param name="includeCursor">Include mouse cursor in capture. Default: false.</param>
     /// <param name="imageFormat">Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).</param>
     /// <param name="quality">Image compression quality 1-100. Default: 85. Only affects JPEG format.</param>
-    /// <param name="maxWidth">Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 1568 (Claude's high-res native limit). Set to 0 to disable scaling.</param>
+    /// <param name="maxWidth">Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.</param>
     /// <param name="maxHeight">Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).</param>
     /// <param name="outputMode">How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.</param>
     /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, UseStructuredContent = true)]
-    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter). LLM-optimized defaults: JPEG format at quality 85, auto-scaled to 1568px width. Use action 'list_monitors' to enumerate available monitors. Use target 'all_monitors' to capture all connected monitors as a single composite image. Respects secure desktop (UAC/lock screen) restrictions.")]
+    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter). Default: JPEG format at quality 85, no scaling (coordinates match screen for accurate mouse clicks). Set maxWidth=1568 for LLM-optimized smaller images. Use action 'list_monitors' to enumerate available monitors. Use target 'all_monitors' to capture all connected monitors as a single composite image. Respects secure desktop (UAC/lock screen) restrictions.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, monitor list, and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -76,7 +77,7 @@ public sealed partial class ScreenshotControlTool
         [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
         [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
         [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
-        [Description("Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 1568 (Claude's high-res native limit). Set to 0 to disable scaling.")] int? maxWidth = null,
+        [Description("Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.")] int? maxWidth = null,
         [Description("Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).")] int? maxHeight = null,
         [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
         [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,

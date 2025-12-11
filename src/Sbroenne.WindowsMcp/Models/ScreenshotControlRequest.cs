@@ -58,7 +58,7 @@ public sealed record ScreenshotControlRequest
 
     /// <summary>
     /// Gets the maximum width in pixels. Image scaled down if wider (aspect ratio preserved).
-    /// Default is 1568 (Claude's high-res native limit). Set to 0 to disable scaling.
+    /// Default is 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.
     /// </summary>
     [JsonPropertyName("max_width")]
     public int MaxWidth { get; init; } = ScreenshotConfiguration.DefaultMaxWidth;

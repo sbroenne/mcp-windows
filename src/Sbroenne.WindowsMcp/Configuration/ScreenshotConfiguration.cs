@@ -38,10 +38,10 @@ public sealed class ScreenshotConfiguration
     public const int DefaultQuality = 85;
 
     /// <summary>
-    /// Default maximum width for auto-scaling. 1568 is Claude's high-res native limit.
-    /// Set to 0 to disable scaling.
+    /// Default maximum width for auto-scaling. 0 means no scaling (coordinates match screen).
+    /// Set to 1568 for LLM-optimized size (Claude's high-res native limit).
     /// </summary>
-    public const int DefaultMaxWidth = 1568;
+    public const int DefaultMaxWidth = 0;
 
     /// <summary>
     /// Default maximum height for auto-scaling. 0 means no height constraint.

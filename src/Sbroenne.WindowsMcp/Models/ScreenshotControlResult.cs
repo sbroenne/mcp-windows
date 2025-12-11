@@ -124,6 +124,7 @@ public sealed record ScreenshotControlResult
         string? filePath = null)
     {
         ArgumentNullException.ThrowIfNull(processed);
+        var wasScaled = processed.OriginalWidth != processed.Width;
         return new()
         {
             Success = true,
@@ -132,8 +133,8 @@ public sealed record ScreenshotControlResult
             ImageData = filePath is null ? Convert.ToBase64String(processed.Data) : null,
             Width = processed.Width,
             Height = processed.Height,
-            OriginalWidth = processed.OriginalWidth != processed.Width ? processed.OriginalWidth : null,
-            OriginalHeight = processed.OriginalHeight != processed.Height ? processed.OriginalHeight : null,
+            OriginalWidth = wasScaled ? processed.OriginalWidth : null,
+            OriginalHeight = wasScaled ? processed.OriginalHeight : null,
             Format = processed.Format,
             FileSizeBytes = processed.Data.Length,
             FilePath = filePath
@@ -171,6 +172,7 @@ public sealed record ScreenshotControlResult
     {
         ArgumentNullException.ThrowIfNull(processed);
         ArgumentNullException.ThrowIfNull(metadata);
+        var wasScaled = processed.OriginalWidth != processed.Width;
         return new()
         {
             Success = true,
@@ -179,8 +181,8 @@ public sealed record ScreenshotControlResult
             ImageData = filePath is null ? Convert.ToBase64String(processed.Data) : null,
             Width = processed.Width,
             Height = processed.Height,
-            OriginalWidth = processed.OriginalWidth != processed.Width ? processed.OriginalWidth : null,
-            OriginalHeight = processed.OriginalHeight != processed.Height ? processed.OriginalHeight : null,
+            OriginalWidth = wasScaled ? processed.OriginalWidth : null,
+            OriginalHeight = wasScaled ? processed.OriginalHeight : null,
             Format = processed.Format,
             FileSizeBytes = processed.Data.Length,
             FilePath = filePath,
