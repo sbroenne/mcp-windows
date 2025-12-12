@@ -335,13 +335,23 @@ public sealed class ScreenshotAllMonitorsTests
         Assert.NotNull(result.VirtualScreen);
         Assert.NotNull(result.Monitors);
 
-        // Virtual screen should be at least as large as any individual monitor
+        // NOTE: Virtual screen is in logical coordinates, monitor dimensions are physical.
+        // With DPI scaling, physical monitor dimensions may exceed virtual screen dimensions.
+        // We verify that monitor positions (which are logical) fall within the virtual screen bounds.
         foreach (var monitor in result.Monitors)
         {
-            Assert.True(result.VirtualScreen.Width >= monitor.Width,
-                $"Virtual screen width ({result.VirtualScreen.Width}) should be >= monitor {monitor.Index} width ({monitor.Width})");
-            Assert.True(result.VirtualScreen.Height >= monitor.Height,
-                $"Virtual screen height ({result.VirtualScreen.Height}) should be >= monitor {monitor.Index} height ({monitor.Height})");
+            Assert.True(monitor.X >= result.VirtualScreen.X,
+                $"Monitor {monitor.Index} X ({monitor.X}) should be >= virtual screen X ({result.VirtualScreen.X})");
+            Assert.True(monitor.Y >= result.VirtualScreen.Y,
+                $"Monitor {monitor.Index} Y ({monitor.Y}) should be >= virtual screen Y ({result.VirtualScreen.Y})");
+
+            // Monitor dimensions should be positive
+            Assert.True(monitor.Width > 0, $"Monitor {monitor.Index} width should be positive");
+            Assert.True(monitor.Height > 0, $"Monitor {monitor.Index} height should be positive");
         }
+
+        // Virtual screen dimensions should be positive
+        Assert.True(result.VirtualScreen.Width > 0, "Virtual screen width should be positive");
+        Assert.True(result.VirtualScreen.Height > 0, "Virtual screen height should be positive");
     }
 }

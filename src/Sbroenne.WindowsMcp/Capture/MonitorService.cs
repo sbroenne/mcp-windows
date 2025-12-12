@@ -1,25 +1,66 @@
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Capture;
 
 /// <summary>
 /// Provides monitor enumeration and information services.
+/// Uses native Win32 APIs to get physical pixel coordinates for DPI-aware screenshot capture.
 /// </summary>
 public sealed class MonitorService : IMonitorService
 {
+    private const int ENUM_CURRENT_SETTINGS = -1;
+
     /// <inheritdoc />
     public int MonitorCount => Screen.AllScreens.Length;
 
     /// <inheritdoc />
     public IReadOnlyList<MonitorInfo> GetMonitors()
     {
-        var screens = Screen.AllScreens;
-        var monitors = new MonitorInfo[screens.Length];
+        var monitors = new List<MonitorInfo>();
+        int index = 0;
 
-        for (var i = 0; i < screens.Length; i++)
+        bool EnumCallback(nint hMonitor, nint hdcMonitor, ref RECT lprcMonitor, nint dwData)
         {
-            monitors[i] = CreateMonitorInfo(screens[i], i);
+            var monitorInfo = MONITORINFO.Create();
+            if (NativeMethods.GetMonitorInfo(hMonitor, ref monitorInfo))
+            {
+                // Get logical position (used by CopyFromScreen)
+                int logicalX = monitorInfo.RcMonitor.Left;
+                int logicalY = monitorInfo.RcMonitor.Top;
+
+                // Get device name for this monitor
+                string? deviceName = GetDeviceNameForMonitor(monitorInfo.RcMonitor);
+
+                // Use EnumDisplaySettingsW to get true physical resolution
+                int physicalWidth = monitorInfo.RcMonitor.Right - monitorInfo.RcMonitor.Left;
+                int physicalHeight = monitorInfo.RcMonitor.Bottom - monitorInfo.RcMonitor.Top;
+
+                if (deviceName != null)
+                {
+                    var devMode = DEVMODE.Create();
+                    if (NativeMethods.EnumDisplaySettingsW(deviceName, ENUM_CURRENT_SETTINGS, ref devMode))
+                    {
+                        // dmPelsWidth and dmPelsHeight are the true physical resolution
+                        physicalWidth = (int)devMode.dmPelsWidth;
+                        physicalHeight = (int)devMode.dmPelsHeight;
+                    }
+                }
+
+                monitors.Add(new MonitorInfo(
+                    Index: index,
+                    DeviceName: deviceName ?? $"Monitor {index}",
+                    Width: physicalWidth,
+                    Height: physicalHeight,
+                    X: logicalX,  // Keep logical X/Y for CopyFromScreen
+                    Y: logicalY,
+                    IsPrimary: monitorInfo.IsPrimary));
+            }
+            index++;
+            return true;
         }
+
+        NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, EnumCallback, IntPtr.Zero);
 
         return monitors;
     }
@@ -27,48 +68,61 @@ public sealed class MonitorService : IMonitorService
     /// <inheritdoc />
     public MonitorInfo? GetMonitor(int index)
     {
-        var screens = Screen.AllScreens;
+        var monitors = GetMonitors();
 
-        if (index < 0 || index >= screens.Length)
+        if (index < 0 || index >= monitors.Count)
         {
             return null;
         }
 
-        return CreateMonitorInfo(screens[index], index);
+        return monitors[index];
     }
 
     /// <inheritdoc />
     public MonitorInfo GetPrimaryMonitor()
     {
-        var screens = Screen.AllScreens;
+        var monitors = GetMonitors();
 
-        for (var i = 0; i < screens.Length; i++)
+        foreach (var monitor in monitors)
         {
-            if (screens[i].Primary)
+            if (monitor.IsPrimary)
             {
-                return CreateMonitorInfo(screens[i], i);
+                return monitor;
             }
         }
 
         // Fallback to first monitor if no primary found (should never happen)
-        return CreateMonitorInfo(screens[0], 0);
+        return monitors.Count > 0 ? monitors[0] : new MonitorInfo(0, "Primary", 1920, 1080, 0, 0, true);
     }
 
     /// <summary>
-    /// Creates a <see cref="MonitorInfo"/> from a <see cref="Screen"/> instance.
+    /// Gets the device name from Screen.AllScreens that matches the given bounds.
     /// </summary>
-    /// <param name="screen">The screen to convert.</param>
-    /// <param name="index">The index of the screen.</param>
-    /// <returns>A new <see cref="MonitorInfo"/> instance.</returns>
-    private static MonitorInfo CreateMonitorInfo(Screen screen, int index)
+    /// <param name="bounds">The bounds from native API.</param>
+    /// <returns>The device name if found, otherwise null.</returns>
+    private static string? GetDeviceNameForMonitor(RECT bounds)
     {
-        return new MonitorInfo(
-            Index: index,
-            DeviceName: screen.DeviceName,
-            Width: screen.Bounds.Width,
-            Height: screen.Bounds.Height,
-            X: screen.Bounds.X,
-            Y: screen.Bounds.Y,
-            IsPrimary: screen.Primary);
+        var screens = Screen.AllScreens;
+
+        // Try to match by comparing positions
+        foreach (var screen in screens)
+        {
+            // If positions match exactly
+            if (screen.Bounds.X == bounds.Left && screen.Bounds.Y == bounds.Top)
+            {
+                return screen.DeviceName;
+            }
+        }
+
+        // If no exact match, try to match by primary status for the primary monitor
+        foreach (var screen in screens)
+        {
+            if (screen.Primary && bounds.Left == 0 && bounds.Top == 0)
+            {
+                return screen.DeviceName;
+            }
+        }
+
+        return null;
     }
 }

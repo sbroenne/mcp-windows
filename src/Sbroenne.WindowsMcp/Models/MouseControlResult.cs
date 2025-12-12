@@ -30,6 +30,30 @@ public sealed record MouseControlResult
     public string? WindowTitle { get; init; }
 
     /// <summary>
+    /// Gets the monitor index where the operation occurred (0-based).
+    /// Only populated for operations with explicit coordinates.
+    /// </summary>
+    [JsonPropertyName("monitor_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MonitorIndex { get; init; }
+
+    /// <summary>
+    /// Gets the width of the monitor where the operation occurred.
+    /// Only populated for operations with explicit coordinates.
+    /// </summary>
+    [JsonPropertyName("monitor_width")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MonitorWidth { get; init; }
+
+    /// <summary>
+    /// Gets the height of the monitor where the operation occurred.
+    /// Only populated for operations with explicit coordinates.
+    /// </summary>
+    [JsonPropertyName("monitor_height")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MonitorHeight { get; init; }
+
+    /// <summary>
     /// Gets the error message if the operation failed.
     /// </summary>
     [JsonPropertyName("error")]
@@ -74,14 +98,26 @@ public sealed record MouseControlResult
     /// <param name="coordinates">The final cursor coordinates.</param>
     /// <param name="screenBounds">The current screen bounds.</param>
     /// <param name="windowTitle">Optional window title under the cursor.</param>
+    /// <param name="monitorIndex">Optional monitor index where the operation occurred.</param>
+    /// <param name="monitorWidth">Optional width of the monitor where the operation occurred.</param>
+    /// <param name="monitorHeight">Optional height of the monitor where the operation occurred.</param>
     /// <returns>A successful result.</returns>
-    public static MouseControlResult CreateSuccess(Coordinates coordinates, ScreenBounds? screenBounds = null, string? windowTitle = null)
+    public static MouseControlResult CreateSuccess(
+        Coordinates coordinates,
+        ScreenBounds? screenBounds = null,
+        string? windowTitle = null,
+        int? monitorIndex = null,
+        int? monitorWidth = null,
+        int? monitorHeight = null)
     {
         return new MouseControlResult
         {
             Success = true,
             FinalPosition = new FinalPosition(coordinates.X, coordinates.Y),
             WindowTitle = windowTitle,
+            MonitorIndex = monitorIndex,
+            MonitorWidth = monitorWidth,
+            MonitorHeight = monitorHeight,
             ScreenBounds = screenBounds,
             ErrorCode = MouseControlErrorCode.Success,
         };

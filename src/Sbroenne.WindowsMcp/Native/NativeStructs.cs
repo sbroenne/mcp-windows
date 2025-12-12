@@ -285,3 +285,122 @@ internal struct CURSORINFO
     /// </summary>
     public readonly bool IsVisible => (Flags & CURSOR_SHOWING) != 0;
 }
+
+/// <summary>
+/// Contains information about the initialization and environment of a display device.
+/// This simplified version contains only the fields needed for display mode enumeration.
+/// </summary>
+[StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+internal struct DEVMODE
+{
+    private const int CCHDEVICENAME = 32;
+    private const int CCHFORMNAME = 32;
+
+    /// <summary>Device name (up to 32 characters).</summary>
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = CCHDEVICENAME)]
+    public string dmDeviceName;
+
+    /// <summary>Version number of the initialization data specification.</summary>
+    public ushort dmSpecVersion;
+
+    /// <summary>Driver version.</summary>
+    public ushort dmDriverVersion;
+
+    /// <summary>Size of the DEVMODE structure (not including private driver data).</summary>
+    public ushort dmSize;
+
+    /// <summary>Size of optional private driver data following this structure.</summary>
+    public ushort dmDriverExtra;
+
+    /// <summary>Specifies which members have been initialized.</summary>
+    public uint dmFields;
+
+    // Position union - we use separate X and Y fields
+    /// <summary>X position of the device.</summary>
+    public int dmPositionX;
+
+    /// <summary>Y position of the device.</summary>
+    public int dmPositionY;
+
+    /// <summary>Display orientation.</summary>
+    public uint dmDisplayOrientation;
+
+    /// <summary>Fixed output mode.</summary>
+    public uint dmDisplayFixedOutput;
+
+    /// <summary>Color resolution in bits per pixel.</summary>
+    public short dmColor;
+
+    /// <summary>Duplex mode.</summary>
+    public short dmDuplex;
+
+    /// <summary>Y resolution.</summary>
+    public short dmYResolution;
+
+    /// <summary>TrueType option.</summary>
+    public short dmTTOption;
+
+    /// <summary>Collation option.</summary>
+    public short dmCollate;
+
+    /// <summary>Form name (up to 32 characters).</summary>
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = CCHFORMNAME)]
+    public string dmFormName;
+
+    /// <summary>Logical pixels per inch (DPI).</summary>
+    public ushort dmLogPixels;
+
+    /// <summary>Bits per pixel (color depth).</summary>
+    public uint dmBitsPerPel;
+
+    /// <summary>Width in pixels.</summary>
+    public uint dmPelsWidth;
+
+    /// <summary>Height in pixels.</summary>
+    public uint dmPelsHeight;
+
+    /// <summary>Display flags or NUP (pages per sheet).</summary>
+    public uint dmDisplayFlags;
+
+    /// <summary>Display frequency (refresh rate in Hz).</summary>
+    public uint dmDisplayFrequency;
+
+    // Additional fields for printers (not used for display)
+    /// <summary>ICM method.</summary>
+    public uint dmICMMethod;
+
+    /// <summary>ICM intent.</summary>
+    public uint dmICMIntent;
+
+    /// <summary>Media type.</summary>
+    public uint dmMediaType;
+
+    /// <summary>Dither type.</summary>
+    public uint dmDitherType;
+
+    /// <summary>Reserved field 1.</summary>
+    public uint dmReserved1;
+
+    /// <summary>Reserved field 2.</summary>
+    public uint dmReserved2;
+
+    /// <summary>Panning width.</summary>
+    public uint dmPanningWidth;
+
+    /// <summary>Panning height.</summary>
+    public uint dmPanningHeight;
+
+    /// <summary>
+    /// Creates a new DEVMODE structure with the dmSize field initialized.
+    /// </summary>
+    /// <returns>An initialized DEVMODE structure.</returns>
+    public static DEVMODE Create()
+    {
+        return new DEVMODE
+        {
+            dmSize = (ushort)Marshal.SizeOf<DEVMODE>(),
+            dmDeviceName = string.Empty,
+            dmFormName = string.Empty
+        };
+    }
+}
