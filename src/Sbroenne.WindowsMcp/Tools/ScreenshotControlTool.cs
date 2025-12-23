@@ -38,16 +38,16 @@ public sealed partial class ScreenshotControlTool
     /// <remarks>
     /// **COORDINATE SYSTEM**: Screenshot pixel coordinates = mouse coordinates. No conversion needed!
     /// If you see a button at pixel (450, 300) in the screenshot, use mouse_control(x=450, y=300, monitorIndex=N).
-    /// 
+    ///
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
     /// Default: JPEG format at quality 85, at logical resolution (matching mouse coordinate space).
-    /// 
+    ///
     /// Monitor targeting:
     /// - 'primary_screen': Captures the main display (with taskbar). Most common choice.
     /// - 'secondary_screen': Captures the other monitor. Only works with exactly 2 monitors.
     /// - 'monitor' with monitorIndex: For 3+ monitors, use list_monitors first to find the index.
     /// - 'all_monitors': Captures all monitors as a single composite image.
-    /// 
+    ///
     /// The list_monitors action returns display_number (matches Windows Settings) and is_primary flag.
     /// Respects secure desktop (UAC/lock screen) restrictions.
     /// </remarks>

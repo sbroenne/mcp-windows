@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
@@ -26,6 +27,7 @@ public sealed partial class WindowManagementTool
     };
 
     private readonly IWindowService _windowService;
+    private readonly IMonitorService _monitorService;
     private readonly WindowOperationLogger? _logger;
     private readonly WindowConfiguration _configuration;
 
@@ -33,17 +35,21 @@ public sealed partial class WindowManagementTool
     /// Initializes a new instance of the <see cref="WindowManagementTool"/> class.
     /// </summary>
     /// <param name="windowService">The window service.</param>
+    /// <param name="monitorService">The monitor service.</param>
     /// <param name="configuration">The window configuration.</param>
     /// <param name="logger">Optional operation logger.</param>
     public WindowManagementTool(
         IWindowService windowService,
+        IMonitorService monitorService,
         WindowConfiguration configuration,
         WindowOperationLogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(windowService);
+        ArgumentNullException.ThrowIfNull(monitorService);
         ArgumentNullException.ThrowIfNull(configuration);
 
         _windowService = windowService;
+        _monitorService = monitorService;
         _configuration = configuration;
         _logger = logger;
     }
@@ -52,8 +58,9 @@ public sealed partial class WindowManagementTool
     /// Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions.
     /// </summary>
     /// <remarks>
-    /// Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.
-    /// Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag).
+    /// Use move_to_monitor to move a window to a specific monitor:
+    /// - Use target='primary_screen' or target='secondary_screen' for easy targeting
+    /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
@@ -67,11 +74,12 @@ public sealed partial class WindowManagementTool
     /// <param name="width">Width for resize or set_bounds action.</param>
     /// <param name="height">Height for resize or set_bounds action.</param>
     /// <param name="timeoutMs">Timeout in milliseconds for wait_for action.</param>
-    /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.</param>
+    /// <param name="target">Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups).</param>
+    /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Alternative to target for 3+ monitor setups.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, UseStructuredContent = true)]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index. Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag).")]
+    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor with target='primary_screen' or 'secondary_screen', or monitorIndex for 3+ monitors.")]
     [return: Description("The result of the window operation including success status, window list or single window info, and error details if failed.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -86,7 +94,8 @@ public sealed partial class WindowManagementTool
         [Description("Width for resize or set_bounds action")] int? width = null,
         [Description("Height for resize or set_bounds action")] int? height = null,
         [Description("Timeout in milliseconds for wait_for action")] int? timeoutMs = null,
-        [Description("Target monitor index for move_to_monitor action (0-based). Use with action=move_to_monitor to move a window to a specific monitor.")] int? monitorIndex = null,
+        [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
+        [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -172,7 +181,7 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.MoveToMonitor:
-                    operationResult = await HandleMoveToMonitorAsync(handle, monitorIndex, cancellationToken);
+                    operationResult = await HandleMoveToMonitorAsync(handle, target, monitorIndex, cancellationToken);
                     break;
 
                 default:
@@ -409,6 +418,7 @@ public sealed partial class WindowManagementTool
 
     private async Task<WindowManagementResult> HandleMoveToMonitorAsync(
         string? handleString,
+        string? target,
         int? monitorIndex,
         CancellationToken cancellationToken)
     {
@@ -419,14 +429,82 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for move_to_monitor action");
         }
 
-        if (!monitorIndex.HasValue)
+        // Resolve target to monitorIndex if provided
+        int? resolvedMonitorIndex = monitorIndex;
+        if (!string.IsNullOrWhiteSpace(target))
+        {
+            var parsedTarget = ParseMonitorTarget(target);
+            if (parsedTarget == null)
+            {
+                return WindowManagementResult.CreateFailure(
+                    WindowManagementErrorCode.InvalidCoordinates,
+                    $"Invalid target: '{target}'. Valid values are: 'primary_screen', 'secondary_screen'");
+            }
+
+            // Resolve target to monitor
+            MonitorInfo? targetMonitor = parsedTarget.Value switch
+            {
+                MonitorTarget.PrimaryScreen => _monitorService.GetPrimaryMonitor(),
+                MonitorTarget.SecondaryScreen => _monitorService.GetSecondaryMonitor(),
+                _ => null
+            };
+
+            if (targetMonitor == null)
+            {
+                var errorMessage = parsedTarget.Value == MonitorTarget.SecondaryScreen
+                    ? "Cannot use 'secondary_screen' target: requires exactly 2 monitors. Use 'monitorIndex' for 3+ monitor setups."
+                    : $"Could not resolve target '{target}' to a monitor";
+                return WindowManagementResult.CreateFailure(
+                    WindowManagementErrorCode.InvalidCoordinates,
+                    errorMessage);
+            }
+
+            // Find the index of this monitor
+            var monitors = _monitorService.GetMonitors();
+            for (int i = 0; i < monitors.Count; i++)
+            {
+                if (monitors[i].X == targetMonitor.X && monitors[i].Y == targetMonitor.Y)
+                {
+                    resolvedMonitorIndex = i;
+                    break;
+                }
+            }
+        }
+
+        if (!resolvedMonitorIndex.HasValue)
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "monitorIndex is required for move_to_monitor action");
+                "Either 'target' or 'monitorIndex' is required for move_to_monitor action. Use target='primary_screen' or target='secondary_screen'.");
         }
 
-        return await _windowService.MoveToMonitorAsync(handle, monitorIndex.Value, cancellationToken);
+        return await _windowService.MoveToMonitorAsync(handle, resolvedMonitorIndex.Value, cancellationToken);
+    }
+
+    private static MonitorTarget? ParseMonitorTarget(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return null;
+        }
+
+        return target.ToLowerInvariant() switch
+        {
+            "primary_screen" or "primaryscreen" or "primary" => MonitorTarget.PrimaryScreen,
+            "secondary_screen" or "secondaryscreen" or "secondary" => MonitorTarget.SecondaryScreen,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Monitor target for window operations.
+    /// </summary>
+    private enum MonitorTarget
+    {
+        /// <summary>Primary screen (main display with taskbar).</summary>
+        PrimaryScreen,
+        /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
+        SecondaryScreen
     }
 
     private static bool TryParseHandle(string? handleString, out nint handle)

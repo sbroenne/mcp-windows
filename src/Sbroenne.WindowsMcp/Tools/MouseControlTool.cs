@@ -25,6 +25,8 @@ public sealed partial class MouseControlTool
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
+    private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
+
     private readonly IMouseInputService _mouseInputService;
     private readonly IMonitorService _monitorService;
     private readonly IElevationDetector _elevationDetector;
@@ -61,46 +63,53 @@ public sealed partial class MouseControlTool
     /// Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions.
     /// </summary>
     /// <remarks>
-    /// <para><strong>BREAKING CHANGE:</strong> monitorIndex parameter is now REQUIRED when x/y coordinates are provided.</para>
+    /// <para><strong>MONITOR TARGETING:</strong></para>
+    /// <list type="bullet">
+    /// <item>'primary_screen': Target the main display (with taskbar). Most common choice.</item>
+    /// <item>'secondary_screen': Target the other monitor. Only works with exactly 2 monitors.</item>
+    /// <item>monitorIndex: For 3+ monitors, use screenshot_control action='list_monitors' first to find the index.</item>
+    /// </list>
     /// <para><strong>COORDINATES:</strong> All x/y coordinates are relative to the specified monitor.</para>
-    /// <para><strong>FINDING THE RIGHT MONITOR:</strong> Use screenshot_control with action='list_monitors' to see all monitors with is_primary flag.</para>
     /// <para><strong>MONITOR CONTEXT:</strong> Successful operations with explicit coordinates return monitor_index, monitor_width, and monitor_height in the response.</para>
     /// <para><strong>QUERY POSITION:</strong> Use action='get_position' to query current cursor position with monitor context.</para>
     /// <para><strong>ERROR CASES:</strong></para>
     /// <list type="bullet">
-    /// <item>missing_required_parameter: monitorIndex not provided when coordinates are specified</item>
+    /// <item>missing_required_parameter: Neither target nor monitorIndex provided when coordinates are specified</item>
+    /// <item>invalid_target: Invalid target value (use 'primary_screen' or 'secondary_screen')</item>
     /// <item>invalid_coordinates: monitorIndex out of range (must be 0 to MonitorCount-1)</item>
     /// <item>coordinates_out_of_bounds: coordinates outside monitor dimensions</item>
     /// </list>
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position.</param>
-    /// <param name="x">X-coordinate relative to the monitor's left edge (required for move with monitorIndex, optional for clicks with monitorIndex).</param>
-    /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move with monitorIndex, optional for clicks with monitorIndex).</param>
-    /// <param name="endX">End x-coordinate relative to the monitor (required for drag action with monitorIndex).</param>
-    /// <param name="endY">End y-coordinate relative to the monitor (required for drag action with monitorIndex).</param>
+    /// <param name="target">Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.</param>
+    /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
+    /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>
+    /// <param name="endX">End x-coordinate relative to the monitor (required for drag action).</param>
+    /// <param name="endY">End y-coordinate relative to the monitor (required for drag action).</param>
     /// <param name="direction">Scroll direction: up, down, left, or right (required for scroll action).</param>
     /// <param name="amount">Number of scroll clicks (default: 1).</param>
     /// <param name="modifiers">Modifier keys to hold during action: ctrl, shift, alt (comma-separated).</param>
     /// <param name="button">Mouse button for drag: left, right, or middle (default: left).</param>
-    /// <param name="monitorIndex">Monitor index (0-based). REQUIRED when x/y/endX/endY coordinates are provided. Specifies which monitor coordinates are relative to. Not required for coordinate-less actions (click at current position) or get_position.</param>
+    /// <param name="monitorIndex">Monitor index (0-based). Alternative to target for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, UseStructuredContent = true)]
-    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. BREAKING CHANGE: monitorIndex is now REQUIRED when coordinates (x/y/endX/endY) are provided. All coordinates are monitor-relative. Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag). Successful operations return monitor context (monitor_index, monitor_width, monitor_height). Use get_position to query current cursor position with monitor info.")]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. Use 'target' parameter with 'primary_screen' or 'secondary_screen' for easy monitor targeting, or 'monitorIndex' for 3+ monitor setups. All coordinates are monitor-relative. Use get_position to query current cursor position with monitor info.")]
     [return: Description("The result of the mouse operation including success status, final cursor position (monitor-relative), monitor context (monitor_index, monitor_width, monitor_height for operations with explicit coordinates), window title at cursor, and error details if failed.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position (query current cursor position with monitor context)")] string action,
-        [Description("X-coordinate relative to the monitor's left edge. REQUIRES monitorIndex parameter. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
-        [Description("Y-coordinate relative to the monitor's top edge. REQUIRES monitorIndex parameter. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
-        [Description("End x-coordinate relative to the monitor. REQUIRES monitorIndex parameter. Required for drag action.")] int? endX = null,
-        [Description("End y-coordinate relative to the monitor. REQUIRES monitorIndex parameter. Required for drag action.")] int? endY = null,
+        [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
+        [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
+        [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
+        [Description("End x-coordinate relative to the monitor. Required for drag action.")] int? endX = null,
+        [Description("End y-coordinate relative to the monitor. Required for drag action.")] int? endY = null,
         [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
         [Description("Number of scroll clicks (default: 1)")] int amount = 1,
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
         [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Monitor index (0-based). REQUIRED when x/y/endX/endY coordinates are provided. Coordinates are interpreted relative to this monitor's top-left corner. Returns error 'missing_required_parameter' if omitted when coordinates are specified. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
+        [Description("Monitor index (0-based). Alternative to 'target' for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -144,26 +153,73 @@ public sealed partial class MouseControlTool
             // NEW VALIDATION: Check if coordinates are provided
             var hasCoordinates = (x.HasValue && y.HasValue) || (endX.HasValue && endY.HasValue);
 
-            // NEW VALIDATION: Require monitorIndex when coordinates are provided
-            if (hasCoordinates && !monitorIndex.HasValue)
+            // Resolve target to monitorIndex if provided
+            int? resolvedMonitorIndex = monitorIndex;
+            if (!string.IsNullOrWhiteSpace(target))
+            {
+                var parsedTarget = ParseTarget(target);
+                if (parsedTarget == null)
+                {
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates,
+                        $"Invalid target: '{target}'. Valid values are: 'primary_screen', 'secondary_screen'");
+                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                // Resolve target to monitor index
+                MonitorInfo? targetMonitor = parsedTarget.Value switch
+                {
+                    MonitorTarget.PrimaryScreen => _monitorService.GetPrimaryMonitor(),
+                    MonitorTarget.SecondaryScreen => _monitorService.GetSecondaryMonitor(),
+                    _ => null
+                };
+
+                if (targetMonitor == null)
+                {
+                    var errorMessage = parsedTarget.Value == MonitorTarget.SecondaryScreen
+                        ? "Cannot use 'secondary_screen' target: requires exactly 2 monitors. Use 'monitorIndex' for 3+ monitor setups."
+                        : $"Could not resolve target '{target}' to a monitor";
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates,
+                        errorMessage);
+                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                // Find the index of this monitor
+                var monitors = _monitorService.GetMonitors();
+                for (int i = 0; i < monitors.Count; i++)
+                {
+                    if (monitors[i].X == targetMonitor.X && monitors[i].Y == targetMonitor.Y)
+                    {
+                        resolvedMonitorIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            // NEW VALIDATION: Require target or monitorIndex when coordinates are provided
+            if (hasCoordinates && !resolvedMonitorIndex.HasValue)
             {
                 var availableIndices = Enumerable.Range(0, _monitorService.MonitorCount).ToList();
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.MissingRequiredParameter,
-                    "monitorIndex is required when using x/y coordinates",
+                    "Either 'target' or 'monitorIndex' is required when using x/y coordinates. Use target='primary_screen' or target='secondary_screen' for easy targeting.",
                     errorDetails: new Dictionary<string, object>
                     {
+                        { "valid_targets", ValidTargets },
                         { "valid_indices", availableIndices }
                     });
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
 
-            // Use monitorIndex if provided, otherwise default to 0 for coordinate-less actions
-            var targetMonitorIndex = monitorIndex ?? 0;
+            // Use resolved monitorIndex, or default to 0 for coordinate-less actions
+            var targetMonitorIndex = resolvedMonitorIndex ?? 0;
 
             // NEW VALIDATION: Validate monitorIndex is in valid range
-            if (monitorIndex.HasValue && (targetMonitorIndex < 0 || targetMonitorIndex >= _monitorService.MonitorCount))
+            if (resolvedMonitorIndex.HasValue && (targetMonitorIndex < 0 || targetMonitorIndex >= _monitorService.MonitorCount))
             {
                 var availableIndices = Enumerable.Range(0, _monitorService.MonitorCount).ToList();
                 var result = MouseControlResult.CreateFailure(
@@ -212,7 +268,7 @@ public sealed partial class MouseControlTool
             }
 
             // NEW VALIDATION: Check if coordinates are within monitor bounds (using logical dimensions)
-            if (hasCoordinates && monitorIndex.HasValue)
+            if (hasCoordinates && resolvedMonitorIndex.HasValue)
             {
                 // Validate start coordinates (x, y) if provided
                 if (x.HasValue && y.HasValue)
@@ -312,14 +368,20 @@ public sealed partial class MouseControlTool
 
             if (operationResult.Success)
             {
-                // Add monitor context to successful operations that used explicit coordinates
-                if (monitorIndex.HasValue)
+                // Add monitor context and convert coordinates to monitor-relative for operations with explicit coordinates
+                if (resolvedMonitorIndex.HasValue)
                 {
                     var monitorInfo = _monitorService.GetMonitor(targetMonitorIndex);
                     if (monitorInfo != null)
                     {
+                        // Convert absolute cursor position to monitor-relative coordinates
+                        // FinalPosition from MouseInputService is in absolute screen coordinates
+                        int relativeX = operationResult.FinalPosition.X - monitorInfo.X;
+                        int relativeY = operationResult.FinalPosition.Y - monitorInfo.Y;
+
                         operationResult = operationResult with
                         {
+                            FinalPosition = new FinalPosition(relativeX, relativeY),
                             MonitorIndex = targetMonitorIndex,
                             MonitorWidth = monitorInfo.Width,
                             MonitorHeight = monitorInfo.Height
@@ -695,6 +757,32 @@ public sealed partial class MouseControlTool
             "get_position" => MouseAction.GetPosition,
             _ => null,
         };
+    }
+
+    private static MonitorTarget? ParseTarget(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return null;
+        }
+
+        return target.ToLowerInvariant() switch
+        {
+            "primary_screen" or "primaryscreen" or "primary" => MonitorTarget.PrimaryScreen,
+            "secondary_screen" or "secondaryscreen" or "secondary" => MonitorTarget.SecondaryScreen,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    /// Monitor target for mouse operations.
+    /// </summary>
+    private enum MonitorTarget
+    {
+        /// <summary>Primary screen (main display with taskbar).</summary>
+        PrimaryScreen,
+        /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
+        SecondaryScreen
     }
 
     private async Task<MouseControlResult> GetCurrentPositionAsync(CancellationToken cancellationToken)
