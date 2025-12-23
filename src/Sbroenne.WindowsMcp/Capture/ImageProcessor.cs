@@ -1,11 +1,10 @@
-using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace Sbroenne.WindowsMcp.Capture;
 
 /// <summary>
-/// Processes captured bitmaps: scaling and format encoding.
+/// Processes captured bitmaps: format encoding.
 /// </summary>
 public sealed class ImageProcessor : IImageProcessor
 {
@@ -13,134 +12,28 @@ public sealed class ImageProcessor : IImageProcessor
     public ProcessedImage Process(
         Bitmap source,
         Models.ImageFormat imageFormat,
-        int quality,
-        int maxWidth,
-        int maxHeight)
+        int quality)
     {
         ArgumentNullException.ThrowIfNull(source);
 
-        var originalWidth = source.Width;
-        var originalHeight = source.Height;
+        var width = source.Width;
+        var height = source.Height;
 
-        // Calculate scaled dimensions
-        var (newWidth, newHeight) = CalculateScaledDimensions(
-            originalWidth,
-            originalHeight,
-            maxWidth,
-            maxHeight);
-
-        // Scale if needed
-        Bitmap outputBitmap;
-        if (newWidth != originalWidth || newHeight != originalHeight)
+        // Encode to requested format
+        var data = imageFormat switch
         {
-            outputBitmap = ScaleBitmap(source, newWidth, newHeight);
-        }
-        else
-        {
-            // No scaling needed - use source directly (don't dispose it here, caller owns it)
-            outputBitmap = source;
-        }
+            Models.ImageFormat.Jpeg => EncodeToJpeg(source, quality),
+            Models.ImageFormat.Png => EncodeToPng(source),
+            _ => throw new ArgumentOutOfRangeException(nameof(imageFormat), imageFormat, "Unsupported image format")
+        };
 
-        try
-        {
-            // Encode to requested format
-            var data = imageFormat switch
-            {
-                Models.ImageFormat.Jpeg => EncodeToJpeg(outputBitmap, quality),
-                Models.ImageFormat.Png => EncodeToPng(outputBitmap),
-                _ => throw new ArgumentOutOfRangeException(nameof(imageFormat), imageFormat, "Unsupported image format")
-            };
-
-            return new ProcessedImage(
-                data,
-                newWidth,
-                newHeight,
-                originalWidth,
-                originalHeight,
-                imageFormat.ToString().ToLowerInvariant());
-        }
-        finally
-        {
-            // Only dispose if we created a new bitmap (scaled)
-            if (outputBitmap != source)
-            {
-                outputBitmap.Dispose();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Calculates scaled dimensions while preserving aspect ratio.
-    /// </summary>
-    /// <param name="originalWidth">Original width in pixels.</param>
-    /// <param name="originalHeight">Original height in pixels.</param>
-    /// <param name="maxWidth">Maximum width constraint (0 = no constraint).</param>
-    /// <param name="maxHeight">Maximum height constraint (0 = no constraint).</param>
-    /// <returns>Scaled dimensions that fit within constraints.</returns>
-    public static (int width, int height) CalculateScaledDimensions(
-        int originalWidth,
-        int originalHeight,
-        int maxWidth,
-        int maxHeight)
-    {
-        // No constraints - return original size
-        if (maxWidth <= 0 && maxHeight <= 0)
-        {
-            return (originalWidth, originalHeight);
-        }
-
-        // Calculate the scaling ratios
-        double widthRatio = maxWidth > 0 ? (double)maxWidth / originalWidth : double.MaxValue;
-        double heightRatio = maxHeight > 0 ? (double)maxHeight / originalHeight : double.MaxValue;
-
-        // Use the smaller ratio to ensure both constraints are met
-        double ratio = Math.Min(widthRatio, heightRatio);
-
-        // Don't upscale - only downscale
-        if (ratio >= 1.0)
-        {
-            return (originalWidth, originalHeight);
-        }
-
-        // Calculate new dimensions
-        var newWidth = Math.Max(1, (int)(originalWidth * ratio));
-        var newHeight = Math.Max(1, (int)(originalHeight * ratio));
-
-        return (newWidth, newHeight);
-    }
-
-    /// <summary>
-    /// Scales a bitmap using high-quality bicubic interpolation.
-    /// </summary>
-    /// <param name="source">Source bitmap to scale.</param>
-    /// <param name="newWidth">Target width.</param>
-    /// <param name="newHeight">Target height.</param>
-    /// <returns>New scaled bitmap. Caller is responsible for disposing.</returns>
-    public static Bitmap ScaleBitmap(Bitmap source, int newWidth, int newHeight)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-
-        var scaledBitmap = new Bitmap(newWidth, newHeight, PixelFormat.Format32bppArgb);
-
-        try
-        {
-            using var graphics = Graphics.FromImage(scaledBitmap);
-
-            // High quality scaling settings
-            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            graphics.SmoothingMode = SmoothingMode.HighQuality;
-            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            graphics.CompositingQuality = CompositingQuality.HighQuality;
-
-            graphics.DrawImage(source, 0, 0, newWidth, newHeight);
-
-            return scaledBitmap;
-        }
-        catch
-        {
-            scaledBitmap.Dispose();
-            throw;
-        }
+        return new ProcessedImage(
+            data,
+            width,
+            height,
+            width,
+            height,
+            imageFormat.ToString().ToLowerInvariant());
     }
 
     /// <summary>

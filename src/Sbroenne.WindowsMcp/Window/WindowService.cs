@@ -529,6 +529,7 @@ public sealed class WindowService : IWindowService
 
         // Calculate new position: center the window on the target monitor
         // while preserving the window size
+        // Note: Width/Height are the logical dimensions that match the coordinate system
         int newX = targetMonitor.X + (targetMonitor.Width - windowInfo.Bounds.Width) / 2;
         int newY = targetMonitor.Y + (targetMonitor.Height - windowInfo.Bounds.Height) / 2;
 

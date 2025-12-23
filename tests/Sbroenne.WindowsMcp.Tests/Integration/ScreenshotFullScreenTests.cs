@@ -54,13 +54,12 @@ public sealed class ScreenshotFullScreenTests
     [Fact]
     public async Task CapturePrimaryScreen_WithPngFormat_ReturnsValidDimensions()
     {
-        // Arrange - explicitly request PNG and no scaling for backward compatibility
+        // Arrange - explicitly request PNG
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.PrimaryScreen,
-            ImageFormat = ImageFormat.Png,
-            MaxWidth = 0 // Disable auto-scaling
+            ImageFormat = ImageFormat.Png
         };
         var primaryMonitor = _monitorService.GetPrimaryMonitor();
 

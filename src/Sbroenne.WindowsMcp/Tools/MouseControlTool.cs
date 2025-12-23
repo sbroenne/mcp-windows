@@ -63,8 +63,7 @@ public sealed partial class MouseControlTool
     /// <remarks>
     /// <para><strong>BREAKING CHANGE:</strong> monitorIndex parameter is now REQUIRED when x/y coordinates are provided.</para>
     /// <para><strong>COORDINATES:</strong> All x/y coordinates are relative to the specified monitor.</para>
-    /// <para>Example: monitorIndex=0, x=100, y=50 clicks 100px from left, 50px from top of primary monitor.</para>
-    /// <para>For secondary monitor: monitorIndex=1, x=100, y=50 clicks 100px from left, 50px from top of secondary monitor.</para>
+    /// <para><strong>FINDING THE RIGHT MONITOR:</strong> Use screenshot_control with action='list_monitors' to see all monitors with is_primary flag.</para>
     /// <para><strong>MONITOR CONTEXT:</strong> Successful operations with explicit coordinates return monitor_index, monitor_width, and monitor_height in the response.</para>
     /// <para><strong>QUERY POSITION:</strong> Use action='get_position' to query current cursor position with monitor context.</para>
     /// <para><strong>ERROR CASES:</strong></para>
@@ -88,7 +87,7 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, UseStructuredContent = true)]
-    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. BREAKING CHANGE: monitorIndex is now REQUIRED when coordinates (x/y/endX/endY) are provided. All coordinates are monitor-relative. Example: monitorIndex=0, x=100, y=50 clicks 100px from left, 50px from top of primary monitor. Successful operations return monitor context (monitor_index, monitor_width, monitor_height). Use get_position to query current cursor position with monitor info.")]
+    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. BREAKING CHANGE: monitorIndex is now REQUIRED when coordinates (x/y/endX/endY) are provided. All coordinates are monitor-relative. Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag). Successful operations return monitor context (monitor_index, monitor_width, monitor_height). Use get_position to query current cursor position with monitor info.")]
     [return: Description("The result of the mouse operation including success status, final cursor position (monitor-relative), monitor context (monitor_index, monitor_width, monitor_height for operations with explicit coordinates), window title at cursor, and error details if failed.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -101,7 +100,7 @@ public sealed partial class MouseControlTool
         [Description("Number of scroll clicks (default: 1)")] int amount = 1,
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
         [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Monitor index (0-based, 0=primary). REQUIRED when x/y/endX/endY coordinates are provided. Coordinates are interpreted relative to this monitor's top-left corner. Returns error 'missing_required_parameter' if omitted when coordinates are specified. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
+        [Description("Monitor index (0-based). REQUIRED when x/y/endX/endY coordinates are provided. Coordinates are interpreted relative to this monitor's top-left corner. Returns error 'missing_required_parameter' if omitted when coordinates are specified. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -212,7 +211,7 @@ public sealed partial class MouseControlTool
                 absoluteEndY = monitor.Y + endY.Value;
             }
 
-            // NEW VALIDATION: Check if coordinates are within monitor bounds
+            // NEW VALIDATION: Check if coordinates are within monitor bounds (using logical dimensions)
             if (hasCoordinates && monitorIndex.HasValue)
             {
                 // Validate start coordinates (x, y) if provided

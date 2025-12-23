@@ -37,12 +37,11 @@ public sealed class ScreenshotAllMonitorsTests
     [Fact]
     public async Task CaptureAllMonitors_ReturnsVirtualScreenDimensions()
     {
-        // Arrange - disable auto-scaling to verify exact dimensions
+        // Arrange
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors,
-            MaxWidth = 0 // Disable auto-scaling
+            Target = CaptureTarget.AllMonitors
         };
         var virtualBounds = CoordinateNormalizer.GetVirtualScreenBounds();
 
@@ -86,18 +85,15 @@ public sealed class ScreenshotAllMonitorsTests
         // On multi-monitor systems, the dimensions will differ
         if (monitors.Count == 1)
         {
-            // Disable auto-scaling to verify exact dimensions
             var allMonitorsRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.AllMonitors,
-                MaxWidth = 0 // Disable auto-scaling
+                Target = CaptureTarget.AllMonitors
             };
             var primaryRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.PrimaryScreen,
-                MaxWidth = 0 // Disable auto-scaling
+                Target = CaptureTarget.PrimaryScreen
             };
 
             // Act
@@ -113,18 +109,15 @@ public sealed class ScreenshotAllMonitorsTests
         else
         {
             // Multi-monitor system: verify all_monitors captures a larger area
-            // Disable auto-scaling to verify exact dimensions
             var allMonitorsRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.AllMonitors,
-                MaxWidth = 0 // Disable auto-scaling
+                Target = CaptureTarget.AllMonitors
             };
             var primaryRequest = new ScreenshotControlRequest
             {
                 Action = ScreenshotAction.Capture,
-                Target = CaptureTarget.PrimaryScreen,
-                MaxWidth = 0 // Disable auto-scaling
+                Target = CaptureTarget.PrimaryScreen
             };
 
             var allMonitorsResult = await _screenshotService.ExecuteAsync(allMonitorsRequest);
@@ -201,12 +194,10 @@ public sealed class ScreenshotAllMonitorsTests
         // has negative coordinates (e.g., monitor to the left of primary)
         var virtualBounds = CoordinateNormalizer.GetVirtualScreenBounds();
 
-        // Disable auto-scaling to verify exact dimensions
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors,
-            MaxWidth = 0 // Disable auto-scaling
+            Target = CaptureTarget.AllMonitors
         };
 
         // Act

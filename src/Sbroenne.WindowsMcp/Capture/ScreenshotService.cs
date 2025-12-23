@@ -71,6 +71,7 @@ public sealed class ScreenshotService : IScreenshotService
             var result = request.Target switch
             {
                 CaptureTarget.PrimaryScreen => await CapturePrimaryScreenAsync(request, cancellationToken),
+                CaptureTarget.SecondaryScreen => await CaptureSecondaryScreenAsync(request, cancellationToken),
                 CaptureTarget.Monitor => await CaptureMonitorAsync(request, cancellationToken),
                 CaptureTarget.Window => await CaptureWindowAsync(request, cancellationToken),
                 CaptureTarget.Region => await CaptureRegionAsync(request, cancellationToken),
@@ -113,19 +114,84 @@ public sealed class ScreenshotService : IScreenshotService
             virtualBounds.Width,
             virtualBounds.Height);
 
+        // Build a helpful message for LLMs
+        var primaryMonitor = monitors.FirstOrDefault(m => m.IsPrimary);
+        string message;
+
+        if (monitors.Count == 1)
+        {
+            message = "Found 1 monitor. Use target='primary_screen' to capture it.";
+        }
+        else if (monitors.Count == 2)
+        {
+            var secondaryMonitor = monitors.FirstOrDefault(m => !m.IsPrimary);
+            message = $"Found 2 monitors. " +
+                $"Primary: display_number={primaryMonitor?.DisplayNumber} (use target='primary_screen'). " +
+                $"Secondary: display_number={secondaryMonitor?.DisplayNumber} (use target='secondary_screen'). " +
+                $"Note: display_number matches Windows Settings, is_primary indicates the main display.";
+        }
+        else
+        {
+            message = $"Found {monitors.Count} monitors. " +
+                $"Primary: display_number={primaryMonitor?.DisplayNumber} (use target='primary_screen'). " +
+                $"For other monitors, use target='monitor' with monitorIndex (0-{monitors.Count - 1}). " +
+                $"Note: display_number matches Windows Settings, is_primary indicates the main display.";
+        }
+
         _logger.LogMonitorListSuccess(monitors.Count);
-        return ScreenshotControlResult.MonitorListSuccess(monitors, virtualScreen, $"Found {monitors.Count} monitor(s)");
+        return ScreenshotControlResult.MonitorListSuccess(monitors, virtualScreen, message);
     }
 
     /// <summary>
     /// Captures the primary screen.
+    /// Uses logical dimensions so screenshot pixels match mouse coordinates.
     /// </summary>
     private Task<ScreenshotControlResult> CapturePrimaryScreenAsync(
         ScreenshotControlRequest request,
         CancellationToken cancellationToken)
     {
         var primary = _monitorService.GetPrimaryMonitor();
+        // Width/Height are the logical dimensions that match mouse coordinates
         var region = new CaptureRegion(primary.X, primary.Y, primary.Width, primary.Height);
+        return CaptureRegionInternalAsync(region, request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Captures the secondary screen (non-primary monitor).
+    /// Only works with exactly 2 monitors.
+    /// </summary>
+    private Task<ScreenshotControlResult> CaptureSecondaryScreenAsync(
+        ScreenshotControlRequest request,
+        CancellationToken cancellationToken)
+    {
+        var monitorCount = _monitorService.MonitorCount;
+
+        if (monitorCount < 2)
+        {
+            return Task.FromResult(ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                "Cannot use 'secondary_screen' target: only one monitor detected. Use 'primary_screen' instead."));
+        }
+
+        if (monitorCount > 2)
+        {
+            var availableMonitors = _monitorService.GetMonitors();
+            return Task.FromResult(ScreenshotControlResult.ErrorWithMonitors(
+                ScreenshotErrorCode.InvalidRequest,
+                $"Cannot use 'secondary_screen' target with {monitorCount} monitors. Use 'list_monitors' to see all monitors, then use 'monitor' target with monitorIndex.",
+                availableMonitors));
+        }
+
+        var secondary = _monitorService.GetSecondaryMonitor();
+        if (secondary is null)
+        {
+            return Task.FromResult(ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                "Secondary monitor not found."));
+        }
+
+        // Width/Height are the logical dimensions that match mouse coordinates
+        var region = new CaptureRegion(secondary.X, secondary.Y, secondary.Width, secondary.Height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
 
@@ -149,6 +215,7 @@ public sealed class ScreenshotService : IScreenshotService
                 availableMonitors));
         }
 
+        // Width/Height are the logical dimensions that match mouse coordinates
         var region = new CaptureRegion(monitor.X, monitor.Y, monitor.Width, monitor.Height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
@@ -278,13 +345,11 @@ public sealed class ScreenshotService : IScreenshotService
                 DrawCursor(graphics, windowRect.Left, windowRect.Top);
             }
 
-            // Process the image (scale + encode)
+            // Process the image (encode)
             var processed = _imageProcessor.Process(
                 bitmap,
                 request.ImageFormat,
-                request.Quality,
-                request.MaxWidth,
-                request.MaxHeight);
+                request.Quality);
 
             _logger.LogCaptureSuccess(processed.Width, processed.Height);
 
@@ -377,13 +442,11 @@ public sealed class ScreenshotService : IScreenshotService
             .Select(m => MonitorRegion.FromMonitorInfo(m, virtualScreen.X, virtualScreen.Y))
             .ToList();
 
-        // Process the image (scale + encode)
+        // Process the image (encode)
         var processed = _imageProcessor.Process(
             bitmap,
             request.ImageFormat,
-            request.Quality,
-            request.MaxWidth,
-            request.MaxHeight);
+            request.Quality);
 
         // Update metadata with actual output dimensions
         var metadata = new CompositeScreenshotMetadata
@@ -484,13 +547,11 @@ public sealed class ScreenshotService : IScreenshotService
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Process the image (scale + encode)
+        // Process the image (encode)
         var processed = _imageProcessor.Process(
             bitmap,
             request.ImageFormat,
-            request.Quality,
-            request.MaxWidth,
-            request.MaxHeight);
+            request.Quality);
 
         _logger.LogCaptureSuccess(processed.Width, processed.Height);
 

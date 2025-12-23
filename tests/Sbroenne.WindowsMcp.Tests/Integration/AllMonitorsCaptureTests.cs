@@ -83,12 +83,11 @@ public sealed class AllMonitorsCaptureTests
     [Fact]
     public async Task CaptureAllMonitors_ReturnsDimensionsMatchingVirtualScreen()
     {
-        // Arrange - disable auto-scaling to verify exact dimensions
+        // Arrange
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.AllMonitors,
-            MaxWidth = 0 // Disable auto-scaling
+            Target = CaptureTarget.AllMonitors
         };
 
         // Get virtual screen bounds (bounding rectangle of all monitors)

@@ -165,8 +165,7 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.PrimaryScreen,
             ImageFormat = ImageFormat.Png,
-            Quality = 20,
-            MaxWidth = 0 // Disable scaling to make comparison meaningful
+            Quality = 20
         };
 
         var highQualityRequest = new ScreenshotControlRequest
@@ -174,8 +173,7 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.PrimaryScreen,
             ImageFormat = ImageFormat.Png,
-            Quality = 95,
-            MaxWidth = 0 // Disable scaling to make comparison meaningful
+            Quality = 95
         };
 
         // Act
@@ -202,15 +200,13 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
 
     #endregion
 
-    #region US2 - Auto-Scaling Tests
+    #region US2 - Dimension Tests
 
     /// <summary>
-    /// T032 [US2]: Default capture does NOT scale when DefaultMaxWidth=0.
-    /// Note: Scaling was disabled by default in PR #13 to ensure accurate mouse positioning.
-    /// When DefaultMaxWidth is non-zero, this test verifies scaling to that width.
+    /// T032: Default capture returns original dimensions (scaling was removed).
     /// </summary>
     [Fact]
-    public async Task Capture_DefaultScaling_ScalesToDefaultMaxWidth()
+    public async Task Capture_DefaultParameters_ReturnsOriginalDimensions()
     {
         // Arrange - default parameters
         var primaryMonitor = _monitorService.GetPrimaryMonitor();
@@ -227,104 +223,9 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
         // Assert
         Assert.True(result.Success);
 
-        // DefaultMaxWidth=0 means no scaling - result matches original dimensions
-        // This ensures screenshot coordinates match screen coordinates for mouse positioning
+        // Result matches original dimensions (no scaling functionality)
         Assert.Equal(primaryMonitor.Width, result.Width);
         Assert.Equal(primaryMonitor.Height, result.Height);
-
-        // When no scaling occurs, OriginalWidth/Height are null (only populated when scaled)
-        Assert.Null(result.OriginalWidth);
-        Assert.Null(result.OriginalHeight);
-    }
-
-    /// <summary>
-    /// T033 [US2]: MaxWidth=0 disables auto-scaling.
-    /// </summary>
-    [Fact]
-    public async Task Capture_MaxWidthZero_DisablesScaling()
-    {
-        // Arrange - explicitly disable scaling
-        var primaryMonitor = _monitorService.GetPrimaryMonitor();
-        var request = new ScreenshotControlRequest
-        {
-            Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.PrimaryScreen,
-            MaxWidth = 0 // Disable scaling
-        };
-
-        // Act
-        var result = await _screenshotService.ExecuteAsync(request);
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.Equal(primaryMonitor.Width, result.Width);
-        Assert.Equal(primaryMonitor.Height, result.Height);
-    }
-
-    /// <summary>
-    /// T034 [US2]: Both MaxWidth and MaxHeight constraints work together.
-    /// </summary>
-    [Fact]
-    public async Task Capture_BothMaxWidthAndMaxHeight_RespectsSmallestConstraint()
-    {
-        // Arrange - use secondary monitor if available for DPI consistency
-        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
-
-        // Capture a 400x300 region with constraints
-        var request = new ScreenshotControlRequest
-        {
-            Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.Region,
-            Region = new CaptureRegion(x, y, 400, 300),
-            MaxWidth = 200,  // Would scale to 200x150
-            MaxHeight = 100  // Would scale to 133x100 (more restrictive)
-        };
-
-        // Act
-        var result = await _screenshotService.ExecuteAsync(request);
-
-        // Assert
-        Assert.True(result.Success);
-
-        // Result should respect the more restrictive constraint
-        Assert.True(result.Width <= 200, $"Width {result.Width} should be <= 200");
-        Assert.True(result.Height <= 100, $"Height {result.Height} should be <= 100");
-
-        // Original dimensions preserved
-        Assert.Equal(400, result.OriginalWidth);
-        Assert.Equal(300, result.OriginalHeight);
-    }
-
-    /// <summary>
-    /// T035 [US2]: No upscaling occurs for small images.
-    /// </summary>
-    [Fact]
-    public async Task Capture_SmallRegion_NoUpscaling()
-    {
-        // Arrange - capture a small region smaller than maxWidth
-        var (x, y) = TestMonitorHelper.GetTestCoordinates(0, 0);
-        var request = new ScreenshotControlRequest
-        {
-            Action = ScreenshotAction.Capture,
-            Target = CaptureTarget.Region,
-            Region = new CaptureRegion(x, y, 100, 75), // Smaller than default maxWidth
-            MaxWidth = ScreenshotConfiguration.DefaultMaxWidth
-        };
-
-        // Act
-        var result = await _screenshotService.ExecuteAsync(request);
-
-        // Assert
-        Assert.True(result.Success);
-
-        // Should not upscale - dimensions should match original
-        Assert.Equal(100, result.Width);
-        Assert.Equal(75, result.Height);
-
-        // OriginalWidth/OriginalHeight are only set when scaling occurs
-        // When no scaling, they should be null (to avoid redundant data)
-        Assert.Null(result.OriginalWidth);
-        Assert.Null(result.OriginalHeight);
     }
 
     #endregion
@@ -528,31 +429,30 @@ public sealed class ScreenshotLlmOptimizationTests : IDisposable
     }
 
     /// <summary>
-    /// T049 [US4]: Backward compatibility (PNG + no scaling).
+    /// T049 [US4]: Backward compatibility (PNG format).
     /// </summary>
     [Fact]
-    public async Task Capture_BackwardCompatibility_PngWithNoScaling()
+    public async Task Capture_BackwardCompatibility_PngFormat()
     {
-        // Arrange - explicitly request PNG and disable scaling
+        // Arrange - explicitly request PNG format
         var primaryMonitor = _monitorService.GetPrimaryMonitor();
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.PrimaryScreen,
-            ImageFormat = ImageFormat.Png,
-            MaxWidth = 0 // Disable scaling
+            ImageFormat = ImageFormat.Png
         };
 
         // Act
         var result = await _screenshotService.ExecuteAsync(request);
 
-        // Assert - should behave like original implementation
+        // Assert
         Assert.True(result.Success);
 
         // 1. PNG format
         Assert.Equal("png", result.Format);
 
-        // 2. No scaling (original dimensions)
+        // 2. Original dimensions
         Assert.Equal(primaryMonitor.Width, result.Width);
         Assert.Equal(primaryMonitor.Height, result.Height);
 

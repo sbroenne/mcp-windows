@@ -25,16 +25,18 @@ public sealed class MonitorService : IMonitorService
             var monitorInfo = MONITORINFO.Create();
             if (NativeMethods.GetMonitorInfo(hMonitor, ref monitorInfo))
             {
-                // Get logical position (used by CopyFromScreen)
+                // Get logical position and dimensions (used by mouse control and virtual screen)
                 int logicalX = monitorInfo.RcMonitor.Left;
                 int logicalY = monitorInfo.RcMonitor.Top;
+                int logicalWidth = monitorInfo.RcMonitor.Right - monitorInfo.RcMonitor.Left;
+                int logicalHeight = monitorInfo.RcMonitor.Bottom - monitorInfo.RcMonitor.Top;
 
                 // Get device name for this monitor
                 string? deviceName = GetDeviceNameForMonitor(monitorInfo.RcMonitor);
 
-                // Use EnumDisplaySettingsW to get true physical resolution
-                int physicalWidth = monitorInfo.RcMonitor.Right - monitorInfo.RcMonitor.Left;
-                int physicalHeight = monitorInfo.RcMonitor.Bottom - monitorInfo.RcMonitor.Top;
+                // Use EnumDisplaySettingsW to get true physical resolution (for high-DPI screenshot capture)
+                int physicalWidth = logicalWidth;
+                int physicalHeight = logicalHeight;
 
                 if (deviceName != null)
                 {
@@ -47,12 +49,18 @@ public sealed class MonitorService : IMonitorService
                     }
                 }
 
+                // Extract display number from device name (e.g., \\.\DISPLAY1 -> 1)
+                int displayNumber = MonitorInfo.ExtractDisplayNumber(deviceName);
+
                 monitors.Add(new MonitorInfo(
                     Index: index,
+                    DisplayNumber: displayNumber,
                     DeviceName: deviceName ?? $"Monitor {index}",
-                    Width: physicalWidth,
-                    Height: physicalHeight,
-                    X: logicalX,  // Keep logical X/Y for CopyFromScreen
+                    PhysicalWidth: physicalWidth,
+                    PhysicalHeight: physicalHeight,
+                    Width: logicalWidth,
+                    Height: logicalHeight,
+                    X: logicalX,
                     Y: logicalY,
                     IsPrimary: monitorInfo.IsPrimary));
             }
@@ -92,7 +100,30 @@ public sealed class MonitorService : IMonitorService
         }
 
         // Fallback to first monitor if no primary found (should never happen)
-        return monitors.Count > 0 ? monitors[0] : new MonitorInfo(0, "Primary", 1920, 1080, 0, 0, true);
+        return monitors.Count > 0 ? monitors[0] : new MonitorInfo(0, 0, "Primary", 1920, 1080, 1920, 1080, 0, 0, true);
+    }
+
+    /// <inheritdoc />
+    public MonitorInfo? GetSecondaryMonitor()
+    {
+        var monitors = GetMonitors();
+
+        // Only valid for exactly 2 monitors
+        if (monitors.Count != 2)
+        {
+            return null;
+        }
+
+        // Return the non-primary monitor
+        foreach (var monitor in monitors)
+        {
+            if (!monitor.IsPrimary)
+            {
+                return monitor;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

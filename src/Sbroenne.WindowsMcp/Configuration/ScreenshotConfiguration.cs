@@ -38,17 +38,6 @@ public sealed class ScreenshotConfiguration
     public const int DefaultQuality = 85;
 
     /// <summary>
-    /// Default maximum width for auto-scaling. 0 means no scaling (coordinates match screen).
-    /// Set to 1568 for LLM-optimized size (Claude's high-res native limit).
-    /// </summary>
-    public const int DefaultMaxWidth = 0;
-
-    /// <summary>
-    /// Default maximum height for auto-scaling. 0 means no height constraint.
-    /// </summary>
-    public const int DefaultMaxHeight = 0;
-
-    /// <summary>
     /// Default output mode (inline base64).
     /// </summary>
     public const OutputMode DefaultOutputMode = OutputMode.Inline;

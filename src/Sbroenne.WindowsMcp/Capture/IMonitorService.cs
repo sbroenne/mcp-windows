@@ -27,6 +27,12 @@ public interface IMonitorService
     MonitorInfo GetPrimaryMonitor();
 
     /// <summary>
+    /// Gets the secondary monitor (non-primary). Only valid for 2-monitor setups.
+    /// </summary>
+    /// <returns>The secondary monitor, or null if there are 0, 1, or 3+ monitors.</returns>
+    MonitorInfo? GetSecondaryMonitor();
+
+    /// <summary>
     /// Gets the total number of monitors.
     /// </summary>
     int MonitorCount { get; }

@@ -53,6 +53,7 @@ public sealed partial class WindowManagementTool
     /// </summary>
     /// <remarks>
     /// Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.
+    /// Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag).
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
@@ -70,7 +71,7 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, UseStructuredContent = true)]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index without calculating coordinates.")]
+    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor to move a window to a specific monitor by index. Use screenshot_control with action='list_monitors' to find the correct monitorIndex (check is_primary flag).")]
     [return: Description("The result of the window operation including success status, window list or single window info, and error details if failed.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,

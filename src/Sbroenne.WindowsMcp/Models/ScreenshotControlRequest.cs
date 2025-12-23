@@ -57,20 +57,6 @@ public sealed record ScreenshotControlRequest
     public int Quality { get; init; } = ScreenshotConfiguration.DefaultQuality;
 
     /// <summary>
-    /// Gets the maximum width in pixels. Image scaled down if wider (aspect ratio preserved).
-    /// Default is 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.
-    /// </summary>
-    [JsonPropertyName("max_width")]
-    public int MaxWidth { get; init; } = ScreenshotConfiguration.DefaultMaxWidth;
-
-    /// <summary>
-    /// Gets the maximum height in pixels. Image scaled down if taller (aspect ratio preserved).
-    /// Default is 0 (no height constraint).
-    /// </summary>
-    [JsonPropertyName("max_height")]
-    public int MaxHeight { get; init; } = ScreenshotConfiguration.DefaultMaxHeight;
-
-    /// <summary>
     /// Gets the output mode. Default is inline (base64 in response).
     /// </summary>
     [JsonPropertyName("output_mode")]

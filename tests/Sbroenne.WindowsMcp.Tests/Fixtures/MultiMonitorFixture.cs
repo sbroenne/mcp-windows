@@ -40,12 +40,20 @@ public sealed class MultiMonitorFixture : IAsyncLifetime
         _availableMonitors.First(m => m.IsPrimary);
 
     /// <summary>
-    /// Gets a secondary monitor (if available).
+    /// Gets a secondary monitor (if available and exactly 2 monitors).
+    /// Matches the behavior of MonitorService.GetSecondaryMonitor().
     /// </summary>
-    /// <returns>The second monitor, or null if only one monitor available.</returns>
+    /// <returns>The non-primary monitor if exactly 2 monitors exist, otherwise null.</returns>
     public MonitorInfo? GetSecondaryMonitor()
     {
-        return _availableMonitors.Count >= 2 ? _availableMonitors[1] : null;
+        // Match MonitorService logic: only return secondary for exactly 2 monitors
+        if (_availableMonitors.Count != 2)
+        {
+            return null;
+        }
+
+        // Return the non-primary monitor
+        return _availableMonitors.FirstOrDefault(m => !m.IsPrimary);
     }
 
     /// <summary>

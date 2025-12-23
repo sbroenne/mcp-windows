@@ -36,16 +36,24 @@ public sealed partial class ScreenshotControlTool
     /// Captures screenshots of screens, monitors, windows, or regions on Windows.
     /// </summary>
     /// <remarks>
+    /// **COORDINATE SYSTEM**: Screenshot pixel coordinates = mouse coordinates. No conversion needed!
+    /// If you see a button at pixel (450, 300) in the screenshot, use mouse_control(x=450, y=300, monitorIndex=N).
+    /// 
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
-    /// Default: JPEG format at quality 85, no scaling (coordinates match screen for accurate mouse clicks).
-    /// Set maxWidth=1568 for LLM-optimized smaller images.
-    /// Use action 'list_monitors' to enumerate available monitors.
-    /// Use target 'all_monitors' to capture all connected monitors as a single composite image.
+    /// Default: JPEG format at quality 85, at logical resolution (matching mouse coordinate space).
+    /// 
+    /// Monitor targeting:
+    /// - 'primary_screen': Captures the main display (with taskbar). Most common choice.
+    /// - 'secondary_screen': Captures the other monitor. Only works with exactly 2 monitors.
+    /// - 'monitor' with monitorIndex: For 3+ monitors, use list_monitors first to find the index.
+    /// - 'all_monitors': Captures all monitors as a single composite image.
+    /// 
+    /// The list_monitors action returns display_number (matches Windows Settings) and is_primary flag.
     /// Respects secure desktop (UAC/lock screen) restrictions.
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'.</param>
-    /// <param name="target">Capture target. Valid values: 'primary_screen', 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.</param>
+    /// <param name="target">Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index for 3+ monitors), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.</param>
     /// <param name="monitorIndex">Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.</param>
     /// <param name="windowHandle">Window handle (IntPtr value) for 'window' target. Get from window_management tool.</param>
     /// <param name="regionX">X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.</param>
@@ -55,19 +63,17 @@ public sealed partial class ScreenshotControlTool
     /// <param name="includeCursor">Include mouse cursor in capture. Default: false.</param>
     /// <param name="imageFormat">Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).</param>
     /// <param name="quality">Image compression quality 1-100. Default: 85. Only affects JPEG format.</param>
-    /// <param name="maxWidth">Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.</param>
-    /// <param name="maxHeight">Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).</param>
     /// <param name="outputMode">How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.</param>
     /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, UseStructuredContent = true)]
-    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter). Default: JPEG format at quality 85, no scaling (coordinates match screen for accurate mouse clicks). Set maxWidth=1568 for LLM-optimized smaller images. Use action 'list_monitors' to enumerate available monitors. Use target 'all_monitors' to capture all connected monitors as a single composite image. Respects secure desktop (UAC/lock screen) restrictions.")]
+    [Description("Captures screenshots of screens, monitors, windows, or regions on Windows. COORDINATE SYSTEM: Screenshot pixel coordinates = mouse coordinates. If you see a button at pixel (450, 300) in the screenshot, use mouse_control(x=450, y=300, monitorIndex=N). No conversion needed! Targets: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups), 'monitor' (by index for 3+ monitors), 'window', 'region', 'all_monitors'. Use 'list_monitors' action to see available monitors.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, monitor list, and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
-        [Description("Capture target. Valid values: 'primary_screen', 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
+        [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
         [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
         [Description("Window handle (IntPtr value) for 'window' target. Get from window_management tool.")] long? windowHandle = null,
         [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int? regionX = null,
@@ -77,8 +83,6 @@ public sealed partial class ScreenshotControlTool
         [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
         [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
         [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
-        [Description("Maximum width in pixels. Image scaled down if wider (aspect ratio preserved). Default: 0 (no scaling, coordinates match screen). Set to 1568 for LLM-optimized size.")] int? maxWidth = null,
-        [Description("Maximum height in pixels. Image scaled down if taller (aspect ratio preserved). Default: 0 (no height constraint).")] int? maxHeight = null,
         [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
         [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
         CancellationToken cancellationToken = default)
@@ -104,7 +108,7 @@ public sealed partial class ScreenshotControlTool
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
-                $"Invalid target: '{target}'. Valid values: 'primary_screen', 'monitor', 'window', 'region', 'all_monitors'");
+                $"Invalid target: '{target}'. Valid values: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'");
         }
 
         // Parse and validate image format
@@ -123,22 +127,6 @@ public sealed partial class ScreenshotControlTool
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
                 $"Quality must be between 1 and 100, got: {parsedQuality}");
-        }
-
-        // Validate maxWidth/maxHeight
-        var parsedMaxWidth = maxWidth ?? ScreenshotConfiguration.DefaultMaxWidth;
-        var parsedMaxHeight = maxHeight ?? ScreenshotConfiguration.DefaultMaxHeight;
-        if (parsedMaxWidth < 0)
-        {
-            return ScreenshotControlResult.Error(
-                ScreenshotErrorCode.InvalidRequest,
-                "maxWidth cannot be negative");
-        }
-        if (parsedMaxHeight < 0)
-        {
-            return ScreenshotControlResult.Error(
-                ScreenshotErrorCode.InvalidRequest,
-                "maxHeight cannot be negative");
         }
 
         // Parse and validate output mode
@@ -187,8 +175,6 @@ public sealed partial class ScreenshotControlTool
             IncludeCursor = includeCursor,
             ImageFormat = parsedImageFormat ?? ScreenshotConfiguration.DefaultImageFormat,
             Quality = parsedQuality,
-            MaxWidth = parsedMaxWidth,
-            MaxHeight = parsedMaxHeight,
             OutputMode = parsedOutputMode ?? ScreenshotConfiguration.DefaultOutputMode,
             OutputPath = outputPath
         };
@@ -228,7 +214,8 @@ public sealed partial class ScreenshotControlTool
 
         return target.ToLowerInvariant() switch
         {
-            "primary_screen" or "primaryscreen" => CaptureTarget.PrimaryScreen,
+            "primary_screen" or "primaryscreen" or "primary" => CaptureTarget.PrimaryScreen,
+            "secondary_screen" or "secondaryscreen" or "secondary" => CaptureTarget.SecondaryScreen,
             "monitor" => CaptureTarget.Monitor,
             "window" => CaptureTarget.Window,
             "region" => CaptureTarget.Region,

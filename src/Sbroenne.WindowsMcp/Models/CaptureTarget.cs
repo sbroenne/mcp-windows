@@ -6,28 +6,34 @@ namespace Sbroenne.WindowsMcp.Models;
 public enum CaptureTarget
 {
     /// <summary>
-    /// Capture the primary monitor (default).
+    /// Capture the primary monitor (default). This is the main display with the taskbar.
     /// </summary>
     PrimaryScreen = 0,
 
     /// <summary>
+    /// Capture the secondary monitor. Only works with exactly 2 monitors.
+    /// For 3+ monitors, use Monitor target with monitorIndex.
+    /// </summary>
+    SecondaryScreen = 1,
+
+    /// <summary>
     /// Capture a specific monitor by index.
     /// </summary>
-    Monitor = 1,
+    Monitor = 2,
 
     /// <summary>
     /// Capture a specific window by handle.
     /// </summary>
-    Window = 2,
+    Window = 3,
 
     /// <summary>
     /// Capture a rectangular screen region.
     /// </summary>
-    Region = 3,
+    Region = 4,
 
     /// <summary>
     /// Capture all connected monitors as a single composite image.
     /// Uses the virtual screen bounds to capture the entire multi-monitor desktop.
     /// </summary>
-    AllMonitors = 4
+    AllMonitors = 5
 }

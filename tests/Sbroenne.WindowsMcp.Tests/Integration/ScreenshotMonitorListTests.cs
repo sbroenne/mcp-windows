@@ -170,4 +170,107 @@ public sealed class ScreenshotMonitorListTests
         Assert.NotNull(monitor2);
         Assert.Equal(monitor1, monitor2);
     }
+
+    [Fact]
+    public void GetMonitors_AllHaveValidDisplayNumber()
+    {
+        // Act
+        var monitors = _monitorService.GetMonitors();
+
+        // Assert
+        foreach (var monitor in monitors)
+        {
+            Assert.True(
+                monitor.DisplayNumber > 0,
+                $"Monitor {monitor.Index} should have positive DisplayNumber, got: {monitor.DisplayNumber}");
+        }
+    }
+
+    [Fact]
+    public void GetMonitors_DisplayNumberMatchesDeviceName()
+    {
+        // Act
+        var monitors = _monitorService.GetMonitors();
+
+        // Assert - display number should be extracted from device name
+        foreach (var monitor in monitors)
+        {
+            var expectedNumber = Sbroenne.WindowsMcp.Models.MonitorInfo.ExtractDisplayNumber(monitor.DeviceName);
+            Assert.Equal(expectedNumber, monitor.DisplayNumber);
+        }
+    }
+
+    [Fact]
+    public void GetSecondaryMonitor_SingleMonitor_ReturnsNull()
+    {
+        // This test verifies behavior - with only one monitor, no secondary exists
+        // Skip if multiple monitors are present
+        if (_monitorService.MonitorCount > 1)
+        {
+            return; // Can't test single-monitor behavior on multi-monitor setup
+        }
+
+        // Act
+        var secondary = _monitorService.GetSecondaryMonitor();
+
+        // Assert
+        Assert.Null(secondary);
+    }
+
+    [SkippableFact]
+    public void GetSecondaryMonitor_MultipleMonitors_ReturnsNonPrimary()
+    {
+        // Skip if only one monitor
+        Skip.If(_monitorService.MonitorCount < 2, "Test requires multiple monitors");
+
+        // Act
+        var secondary = _monitorService.GetSecondaryMonitor();
+
+        // Assert
+        Assert.NotNull(secondary);
+        Assert.False(secondary.IsPrimary, "Secondary monitor should not be primary");
+    }
+
+    [SkippableFact]
+    public void GetSecondaryMonitor_ExactlyTwoMonitors_ReturnsTheOtherOne()
+    {
+        // Skip if not exactly two monitors
+        Skip.If(_monitorService.MonitorCount != 2, "Test requires exactly 2 monitors");
+
+        // Arrange
+        var primary = _monitorService.GetPrimaryMonitor();
+
+        // Act
+        var secondary = _monitorService.GetSecondaryMonitor();
+
+        // Assert
+        Assert.NotNull(secondary);
+        Assert.NotEqual(primary.Index, secondary.Index);
+    }
+
+    [SkippableFact]
+    public void GetSecondaryMonitor_ThreeOrMoreMonitors_ReturnsNull()
+    {
+        // Skip if not enough monitors
+        Skip.If(_monitorService.MonitorCount < 3, "Test requires 3+ monitors");
+
+        // Act - with 3+ monitors, secondary_screen is ambiguous
+        var secondary = _monitorService.GetSecondaryMonitor();
+
+        // Assert
+        Assert.Null(secondary);
+    }
+
+    [Fact]
+    public void MonitorInfo_CanSerializeToJson_IncludesDisplayNumber()
+    {
+        // Arrange
+        var monitor = _monitorService.GetPrimaryMonitor();
+
+        // Act
+        var json = System.Text.Json.JsonSerializer.Serialize(monitor);
+
+        // Assert
+        Assert.Contains("\"display_number\"", json);
+    }
 }
