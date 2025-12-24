@@ -1,0 +1,28 @@
+# VS Code Extension ignore file
+# Excludes files from the extension package (VSIX)
+
+# Source files (TypeScript)
+src/**
+tsconfig.json
+
+# Development files
+.vscode/**
+node_modules/**
+*.ts
+*.map
+eslint.config.mjs
+
+# Git
+.git/**
+.gitignore
+
+# Build artifacts not needed in package
+*.vsix
+
+# Binaries - exclude debug/dev files
+bin/**/*.pdb
+bin/**/*.xml
+bin/**/runtimes/browser/**
+
+# Documentation source (README is included explicitly)
+CONTRIBUTING.md

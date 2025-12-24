@@ -9,6 +9,8 @@ using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -29,6 +31,7 @@ public sealed partial class MouseControlTool
 
     private readonly IMouseInputService _mouseInputService;
     private readonly IMonitorService _monitorService;
+    private readonly IWindowEnumerator _windowEnumerator;
     private readonly IElevationDetector _elevationDetector;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly MouseOperationLogger _logger;
@@ -39,6 +42,7 @@ public sealed partial class MouseControlTool
     /// </summary>
     /// <param name="mouseInputService">The mouse input service.</param>
     /// <param name="monitorService">The monitor service.</param>
+    /// <param name="windowEnumerator">The window enumerator for getting target window info.</param>
     /// <param name="elevationDetector">The elevation detector.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="logger">The operation logger.</param>
@@ -46,6 +50,7 @@ public sealed partial class MouseControlTool
     public MouseControlTool(
         IMouseInputService mouseInputService,
         IMonitorService monitorService,
+        IWindowEnumerator windowEnumerator,
         IElevationDetector elevationDetector,
         ISecureDesktopDetector secureDesktopDetector,
         MouseOperationLogger logger,
@@ -53,6 +58,7 @@ public sealed partial class MouseControlTool
     {
         _mouseInputService = mouseInputService ?? throw new ArgumentNullException(nameof(mouseInputService));
         _monitorService = monitorService ?? throw new ArgumentNullException(nameof(monitorService));
+        _windowEnumerator = windowEnumerator ?? throw new ArgumentNullException(nameof(windowEnumerator));
         _elevationDetector = elevationDetector ?? throw new ArgumentNullException(nameof(elevationDetector));
         _secureDesktopDetector = secureDesktopDetector ?? throw new ArgumentNullException(nameof(secureDesktopDetector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -92,11 +98,13 @@ public sealed partial class MouseControlTool
     /// <param name="modifiers">Modifier keys to hold during action: ctrl, shift, alt (comma-separated).</param>
     /// <param name="button">Mouse button for drag: left, right, or middle (default: left).</param>
     /// <param name="monitorIndex">Monitor index (0-based). Alternative to target for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices.</param>
+    /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
+    /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, UseStructuredContent = true)]
-    [Description("Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. Use 'target' parameter with 'primary_screen' or 'secondary_screen' for easy monitor targeting, or 'monitorIndex' for 3+ monitor setups. All coordinates are monitor-relative. Use get_position to query current cursor position with monitor info.")]
-    [return: Description("The result of the mouse operation including success status, final cursor position (monitor-relative), monitor context (monitor_index, monitor_width, monitor_height for operations with explicit coordinates), window title at cursor, and error details if failed.")]
+    [Description("Control mouse input on Windows. PREFER ui_automation FIRST - only use mouse_control as fallback when ui_automation patterns don't work. Use clickablePoint coordinates from ui_automation results for reliable clicking. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. Use 'target' parameter with 'primary_screen' or 'secondary_screen' for easy monitor targeting, or 'monitorIndex' for 3+ monitor setups. IMPORTANT: Use 'expectedWindowTitle' or 'expectedProcessName' to verify the target window BEFORE clicking - the operation will fail with 'wrong_target_window' if the foreground window doesn't match.")]
+    [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position (query current cursor position with monitor context)")] string action,
@@ -110,6 +118,8 @@ public sealed partial class MouseControlTool
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
         [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
         [Description("Monitor index (0-based). Alternative to 'target' for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
+        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent clicking in the wrong application.")] string? expectedWindowTitle = null,
+        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent clicking in the wrong application.")] string? expectedProcessName = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -130,6 +140,17 @@ public sealed partial class MouseControlTool
 
         try
         {
+            // Pre-flight check: verify target window if expected values are specified
+            if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
+            {
+                var targetCheckResult = await VerifyTargetWindowAsync(expectedWindowTitle, expectedProcessName, linkedToken);
+                if (!targetCheckResult.Success)
+                {
+                    _logger.LogOperationFailure(correlationId, action ?? "null", targetCheckResult.ErrorCode.ToString(), targetCheckResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return targetCheckResult;
+                }
+            }
+
             // Validate and parse the action
             if (string.IsNullOrWhiteSpace(action))
             {
@@ -387,6 +408,12 @@ public sealed partial class MouseControlTool
                             MonitorHeight = monitorInfo.Height
                         };
                     }
+                }
+
+                // Attach target window info for input operations (not get_position)
+                if (mouseAction.Value != MouseAction.GetPosition)
+                {
+                    operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
                 }
 
                 _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.WindowTitle, stopwatch.ElapsedMilliseconds);
@@ -835,4 +862,100 @@ public sealed partial class MouseControlTool
         };
     }
 
+    /// <summary>
+    /// Attaches information about the current foreground window to the result.
+    /// This helps LLM agents verify that mouse operations targeted the correct window.
+    /// </summary>
+    private async Task<MouseControlResult> AttachTargetWindowInfoAsync(MouseControlResult result, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var foregroundHandle = NativeMethods.GetForegroundWindow();
+            if (foregroundHandle == IntPtr.Zero)
+            {
+                return result; // No foreground window, return original result
+            }
+
+            var windowInfo = await _windowEnumerator.GetWindowInfoAsync(foregroundHandle, cancellationToken);
+            if (windowInfo == null)
+            {
+                return result; // Couldn't get window info, return original result
+            }
+
+            return result with
+            {
+                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+            };
+        }
+        catch
+        {
+            // Best effort - if we can't get the window info, just return the original result
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Verifies that the foreground window matches the expected target before performing mouse actions.
+    /// This prevents clicks from being sent to the wrong application.
+    /// </summary>
+    /// <param name="expectedTitle">Expected window title (partial match, case-insensitive).</param>
+    /// <param name="expectedProcessName">Expected process name (case-insensitive).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Success result if window matches, failure result with WrongTargetWindow error if not.</returns>
+    private async Task<MouseControlResult> VerifyTargetWindowAsync(string? expectedTitle, string? expectedProcessName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var foregroundHandle = NativeMethods.GetForegroundWindow();
+            if (foregroundHandle == IntPtr.Zero)
+            {
+                return MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "No foreground window found. Cannot verify target window.");
+            }
+
+            var windowInfo = await _windowEnumerator.GetWindowInfoAsync(foregroundHandle, cancellationToken);
+            if (windowInfo == null)
+            {
+                return MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "Could not retrieve foreground window information.");
+            }
+
+            // Check expected title (partial, case-insensitive match)
+            if (!string.IsNullOrEmpty(expectedTitle))
+            {
+                if (string.IsNullOrEmpty(windowInfo.Title) ||
+                    !windowInfo.Title.Contains(expectedTitle, StringComparison.OrdinalIgnoreCase))
+                {
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.WrongTargetWindow,
+                        $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent click in wrong window.");
+                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                }
+            }
+
+            // Check expected process name (case-insensitive match)
+            if (!string.IsNullOrEmpty(expectedProcessName))
+            {
+                if (string.IsNullOrEmpty(windowInfo.ProcessName) ||
+                    !windowInfo.ProcessName.Equals(expectedProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.WrongTargetWindow,
+                        $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent click in wrong window.");
+                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                }
+            }
+
+            // Window matches expectations
+            return MouseControlResult.CreateSuccess(new Coordinates(0, 0));
+        }
+        catch (Exception ex)
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.WrongTargetWindow,
+                $"Failed to verify target window: {ex.Message}");
+        }
+    }
 }

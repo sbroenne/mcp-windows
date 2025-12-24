@@ -119,7 +119,7 @@ As an LLM agent, I need to query the virtual screen dimensions so I can understa
 - Windows provides accurate virtual screen metrics via `GetSystemMetrics`
 - Virtual screen coordinates are consistent with individual monitor positions
 - Existing `CaptureRegionInternalAsync` can handle virtual screen coordinates including negative values
-- The feature targets Windows 10/11 with standard display drivers
+- The feature targets Windows 11 with standard display drivers
 
 ## Technical Notes
 

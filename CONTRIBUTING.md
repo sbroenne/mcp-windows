@@ -11,7 +11,7 @@ This project adheres to the Contributor Covenant. By participating, you are expe
 ### Prerequisites
 
 - Windows 10/11
-- .NET 8.0 SDK
+- .NET 10.0 SDK
 - Node.js 18+ (for VS Code extension development)
 - Visual Studio 2022 or VS Code with C# extension
 

@@ -79,8 +79,8 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, UseStructuredContent = true)]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. Use move_to_monitor with target='primary_screen' or 'secondary_screen', or monitorIndex for 3+ monitors.")]
-    [return: Description("The result of the window operation including success status, window list or single window info, and error details if failed.")]
+    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. BEST PRACTICE: Before sending keyboard/mouse input to a specific window, use 'activate' with the window handle to ensure it has focus. Use 'get_foreground' to verify which window is currently active. Use 'find' or 'list' to discover window handles.")]
+    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, is_foreground), and error details if failed. Save the 'handle' value to use with activate, close, or other window operations.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,

@@ -13,10 +13,12 @@ This directory contains all test scenario definitions for the LLM-Based Integrat
 | VISUAL | 7 | TC-VISUAL-001 to TC-VISUAL-006, TC-VISUAL-001a |
 | WORKFLOW | 10 | TC-WORKFLOW-001 to TC-WORKFLOW-010 |
 | ERROR | 10 | TC-ERROR-001 to TC-ERROR-008, TC-ERROR-009, TC-ERROR-010 |
-| **Total** | **84** | |
+| UIAUTOMATION | 12 | TC-UIAUTOMATION-001 to TC-UIAUTOMATION-012 |
+| **Total** | **96** | |
 
 > **New in v1.2**: Added 4 all-monitors scenarios (TC-SCREENSHOT-001a/b, TC-VISUAL-001a, TC-VISUAL-006)
 > **New in v1.3**: Added 6 edge case scenarios (TC-ERROR-009/010, TC-MOUSE-014, TC-SCREENSHOT-011, TC-KEYBOARD-016, TC-WINDOW-016)
+> **New in v1.4**: Added 12 UI Automation & OCR scenarios (TC-UIAUTOMATION-001 to TC-UIAUTOMATION-012)
 
 ## Scenarios by Category
 
@@ -141,13 +143,30 @@ This directory contains all test scenario definitions for the LLM-Based Integrat
 | [TC-ERROR-009](TC-ERROR-009.md) | **Key already held error** ⭐ | P2 |
 | [TC-ERROR-010](TC-ERROR-010.md) | **Key not held error** ⭐ | P2 |
 
+### UI Automation & OCR (12 scenarios)
+
+| ID | Description | Priority |
+|----|-------------|----------|
+| [TC-UIAUTOMATION-001](TC-UIAUTOMATION-001.md) | Find element by name in Notepad | P1 |
+| [TC-UIAUTOMATION-002](TC-UIAUTOMATION-002.md) | Get UI tree of Calculator | P1 |
+| [TC-UIAUTOMATION-003](TC-UIAUTOMATION-003.md) | Find and click Calculator buttons | P1 |
+| [TC-UIAUTOMATION-004](TC-UIAUTOMATION-004.md) | Find and type in Notepad | P1 |
+| [TC-UIAUTOMATION-005](TC-UIAUTOMATION-005.md) | Wait for save dialog to appear | P1 |
+| [TC-UIAUTOMATION-006](TC-UIAUTOMATION-006.md) | OCR text from screen region | P2 |
+| [TC-UIAUTOMATION-007](TC-UIAUTOMATION-007.md) | Get text from Calculator display | P1 |
+| [TC-UIAUTOMATION-008](TC-UIAUTOMATION-008.md) | Toggle checkbox via invoke pattern | P2 |
+| [TC-UIAUTOMATION-009](TC-UIAUTOMATION-009.md) | Scroll element into view | P2 |
+| [TC-UIAUTOMATION-010](TC-UIAUTOMATION-010.md) | **Electron app (VS Code) automation** ⭐ | P2 |
+| [TC-UIAUTOMATION-011](TC-UIAUTOMATION-011.md) | Error handling for invalid elements | P2 |
+| [TC-UIAUTOMATION-012](TC-UIAUTOMATION-012.md) | Multi-monitor coordinate mapping | P1 |
+
 ## Priority Distribution
 
 | Priority | Count | Percentage |
 |----------|-------|------------|
-| P1 (Critical) | 26 | 33% |
-| P2 (Important) | 45 | 58% |
-| P3 (Nice-to-have) | 7 | 9% |
+| P1 (Critical) | 33 | 34% |
+| P2 (Important) | 56 | 58% |
+| P3 (Nice-to-have) | 7 | 7% |
 
 ## Quick Links
 

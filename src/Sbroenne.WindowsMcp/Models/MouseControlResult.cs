@@ -30,6 +30,14 @@ public sealed record MouseControlResult
     public string? WindowTitle { get; init; }
 
     /// <summary>
+    /// Gets detailed information about the window that received the mouse input.
+    /// This helps LLM agents verify that clicks/input went to the correct window.
+    /// </summary>
+    [JsonPropertyName("target_window")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TargetWindowInfo? TargetWindow { get; init; }
+
+    /// <summary>
     /// Gets the monitor index where the operation occurred (0-based).
     /// Only populated for operations with explicit coordinates.
     /// </summary>
@@ -79,6 +87,14 @@ public sealed record MouseControlResult
     [JsonPropertyName("error_details")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object>? ErrorDetails { get; init; }
+
+    /// <summary>
+    /// Gets the suggested recovery action for LLM agents when the operation fails.
+    /// Provides actionable guidance on what to try next.
+    /// </summary>
+    [JsonPropertyName("recovery_suggestion")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? RecoverySuggestion { get; init; }
 
     /// <summary>
     /// Gets the error message (alias for Error property for backwards compatibility).
@@ -160,9 +176,39 @@ public sealed record MouseControlResult
             Error = errorMessage,
             ErrorCode = errorCode,
             ErrorDetails = details.Count > 0 ? details : null,
+            RecoverySuggestion = GetRecoverySuggestion(errorCode),
             ScreenBounds = screenBounds,
         };
     }
+
+    private static string GetRecoverySuggestion(MouseControlErrorCode errorCode) => errorCode switch
+    {
+        MouseControlErrorCode.InvalidCoordinates =>
+            "Check monitorIndex is valid (use screenshot_control action='list_monitors'). Coordinates must be within monitor bounds.",
+
+        MouseControlErrorCode.CoordinatesOutOfBounds =>
+            "Coordinates are outside monitor dimensions. Use screenshot_control action='list_monitors' to check monitor bounds. Coordinates are relative to monitor origin (0,0).",
+
+        MouseControlErrorCode.MissingRequiredParameter =>
+            "When using x/y coordinates, you must specify either 'target' (e.g., 'primary_screen') or 'monitorIndex'. Use target='primary_screen' for the main display.",
+
+        MouseControlErrorCode.ElevatedProcessTarget =>
+            "Cannot click on Administrator windows. Try: 1) Target a different non-elevated window. 2) Run MCP server with elevated privileges.",
+
+        MouseControlErrorCode.SecureDesktopActive =>
+            "Windows secure desktop (UAC dialog or lock screen) is active. Wait for user to dismiss it before retrying.",
+
+        MouseControlErrorCode.WrongTargetWindow =>
+            "A different window has focus. Use window_management action='activate' with the target window handle first, then retry the click.",
+
+        MouseControlErrorCode.InvalidAction =>
+            "Valid actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position",
+
+        MouseControlErrorCode.InvalidScrollDirection =>
+            "Valid scroll directions: up, down, left, right",
+
+        _ => "Check error details and retry with corrected parameters."
+    };
 
     private static string ConvertErrorCodeToString(MouseControlErrorCode errorCode)
     {

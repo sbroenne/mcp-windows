@@ -1,7 +1,7 @@
 {
   "name": "windows-mcp",
   "displayName": "Windows MCP Server",
-  "description": "Windows automation for AI assistants - control mouse, keyboard, windows, and capture screenshots",
+  "description": "Windows automation for AI assistants - control mouse, keyboard, windows, capture screenshots, and automate UI with accessibility APIs",
   "version": "1.0.0",
   "publisher": "sbroenne",
   "icon": "icon.png",
@@ -47,14 +47,6 @@
     "ms-dotnettools.vscode-dotnet-runtime"
   ],
   "main": "./out/extension.js",
-  "files": [
-    "out/**",
-    "bin/**",
-    "README.md",
-    "CHANGELOG.md",
-    "LICENSE",
-    "icon.png"
-  ],
   "contributes": {
     "mcpServerDefinitionProviders": [
       {
@@ -65,14 +57,16 @@
   },
   "scripts": {
     "clean": "cd .. && dotnet clean src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release",
-    "build:mcp-server": "npm run clean && cd .. && dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release --no-self-contained -o vscode-extension/bin --verbosity minimal",
+    "clean:bin": "pwsh -NoProfile -Command \"Get-ChildItem -Path bin -Recurse -Include *.pdb,*.xml | Remove-Item -Force; if (Test-Path bin/runtimes/browser) { Remove-Item -Path bin/runtimes/browser -Recurse -Force }\"",
+    "build:mcp-server": "npm run clean && cd .. && dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release --no-self-contained -o vscode-extension/bin --verbosity minimal && cd vscode-extension && npm run clean:bin",
     "vscode:prepublish": "npm run build:mcp-server && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "npm run build:mcp-server && vsce package",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.2",
     "@types/node": "^22.19.2",
     "@types/vscode": "^1.106.1",
     "@typescript-eslint/eslint-plugin": "^8.46.2",

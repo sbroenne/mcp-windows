@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
@@ -16,6 +17,21 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     private TestHarnessForm? _form;
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
+    private bool _isWarmedUp;
+
+    // P/Invoke for foreground window verification
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    private const int ASFW_ANY = -1;
 
     /// <summary>
     /// Gets the handle of the test window.
@@ -72,8 +88,14 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
                 _form.Height);
         });
 
-        // Give the window time to settle
-        await Task.Delay(100);
+        // Increased settle time for Windows to fully process the window
+        await Task.Delay(200);
+
+        // Perform initial focus acquisition with verification
+        await EnsureTestWindowForegroundAsync();
+
+        // Warmup: perform a quick mouse move to ensure input system is primed
+        await WarmupMouseInputAsync();
     }
 
     private void RunMessageLoop()
@@ -159,18 +181,74 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// Ensures the test window is in the foreground before a test operation.
+    /// Ensures the test window is in the foreground with retry logic and verification.
     /// </summary>
-    public void EnsureTestWindowForeground()
+    public async Task EnsureTestWindowForegroundAsync(int maxRetries = 3, int delayMs = 100)
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
+            return;
+        }
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            // Allow any process to set foreground window
+            AllowSetForegroundWindow(ASFW_ANY);
+
             _form.Invoke(() =>
             {
                 _form.Activate();
                 _form.BringToFront();
             });
+
+            // Also try SetForegroundWindow directly
+            SetForegroundWindow(TestWindowHandle);
+
+            // Wait for focus to settle
+            await Task.Delay(delayMs);
+
+            // Verify we got focus
+            if (GetForegroundWindow() == TestWindowHandle)
+            {
+                return; // Success!
+            }
         }
+
+        // Final attempt - just proceed and hope for the best
+        _form.Invoke(() =>
+        {
+            _form.Activate();
+            _form.BringToFront();
+        });
+        await Task.Delay(delayMs);
+    }
+
+    /// <summary>
+    /// Ensures the test window is in the foreground before a test operation.
+    /// Synchronous wrapper for backward compatibility.
+    /// </summary>
+    public void EnsureTestWindowForeground()
+    {
+        EnsureTestWindowForegroundAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Warmup mouse input to ensure the first actual test doesn't suffer from
+    /// Windows input initialization delays.
+    /// </summary>
+    private async Task WarmupMouseInputAsync()
+    {
+        if (_isWarmedUp || _form == null || _form.IsDisposed)
+        {
+            return;
+        }
+
+        // Move mouse to window center to "wake up" the input system
+        var center = GetTestWindowCenter();
+        await MouseInputService.MoveAsync(center.X, center.Y);
+        await Task.Delay(50);
+
+        _isWarmedUp = true;
     }
 
     /// <summary>

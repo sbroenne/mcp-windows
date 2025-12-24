@@ -38,6 +38,9 @@ public enum MouseControlErrorCode
     /// <summary>Input was blocked by another application or system state.</summary>
     InputBlocked = 202,
 
+    /// <summary>The foreground window does not match the expected target window.</summary>
+    WrongTargetWindow = 203,
+
     #endregion
 
     #region Operation Errors (300-399)

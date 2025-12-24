@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
@@ -256,6 +257,20 @@ public class WindowTestFixture : IAsyncLifetime, IDisposable
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
 
+    // P/Invoke for foreground window verification
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    private const int ASFW_ANY = -1;
+
     /// <summary>
     /// Gets the window service instance for testing.
     /// </summary>
@@ -341,8 +356,11 @@ public class WindowTestFixture : IAsyncLifetime, IDisposable
                 _form.Height);
         });
 
-        // Give the window time to settle
-        await Task.Delay(100);
+        // Increased settle time for Windows to fully process the window
+        await Task.Delay(200);
+
+        // Perform initial focus acquisition with verification
+        await EnsureTestWindowForegroundAsync();
     }
 
     private void RunMessageLoop()
@@ -430,18 +448,55 @@ public class WindowTestFixture : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// Ensures the test window is in the foreground before a test operation.
+    /// Ensures the test window is in the foreground with retry logic and verification.
     /// </summary>
-    public void EnsureTestWindowForeground()
+    public async Task EnsureTestWindowForegroundAsync(int maxRetries = 3, int delayMs = 100)
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
+            return;
+        }
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            // Allow any process to set foreground window
+            AllowSetForegroundWindow(ASFW_ANY);
+
             _form.Invoke(() =>
             {
                 _form.Activate();
                 _form.BringToFront();
             });
+
+            // Also try SetForegroundWindow directly
+            SetForegroundWindow(TestWindowHandle);
+
+            // Wait for focus to settle
+            await Task.Delay(delayMs);
+
+            // Verify we got focus
+            if (GetForegroundWindow() == TestWindowHandle)
+            {
+                return; // Success!
+            }
         }
+
+        // Final attempt - just proceed and hope for the best
+        _form.Invoke(() =>
+        {
+            _form.Activate();
+            _form.BringToFront();
+        });
+        await Task.Delay(delayMs);
+    }
+
+    /// <summary>
+    /// Ensures the test window is in the foreground before a test operation.
+    /// Synchronous wrapper for backward compatibility.
+    /// </summary>
+    public void EnsureTestWindowForeground()
+    {
+        EnsureTestWindowForegroundAsync().GetAwaiter().GetResult();
     }
 
     /// <summary>

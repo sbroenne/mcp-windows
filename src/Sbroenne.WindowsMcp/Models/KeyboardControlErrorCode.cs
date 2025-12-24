@@ -45,5 +45,8 @@ public enum KeyboardControlErrorCode
     LayoutDetectionFailed = 12,
 
     /// <summary>The specified key name is invalid or not recognized.</summary>
-    InvalidKey = 13
+    InvalidKey = 13,
+
+    /// <summary>The foreground window does not match the expected target window.</summary>
+    WrongTargetWindow = 14
 }

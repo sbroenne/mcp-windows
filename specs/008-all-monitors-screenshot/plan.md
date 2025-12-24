@@ -13,7 +13,7 @@ Add a new `all_monitors` capture target to the screenshot_control tool that capt
 **Primary Dependencies**: Windows GDI+ (System.Drawing), existing ScreenshotService infrastructure  
 **Storage**: N/A (returns base64-encoded PNG via MCP)  
 **Testing**: xUnit 2.6+ integration tests on multi-monitor systems  
-**Target Platform**: Windows 10/11 with multi-monitor support  
+**Target Platform**: Windows 11 with multi-monitor support  
 **Project Type**: Single project (existing MCP server)  
 **Performance Goals**: < 500ms capture time on typical 2-monitor setup (SC-001)  
 **Constraints**: MaxPixels limit applies to prevent memory issues with large virtual screens  

@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>Sbroenne.WindowsMcp</RootNamespace>
     <AssemblyName>Sbroenne.WindowsMcp</AssemblyName>
-    <Description>MCP server for Windows automation - mouse, keyboard, window management, and screenshots</Description>
+    <Description>MCP Server for Windows automation - mouse, keyboard, window management, and screenshots</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
@@ -24,6 +24,14 @@
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
+
+    <!-- Production optimization: exclude debug symbols and XML docs from publish -->
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <PublishDocumentationFile Condition="'$(Configuration)' == 'Release'">false</PublishDocumentationFile>
+
+    <!-- WinRT/C#/Win projection trimming for smaller output -->
+    <CsWinRTEnableLogging>false</CsWinRTEnableLogging>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,7 +39,11 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Polly" />
-    <PackageReference Include="System.Drawing.Common" />
+  </ItemGroup>
+
+  <!-- UI Automation framework references -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
   </ItemGroup>
 
 </Project>

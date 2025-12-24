@@ -8,6 +8,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Tests.Fixtures;
 using Sbroenne.WindowsMcp.Tools;
+using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Tools;
 
@@ -29,6 +30,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var mouseService = new MouseInputService();
         var monitorService = new MonitorService();
         var elevationDetector = new ElevationDetector();
+        var windowEnumerator = new WindowEnumerator(elevationDetector, WindowConfiguration.FromEnvironment());
         var secureDesktopDetector = new SecureDesktopDetector();
         var logger = new MouseOperationLogger(NullLogger<MouseOperationLogger>.Instance);
         var config = MouseConfiguration.FromEnvironment();
@@ -36,6 +38,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         _tool = new MouseControlTool(
             mouseService,
             monitorService,
+            windowEnumerator,
             elevationDetector,
             secureDesktopDetector,
             logger,

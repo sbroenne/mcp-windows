@@ -8,7 +8,7 @@ permalink: /features/
 
 # Complete Feature Reference
 
-Windows MCP Server provides 4 specialized tools for comprehensive Windows automation.
+Windows MCP Server provides 5 specialized tools for comprehensive Windows automation.
 
 ## 🖱️ Mouse Control
 
@@ -136,6 +136,59 @@ Capture screenshots on Windows with LLM-optimized defaults.
 
 ---
 
+## 🔍 UI Automation & OCR
+
+Discover, interact with, and extract text from Windows applications using the Windows UI Automation API.
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `find` | Find elements matching query | Query filters (see below) |
+| `get_tree` | Get UI element tree | `windowHandle` or `processName` |
+| `invoke` | Invoke pattern on element | `elementId`, `pattern` |
+| `focus` | Set keyboard focus | `elementId` |
+| `find_and_click` | Find and click element | Query filters |
+| `find_and_type` | Find edit and type text | Query filters, `text` |
+| `find_and_select` | Find and select item | Query filters, `item` |
+| `get_text` | Get text from element | `elementId` or query |
+| `wait_for` | Wait for element | Query filters, `timeoutMs` |
+| `ocr` | Recognize text in region | `source`, region params |
+| `ocr_element` | OCR on element bounds | `elementId` or query |
+| `ocr_status` | Check OCR availability | none |
+
+**Query Filters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `name` | Element's Name property (button label, window title) |
+| `controlType` | Element type: Button, Edit, ComboBox, TreeItem, etc. |
+| `automationId` | Developer-assigned automation identifier |
+| `className` | Win32 class name |
+| `processName` | Process name (notepad, Code, etc.) |
+| `windowHandle` | Specific window handle |
+| `parentElementId` | Scope search to element's children |
+
+**Supported Patterns:**
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| `Invoke` | Click/activate | Buttons, menu items |
+| `Toggle` | Toggle state | Checkboxes |
+| `Expand` / `Collapse` | Expand/collapse | TreeItems, ComboBoxes |
+| `Value` | Set text value | Edit controls |
+| `RangeValue` | Set numeric value | Sliders, spinners |
+| `Scroll` | Scroll content | Scrollable containers |
+
+**Features:**
+- Pattern-based interaction (no coordinates needed)
+- Scoped tree navigation with parentElementId
+- OCR fallback for text not exposed by UI Automation
+- Multi-monitor coordinate integration with mouse_control
+- Electron app support (VS Code, Teams, Slack)
+
+See the [full UI Automation guide](/ui-automation/) for detailed examples.
+
+---
+
 ## Error Handling
 
 The server handles common Windows security scenarios:
@@ -154,6 +207,7 @@ The server handles common Windows security scenarios:
 | `InvalidRegion` | Capture region has invalid dimensions |
 | `CaptureFailed` | Screenshot capture operation failed |
 | `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
+| `WrongTargetWindow` | Foreground window doesn't match expectedWindowTitle or expectedProcessName |
 
 ---
 

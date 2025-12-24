@@ -1,6 +1,6 @@
 # Windows MCP Server
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to use the Windows 11 with mouse, keyboard and windows tools. Take screenshots to allow the LLM to see what it is doing.
+A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with mouse, keyboard, window management, screenshot, and UI automation tools.
 
 Designed for computer use, QA and RPA scenarios.
 
@@ -50,6 +50,18 @@ Designed for computer use, QA and RPA scenarios.
 - **Cursor inclusion** - optionally include mouse cursor in captures
 - **Multi-monitor aware** - supports extended desktop configurations
 - **DPI aware** - correct pixel dimensions on high-DPI displays
+
+### 🔍 UI Automation & OCR
+- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
+- **Element discovery** - Find UI elements by name, control type, or automation ID
+- **UI tree navigation** - Traverse the accessibility tree with depth limiting
+- **Wait for elements** - Wait for UI elements to appear with configurable timeout
+- **Text extraction** - Get text from controls via UI Automation or OCR fallback
+- **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
+- **Multi-window workflows** - Auto-activate target windows before interaction with `activateFirst`
+- **Wrong window detection** - Verify expected window is active before interactive actions
+- **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
+- **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
 
 ## Why Choose Windows MCP?
 
@@ -108,7 +120,7 @@ If you downloaded from the releases page, add to your MCP client configuration:
 }
 ```
 
-> **Note:** Releases are framework-dependent and require [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) to be installed.
+> **Note:** Releases are framework-dependent and require [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) to be installed.
 
 ## Tools
 
@@ -190,6 +202,24 @@ Capture screenshots on Windows.
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
+### ui_automation
+
+Interact with Windows UI elements using the UI Automation API and OCR.
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `find` | Find elements by name, type, or ID | `name`, `controlType`, or `automationId` |
+| `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
+| `click` | Find and click element | Query filters |
+| `type` | Type text into edit control | Query filters + `text` |
+| `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
+| `ocr` | OCR text in screen region | Region parameters |
+
+**Key Features:**
+- Pattern-based interaction (no coordinates needed)
+- Multi-window support with `activateFirst` and `targetWindowHandle`
+- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+
 ## Supported Keys
 
 ### Function Keys
@@ -231,6 +261,7 @@ The server handles common Windows security scenarios:
 | `InvalidRegion` | Capture region has invalid dimensions |
 | `CaptureFailed` | Screenshot capture operation failed |
 | `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
+| `WrongTargetWindow` | Foreground window doesn't match expectedWindowTitle or expectedProcessName |
 
 ## Configuration
 

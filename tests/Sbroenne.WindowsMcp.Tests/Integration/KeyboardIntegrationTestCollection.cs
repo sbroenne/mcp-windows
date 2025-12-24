@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
@@ -25,6 +26,21 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     private TestHarnessForm? _form;
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
+    private bool _isWarmedUp;
+
+    // P/Invoke for foreground window verification
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    private const int ASFW_ANY = -1;
 
     /// <summary>
     /// Gets the handle of the test window.
@@ -71,8 +87,14 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
             TestWindowHandle = _form.Handle;
         });
 
-        // Give the window time to settle
-        await Task.Delay(100);
+        // Increased settle time for Windows to fully process the window
+        await Task.Delay(200);
+
+        // Perform initial focus acquisition with verification
+        await EnsureTestWindowFocusedAsync();
+
+        // Warmup: verify keyboard input actually works before running tests
+        await WarmupKeyboardInputAsync();
     }
 
     private void RunMessageLoop()
@@ -134,18 +156,86 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
 
     /// <summary>
     /// Ensures the test window is in the foreground with text box focused.
+    /// Uses retry logic and verification for reliability.
     /// </summary>
-    public void EnsureTestWindowFocused()
+    public async Task EnsureTestWindowFocusedAsync(int maxRetries = 3, int delayMs = 100)
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
+            return;
+        }
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            // Allow any process to set foreground window
+            AllowSetForegroundWindow(ASFW_ANY);
+
             _form.Invoke(() =>
             {
                 _form.Activate();
                 _form.BringToFront();
                 _form.FocusTextBox();
             });
+
+            // Also try SetForegroundWindow directly
+            SetForegroundWindow(TestWindowHandle);
+
+            // Wait for focus to settle
+            await Task.Delay(delayMs);
+
+            // Verify we got focus
+            if (GetForegroundWindow() == TestWindowHandle)
+            {
+                return; // Success!
+            }
         }
+
+        // Final attempt - just proceed and hope for the best
+        _form.Invoke(() =>
+        {
+            _form.Activate();
+            _form.BringToFront();
+            _form.FocusTextBox();
+        });
+        await Task.Delay(delayMs);
+    }
+
+    /// <summary>
+    /// Ensures the test window is in the foreground with text box focused.
+    /// Synchronous wrapper for backward compatibility.
+    /// </summary>
+    public void EnsureTestWindowFocused()
+    {
+        EnsureTestWindowFocusedAsync().GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Warmup keyboard input to ensure the first actual test doesn't suffer from
+    /// Windows focus/input initialization delays.
+    /// </summary>
+    private async Task WarmupKeyboardInputAsync()
+    {
+        if (_isWarmedUp || _form == null || _form.IsDisposed)
+        {
+            return;
+        }
+
+        // Type a character and verify it was received
+        Reset();
+        await EnsureTestWindowFocusedAsync();
+
+        var result = await KeyboardInputService.TypeTextAsync("x");
+        if (result.Success)
+        {
+            // Wait for the character to appear
+            await WaitForInputTextAsync("x", TimeSpan.FromSeconds(1));
+        }
+
+        // Clear for actual tests
+        Reset();
+        await EnsureTestWindowFocusedAsync();
+
+        _isWarmedUp = true;
     }
 
     /// <summary>

@@ -1,6 +1,6 @@
 # Windows MCP Server - VS Code Extension
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to use the Windows 11 with mouse, keyboard and windows tools. Take screenshots to allow the LLM to see what it is doing.
+A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to use the Windows 11 with mouse, keyboard, windows, screenshot and UI automation tools.
 
 Designed for computer use, QA and RPA scenarios.
 
@@ -51,10 +51,21 @@ This extension provides Windows automation capabilities for AI assistants like G
 - Optional cursor inclusion
 - List available monitors
 
+### 🔍 UI Automation & OCR
+- **Pattern-based interaction** - Click buttons, toggle checkboxes without coordinates
+- Find UI elements by name, control type, automation ID
+- Get UI tree structure with depth limiting
+- Invoke patterns: Invoke, Toggle, Expand, Collapse, Value, RangeValue, Scroll
+- Wait for elements to appear with timeout
+- OCR text recognition for controls that don't expose text
+- Scoped tree navigation with parentElementId
+- Multi-monitor coordinate integration
+- Electron app support (VS Code, Teams, Slack)
+
 ## Requirements
 
-- **Windows 10 or Windows 11**
-- **.NET 8.0 Runtime** (automatically installed via the .NET Install Tool extension)
+- **Windows 11**
+- **.NET 10.0 Runtime** (automatically installed via the .NET Install Tool extension)
 
 ## Installation
 
@@ -73,6 +84,9 @@ Once installed, the Windows MCP server is automatically available to AI assistan
 - "List all open windows"
 - "Move this window to monitor 2"
 - "Press Ctrl+S to save"
+- "Find the Save button and click it"
+- "Get the UI tree for Notepad"
+- "Wait for the 'File Saved' dialog to appear"
 
 ## Multi-Monitor Support
 
@@ -91,6 +105,7 @@ Use `screenshot_control` with `list_monitors` action to see all connected monito
 | `keyboard_control` | Control keyboard input (type, press keys, combos, sequences) |
 | `window_management` | Control windows (list, activate, move, resize, move between monitors) |
 | `screenshot_control` | Capture screenshots (screen, window, region, all monitors) |
+| `ui_automation` | Find UI elements, interact with controls, OCR text recognition |
 
 ## Key Parameters
 
@@ -112,6 +127,12 @@ Use `screenshot_control` with `list_monitors` action to see all connected monito
 - `quality` - Compression quality 1-100 (default: 85)
 - `maxWidth` - Max width in pixels (default: 1568, LLM-optimized); 0 to disable
 - `outputMode` - "inline" (base64) or "file" (returns file path)
+
+### UI Automation
+- `action` - Operation: find, get_tree, click, type, wait_for, ocr, etc.
+- `name` / `controlType` / `automationId` - Element query filters
+- `expectedWindowTitle` / `expectedProcessName` - Verify correct window before action
+- `activateFirst` + `targetWindowHandle` - Auto-activate window before interaction
 
 ## Platform Support
 
