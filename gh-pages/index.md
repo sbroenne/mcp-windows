@@ -1,8 +1,8 @@
 ---
 layout: default
 title: "Windows MCP Server - AI-Powered Windows Automation via GitHub Copilot & Claude"
-description: "Control Windows with natural language through AI assistants like GitHub Copilot and Claude. Automate mouse, keyboard, windows, and screenshots. One-click install for Visual Studio Code."
-keywords: "Windows automation, MCP server, AI Windows, mouse control, keyboard control, window management, screenshot capture, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
+description: "Control Windows with natural language through AI assistants like GitHub Copilot and Claude. Automate mouse, keyboard, windows, screenshots, and UI elements with OCR. One-click install for Visual Studio Code."
+keywords: "Windows automation, MCP server, AI Windows, mouse control, keyboard control, window management, screenshot capture, UI automation, OCR, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
 canonical_url: "https://windowsmcpserver.dev/"
 ---
 
@@ -11,7 +11,7 @@ canonical_url: "https://windowsmcpserver.dev/"
     <div class="hero-content">
       <img src="{{ '/assets/images/icon.png' | relative_url }}" alt="Windows MCP Server Icon" class="hero-icon">
       <h1 class="hero-title">Windows MCP Server</h1>
-      <p class="hero-subtitle">AI-powered Windows automation via GitHub Copilot, Claude, and other MCP clients — including mouse, keyboard, windows, and screenshots.</p>
+      <p class="hero-subtitle">AI-powered Windows automation via GitHub Copilot, Claude, and other MCP clients — including mouse, keyboard, windows, screenshots, and UI automation with OCR.</p>
     </div>
   </div>
 </div>
@@ -34,7 +34,7 @@ canonical_url: "https://windowsmcpserver.dev/"
 <p>One-click setup with GitHub Copilot integration</p>
 <p><a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp" class="button-link">Install from Marketplace</a></p>
 
-**Windows MCP Server** enables AI assistants (GitHub Copilot, Claude, ChatGPT) to control Windows through natural language commands, including mouse control, keyboard input, window management, and screenshot capture – designed for computer use, QA, and RPA scenarios.
+**Windows MCP Server** enables AI assistants (GitHub Copilot, Claude, ChatGPT) to control Windows through natural language commands, including mouse control, keyboard input, window management, screenshot capture, and UI automation with OCR – designed for computer use, QA, and RPA scenarios.
 
 It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Desktop, Cursor, Windsurf, etc.
 
@@ -61,6 +61,11 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 <div class="feature-card">
 <h3>📸 Screenshot Capture</h3>
 <p>LLM-optimized captures. Primary screen, specific monitor, window, region, or all monitors. JPEG/PNG/WebP with auto-scaling.</p>
+</div>
+
+<div class="feature-card">
+<h3>🔍 UI Automation & OCR</h3>
+<p>Pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes. OCR fallback for text extraction. Multi-window workflow support.</p>
 </div>
 </div>
 
@@ -114,6 +119,12 @@ Ask your AI assistant to automate Windows tasks using natural language:
 <h4>📸 Screen Capture</h4>
 <p><strong>You:</strong> "Take a screenshot and tell me what applications are open"</p>
 <p>AI captures the screen and analyzes the visible windows and content.</p>
+</div>
+
+<div class="example-section">
+<h4>🔍 UI Automation</h4>
+<p><strong>You:</strong> "Find the Save button in Notepad and click it"</p>
+<p>AI uses UI Automation to find the button by name and clicks it without needing coordinates.</p>
 </div>
 
 ## Installation

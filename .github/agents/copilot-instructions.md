@@ -17,6 +17,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-07
 - C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace (011-screenshot-llm-optimization)
 - File output to `System.IO.Path.GetTempPath()` with unique naming (011-screenshot-llm-optimization)
 - File output to `System.IO.Path.GetTempPath()` with timestamp naming (011-screenshot-llm-optimization)
+- N/A (stateless operations) (013-ui-automation-ocr)
+- C# 12+ / .NET 8.0 + System.Windows.Automation (UIAutomationClient.dll), Windows.Media.Ocr, Microsoft.Windows.AI.Imaging (optional NPU) (013-ui-automation-ocr)
 
 - C# 12+ (latest stable per Constitution XIII) (001-mouse-control)
 
@@ -36,9 +38,9 @@ tests/
 C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 
 ## Recent Changes
+- 013-ui-automation-ocr: Added C# 12+ / .NET 8.0 + System.Windows.Automation (UIAutomationClient.dll), Windows.Media.Ocr, Microsoft.Windows.AI.Imaging (optional NPU)
+- 013-ui-automation-ocr: Added C# 12+ / .NET 8.0
 - 011-screenshot-llm-optimization: Added C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace
-- 011-screenshot-llm-optimization: Added C# 12+ / .NET 8.0 + System.Drawing (GDI+ for encoding/scaling), existing `Sbroenne.WindowsMcp.Capture` namespace
-- 010-code-quality: Added C# 12 / .NET 8.0 + MCP C# SDK (latest), Microsoft.Extensions.*, System.Text.Json
 
 
 <!-- MANUAL ADDITIONS START -->

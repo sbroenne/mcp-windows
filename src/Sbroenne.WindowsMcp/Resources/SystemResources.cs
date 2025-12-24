@@ -126,4 +126,95 @@ public sealed class SystemResources
             return "Unknown Layout";
         }
     }
+
+    /// <summary>
+    /// Gets best practices guidance for using Windows automation tools effectively.
+    /// </summary>
+    /// <returns>Markdown document with best practices.</returns>
+    [McpServerResource(UriTemplate = "system://best-practices", Name = "best-practices", Title = "Windows Automation Best Practices", MimeType = "text/markdown")]
+    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications to avoid common pitfalls like sending input to wrong windows.")]
+    public static string GetBestPractices()
+    {
+        return """
+            # Windows Automation Best Practices
+
+            ## Critical: Always Verify Target Window
+
+            Every keyboard, mouse, and UI automation response includes a `target_window` object showing which window received the input:
+            ```json
+            {
+              "success": true,
+              "target_window": {
+                "handle": "123456",
+                "title": "My Application",
+                "process_name": "myapp",
+                "process_id": 1234
+              }
+            }
+            ```
+
+            **ALWAYS check `target_window.title` or `target_window.process_name` matches your intended target.**
+
+            ## Recommended Workflow for UI Automation
+
+            ### 1. Find the Target Window
+            ```
+            window_management(action="find", title="My Application")
+            → Save the handle from the response
+            ```
+
+            ### 2. Activate the Window
+            ```
+            window_management(action="activate", handle="<saved_handle>")
+            ```
+
+            ### 3. Verify Activation
+            ```
+            window_management(action="get_foreground")
+            → Confirm the returned window matches your target
+            ```
+
+            ### 4. Perform Input Operations
+            Use keyboard_control, mouse_control, or ui_automation.
+            Check `target_window` in each response to verify input went to the correct window.
+
+            ### 5. Verify Results with Screenshot
+            ```
+            screenshot_control(target="primary_screen")
+            → Visually confirm the expected UI state
+            ```
+
+            ## Common Pitfalls
+
+            1. **Window focus changed**: Another application stole focus between operations
+               - Solution: Re-activate the target window before each critical operation
+
+            2. **Dialog appeared**: A modal dialog blocked the expected UI
+               - Solution: Use ui_automation(action="find") to check for dialogs
+
+            3. **Wrong window received input**: Multiple windows with similar titles
+               - Solution: Use process_name or handle to identify windows uniquely
+
+            4. **UI element not found**: Element hasn't loaded yet
+               - Solution: Use ui_automation(action="wait_for", timeoutMs=5000) before interacting
+
+            5. **Coordinates outside bounds**: Click/move coordinates outside visible area
+               - Solution: Use screenshot_control(action="list_monitors") to understand display layout
+
+            ## Tool Integration Quick Reference
+
+            | Task | Tool | Action |
+            |------|------|--------|
+            | Find a window | window_management | find, list |
+            | Activate a window | window_management | activate |
+            | Check active window | window_management | get_foreground |
+            | Find UI element | ui_automation | find, wait_for |
+            | Type text | keyboard_control | type |
+            | Press key combo | keyboard_control | combo |
+            | Click coordinates | mouse_control | click |
+            | Click UI element | ui_automation | click, invoke |
+            | Verify UI state | screenshot_control | capture |
+            | Read text | ui_automation | get_text, ocr |
+            """;
+    }
 }

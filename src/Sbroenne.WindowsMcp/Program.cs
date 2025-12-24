@@ -48,6 +48,13 @@ builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 builder.Services.AddSingleton<IScreenshotService, ScreenshotService>();
 builder.Services.AddSingleton<IVisualDiffService, VisualDiffService>();
 
+// Register OCR services (Windows.Media.Ocr legacy engine)
+builder.Services.AddSingleton<IOcrService, LegacyOcrService>();
+
+// Register UI Automation services
+builder.Services.AddSingleton<UIAutomationThread>();
+builder.Services.AddSingleton<IUIAutomationService, UIAutomationService>();
+
 // Configure MCP server with stdio transport
 builder.Services
     .AddMcpServer(options =>
@@ -64,7 +71,13 @@ builder.Services
     .WithTools<KeyboardControlTool>()
     .WithTools<WindowManagementTool>()
     .WithTools<ScreenshotControlTool>()
+    .WithTools<UIAutomationTool>()
     .WithResources<SystemResources>();
 
 var host = builder.Build();
+
+// Force OCR service initialization to trigger startup logging (FR-044)
+// The NpuOcrService and LegacyOcrService log their availability status during construction
+_ = host.Services.GetRequiredService<IOcrService>();
+
 await host.RunAsync();

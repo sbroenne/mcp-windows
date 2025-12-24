@@ -63,6 +63,14 @@ public sealed record KeyboardControlResult
     public KeyboardLayoutInfo? KeyboardLayout { get; init; }
 
     /// <summary>
+    /// Gets or sets information about the window that received the keyboard input.
+    /// This helps LLM agents verify that input was sent to the correct window.
+    /// </summary>
+    [JsonPropertyName("target_window")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TargetWindowInfo? TargetWindow { get; init; }
+
+    /// <summary>
     /// Creates a successful result for a type operation.
     /// </summary>
     /// <param name="charactersTyped">Number of characters typed.</param>
@@ -176,6 +184,18 @@ public sealed record KeyboardControlResult
             Success = false,
             ErrorCode = errorCode,
             Error = error
+        };
+    }
+
+    /// <summary>
+    /// Creates a generic successful result (used internally for pre-flight checks).
+    /// </summary>
+    /// <returns>A successful KeyboardControlResult.</returns>
+    internal static KeyboardControlResult CreateSuccess()
+    {
+        return new KeyboardControlResult
+        {
+            Success = true
         };
     }
 }

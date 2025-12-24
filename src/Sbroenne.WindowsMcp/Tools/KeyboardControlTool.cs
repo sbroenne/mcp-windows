@@ -9,6 +9,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -26,6 +27,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     };
 
     private readonly IKeyboardInputService _keyboardInputService;
+    private readonly IWindowEnumerator _windowEnumerator;
     private readonly IElevationDetector _elevationDetector;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly KeyboardOperationLogger _logger;
@@ -36,18 +38,21 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// Initializes a new instance of the <see cref="KeyboardControlTool"/> class.
     /// </summary>
     /// <param name="keyboardInputService">The keyboard input service.</param>
+    /// <param name="windowEnumerator">The window enumerator for getting target window info.</param>
     /// <param name="elevationDetector">The elevation detector.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="logger">The operation logger.</param>
     /// <param name="configuration">The keyboard configuration.</param>
     public KeyboardControlTool(
         IKeyboardInputService keyboardInputService,
+        IWindowEnumerator windowEnumerator,
         IElevationDetector elevationDetector,
         ISecureDesktopDetector secureDesktopDetector,
         KeyboardOperationLogger logger,
         KeyboardConfiguration configuration)
     {
         _keyboardInputService = keyboardInputService ?? throw new ArgumentNullException(nameof(keyboardInputService));
+        _windowEnumerator = windowEnumerator ?? throw new ArgumentNullException(nameof(windowEnumerator));
         _elevationDetector = elevationDetector ?? throw new ArgumentNullException(nameof(elevationDetector));
         _secureDesktopDetector = secureDesktopDetector ?? throw new ArgumentNullException(nameof(secureDesktopDetector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -65,11 +70,13 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
     /// <param name="sequence">JSON array of key sequence items, e.g., [{"key":"ctrl"},{"key":"c"}] (for sequence action).</param>
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
+    /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
+    /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, UseStructuredContent = true)]
-    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions.")]
-    [return: Description("The result of the keyboard operation including success status, characters typed, key pressed, keyboard layout info, and error details if failed.")]
+    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions. IMPORTANT: Use 'expectedWindowTitle' or 'expectedProcessName' to verify the target window BEFORE sending input - the operation will fail with 'wrong_target_window' if the foreground window doesn't match, preventing input from going to the wrong application.")]
+    [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout")] string action,
@@ -79,6 +86,8 @@ public sealed partial class KeyboardControlTool : IDisposable
         [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
         [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
         [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
+        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string? expectedWindowTitle = null,
+        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string? expectedProcessName = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -99,6 +108,17 @@ public sealed partial class KeyboardControlTool : IDisposable
 
         try
         {
+            // Pre-flight check: verify target window if expected values are specified
+            if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
+            {
+                var targetCheckResult = await VerifyTargetWindowAsync(expectedWindowTitle, expectedProcessName, linkedToken);
+                if (!targetCheckResult.Success)
+                {
+                    _logger.LogOperationFailure(correlationId, action ?? "null", targetCheckResult.ErrorCode.ToString(), targetCheckResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return targetCheckResult;
+                }
+            }
+
             // Validate and parse the action
             if (string.IsNullOrWhiteSpace(action))
             {
@@ -163,6 +183,13 @@ public sealed partial class KeyboardControlTool : IDisposable
             }
 
             stopwatch.Stop();
+
+            // For successful operations that send input, attach the target window info
+            // This helps LLM agents verify the input went to the correct window
+            if (operationResult.Success && keyboardAction.Value != KeyboardAction.GetKeyboardLayout)
+            {
+                operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
+            }
 
             if (operationResult.Success)
             {
@@ -459,6 +486,106 @@ public sealed partial class KeyboardControlTool : IDisposable
         // Get current cursor position to check elevation
         NativeMethods.GetCursorPos(out var cursorPos);
         return _elevationDetector.IsTargetElevated(cursorPos.X, cursorPos.Y);
+    }
+
+    /// <summary>
+    /// Verifies that the foreground window matches the expected target before sending input.
+    /// This prevents input from being sent to the wrong application.
+    /// </summary>
+    /// <param name="expectedTitle">Expected window title (partial match, case-insensitive).</param>
+    /// <param name="expectedProcessName">Expected process name (case-insensitive).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Success result if window matches, failure result with WrongTargetWindow error if not.</returns>
+    private async Task<KeyboardControlResult> VerifyTargetWindowAsync(string? expectedTitle, string? expectedProcessName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var foregroundHandle = NativeMethods.GetForegroundWindow();
+            if (foregroundHandle == IntPtr.Zero)
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    "No foreground window found. Cannot verify target window.");
+            }
+
+            var windowInfo = await _windowEnumerator.GetWindowInfoAsync(foregroundHandle, cancellationToken);
+            if (windowInfo == null)
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    "Could not retrieve foreground window information.");
+            }
+
+            // Check expected title (partial, case-insensitive match)
+            if (!string.IsNullOrEmpty(expectedTitle))
+            {
+                if (string.IsNullOrEmpty(windowInfo.Title) ||
+                    !windowInfo.Title.Contains(expectedTitle, StringComparison.OrdinalIgnoreCase))
+                {
+                    var result = KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent input to wrong window.");
+                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                }
+            }
+
+            // Check expected process name (case-insensitive match)
+            if (!string.IsNullOrEmpty(expectedProcessName))
+            {
+                if (string.IsNullOrEmpty(windowInfo.ProcessName) ||
+                    !windowInfo.ProcessName.Equals(expectedProcessName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var result = KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent input to wrong window.");
+                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                }
+            }
+
+            // Window matches expectations
+            return KeyboardControlResult.CreateSuccess();
+        }
+        catch (Exception ex)
+        {
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.WrongTargetWindow,
+                $"Failed to verify target window: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Attaches information about the foreground window to the result.
+    /// This helps LLM agents verify that input was sent to the correct window.
+    /// </summary>
+    /// <param name="result">The original result.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result with target window info attached.</returns>
+    private async Task<KeyboardControlResult> AttachTargetWindowInfoAsync(KeyboardControlResult result, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var foregroundHandle = NativeMethods.GetForegroundWindow();
+            if (foregroundHandle == IntPtr.Zero)
+            {
+                return result; // No foreground window, return original result
+            }
+
+            var windowInfo = await _windowEnumerator.GetWindowInfoAsync(foregroundHandle, cancellationToken);
+            if (windowInfo == null)
+            {
+                return result; // Couldn't get window info, return original result
+            }
+
+            return result with
+            {
+                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+            };
+        }
+        catch
+        {
+            // Best effort - if we can't get the window info, just return the original result
+            return result;
+        }
     }
 
     /// <inheritdoc />
