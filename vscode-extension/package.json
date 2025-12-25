@@ -1,7 +1,7 @@
 {
   "name": "windows-mcp",
   "displayName": "Windows MCP Server",
-  "description": "Windows automation for AI assistants - control mouse, keyboard, windows, capture screenshots, and automate UI with accessibility APIs",
+  "description": "Windows automation for AI assistants - UI automation with accessibility APIs, mouse, keyboard, window management, and screenshots",
   "version": "1.0.0",
   "publisher": "sbroenne",
   "icon": "icon.png",
@@ -30,6 +30,7 @@
     "model context protocol",
     "windows",
     "automation",
+    "ui automation",
     "mouse",
     "keyboard",
     "screenshot",
@@ -37,8 +38,7 @@
     "copilot",
     "ai",
     "github copilot",
-    "rpa",
-    "ui automation"
+    "rpa"
   ],
   "activationEvents": [
     "onStartupFinished"

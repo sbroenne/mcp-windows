@@ -1,6 +1,6 @@
 # Windows MCP Server - VS Code Extension
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to use the Windows 11 with mouse, keyboard, windows, screenshot and UI automation tools.
+A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with UI automation, mouse, keyboard, window management, and screenshot tools.
 
 Designed for computer use, QA and RPA scenarios.
 
@@ -15,12 +15,26 @@ Designed for computer use, QA and RPA scenarios.
 
 This extension provides Windows automation capabilities for AI assistants like GitHub Copilot:
 
+### 🔍 UI Automation & OCR
+- **Pattern-based interaction** - Click buttons, toggle checkboxes without coordinates
+- Find UI elements by name, control type, automation ID
+- Get UI tree structure with depth limiting
+- 15 actions: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
+- Wait for elements to appear with timeout
+- OCR text recognition for controls that don't expose text
+- **Multi-window workflows** - Auto-activate windows with `activateFirst` + `targetWindowHandle`
+- **Wrong window detection** - Verify target with `expectedWindowTitle` / `expectedProcessName`
+- Scoped tree navigation with parentElementId
+- Multi-monitor coordinate integration
+- Electron app support (VS Code, Teams, Slack)
+
 ### 🖱️ Mouse Control
 - Click, double-click, right-click, middle-click
 - Move cursor to coordinates (monitor-relative)
 - Drag operations with modifier key support
 - Scroll in any direction
-- **Multi-monitor aware** - coordinates are always relative to a monitor (defaults to primary)
+- **Get cursor position** with `get_position` action
+- **Multi-monitor aware** - use `target='primary_screen'` or `'secondary_screen'` for easy targeting
 - DPI aware for accurate positioning
 
 ### ⌨️ Keyboard Control
@@ -34,33 +48,23 @@ This extension provides Windows automation capabilities for AI assistants like G
 ### 🪟 Window Management
 - List and find windows (with monitor info)
 - Activate, minimize, maximize, restore, close
-- Move and resize windows
-- **Move windows between monitors**
-- Wait for windows to appear
+- Move, resize, and set_bounds for windows
+- **Move windows between monitors** with `move_to_monitor` action
+- Wait for windows to appear with `wait_for`
+- Get current foreground window with `get_foreground`
 - Regex support for window title matching
 
 ### 📸 Screenshot Capture
 - **LLM-Optimized by Default** - JPEG @ quality 85, auto-scaled to 1568px width
-- Capture primary screen or specific monitors
-- Capture specific windows
-- Capture regions
-- Capture all monitors at once
-- Format options: JPEG (default), PNG, WebP
+- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
+- Capture specific windows by handle
+- Capture regions by coordinates
+- Capture all monitors at once with `all_monitors`
+- Format options: JPEG (default), PNG
 - Auto-scaling reduces 4K screenshots by 97% (from ~8MB to ~200KB)
 - File output mode for zero base64 overhead
 - Optional cursor inclusion
-- List available monitors
-
-### 🔍 UI Automation & OCR
-- **Pattern-based interaction** - Click buttons, toggle checkboxes without coordinates
-- Find UI elements by name, control type, automation ID
-- Get UI tree structure with depth limiting
-- Invoke patterns: Invoke, Toggle, Expand, Collapse, Value, RangeValue, Scroll
-- Wait for elements to appear with timeout
-- OCR text recognition for controls that don't expose text
-- Scoped tree navigation with parentElementId
-- Multi-monitor coordinate integration
-- Electron app support (VS Code, Teams, Slack)
+- List available monitors with `list_monitors` action
 
 ## Requirements
 
@@ -77,16 +81,15 @@ This extension provides Windows automation capabilities for AI assistants like G
 
 Once installed, the Windows MCP server is automatically available to AI assistants like GitHub Copilot. You can use natural language to:
 
-- "Click at position 100, 200"
-- "Click at 500, 300 on monitor 1" (secondary monitor)
-- "Type 'Hello, World!'"
-- "Take a screenshot of the primary monitor"
-- "List all open windows"
-- "Move this window to monitor 2"
-- "Press Ctrl+S to save"
 - "Find the Save button and click it"
-- "Get the UI tree for Notepad"
+- "Get the UI tree for this window"
 - "Wait for the 'File Saved' dialog to appear"
+- "Click at position 100, 200 on the primary screen"
+- "Take a screenshot of the secondary monitor"
+- "List all open windows"
+- "Move this window to the secondary screen"
+- "Type 'Hello, World!'"
+- "Press Ctrl+S to save"
 
 ## Multi-Monitor Support
 
@@ -101,38 +104,53 @@ Use `screenshot_control` with `list_monitors` action to see all connected monito
 
 | Tool | Description |
 |------|-------------|
+| `ui_automation` | Find UI elements, interact with controls, OCR text recognition |
 | `mouse_control` | Control mouse input (click, move, drag, scroll) - coordinates relative to monitor |
 | `keyboard_control` | Control keyboard input (type, press keys, combos, sequences) |
 | `window_management` | Control windows (list, activate, move, resize, move between monitors) |
 | `screenshot_control` | Capture screenshots (screen, window, region, all monitors) |
-| `ui_automation` | Find UI elements, interact with controls, OCR text recognition |
 
 ## Key Parameters
 
-### Mouse Control
-- `x`, `y` - Coordinates relative to the target monitor
-- `monitorIndex` - Which monitor (0 = primary, 1+ = additional monitors)
-- `modifiers` - Hold keys during click (ctrl, shift, alt)
-
-### Window Management
-- `handle` - Window handle from list/find operations
-- `monitorIndex` - Target monitor for move_to_monitor action
-- Window info includes: bounds, process name, monitor location
-
-### Screenshot Control
-- `target` - What to capture (primary_screen, monitor, window, region, all_monitors)
-- `monitorIndex` - Which monitor to capture
-- `includeCursor` - Include mouse cursor in capture
-- `imageFormat` - Output format: "jpeg" (default), "png", "webp"
-- `quality` - Compression quality 1-100 (default: 85)
-- `maxWidth` - Max width in pixels (default: 1568, LLM-optimized); 0 to disable
-- `outputMode` - "inline" (base64) or "file" (returns file path)
-
 ### UI Automation
-- `action` - Operation: find, get_tree, click, type, wait_for, ocr, etc.
+- `action` - One of: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
 - `name` / `controlType` / `automationId` - Element query filters
+- `elementId` - Element ID from a previous find operation (for toggle, invoke, focus actions)
+- `parentElementId` - Scope search to a subtree for performance
 - `expectedWindowTitle` / `expectedProcessName` - Verify correct window before action
 - `activateFirst` + `targetWindowHandle` - Auto-activate window before interaction
+
+### Mouse Control
+- `action` - One of: move, click, double_click, right_click, middle_click, drag, scroll, get_position
+- `target` - Monitor target: 'primary_screen' or 'secondary_screen' (for 2-monitor setups)
+- `monitorIndex` - Monitor index for 3+ monitor setups (0-based)
+- `x`, `y` - Coordinates relative to the target monitor
+- `modifiers` - Hold keys during click (ctrl, shift, alt)
+- `expectedWindowTitle` / `expectedProcessName` - Verify correct window before click
+
+### Keyboard Control
+- `text` - Text to type (supports Unicode)
+- `key` - Key to press (Enter, Tab, F1, etc.)
+- `modifiers` - Modifier keys (ctrl, shift, alt, win)
+- `sequence` - Array of keys for key sequences
+
+### Window Management
+- `action` - One of: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor
+- `handle` - Window handle from list/find operations
+- `target` - Monitor target for move_to_monitor: 'primary_screen' or 'secondary_screen'
+- `monitorIndex` - Monitor index for move_to_monitor (3+ monitors)
+- `title` - Window title for find/wait_for actions
+- `filter` - Filter for list action (matches title or process name)
+
+### Screenshot Control
+- `action` - One of: capture (default), list_monitors
+- `target` - Capture target: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'
+- `monitorIndex` - Which monitor for 'monitor' target (0-based)
+- `windowHandle` - Window handle for 'window' target
+- `includeCursor` - Include mouse cursor in capture
+- `imageFormat` - Output format: 'jpeg' (default), 'png'
+- `quality` - Compression quality 1-100 (default: 85, JPEG only)
+- `outputMode` - 'inline' (base64, default) or 'file' (returns file path)
 
 ## Platform Support
 

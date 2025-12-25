@@ -76,6 +76,7 @@ public class MouseClickTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public void ElevationDetector_CanDetectElevatedProcessTarget()
     {
         // Arrange - test against the known non-elevated test window

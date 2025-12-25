@@ -1,8 +1,8 @@
 ---
 layout: default
 title: "Complete Feature Reference - Windows MCP Server"
-description: "4 specialized tools for comprehensive Windows automation. Mouse control, keyboard input, window management, and screenshot capture."
-keywords: "Windows MCP features, mouse automation, keyboard control, window management, screenshot tools, MCP operations"
+description: "5 specialized tools for comprehensive Windows automation. UI Automation, mouse control, keyboard input, window management, and screenshot capture."
+keywords: "Windows MCP features, UI automation, mouse automation, keyboard control, window management, screenshot tools, MCP operations"
 permalink: /features/
 ---
 
@@ -10,23 +10,88 @@ permalink: /features/
 
 Windows MCP Server provides 5 specialized tools for comprehensive Windows automation.
 
+## 🔍 UI Automation & OCR
+
+Discover, interact with, and extract text from Windows applications using the Windows UI Automation API and OCR.
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `find` | Find elements matching query | Query filters (see below) |
+| `get_tree` | Get UI element tree | `windowHandle` or `processName` |
+| `wait_for` | Wait for element to appear | Query filters, `timeoutMs` |
+| `click` | Find and click element | Query filters |
+| `type` | Find edit and type text | Query filters, `text` |
+| `select` | Find and select item | Query filters, `value` |
+| `toggle` | Toggle a checkbox/button | `elementId` |
+| `invoke` | Invoke a pattern on element | `elementId`, `value` |
+| `focus` | Set keyboard focus | `elementId` |
+| `scroll_into_view` | Scroll element into view | `elementId` or query |
+| `get_text` | Get text from element | `elementId` or query |
+| `highlight` | Visually highlight element | `elementId` |
+| `ocr` | Recognize text in region | `windowHandle` (optional) |
+| `ocr_element` | OCR on element bounds | `elementId` |
+| `ocr_status` | Check OCR availability | none |
+
+**Query Filters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `name` | Element's Name property (button label, window title) |
+| `controlType` | Element type: Button, Edit, ComboBox, TreeItem, etc. |
+| `automationId` | Developer-assigned automation identifier |
+| `windowHandle` | Specific window handle |
+| `parentElementId` | Scope search to element's children |
+
+**Multi-Window Workflow Parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `expectedWindowTitle` | Verify foreground window title before action (fails with 'wrong_target_window' if mismatch) |
+| `expectedProcessName` | Verify foreground process name before action |
+
+**Supported Patterns:**
+
+| Pattern | Description | Use Case |
+|---------|-------------|----------|
+| `Invoke` | Click/activate | Buttons, menu items |
+| `Toggle` | Toggle state | Checkboxes |
+| `Expand` / `Collapse` | Expand/collapse | TreeItems, ComboBoxes |
+| `Value` | Set text value | Edit controls |
+| `RangeValue` | Set numeric value | Sliders, spinners |
+| `Scroll` | Scroll content | Scrollable containers |
+
+**Features:**
+- Pattern-based interaction (no coordinates needed)
+- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+- Scoped tree navigation with parentElementId
+- OCR fallback for text not exposed by UI Automation
+- Multi-monitor coordinate integration with mouse_control
+- Electron app support (VS Code, Teams, Slack)
+
+See the [full UI Automation guide](/ui-automation/) for detailed examples.
+
+---
+
 ## 🖱️ Mouse Control
 
 Control mouse input on Windows with full multi-monitor and DPI support.
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `click` | Left-click at coordinates | `x`, `y` |
-| `double_click` | Double-click at coordinates | `x`, `y` |
-| `right_click` | Right-click at coordinates | `x`, `y` |
-| `middle_click` | Middle-click at coordinates | `x`, `y` |
-| `move` | Move cursor to coordinates | `x`, `y` |
-| `drag` | Drag from current position to coordinates | `x`, `y` |
-| `scroll` | Scroll at coordinates | `x`, `y`, `direction`, `amount` |
+| `move` | Move cursor to coordinates | `x`, `y`, `target` or `monitorIndex` |
+| `click` | Left-click at coordinates | optional: `x`, `y` |
+| `double_click` | Double-click at coordinates | optional: `x`, `y` |
+| `right_click` | Right-click at coordinates | optional: `x`, `y` |
+| `middle_click` | Middle-click at coordinates | optional: `x`, `y` |
+| `drag` | Drag from current position to coordinates | `x`, `y`, `endX`, `endY` |
+| `scroll` | Scroll at coordinates | `direction`, optional: `x`, `y`, `amount` |
+| `get_position` | Get current cursor position with monitor context | none |
 
 **Features:**
-- Multi-monitor support with DPI awareness
+- Multi-monitor support with easy targeting (`target='primary_screen'` or `'secondary_screen'`)
+- DPI awareness for accurate positioning
 - Modifier key support (Ctrl+click, Shift+click, etc.)
+- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
 - Hold/release for drag operations
 
 ---
@@ -89,9 +154,11 @@ Control windows on the Windows desktop.
 | `resize` | Resize window | `handle`, `width`, `height` |
 | `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
+| `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
 
 **Features:**
-- Multi-monitor support with monitor index and DPI awareness
+- Multi-monitor support with easy targeting (`target='primary_screen'` or `'secondary_screen'`)
+- Monitor index for 3+ monitor setups
 - UWP/Store apps proper detection and handling
 - Cloaking detection for virtual desktop and shell-managed windows
 - Regex pattern matching for window titles
@@ -111,81 +178,28 @@ Capture screenshots on Windows with LLM-optimized defaults.
 
 | Target | Description | Additional Parameters |
 |--------|-------------|----------------------|
-| `primary_screen` | Capture primary monitor | none |
-| `monitor` | Capture specific monitor | `monitor_index` |
-| `window` | Capture specific window | `window_handle` |
-| `region` | Capture rectangular region | `x`, `y`, `width`, `height` |
+| `primary_screen` | Capture primary monitor (default) | none |
+| `secondary_screen` | Capture secondary monitor (2-monitor setups) | none |
+| `monitor` | Capture specific monitor | `monitorIndex` |
+| `window` | Capture specific window | `windowHandle` |
+| `region` | Capture rectangular region | `regionX`, `regionY`, `regionWidth`, `regionHeight` |
 | `all_monitors` | Composite of all displays | none |
 
 **Optional Parameters:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `include_cursor` | boolean | `false` | Include mouse cursor in capture |
-| `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png", "webp" |
-| `quality` | integer | `85` | Compression quality for JPEG/WebP (1-100) |
-| `maxWidth` | integer | `1568` | Max width in pixels (LLM-optimized); 0 to disable |
-| `maxHeight` | integer | `null` | Max height in pixels (optional) |
+| `includeCursor` | boolean | `false` | Include mouse cursor in capture |
+| `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
+| `quality` | integer | `85` | Compression quality for JPEG (1-100) |
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
 **Features:**
 - LLM-Optimized by Default (JPEG, auto-scaling to 1568px, quality 85)
+- Easy targeting with `target='primary_screen'` or `'secondary_screen'`
 - Multi-monitor aware with extended desktop support
 - DPI aware for correct pixel dimensions on high-DPI displays
-
----
-
-## 🔍 UI Automation & OCR
-
-Discover, interact with, and extract text from Windows applications using the Windows UI Automation API.
-
-| Action | Description | Required Parameters |
-|--------|-------------|---------------------|
-| `find` | Find elements matching query | Query filters (see below) |
-| `get_tree` | Get UI element tree | `windowHandle` or `processName` |
-| `invoke` | Invoke pattern on element | `elementId`, `pattern` |
-| `focus` | Set keyboard focus | `elementId` |
-| `find_and_click` | Find and click element | Query filters |
-| `find_and_type` | Find edit and type text | Query filters, `text` |
-| `find_and_select` | Find and select item | Query filters, `item` |
-| `get_text` | Get text from element | `elementId` or query |
-| `wait_for` | Wait for element | Query filters, `timeoutMs` |
-| `ocr` | Recognize text in region | `source`, region params |
-| `ocr_element` | OCR on element bounds | `elementId` or query |
-| `ocr_status` | Check OCR availability | none |
-
-**Query Filters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `name` | Element's Name property (button label, window title) |
-| `controlType` | Element type: Button, Edit, ComboBox, TreeItem, etc. |
-| `automationId` | Developer-assigned automation identifier |
-| `className` | Win32 class name |
-| `processName` | Process name (notepad, Code, etc.) |
-| `windowHandle` | Specific window handle |
-| `parentElementId` | Scope search to element's children |
-
-**Supported Patterns:**
-
-| Pattern | Description | Use Case |
-|---------|-------------|----------|
-| `Invoke` | Click/activate | Buttons, menu items |
-| `Toggle` | Toggle state | Checkboxes |
-| `Expand` / `Collapse` | Expand/collapse | TreeItems, ComboBoxes |
-| `Value` | Set text value | Edit controls |
-| `RangeValue` | Set numeric value | Sliders, spinners |
-| `Scroll` | Scroll content | Scrollable containers |
-
-**Features:**
-- Pattern-based interaction (no coordinates needed)
-- Scoped tree navigation with parentElementId
-- OCR fallback for text not exposed by UI Automation
-- Multi-monitor coordinate integration with mouse_control
-- Electron app support (VS Code, Teams, Slack)
-
-See the [full UI Automation guide](/ui-automation/) for detailed examples.
 
 ---
 

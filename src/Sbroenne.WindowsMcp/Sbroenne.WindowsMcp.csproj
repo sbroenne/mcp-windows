@@ -16,7 +16,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>Sbroenne.WindowsMcp</RootNamespace>
     <AssemblyName>Sbroenne.WindowsMcp</AssemblyName>
-    <Description>MCP Server for Windows automation - mouse, keyboard, window management, and screenshots</Description>
+    <Description>MCP Server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
