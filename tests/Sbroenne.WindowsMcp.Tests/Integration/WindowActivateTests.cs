@@ -29,6 +29,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task ActivateWindow_BringsWindowToForeground()
     {
         // Arrange - Use the test harness window
@@ -45,6 +46,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task ActivateWindow_RestoresMinimizedWindow()
     {
         // Arrange - Use the test harness window and minimize it first
@@ -66,6 +68,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task ActivateWindow_ReturnsWindowInfo()
     {
         // Arrange - Use the test harness window

@@ -93,6 +93,7 @@ public sealed class ScreenshotSecondaryScreenTests
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task CaptureSecondaryScreen_SingleMonitor_ReturnsHelpfulError()
     {
         // Skip if multiple monitors

@@ -20,7 +20,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 8.0.x
+        dotnet-version: 10.0.x
 
     - name: Extract Version
       run: |
@@ -45,9 +45,6 @@ jobs:
     - name: Restore Dependencies
       run: dotnet restore
 
-    - name: Run Tests
-      run: dotnet test --filter "Category!=Integration" --no-restore
-
     - name: Publish (Portable)
       run: dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -o publish --no-self-contained
 
@@ -69,26 +66,27 @@ jobs:
         $notes = @"
         ## Windows MCP Server $tagName
 
-        MCP server for Windows automation - control mouse, keyboard, windows, and capture screenshots.
+        MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.
 
         ### Download
 
         | File | Description |
         |------|-------------|
-        | windows-mcp-server-$version.zip | Cross-platform .NET 8, requires [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) |
+        | windows-mcp-server-$version.zip | Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) |
 
         ### Available Tools
 
         | Tool | Description |
         |------|-------------|
-        | mouse_control | Click, double-click, right-click, move, drag, scroll |
+        | ui_automation | Find UI elements, interact with controls, OCR text recognition |
+        | mouse_control | Click, double-click, right-click, move, drag, scroll, get_position |
         | keyboard_control | Type text, press keys, combinations, sequences |
-        | window_management | List, find, activate, minimize, maximize, move, resize windows |
+        | window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |
         | screenshot_control | Capture screens, monitors, windows, or regions |
 
         ### Installation
 
-        1. Install [.NET 8 Runtime](https://dotnet.microsoft.com/download/dotnet/8.0)
+        1. Install [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
         2. Extract the zip to a folder
         3. Run with ``dotnet Sbroenne.WindowsMcp.dll`` or add to your MCP client config
 

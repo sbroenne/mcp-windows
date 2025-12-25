@@ -152,6 +152,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     }
 
     [Fact]
+    [Trait("Category", "RequiresDisplay")]
     public async Task ExecuteAsync_ClickWithoutCoordinates_DoesNotRequireMonitorIndex()
     {
         // Arrange - click at current cursor position (no x/y provided)
@@ -240,6 +241,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     }
 
     [Fact]
+    [Trait("Category", "RequiresDisplay")]
     public async Task ExecuteAsync_SuccessfulClick_IncludesMonitorInfo()
     {
         // Arrange
@@ -266,6 +268,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     }
 
     [Fact]
+    [Trait("Category", "RequiresDisplay")]
     public async Task ExecuteAsync_CoordinatelessClick_DoesNotIncludeMonitorInfo()
     {
         // Arrange - click at current position (no coordinates, no monitorIndex)

@@ -28,18 +28,22 @@ Windows MCP Server provides a unified `ui_automation` tool for discovering, inte
 
 | Action | Description | Key Parameters |
 |--------|-------------|----------------|
-| `find` | Find elements matching query | `name`, `controlType`, `automationId`, `processName`, `windowHandle` |
-| `get_tree` | Get UI element tree | `windowHandle`, `parentElementId`, `maxDepth`, `controlTypeFilter` |
+| `find` | Find elements matching query | `name`, `controlType`, `automationId`, `windowHandle` |
+| `get_tree` | Get UI element tree | `windowHandle`, `parentElementId`, `maxDepth` |
+| `wait_for` | Wait for element to appear | `name`, `controlType`, `timeoutMs` |
 
 ### Interaction Actions
 
 | Action | Description | Key Parameters |
 |--------|-------------|----------------|
-| `invoke` | Invoke a pattern on an element | `elementId`, `pattern`, `value` |
+| `click` | Find element and click its center | `name`, `controlType`, `automationId` |
+| `type` | Find edit control and type text | `controlType`, `automationId`, `text` |
+| `select` | Find selection control and select item | `controlType`, `automationId`, `value` |
+| `toggle` | Toggle a checkbox or toggle button | `elementId` |
+| `invoke` | Invoke a pattern on an element | `elementId`, `value` |
 | `focus` | Set keyboard focus to element | `elementId` |
-| `find_and_click` | Find element and click its center | `name`, `controlType`, `automationId` |
-| `find_and_type` | Find edit control and type text | `controlType`, `automationId`, `text` |
-| `find_and_select` | Find selection control and select item | `controlType`, `automationId`, `item` |
+| `scroll_into_view` | Scroll element into view | `elementId` or query parameters |
+| `highlight` | Visually highlight element (debugging) | `elementId` |
 
 ### Text Actions
 
@@ -47,18 +51,12 @@ Windows MCP Server provides a unified `ui_automation` tool for discovering, inte
 |--------|-------------|----------------|
 | `get_text` | Get text from UI element | `elementId` or query parameters |
 
-### Wait Actions
-
-| Action | Description | Key Parameters |
-|--------|-------------|----------------|
-| `wait_for` | Wait for element to appear | `name`, `controlType`, `timeoutMs` |
-
 ### OCR Actions
 
 | Action | Description | Key Parameters |
 |--------|-------------|----------------|
-| `ocr` | Recognize text in region | `source`, `x`, `y`, `width`, `height`, `monitorIndex` |
-| `ocr_element` | OCR on element's bounding rect | `elementId` or query parameters |
+| `ocr` | Recognize text in region | `windowHandle` (optional), `language` |
+| `ocr_element` | OCR on element's bounding rect | `elementId` |
 | `ocr_status` | Check OCR engine availability | none |
 
 ---
@@ -72,10 +70,9 @@ When finding elements, you can combine multiple parameters for precise matching:
 | `name` | string | Element's Name property (button label, window title) |
 | `controlType` | string | Element type: `Button`, `Edit`, `ComboBox`, `TreeItem`, etc. |
 | `automationId` | string | Developer-assigned automation identifier |
-| `className` | string | Win32 class name |
-| `processName` | string | Process name (e.g., `notepad`, `Code`) |
 | `windowHandle` | integer | Specific window handle to search within |
 | `parentElementId` | string | Scope search to children of this element |
+| `includeChildren` | boolean | Include child elements in response |
 
 ---
 
@@ -87,8 +84,6 @@ When working with multiple windows, use these parameters to ensure actions targe
 |-----------|------|-------------|
 | `expectedWindowTitle` | string | Verify foreground window title contains this text before action. Fails with `wrong_target_window` if mismatch. |
 | `expectedProcessName` | string | Verify foreground process name matches before action. Fails with `wrong_target_window` if mismatch. |
-| `activateFirst` | boolean | When `true`, automatically activate the target window before performing interactive actions. |
-| `targetWindowHandle` | integer | Window handle to activate. Use with `activateFirst=true`. |
 
 ### Multi-Window Workflow Example
 
@@ -102,19 +97,16 @@ When automating across multiple windows (e.g., two VS Code instances):
 }
 ```
 
-**Step 2: Activate target window and perform action**
+**Step 2: Activate target window first**
 ```json
 {
-  "tool": "ui_automation",
-  "action": "click",
-  "name": "Install",
-  "controlType": "Button",
-  "activateFirst": true,
-  "targetWindowHandle": 12345678
+  "tool": "window_management",
+  "action": "activate",
+  "handle": "12345678"
 }
 ```
 
-**Alternative: Verify before action (fails if wrong window)**
+**Step 3: Perform action with verification**
 ```json
 {
   "tool": "ui_automation",
@@ -174,23 +166,22 @@ Patterns define what operations an element supports:
 
 ### 1. Click a Button by Name
 
-**Preferred: Use InvokePattern (no coordinates needed)**
+**Find and click by query:**
+
+```json
+{
+  "action": "click",
+  "name": "Save",
+  "controlType": "Button"
+}
+```
+
+**Click by elementId (after discovery):**
 
 ```json
 {
   "action": "invoke",
-  "elementId": "window:12345|runtime:67890|path:Button:Save",
-  "pattern": "Invoke"
-}
-```
-
-**Alternative: Find and click**
-
-```json
-{
-  "action": "find_and_click",
-  "name": "Save",
-  "controlType": "Button"
+  "elementId": "window:12345|runtime:67890|path:Button:Save"
 }
 ```
 
@@ -198,7 +189,7 @@ Patterns define what operations an element supports:
 
 ```json
 {
-  "action": "find_and_type",
+  "action": "type",
   "controlType": "Edit",
   "automationId": "SearchBox",
   "text": "hello world"
@@ -220,9 +211,8 @@ Patterns define what operations an element supports:
 
 ```json
 {
-  "action": "invoke",
-  "elementId": "window:12345|runtime:67890|path:CheckBox:RememberMe",
-  "pattern": "Toggle"
+  "action": "toggle",
+  "elementId": "window:12345|runtime:67890|path:CheckBox:RememberMe"
 }
 ```
 
@@ -232,7 +222,7 @@ Patterns define what operations an element supports:
 {
   "action": "invoke",
   "elementId": "window:12345|runtime:67890|path:ComboBox:ColorPicker",
-  "pattern": "Expand"
+  "value": "Expand"
 }
 ```
 
@@ -244,10 +234,11 @@ When you don't know the UI structure, use this workflow:
 
 ### Step 1: Get the UI Tree
 
+First activate the target window, then get the tree:
+
 ```json
 {
   "action": "get_tree",
-  "processName": "notepad",
   "maxDepth": 3
 }
 ```
@@ -283,7 +274,6 @@ Use discovered properties:
 ```json
 {
   "action": "find",
-  "processName": "notepad",
   "controlType": "Edit"
 }
 ```
@@ -294,9 +284,18 @@ Type into the discovered edit control:
 
 ```json
 {
+  "action": "type",
+  "controlType": "Edit",
+  "text": "Hello from MCP!"
+}
+```
+
+Or set value directly using elementId:
+
+```json
+{
   "action": "invoke",
   "elementId": "window:12345|runtime:2|path:Edit:",
-  "pattern": "Value",
   "value": "Hello from MCP!"
 }
 ```
@@ -342,19 +341,13 @@ Navigate large UI trees efficiently using `parentElementId`:
 
 ## OCR Workflows
 
-### Recognize Text in Region
+### Recognize Text From Current Foreground Window
 
 When UI Automation doesn't expose text:
 
 ```json
 {
-  "action": "ocr",
-  "source": "region",
-  "monitorIndex": 0,
-  "x": 100,
-  "y": 200,
-  "width": 500,
-  "height": 100
+  "action": "ocr"
 }
 ```
 
@@ -373,6 +366,16 @@ When UI Automation doesn't expose text:
     }
   ],
   "engine": "WindowsMediaOcr"
+}
+```
+
+### OCR on Specific Window
+
+```json
+{
+  "action": "ocr",
+  "windowHandle": 12345678,
+  "language": "en-US"
 }
 ```
 
@@ -458,7 +461,7 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 }
 ```
 
-**Recovery:** Use a supported pattern or fall back to `find_and_click`.
+**Recovery:** Use a supported pattern or fall back to `click`.
 
 ### Timeout
 
@@ -492,26 +495,26 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 |------------|-------------|----------|
 | `ElementNotFound` | No element matches query | Check query parameters, use get_tree |
 | `MultipleMatches` | Query matched multiple elements | Add more specific criteria |
-| `PatternNotSupported` | Element doesn't support pattern | Use find_and_click or different pattern |
+| `PatternNotSupported` | Element doesn't support pattern | Use click or different pattern |
 | `ElementStale` | Element no longer exists | Re-query to get fresh elementId |
 | `ElevatedTarget` | Target runs as Administrator | Run MCP as Admin |
 | `Timeout` | Operation timed out | Increase timeout, verify element exists |
 | `InvalidQuery` | Query parameters invalid | Check parameter types and values |
 | `OcrNotAvailable` | OCR engine not available | Check Windows version, install language pack |
-| `WrongTargetWindow` | Foreground window doesn't match expected | Use `activateFirst` with `targetWindowHandle`, or verify correct window is active |
+| `WrongTargetWindow` | Foreground window doesn't match expected | Use `window_management` to activate correct window, then verify with `expectedWindowTitle` |
 | `InternalError` | Unexpected error | Check logs, report issue |
 
 ---
 
 ## Best Practices
 
-1. **Prefer patterns over coordinates** - Use `invoke`, `find_and_type` when possible
+1. **Prefer patterns over coordinates** - Use `invoke`, `click`, `type` when possible
 2. **Start with get_tree** - Discover UI structure before writing queries  
 3. **Use multiple filters** - Combine `name`, `controlType`, `automationId` for unique matches
 4. **Scope with parentElementId** - Limit search to relevant subtrees for performance
 5. **Handle timeouts** - Use `wait_for` with appropriate timeouts for dynamic UI
 6. **Fall back to OCR** - When UI Automation doesn't expose text
-7. **Check process name** - Scope queries to specific applications
+7. **Use expectedWindowTitle** - Verify correct window before interactive actions
 
 ---
 
@@ -524,7 +527,6 @@ For VS Code, Teams, Slack, and other Electron apps:
 ```json
 {
   "action": "find",
-  "processName": "Code",
   "name": "Explorer",
   "controlType": "TreeItem"
 }
@@ -534,8 +536,7 @@ For VS Code, Teams, Slack, and other Electron apps:
 
 ```json
 {
-  "action": "find_and_click",
-  "processName": "Code",
+  "action": "click",
   "controlType": "TabItem",
   "name": "index.ts"
 }

@@ -1,6 +1,6 @@
 # Windows MCP Server
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with mouse, keyboard, window management, screenshot, and UI automation tools.
+A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with UI automation, mouse, keyboard, window management, and screenshot tools.
 
 Designed for computer use, QA and RPA scenarios.
 
@@ -8,13 +8,28 @@ Designed for computer use, QA and RPA scenarios.
 
 ## Features
 
+### � UI Automation & OCR
+- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
+- **Element discovery** - Find UI elements by name, control type, or automation ID
+- **UI tree navigation** - Traverse the accessibility tree with depth limiting
+- **Wait for elements** - Wait for UI elements to appear with configurable timeout
+- **Text extraction** - Get text from controls via UI Automation or OCR fallback
+- **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
+- **Multi-window workflows** - Auto-activate target windows before interaction with `activateFirst`
+- **Wrong window detection** - Verify expected window is active before interactive actions
+- **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
+- **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
+
 ### 🖱️ Mouse Control
 - Click, double-click, right-click, middle-click
 - Move cursor to absolute coordinates
 - Drag operations with hold/release
 - Scroll up/down/left/right
+- **Get cursor position** with `get_position` action (returns monitor context)
 - Multi-monitor support with DPI awareness
+- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
 - Modifier key support (Ctrl+click, Shift+click, etc.)
+- **Wrong window detection** - verify target with `expectedWindowTitle` / `expectedProcessName`
 
 ### ⌨️ Keyboard Control
 - **Unicode text typing** (layout-independent) - type any character in any language
@@ -31,37 +46,27 @@ Designed for computer use, QA and RPA scenarios.
 - **Activate windows** - bring windows to foreground with focus
 - **Get foreground** - report which window currently has focus
 - **Control state** - minimize, maximize, restore, and close windows
-- **Move/resize** - position and size windows to specified coordinates
+- **Move/resize** - position and size windows with move, resize, or set_bounds
 - **Wait for window** - wait for a window to appear with configurable timeout
+- **Move to monitor** - move windows between monitors with `move_to_monitor` action
 - **Multi-monitor support** - full awareness of monitor index and DPI
 - **UWP/Store apps** - proper detection and handling
 - **Cloaking detection** - filter out virtual desktop and shell-managed windows
 
 ### 📸 Screenshot Capture
 - **LLM-Optimized by Default** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
-- **Capture primary screen** - full screenshot of the main display
+- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
 - **Capture specific monitor** - screenshot any connected display by index
 - **Capture window** - screenshot a specific window (even if partially obscured)
 - **Capture region** - screenshot an arbitrary rectangular area
 - **Capture all monitors** - composite screenshot of entire virtual desktop
-- **Format options** - JPEG (default), PNG, WebP with configurable quality (1-100)
+- **Format options** - JPEG (default) or PNG with configurable quality (1-100)
 - **Auto-scaling** - defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
 - **Output modes** - inline base64 (default) or file path for zero-overhead file workflows
 - **Cursor inclusion** - optionally include mouse cursor in captures
+- **List monitors** - use `list_monitors` action to see all connected displays
 - **Multi-monitor aware** - supports extended desktop configurations
 - **DPI aware** - correct pixel dimensions on high-DPI displays
-
-### 🔍 UI Automation & OCR
-- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
-- **Element discovery** - Find UI elements by name, control type, or automation ID
-- **UI tree navigation** - Traverse the accessibility tree with depth limiting
-- **Wait for elements** - Wait for UI elements to appear with configurable timeout
-- **Text extraction** - Get text from controls via UI Automation or OCR fallback
-- **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
-- **Multi-window workflows** - Auto-activate target windows before interaction with `activateFirst`
-- **Wrong window detection** - Verify expected window is active before interactive actions
-- **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
-- **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
 
 ## Why Choose Windows MCP?
 
@@ -124,19 +129,38 @@ If you downloaded from the releases page, add to your MCP client configuration:
 
 ## Tools
 
+### ui_automation
+
+Interact with Windows UI elements using the UI Automation API and OCR.
+
+| Action | Description | Required Parameters |
+|--------|-------------|---------------------|
+| `find` | Find elements by name, type, or ID | `name`, `controlType`, or `automationId` |
+| `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
+| `click` | Find and click element | Query filters |
+| `type` | Type text into edit control | Query filters + `text` |
+| `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
+| `ocr` | OCR text in screen region | Region parameters |
+
+**Key Features:**
+- Pattern-based interaction (no coordinates needed)
+- Multi-window support with `activateFirst` and `targetWindowHandle`
+- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+
 ### mouse_control
 
 Control mouse input on Windows.
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `click` | Left-click at coordinates | `x`, `y` |
-| `double_click` | Double-click at coordinates | `x`, `y` |
-| `right_click` | Right-click at coordinates | `x`, `y` |
-| `middle_click` | Middle-click at coordinates | `x`, `y` |
-| `move` | Move cursor to coordinates | `x`, `y` |
-| `drag` | Drag from current position to coordinates | `x`, `y` |
-| `scroll` | Scroll at coordinates | `x`, `y`, `direction`, `amount` |
+| `move` | Move cursor to coordinates | `x`, `y`, `target` or `monitorIndex` |
+| `click` | Left-click at coordinates | optional: `x`, `y` |
+| `double_click` | Double-click at coordinates | optional: `x`, `y` |
+| `right_click` | Right-click at coordinates | optional: `x`, `y` |
+| `middle_click` | Middle-click at coordinates | optional: `x`, `y` |
+| `drag` | Drag from current position to coordinates | `x`, `y`, `endX`, `endY` |
+| `scroll` | Scroll at coordinates | `direction`, optional: `x`, `y`, `amount` |
+| `get_position` | Get current cursor position with monitor context | none |
 
 ### keyboard_control
 
@@ -171,6 +195,7 @@ Control windows on the Windows desktop.
 | `resize` | Resize window | `handle`, `width`, `height` |
 | `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
+| `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
 
 ### screenshot_control
 
@@ -185,40 +210,22 @@ Capture screenshots on Windows.
 
 | Target | Description | Additional Parameters |
 |--------|-------------|----------------------|
-| `primary_screen` | Capture primary monitor | none |
-| `monitor` | Capture specific monitor | `monitor_index` |
-| `window` | Capture specific window | `window_handle` |
-| `region` | Capture rectangular region | `x`, `y`, `width`, `height` |
+| `primary_screen` | Capture primary monitor (default) | none |
+| `secondary_screen` | Capture secondary monitor (2-monitor setups) | none |
+| `monitor` | Capture specific monitor | `monitorIndex` |
+| `window` | Capture specific window | `windowHandle` |
+| `region` | Capture rectangular region | `regionX`, `regionY`, `regionWidth`, `regionHeight` |
+| `all_monitors` | Composite of all displays | none |
 
 **Optional Parameters:**
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `include_cursor` | boolean | `false` | Include mouse cursor in capture |
-| `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png", "webp" |
-| `quality` | integer | `85` | Compression quality for JPEG/WebP (1-100) |
-| `maxWidth` | integer | `1568` | Max width in pixels (LLM-optimized); 0 to disable scaling |
-| `maxHeight` | integer | `null` | Max height in pixels (optional) |
+| `includeCursor` | boolean | `false` | Include mouse cursor in capture |
+| `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
+| `quality` | integer | `85` | Compression quality for JPEG (1-100) |
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
-
-### ui_automation
-
-Interact with Windows UI elements using the UI Automation API and OCR.
-
-| Action | Description | Required Parameters |
-|--------|-------------|---------------------|
-| `find` | Find elements by name, type, or ID | `name`, `controlType`, or `automationId` |
-| `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
-| `click` | Find and click element | Query filters |
-| `type` | Type text into edit control | Query filters + `text` |
-| `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
-| `ocr` | OCR text in screen region | Region parameters |
-
-**Key Features:**
-- Pattern-based interaction (no coordinates needed)
-- Multi-window support with `activateFirst` and `targetWindowHandle`
-- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
 
 ## Supported Keys
 

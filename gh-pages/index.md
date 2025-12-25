@@ -44,8 +44,13 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 
 <div class="features-grid">
 <div class="feature-card">
+<h3>� UI Automation & OCR</h3>
+<p>15 actions for pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes, type text. OCR fallback for text extraction. Multi-window workflow support with activateFirst.</p>
+</div>
+
+<div class="feature-card">
 <h3>🖱️ Mouse Control</h3>
-<p>Click, double-click, right-click, drag, scroll. Multi-monitor support with DPI awareness. Modifier key support (Ctrl+click, Shift+click, etc.).</p>
+<p>Click, double-click, right-click, drag, scroll, get_position. Multi-monitor support with easy targeting (primary_screen/secondary_screen). DPI awareness and modifier keys.</p>
 </div>
 
 <div class="feature-card">
@@ -55,17 +60,12 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 
 <div class="feature-card">
 <h3>🪟 Window Management</h3>
-<p>List, find, activate, minimize, maximize, restore, close, move, and resize windows. UWP/Store app support and virtual desktop awareness.</p>
+<p>List, find, activate, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor. UWP/Store app support and virtual desktop awareness.</p>
 </div>
 
 <div class="feature-card">
 <h3>📸 Screenshot Capture</h3>
-<p>LLM-optimized captures. Primary screen, specific monitor, window, region, or all monitors. JPEG/PNG/WebP with auto-scaling.</p>
-</div>
-
-<div class="feature-card">
-<h3>🔍 UI Automation & OCR</h3>
-<p>Pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes. OCR fallback for text extraction. Multi-window workflow support.</p>
+<p>LLM-optimized captures. Primary/secondary screen, specific monitor, window, region, or all monitors. JPEG/PNG with auto-scaling and list_monitors action.</p>
 </div>
 </div>
 
