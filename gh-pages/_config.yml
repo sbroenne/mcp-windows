@@ -3,10 +3,13 @@
 
 # Site settings
 title: "Windows MCP Server"
-description: "AI-powered Windows automation through GitHub Copilot & Claude"
+description: "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA."
 url: "https://windowsmcpserver.dev"
 baseurl: ""
 repository: "sbroenne/mcp-windows"
+
+# Theme
+theme: jekyll-theme-cayman
 
 # Plugins
 plugins:
@@ -26,6 +29,7 @@ social:
   name: Stefan Broenne
   links:
     - https://github.com/sbroenne
+    - https://www.youtube.com/channel/UCq1ojGTy4-aZz8_CmEPp2aw
 
 logo: /assets/images/icon.png
 

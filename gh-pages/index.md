@@ -1,8 +1,8 @@
 ---
 layout: default
-title: "Windows MCP Server - AI-Powered Windows Automation via GitHub Copilot & Claude"
-description: "Control Windows with natural language through AI assistants like GitHub Copilot and Claude. Automate mouse, keyboard, windows, screenshots, and UI elements with OCR. One-click install for Visual Studio Code."
-keywords: "Windows automation, MCP server, AI Windows, mouse control, keyboard control, window management, screenshot capture, UI automation, OCR, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
+title: "AI-Powered Windows Automation for Computer Use, QA & RPA"
+description: "Enable AI assistants like GitHub Copilot and Claude to control Windows with UI Automation, mouse, keyboard, window management, and screenshots."
+keywords: "Windows automation, MCP server, AI Windows, UI automation, mouse control, keyboard control, window management, screenshot capture, OCR, computer use, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
 canonical_url: "https://windowsmcpserver.dev/"
 ---
 
@@ -11,7 +11,7 @@ canonical_url: "https://windowsmcpserver.dev/"
     <div class="hero-content">
       <img src="{{ '/assets/images/icon.png' | relative_url }}" alt="Windows MCP Server Icon" class="hero-icon">
       <h1 class="hero-title">Windows MCP Server</h1>
-      <p class="hero-subtitle">AI-powered Windows automation via GitHub Copilot, Claude, and other MCP clients — including mouse, keyboard, windows, screenshots, and UI automation with OCR.</p>
+      <p class="hero-subtitle">AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA.</p>
     </div>
   </div>
 </div>
@@ -29,12 +29,12 @@ canonical_url: "https://windowsmcpserver.dev/"
 <div class="container content-section" markdown="1">
 ## 🤔 What is This?
 
-**Control Windows with AI - A Model Context Protocol (MCP) server for comprehensive Windows automation through conversational AI.**
+**AI-powered Windows automation — A Model Context Protocol (MCP) server for computer use, QA, and RPA scenarios.**
 
 <p>One-click setup with GitHub Copilot integration</p>
 <p><a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp" class="button-link">Install from Marketplace</a></p>
 
-**Windows MCP Server** enables AI assistants (GitHub Copilot, Claude, ChatGPT) to control Windows through natural language commands, including mouse control, keyboard input, window management, screenshot capture, and UI automation with OCR – designed for computer use, QA, and RPA scenarios.
+**Windows MCP Server** enables AI assistants (GitHub Copilot, Claude, ChatGPT) to control Windows through UI Automation, mouse, keyboard, window management, and screenshots.
 
 It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Desktop, Cursor, Windsurf, etc.
 
@@ -44,10 +44,9 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 
 <div class="features-grid">
 <div class="feature-card">
-<h3>� UI Automation & OCR</h3>
+<h3>🔍 UI Automation & OCR</h3>
 <p>15 actions for pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes, type text. OCR fallback for text extraction. Multi-window workflow support with activateFirst.</p>
 </div>
-
 <div class="feature-card">
 <h3>🖱️ Mouse Control</h3>
 <p>Click, double-click, right-click, drag, scroll, get_position. Multi-monitor support with easy targeting (primary_screen/secondary_screen). DPI awareness and modifier keys.</p>

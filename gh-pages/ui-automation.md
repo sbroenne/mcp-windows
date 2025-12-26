@@ -1,12 +1,21 @@
 ---
 layout: default
-title: "UI Automation & OCR - Windows MCP Server"
-description: "Comprehensive guide to Windows UI Automation for LLM agents. Find elements, interact with controls, and extract text using OCR."
-keywords: "Windows UI Automation, OCR, MCP, accessibility, UI testing, RPA, LLM agents"
+title: "UI Automation & OCR"
+description: "The core capability of Windows MCP Server. Find UI elements, interact with controls, and extract text using the Windows UI Automation accessibility API and OCR."
+keywords: "Windows UI Automation, accessibility API, OCR, MCP, UI testing, RPA, LLM agents, computer use"
 permalink: /ui-automation/
 ---
 
-# UI Automation & OCR
+<div class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <h1 class="hero-title">UI Automation & OCR</h1>
+      <p class="hero-subtitle">The core capability — interact with Windows applications through accessibility APIs</p>
+    </div>
+  </div>
+</div>
+
+<div class="container content-section" markdown="1">
 
 Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API and OCR.
 
@@ -561,4 +570,6 @@ For VS Code, Teams, Slack, and other Electron apps:
 - [Keyboard Control](/features/#-keyboard-control) - Type text, press keys
 - [Window Management](/features/#-window-management) - Get window handles for scoping
 - [Screenshot Capture](/features/#-screenshot-capture) - Visual verification
+
+</div>
 
