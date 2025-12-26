@@ -16,12 +16,8 @@ public sealed record UIAutomationResult
     public required string Action { get; init; }
 
     /// <summary>
-    /// Single element result (for find, wait_for, invoke, etc.).
-    /// </summary>
-    public UIElementInfo? Element { get; init; }
-
-    /// <summary>
-    /// Multiple element results (for find with multiple matches, get_tree).
+    /// Element results (single or multiple). Always use this property to access found elements.
+    /// For single-element results, use Elements[0]. For multiple matches, iterate the array.
     /// </summary>
     public UIElementInfo[]? Elements { get; init; }
 
@@ -69,7 +65,7 @@ public sealed record UIAutomationResult
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
-    /// Creates a success result with a single element.
+    /// Creates a success result with a single element (wrapped in an array for consistency).
     /// </summary>
     /// <param name="action">The action performed.</param>
     /// <param name="element">The element found.</param>
@@ -83,7 +79,7 @@ public sealed record UIAutomationResult
         {
             Success = true,
             Action = action,
-            Element = element,
+            Elements = [element],
             ElementCount = 1,
             UsageHint = GetUsageHintForElement(element),
             Diagnostics = diagnostics

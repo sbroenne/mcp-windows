@@ -89,3 +89,7 @@ launchSettings.json
 
 # LLM Integration Test Results (screenshots and logs)
 specs/007-llm-integration-testing/results/
+
+# Node.js
+node_modules/
+

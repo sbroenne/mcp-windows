@@ -266,7 +266,7 @@ The server handles common Windows security scenarios:
 | `InvalidRegion` | Capture region has invalid dimensions |
 | `CaptureFailed` | Screenshot capture operation failed |
 | `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
-| `WrongTargetWindow` | Foreground window doesn't match expectedWindowTitle or expectedProcessName |
+| `WrongTargetWindow` | Window activation failed or target window not found |
 
 ## Configuration
 

@@ -107,4 +107,30 @@ public interface IUIAutomationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The element info if found, or null if stale.</returns>
     Task<UIElementInfo?> ResolveElementAsync(string elementId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the UI element at the current cursor position.
+    /// Equivalent to Python-UIAutomation's ControlFromCursor.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with the element under the cursor.</returns>
+    Task<UIAutomationResult> GetElementAtCursorAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the currently focused UI element.
+    /// Equivalent to Python-UIAutomation's GetFocusedControl.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with the focused element.</returns>
+    Task<UIAutomationResult> GetFocusedElementAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all ancestor elements of the specified element up to the desktop root.
+    /// Equivalent to Python-UIAutomation's GetAncestorControl.
+    /// </summary>
+    /// <param name="elementId">The element ID to get ancestors for.</param>
+    /// <param name="maxDepth">Maximum number of ancestor levels to return (null for all).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with ancestor elements (ordered from immediate parent to root).</returns>
+    Task<UIAutomationResult> GetAncestorsAsync(string elementId, int? maxDepth, CancellationToken cancellationToken = default);
 }

@@ -18,6 +18,7 @@ public sealed class UIAutomationToolTests
     private readonly IOcrService _mockOcrService;
     private readonly IScreenshotService _mockScreenshotService;
     private readonly IWindowEnumerator _mockWindowEnumerator;
+    private readonly IWindowService _mockWindowService;
     private readonly ILogger<UIAutomationTool> _mockLogger;
     private readonly UIAutomationTool _tool;
 
@@ -27,8 +28,9 @@ public sealed class UIAutomationToolTests
         _mockOcrService = Substitute.For<IOcrService>();
         _mockScreenshotService = Substitute.For<IScreenshotService>();
         _mockWindowEnumerator = Substitute.For<IWindowEnumerator>();
+        _mockWindowService = Substitute.For<IWindowService>();
         _mockLogger = Substitute.For<ILogger<UIAutomationTool>>();
-        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockLogger);
+        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger);
     }
 
     #region Test Helpers
@@ -69,7 +71,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockLogger));
+            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger));
     }
 
     [Fact]
@@ -77,7 +79,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, null!));
+            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, null!));
     }
 
     #endregion
@@ -491,21 +493,20 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndClickAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
+        // Act - test without windowHandle since that triggers auto-activation
+        // The parameter passing is the same regardless of window handle
         await _tool.ExecuteAsync(
             UIAutomationAction.Click,
             name: "Button",
             controlType: "Button",
-            automationId: "btn123",
-            windowHandle: 12345);
+            automationId: "btn123");
 
         // Assert
         await _mockService.Received(1).FindAndClickAsync(
             Arg.Is<ElementQuery>(q =>
                 q.Name == "Button" &&
                 q.ControlType == "Button" &&
-                q.AutomationId == "btn123" &&
-                q.WindowHandle == 12345),
+                q.AutomationId == "btn123"),
             Arg.Any<CancellationToken>());
     }
 

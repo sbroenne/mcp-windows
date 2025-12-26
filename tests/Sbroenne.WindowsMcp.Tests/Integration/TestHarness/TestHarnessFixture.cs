@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 
 /// <summary>
@@ -6,6 +8,17 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 /// </summary>
 public sealed class TestHarnessFixture : IDisposable
 {
+    private const int ASFW_ANY = -1;
+
+    [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool AllowSetForegroundWindow(int dwProcessId);
+
+    [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
     private readonly Thread _uiThread;
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
@@ -26,6 +39,11 @@ public sealed class TestHarnessFixture : IDisposable
     /// Gets the screen where the test harness is displayed.
     /// </summary>
     public Screen? TestScreen { get; private set; }
+
+    /// <summary>
+    /// Gets the window handle of the test harness form.
+    /// </summary>
+    public nint TestWindowHandle => _form?.Handle ?? nint.Zero;
 
     public TestHarnessFixture()
     {
@@ -61,18 +79,50 @@ public sealed class TestHarnessFixture : IDisposable
     }
 
     /// <summary>
-    /// Brings the test harness to the foreground.
+    /// Brings the test harness to the foreground with robust retry logic.
+    /// Uses Win32 APIs to ensure window activation works reliably.
     /// </summary>
     public void BringToFront()
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
+            return;
+        }
+
+        const int maxRetries = 3;
+        const int delayMs = 100;
+
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            // Allow any process to set foreground window
+            AllowSetForegroundWindow(ASFW_ANY);
+
             _form.Invoke(() =>
             {
                 _form.Activate();
                 _form.BringToFront();
             });
+
+            // Also try SetForegroundWindow directly with the handle
+            SetForegroundWindow(TestWindowHandle);
+
+            // Wait for focus to settle
+            Thread.Sleep(delayMs);
+
+            // Verify we got focus
+            if (GetForegroundWindow() == TestWindowHandle)
+            {
+                return; // Success!
+            }
         }
+
+        // Final attempt - just proceed
+        _form.Invoke(() =>
+        {
+            _form.Activate();
+            _form.BringToFront();
+        });
+        Thread.Sleep(delayMs);
     }
 
     /// <summary>
@@ -80,14 +130,20 @@ public sealed class TestHarnessFixture : IDisposable
     /// </summary>
     public void FocusTextBox()
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
-            _form.Invoke(() =>
-            {
-                _form.Activate();
-                _form.FocusTextBox();
-            });
+            return;
         }
+
+        // Ensure window is activated first
+        AllowSetForegroundWindow(ASFW_ANY);
+        SetForegroundWindow(TestWindowHandle);
+
+        _form.Invoke(() =>
+        {
+            _form.Activate();
+            _form.FocusTextBox();
+        });
     }
 
     /// <summary>

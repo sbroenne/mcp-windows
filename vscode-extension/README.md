@@ -20,8 +20,7 @@ This extension provides Windows automation capabilities for AI assistants like G
 - 15 actions: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
 - Wait for elements to appear with timeout
 - OCR text recognition for controls that don't expose text
-- **Multi-window workflows** - Auto-activate windows with `activateFirst` + `targetWindowHandle`
-- **Wrong window detection** - Verify target with `expectedWindowTitle` / `expectedProcessName`
+- **Multi-window workflows** - Pass `windowHandle` to target specific windows (auto-activates for interactive actions)
 - Scoped tree navigation with parentElementId
 - Multi-monitor coordinate integration
 - Electron app support (VS Code, Teams, Slack)
@@ -112,11 +111,10 @@ Use `screenshot_control` with `list_monitors` action to see all connected monito
 
 ### UI Automation
 - `action` - One of: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
+- `windowHandle` - Target a specific window (auto-activates for interactive actions)
 - `name` / `controlType` / `automationId` - Element query filters
 - `elementId` - Element ID from a previous find operation (for toggle, invoke, focus actions)
 - `parentElementId` - Scope search to a subtree for performance
-- `expectedWindowTitle` / `expectedProcessName` - Verify correct window before action
-- `activateFirst` + `targetWindowHandle` - Auto-activate window before interaction
 
 ### Mouse Control
 - `action` - One of: move, click, double_click, right_click, middle_click, drag, scroll, get_position
