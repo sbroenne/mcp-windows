@@ -1,7 +1,7 @@
 {
   "name": "windows-mcp",
   "displayName": "Windows MCP Server",
-  "description": "Windows automation for AI assistants - UI automation with accessibility APIs, mouse, keyboard, window management, and screenshots",
+  "description": "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA",
   "version": "1.0.0",
   "publisher": "sbroenne",
   "icon": "icon.png",

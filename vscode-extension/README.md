@@ -1,8 +1,6 @@
 # Windows MCP Server - VS Code Extension
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with UI automation, mouse, keyboard, window management, and screenshot tools.
-
-Designed for computer use, QA and RPA scenarios.
+AI-powered Windows automation — A Model Context Protocol (MCP) server with UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA.
 
 ## Why Windows MCP?
 

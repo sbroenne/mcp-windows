@@ -1,6 +1,6 @@
 ---
 layout: default
-title: "Contributing - Windows MCP Server"
+title: "Contributing"
 description: "How to contribute to Windows MCP Server development. Guidelines for pull requests, code style, and community participation."
 permalink: /contributing/
 ---
