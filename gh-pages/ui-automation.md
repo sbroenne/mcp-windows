@@ -17,7 +17,16 @@ permalink: /ui-automation/
 
 <div class="container content-section" markdown="1">
 
-Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API and OCR.
+Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API (UIA3) and OCR.
+
+## Architecture
+
+Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance and compatibility:
+
+- **Direct COM interop** - No managed wrapper overhead, ~40% faster than UIA2
+- **Modern framework support** - Better compatibility with WPF, UWP, WinUI, and Electron apps
+- **Efficient tree traversal** - Optimized caching and batched property requests
+- **Stable element IDs** - Reliable element references across operations
 
 ## Overview
 

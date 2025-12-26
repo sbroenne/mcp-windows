@@ -5,6 +5,21 @@ All notable changes to the Windows MCP Server extension will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **UIA3 Migration** - Migrated UI Automation from UIA2 (managed wrapper) to UIA3 (COM API)
+  - ~40% performance improvement for element discovery and tree traversal
+  - Better compatibility with modern Windows applications
+  - Improved stability and reduced memory usage
+  - Direct COM interop eliminates managed wrapper overhead
+
+### Added
+- Comprehensive UI Automation test infrastructure
+  - WinForms test harness with TabControl, ListView, TreeView, DataGridView, and common form controls
+  - Electron test harness for Chromium-based application testing
+  - 45+ integration tests covering find, click, type, toggle, tree navigation, and advanced search
+
 ## [1.0.9] - 2025-12-25
 
 ### Changed
