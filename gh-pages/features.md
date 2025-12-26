@@ -1,14 +1,21 @@
 ---
 layout: default
-title: "Complete Feature Reference - Windows MCP Server"
-description: "5 specialized tools for comprehensive Windows automation. UI Automation, mouse control, keyboard input, window management, and screenshot capture."
-keywords: "Windows MCP features, UI automation, mouse automation, keyboard control, window management, screenshot tools, MCP operations"
+title: "Complete Feature Reference"
+description: "All tools and operations: UI Automation & OCR, mouse control, keyboard input, window management, and screenshot capture."
+keywords: "Windows automation, UI automation, mouse control, keyboard input, window management, screenshot capture, MCP operations"
 permalink: /features/
 ---
 
-# Complete Feature Reference
+<div class="hero">
+  <div class="container">
+    <div class="hero-content">
+      <h1 class="hero-title">Complete Feature Reference</h1>
+      <p class="hero-subtitle">All tools and operations for Windows automation</p>
+    </div>
+  </div>
+</div>
 
-Windows MCP Server provides 5 specialized tools for comprehensive Windows automation.
+<div class="container content-section" markdown="1">
 
 ## 🔍 UI Automation & OCR
 
@@ -243,3 +250,5 @@ The server handles common Windows security scenarios:
 | `MCP_WINDOWS_WINDOW_ACTIVATION_MAX_RETRIES` | `3` | Max retries for window activation |
 | `MCP_WINDOWS_SCREENSHOT_TIMEOUT_MS` | `5000` | Screenshot operation timeout |
 | `MCP_WINDOWS_SCREENSHOT_MAX_PIXELS` | `33177600` | Maximum capture size (default 8K) |
+
+</div>

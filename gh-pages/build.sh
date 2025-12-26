@@ -13,16 +13,26 @@ echo "📁 Copying shared content files..."
 # Create _includes directory if it doesn't exist
 mkdir -p "$SCRIPT_DIR/_includes"
 
+# Copy CHANGELOG.md from vscode-extension if it exists
+# Strip top H1 block (title + paragraph) and convert remaining H1 to H2
+if [ -f "$ROOT_DIR/vscode-extension/CHANGELOG.md" ]; then
+    awk '
+        BEGIN { inheader=0; headerdone=0 }
+        {
+            if (headerdone==0 && /^# /) { inheader=1; next }                 # drop H1 title
+            if (inheader==1 && /^All notable/) { next }                      # drop description line
+            if (inheader==1 && /^$/) { inheader=0; headerdone=1; next }      # blank line ends header
+            if (/^# /) { sub(/^# /, "## "); print; next }                   # convert any remaining H1 → H2
+            print
+        }
+    ' "$ROOT_DIR/vscode-extension/CHANGELOG.md" > "$SCRIPT_DIR/_includes/changelog.md"
+    echo "   ✓ Copied CHANGELOG.md (stripped top H1 block, H1→H2)"
+fi
+
 # Copy CONTRIBUTING.md from root
 if [ -f "$ROOT_DIR/CONTRIBUTING.md" ]; then
     cp "$ROOT_DIR/CONTRIBUTING.md" "$SCRIPT_DIR/_includes/contributing.md"
     echo "   ✓ Copied CONTRIBUTING.md"
-fi
-
-# Copy CHANGELOG.md from vscode-extension if it exists
-if [ -f "$ROOT_DIR/vscode-extension/CHANGELOG.md" ]; then
-    cp "$ROOT_DIR/vscode-extension/CHANGELOG.md" "$SCRIPT_DIR/_includes/changelog.md"
-    echo "   ✓ Copied CHANGELOG.md"
 fi
 
 # Determine build mode

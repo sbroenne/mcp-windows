@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    
+
+    <!-- Search engine verification -->
+    <meta name="msvalidate.01" content="C043BE1CE650BCF122B8139C77889186" />
+
     <!-- Bot directives for rich snippets -->
     <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
     <meta name="theme-color" content="#0078d4">
@@ -28,23 +31,24 @@
         "price": "0",
         "priceCurrency": "USD"
       },
-      "description": "Control Windows with Natural Language through AI assistants like GitHub Copilot and Claude. Automate mouse, keyboard, windows, and screenshots.",
+      "description": "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA.",
       "url": "https://windowsmcpserver.dev/",
       "softwareVersion": "1.0",
       "programmingLanguage": "C#",
       "downloadUrl": "https://github.com/sbroenne/mcp-windows/releases",
       "codeRepository": "https://github.com/sbroenne/mcp-windows",
-      "keywords": "Windows, automation, MCP, AI, mouse control, keyboard, window management, screenshots, GitHub Copilot, Claude",
+      "keywords": "Windows, automation, MCP, AI, UI automation, mouse, keyboard, window management, screenshots, computer use, RPA, QA, GitHub Copilot, Claude",
       "author": {
         "@type": "Person",
         "name": "Stefan Broenne"
       },
       "featureList": [
-        "Mouse control automation",
-        "Keyboard input automation",
+        "UI Automation with accessibility APIs",
+        "OCR text extraction",
+        "Mouse control",
+        "Keyboard input",
         "Window management",
-        "Screenshot capture",
-        "MCP Server"
+        "Screenshot capture"
       ]
     }
     </script>
@@ -65,7 +69,7 @@
   <body>
     <div class="container-lg px-3 my-5 markdown-body">
       {% if site.title and site.title != page.title %}
-      <h1><a href="{{ '/' | absolute_url }}">{{ site.title }}</a></h1>
+      <div class="site-title"><a href="{{ '/' | absolute_url }}">{{ site.title }}</a></div>
       {% endif %}
 
       {{ content }}

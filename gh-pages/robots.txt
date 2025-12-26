@@ -1,0 +1,8 @@
+# robots.txt for Windows MCP Server documentation
+# https://windowsmcpserver.dev/
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://windowsmcpserver.dev/sitemap.xml

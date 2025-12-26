@@ -1,8 +1,6 @@
 # Windows MCP Server
 
-A Model Context Protocol (MCP) server that allows an LLM/coding agent like GitHub Copilot or Claude to control Windows 11 with UI automation, mouse, keyboard, window management, and screenshot tools.
-
-Designed for computer use, QA and RPA scenarios.
+AI-powered Windows automation — A Model Context Protocol (MCP) server with UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA.
 
 > **🤖 Co-designed with Claude Sonnet 4.5 via GitHub Copilot** - This project was developed in collaboration with AI pair programming, leveraging Claude Opus 4.5's capabilities through GitHub Copilot to design, create & test a robust, production-ready Windows automation solution. 
 
