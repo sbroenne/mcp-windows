@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'">
+    <title>MCP Electron Test Harness</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; padding: 16px; padding-bottom: 50px; background: #f5f5f5; }
+        h1 { margin: 0 0 16px 0; font-size: 24px; }
+        h2 { margin: 16px 0 8px 0; font-size: 18px; color: #333; }
+        h3 { margin: 12px 0 6px 0; font-size: 14px; color: #555; }
+        .container { background: white; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+        .col { flex: 1; min-width: 200px; }
+        label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 13px; }
+        input[type="text"], input[type="email"], input[type="password"], input[type="search"], input[type="number"], input[type="date"] {
+            width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+        }
+        textarea { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; resize: vertical; min-height: 60px; }
+        select { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; background: white; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; font-size: 14px; cursor: pointer; margin-right: 8px; margin-bottom: 8px; }
+        button.primary { background: #0066cc; color: white; }
+        button.primary:hover { background: #0052a3; }
+        button.secondary { background: #e0e0e0; color: #333; }
+        button.secondary:hover { background: #d0d0d0; }
+        button.danger { background: #cc3300; color: white; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .checkbox-group, .radio-group { display: flex; flex-direction: column; gap: 8px; }
+        .checkbox-item, .radio-item { display: flex; align-items: center; gap: 8px; }
+        .checkbox-item input, .radio-item input { width: 18px; height: 18px; }
+        .tab-container { border: 1px solid #ccc; border-radius: 4px; overflow: hidden; }
+        .tab-list { display: flex; background: #f0f0f0; border-bottom: 1px solid #ccc; }
+        .tab-list [role="tab"] { padding: 10px 20px; background: transparent; border: none; border-radius: 0; cursor: pointer; }
+        .tab-list [role="tab"][aria-selected="true"] { background: white; border-bottom: 2px solid #0066cc; font-weight: 600; }
+        .tab-panel { padding: 16px; display: none; }
+        .tab-panel[aria-hidden="false"] { display: block; }
+        .tree { list-style: none; padding-left: 0; margin: 0; }
+        .tree ul { list-style: none; padding-left: 20px; margin: 4px 0; }
+        .tree-item { padding: 4px 8px; cursor: pointer; border-radius: 4px; display: inline-block; }
+        .tree-item:hover { background: #e8f0fe; }
+        .tree-item[aria-selected="true"] { background: #0066cc; color: white; }
+        .tree-toggle { width: 16px; display: inline-block; }
+        .list-container { border: 1px solid #ccc; border-radius: 4px; max-height: 150px; overflow-y: auto; }
+        [role="listbox"] { list-style: none; padding: 0; margin: 0; }
+        [role="option"] { padding: 8px 12px; cursor: pointer; }
+        [role="option"]:hover { background: #f0f0f0; }
+        [role="option"][aria-selected="true"] { background: #0066cc; color: white; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f5f5f5; font-weight: 600; }
+        progress { width: 100%; height: 20px; }
+        input[type="range"] { width: 100%; }
+        dialog { border: none; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); padding: 20px; max-width: 400px; }
+        dialog::backdrop { background: rgba(0,0,0,0.5); }
+        .status-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #333; color: white; padding: 8px 16px; font-size: 12px; display: flex; justify-content: space-between; }
+        .section { padding: 12px; border: 1px solid #e0e0e0; border-radius: 4px; margin: 8px 0; }
+        .level-2 { background: #fafafa; }
+        .level-3 { background: #f5f5f5; }
+        .level-4 { background: #f0f0f0; }
+        .level-5 { background: #eaeaea; }
+        .accordion-header { padding: 10px; background: #f0f0f0; cursor: pointer; border-radius: 4px; margin-bottom: 4px; }
+        .accordion-header:hover { background: #e0e0e0; }
+        .accordion-content { padding: 12px; display: none; }
+        .accordion-content.open { display: block; }
+    </style>
+</head>
+<body>
+    <h1 id="main-heading" aria-label="Main Heading">MCP Electron Test Harness</h1>
+
+    <!-- Navigation Bar (Level 1) -->
+    <nav role="navigation" aria-label="Main navigation" class="container">
+        <div class="row">
+            <button class="primary" id="nav-home" aria-label="Navigate Home">Home</button>
+            <button class="secondary" id="nav-forms" aria-label="Navigate Forms">Forms</button>
+            <button class="secondary" id="nav-data" aria-label="Navigate Data">Data</button>
+            <button class="secondary" id="nav-settings" aria-label="Navigate Settings">Settings</button>
+        </div>
+    </nav>
+
+    <!-- Form Controls Section (Level 1 -> 2 -> 3 -> 4) -->
+    <section class="container" aria-labelledby="forms-heading">
+        <h2 id="forms-heading">Form Controls</h2>
+
+        <!-- Text Inputs (Level 2) -->
+        <div class="section level-2" role="group" aria-label="Text Input Group">
+            <h3>Text Inputs</h3>
+            <div class="row">
+                <div class="col">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" aria-label="Username Input">
+                </div>
+                <div class="col">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" placeholder="user@example.com" aria-label="Email Input">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter password" aria-label="Password Input">
+                </div>
+                <div class="col">
+                    <label for="search-input">Search</label>
+                    <input type="search" id="search-input" name="search" placeholder="Search..." aria-label="Search Input">
+                </div>
+            </div>
+
+            <!-- Numeric Inputs (Level 3) -->
+            <div class="section level-3" role="group" aria-label="Numeric Input Group">
+                <h3>Numeric & Date Inputs</h3>
+                <div class="row">
+                    <div class="col">
+                        <label for="quantity">Quantity</label>
+                        <input type="number" id="quantity" name="quantity" min="0" max="100" value="1" aria-label="Quantity Input">
+                    </div>
+                    <div class="col">
+                        <label for="date-input">Date</label>
+                        <input type="date" id="date-input" name="date" aria-label="Date Input">
+                    </div>
+                </div>
+
+                <!-- Deep Nested (Level 4) -->
+                <div class="section level-4" role="group" aria-label="Advanced Options Group">
+                    <h3>Advanced Options</h3>
+                    <label for="notes">Additional Notes</label>
+                    <textarea id="notes" name="notes" placeholder="Enter notes..." aria-label="Notes Input"></textarea>
+
+                    <!-- Even Deeper (Level 5) -->
+                    <div class="section level-5" role="group" aria-label="Priority Settings">
+                        <label for="priority-deep">Priority Level</label>
+                        <select id="priority-deep" aria-label="Priority Selection">
+                            <option value="low">Low Priority</option>
+                            <option value="medium" selected>Medium Priority</option>
+                            <option value="high">High Priority</option>
+                        </select>
+                        <button class="secondary" id="apply-priority-btn" aria-label="Apply Priority">Apply</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selection Controls (Level 2) -->
+        <div class="section level-2" role="group" aria-label="Selection Controls">
+            <h3>Selection Controls</h3>
+            <div class="row">
+                <div class="col">
+                    <label for="country-select">Country</label>
+                    <select id="country-select" name="country" aria-label="Country Selection">
+                        <option value="">Select a country...</option>
+                        <option value="us">United States</option>
+                        <option value="uk">United Kingdom</option>
+                        <option value="de">Germany</option>
+                        <option value="fr">France</option>
+                        <option value="jp">Japan</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label for="category-select">Category</label>
+                    <select id="category-select" name="category" aria-label="Category Selection">
+                        <option value="tech">Technology</option>
+                        <option value="science">Science</option>
+                        <option value="art">Art</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Checkboxes and Radios (Level 3) -->
+            <div class="section level-3" role="group" aria-label="Checkbox and Radio Group">
+                <div class="row">
+                    <div class="col">
+                        <label>Options (Checkboxes)</label>
+                        <div class="checkbox-group" role="group" aria-label="Options Checkboxes">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="option-notify" name="options" value="notify" aria-label="Enable Notifications">
+                                <label for="option-notify">Enable notifications</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="option-autosave" name="options" value="autosave" checked aria-label="Auto-save Drafts">
+                                <label for="option-autosave">Auto-save drafts</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="option-darkmode" name="options" value="darkmode" aria-label="Dark Mode">
+                                <label for="option-darkmode">Dark mode</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col">
+                        <label>Size (Radio Buttons)</label>
+                        <div class="radio-group" role="radiogroup" aria-label="Size Selection">
+                            <div class="radio-item">
+                                <input type="radio" id="size-small" name="size" value="small" aria-label="Small Size">
+                                <label for="size-small">Small</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size-medium" name="size" value="medium" checked aria-label="Medium Size">
+                                <label for="size-medium">Medium</label>
+                            </div>
+                            <div class="radio-item">
+                                <input type="radio" id="size-large" name="size" value="large" aria-label="Large Size">
+                                <label for="size-large">Large</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="row">
+            <button class="primary" id="submit-btn" aria-label="Submit Form">Submit Form</button>
+            <button class="secondary" id="reset-btn" aria-label="Reset Form">Reset</button>
+            <button class="secondary" id="cancel-btn" aria-label="Cancel">Cancel</button>
+            <button class="danger" id="delete-btn" aria-label="Delete">Delete</button>
+            <button class="secondary" id="disabled-btn" disabled aria-label="Disabled Button">Disabled</button>
+        </div>
+    </section>
+
+    <!-- Tab Navigation Section -->
+    <section class="container" aria-labelledby="tabs-heading">
+        <h2 id="tabs-heading">Tab Navigation</h2>
+        <div class="tab-container">
+            <div class="tab-list" role="tablist" aria-label="Content Tabs">
+                <button role="tab" id="tab-overview" aria-selected="true" aria-controls="panel-overview">Overview</button>
+                <button role="tab" id="tab-details" aria-selected="false" aria-controls="panel-details">Details</button>
+                <button role="tab" id="tab-history" aria-selected="false" aria-controls="panel-history">History</button>
+                <button role="tab" id="tab-settings" aria-selected="false" aria-controls="panel-settings">Settings</button>
+            </div>
+            <div role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" aria-hidden="false">
+                <h3>Overview Content</h3>
+                <p>This is the overview panel with general information.</p>
+                <div class="section level-3">
+                    <h3>Nested Section in Tab</h3>
+                    <p>Content nested within the overview tab panel.</p>
+                    <div class="section level-4">
+                        <p>Even more deeply nested content inside tabs.</p>
+                        <button class="secondary" id="nested-tab-btn" aria-label="Nested Tab Button">Nested Action</button>
+                    </div>
+                </div>
+            </div>
+            <div role="tabpanel" id="panel-details" aria-labelledby="tab-details" aria-hidden="true">
+                <h3>Details Content</h3>
+                <p>Detailed information and specifications.</p>
+                <label for="detail-input">Detail Field</label>
+                <input type="text" id="detail-input" placeholder="Enter detail..." aria-label="Detail Input">
+            </div>
+            <div role="tabpanel" id="panel-history" aria-labelledby="tab-history" aria-hidden="true">
+                <h3>History Content</h3>
+                <p>Historical data and change log.</p>
+            </div>
+            <div role="tabpanel" id="panel-settings" aria-labelledby="tab-settings" aria-hidden="true">
+                <h3>Settings Content</h3>
+                <p>Configuration and preferences.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Accordion Section -->
+    <section class="container" aria-labelledby="accordion-heading">
+        <h2 id="accordion-heading">Accordion</h2>
+        <div role="group" aria-label="Accordion Sections">
+            <div class="accordion-header" role="button" aria-expanded="true" aria-controls="accordion-1-content" id="accordion-1" tabindex="0">
+                Section 1: Introduction
+            </div>
+            <div class="accordion-content open" id="accordion-1-content" role="region" aria-labelledby="accordion-1">
+                <p>Introduction content with nested elements.</p>
+                <div class="section level-3">
+                    <label for="intro-field">Introduction Field</label>
+                    <input type="text" id="intro-field" placeholder="Type here..." aria-label="Introduction Field">
+                </div>
+            </div>
+
+            <div class="accordion-header" role="button" aria-expanded="false" aria-controls="accordion-2-content" id="accordion-2" tabindex="0">
+                Section 2: Configuration
+            </div>
+            <div class="accordion-content" id="accordion-2-content" role="region" aria-labelledby="accordion-2">
+                <p>Configuration options and settings.</p>
+            </div>
+
+            <div class="accordion-header" role="button" aria-expanded="false" aria-controls="accordion-3-content" id="accordion-3" tabindex="0">
+                Section 3: Advanced
+            </div>
+            <div class="accordion-content" id="accordion-3-content" role="region" aria-labelledby="accordion-3">
+                <p>Advanced settings for power users.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tree View Section -->
+    <section class="container" aria-labelledby="tree-heading">
+        <h2 id="tree-heading">Tree View</h2>
+        <ul class="tree" role="tree" aria-label="File Browser">
+            <li role="treeitem" aria-expanded="true" id="tree-root">
+                <span class="tree-item"><span class="tree-toggle">▼</span> Project Root</span>
+                <ul role="group">
+                    <li role="treeitem" aria-expanded="true" id="tree-src">
+                        <span class="tree-item"><span class="tree-toggle">▼</span> src</span>
+                        <ul role="group">
+                            <li role="treeitem" aria-expanded="false" id="tree-components">
+                                <span class="tree-item"><span class="tree-toggle">▶</span> components</span>
+                                <ul role="group" hidden>
+                                    <li role="treeitem" id="tree-button-tsx"><span class="tree-item">Button.tsx</span></li>
+                                    <li role="treeitem" id="tree-input-tsx"><span class="tree-item">Input.tsx</span></li>
+                                    <li role="treeitem" id="tree-modal-tsx"><span class="tree-item">Modal.tsx</span></li>
+                                    <li role="treeitem" aria-expanded="false" id="tree-forms">
+                                        <span class="tree-item"><span class="tree-toggle">▶</span> forms</span>
+                                        <ul role="group" hidden>
+                                            <li role="treeitem" id="tree-textfield"><span class="tree-item">TextField.tsx</span></li>
+                                            <li role="treeitem" id="tree-checkbox"><span class="tree-item">Checkbox.tsx</span></li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                            </li>
+                            <li role="treeitem" id="tree-main-ts"><span class="tree-item">main.ts</span></li>
+                            <li role="treeitem" id="tree-app-tsx"><span class="tree-item">App.tsx</span></li>
+                        </ul>
+                    </li>
+                    <li role="treeitem" aria-expanded="false" id="tree-tests">
+                        <span class="tree-item"><span class="tree-toggle">▶</span> tests</span>
+                        <ul role="group" hidden>
+                            <li role="treeitem" id="tree-unit-test"><span class="tree-item">unit.test.ts</span></li>
+                            <li role="treeitem" id="tree-integration-test"><span class="tree-item">integration.test.ts</span></li>
+                        </ul>
+                    </li>
+                    <li role="treeitem" id="tree-readme"><span class="tree-item">README.md</span></li>
+                    <li role="treeitem" id="tree-package-json"><span class="tree-item">package.json</span></li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+
+    <!-- List and Table Section -->
+    <section class="container" aria-labelledby="data-heading">
+        <h2 id="data-heading">Data Display</h2>
+        <div class="row">
+            <div class="col">
+                <h3>List View</h3>
+                <div class="list-container">
+                    <ul role="listbox" aria-label="Item List" id="item-list">
+                        <li role="option" id="list-item-1" aria-selected="false">Item 1 - First entry</li>
+                        <li role="option" id="list-item-2" aria-selected="true">Item 2 - Selected item</li>
+                        <li role="option" id="list-item-3" aria-selected="false">Item 3 - Third entry</li>
+                        <li role="option" id="list-item-4" aria-selected="false">Item 4 - Fourth entry</li>
+                        <li role="option" id="list-item-5" aria-selected="false">Item 5 - Fifth entry</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col">
+                <h3>Data Table</h3>
+                <table role="grid" aria-label="Projects Table">
+                    <thead>
+                        <tr><th>ID</th><th>Name</th><th>Status</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr role="row" id="table-row-1">
+                            <td>001</td><td>Alpha Project</td><td>Active</td>
+                            <td><button class="secondary" aria-label="Edit Alpha Project">Edit</button></td>
+                        </tr>
+                        <tr role="row" id="table-row-2">
+                            <td>002</td><td>Beta Project</td><td>Pending</td>
+                            <td><button class="secondary" aria-label="Edit Beta Project">Edit</button></td>
+                        </tr>
+                        <tr role="row" id="table-row-3">
+                            <td>003</td><td>Gamma Project</td><td>Completed</td>
+                            <td><button class="secondary" aria-label="Edit Gamma Project">Edit</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- Progress and Slider Section -->
+    <section class="container" aria-labelledby="progress-heading">
+        <h2 id="progress-heading">Progress & Sliders</h2>
+        <div class="row">
+            <div class="col">
+                <label for="progress-bar">Download Progress</label>
+                <progress id="progress-bar" value="65" max="100" aria-label="Download Progress">65%</progress>
+            </div>
+            <div class="col">
+                <label for="volume-slider">Volume: <span id="volume-value">50</span>%</label>
+                <input type="range" id="volume-slider" min="0" max="100" value="50" aria-label="Volume Control">
+            </div>
+        </div>
+    </section>
+
+    <!-- Dialog Trigger -->
+    <section class="container">
+        <h2>Modal Dialog</h2>
+        <button class="primary" id="open-dialog-btn" aria-label="Open Dialog">Open Dialog</button>
+        <button class="secondary" id="show-alert-btn" aria-label="Show Alert">Show Alert</button>
+    </section>
+
+    <!-- Modal Dialog -->
+    <dialog id="modal-dialog" aria-labelledby="dialog-title">
+        <h2 id="dialog-title">Confirmation Dialog</h2>
+        <p>Are you sure you want to proceed with this action?</p>
+        <div class="section level-3">
+            <label for="dialog-input">Confirm by typing "yes":</label>
+            <input type="text" id="dialog-input" placeholder="Type here..." aria-label="Confirmation Input">
+        </div>
+        <div class="row">
+            <button class="primary" id="dialog-confirm" aria-label="Confirm Dialog">Confirm</button>
+            <button class="secondary" id="dialog-cancel" aria-label="Cancel Dialog">Cancel</button>
+        </div>
+    </dialog>
+
+    <!-- Status Bar -->
+    <footer class="status-bar" role="contentinfo" aria-label="Status Bar">
+        <span id="status-message">Ready</span>
+        <span id="status-info">Items: 5 | Selected: 1</span>
+    </footer>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('[role="tab"]').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('[role="tab"]').forEach(t => t.setAttribute('aria-selected', 'false'));
+                document.querySelectorAll('[role="tabpanel"]').forEach(p => p.setAttribute('aria-hidden', 'true'));
+                tab.setAttribute('aria-selected', 'true');
+                const panel = document.getElementById(tab.getAttribute('aria-controls'));
+                if (panel) panel.setAttribute('aria-hidden', 'false');
+                updateStatus(`Switched to ${tab.textContent} tab`);
+            });
+        });
+
+        // Accordion
+        document.querySelectorAll('.accordion-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const content = document.getElementById(header.getAttribute('aria-controls'));
+                const isExpanded = header.getAttribute('aria-expanded') === 'true';
+                header.setAttribute('aria-expanded', !isExpanded);
+                content.classList.toggle('open', !isExpanded);
+                updateStatus(`Accordion ${header.textContent.trim()} ${!isExpanded ? 'expanded' : 'collapsed'}`);
+            });
+        });
+
+        // Tree toggle
+        document.querySelectorAll('.tree-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const li = item.closest('[role="treeitem"]');
+                const toggle = item.querySelector('.tree-toggle');
+                const group = li.querySelector(':scope > [role="group"]');
+
+                if (group && toggle) {
+                    const isExpanded = li.getAttribute('aria-expanded') === 'true';
+                    li.setAttribute('aria-expanded', !isExpanded);
+                    group.hidden = isExpanded;
+                    toggle.textContent = isExpanded ? '▶' : '▼';
+                }
+
+                document.querySelectorAll('.tree-item').forEach(i => i.removeAttribute('aria-selected'));
+                item.setAttribute('aria-selected', 'true');
+                updateStatus(`Tree: Selected ${item.textContent.replace(/[▼▶]\s*/, '').trim()}`);
+            });
+        });
+
+        // List selection
+        document.querySelectorAll('[role="option"]').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('[role="option"]').forEach(o => o.setAttribute('aria-selected', 'false'));
+                option.setAttribute('aria-selected', 'true');
+                updateStatus(`List: Selected ${option.textContent}`);
+            });
+        });
+
+        // Slider
+        document.getElementById('volume-slider').addEventListener('input', (e) => {
+            document.getElementById('volume-value').textContent = e.target.value;
+        });
+
+        // Dialog
+        const dialog = document.getElementById('modal-dialog');
+        document.getElementById('open-dialog-btn').addEventListener('click', () => { dialog.showModal(); updateStatus('Dialog opened'); });
+        document.getElementById('dialog-confirm').addEventListener('click', () => { dialog.close(); updateStatus('Dialog confirmed'); });
+        document.getElementById('dialog-cancel').addEventListener('click', () => { dialog.close(); updateStatus('Dialog cancelled'); });
+
+        // Navigation buttons
+        document.getElementById('nav-home').addEventListener('click', () => updateStatus('Navigated to Home'));
+        document.getElementById('nav-forms').addEventListener('click', () => updateStatus('Navigated to Forms'));
+        document.getElementById('nav-data').addEventListener('click', () => updateStatus('Navigated to Data'));
+        document.getElementById('nav-settings').addEventListener('click', () => updateStatus('Navigated to Settings'));
+
+        // Form buttons
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            updateStatus(`Form submitted: ${username}, ${email}`);
+        });
+        document.getElementById('reset-btn').addEventListener('click', () => { resetForm(); updateStatus('Form reset'); });
+        document.getElementById('cancel-btn').addEventListener('click', () => updateStatus('Cancelled'));
+        document.getElementById('delete-btn').addEventListener('click', () => updateStatus('Delete clicked'));
+        document.getElementById('show-alert-btn').addEventListener('click', () => { alert('This is an alert!'); updateStatus('Alert shown'); });
+
+        function updateStatus(message) { document.getElementById('status-message').textContent = message; }
+
+        function resetForm() {
+            document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"], input[type="search"], textarea').forEach(el => el.value = '');
+            document.querySelectorAll('input[type="checkbox"]').forEach(el => el.checked = el.id === 'option-autosave');
+            document.querySelectorAll('input[type="radio"]').forEach(el => el.checked = el.id === 'size-medium');
+            document.getElementById('country-select').value = '';
+            document.getElementById('category-select').value = 'tech';
+            document.getElementById('priority-deep').value = 'medium';
+        }
+
+        // Listen for reset from main process
+        if (window.electronAPI) { window.electronAPI.onReset(() => { resetForm(); updateStatus('Ready'); }); }
+    </script>
+</body>
+</html>

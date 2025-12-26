@@ -1,0 +1,16 @@
+{
+  "name": "mcp-electron-test-harness",
+  "version": "1.0.0",
+  "description": "Electron test harness for Windows MCP UI Automation testing",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && electron .",
+    "dev": "tsc && electron ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "electron": "^28.0.0",
+    "typescript": "^5.3.0"
+  }
+}

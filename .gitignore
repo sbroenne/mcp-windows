@@ -93,3 +93,6 @@ specs/007-llm-integration-testing/results/
 # Node.js
 node_modules/
 
+# Electron harness build output
+tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/dist/
+
