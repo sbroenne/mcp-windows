@@ -332,18 +332,35 @@ public sealed class UIAutomationToolTests
 
     #endregion
 
-    #region Not Yet Implemented Actions Tests
+    #region Highlight Action Tests
 
     [Fact]
-    public async Task ExecuteAsync_HighlightAction_ReturnsNotImplementedAsync()
+    public async Task ExecuteAsync_HighlightAction_WithElementId_CallsServiceAsync()
     {
+        // Arrange
+        var expectedResult = UIAutomationResult.CreateSuccess("highlight", CreateTestElementInfo("test-id"));
+        _mockService.HighlightElementAsync("test-id", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(expectedResult));
+
         // Act
         var result = await _tool.ExecuteAsync(UIAutomationAction.Highlight, elementId: "test-id");
 
         // Assert
+        Assert.True(result.Success);
+        Assert.Equal("highlight", result.Action);
+        await _mockService.Received(1).HighlightElementAsync("test-id", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HighlightAction_WithoutElementId_ReturnsErrorAsync()
+    {
+        // Act
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Highlight);
+
+        // Assert
         Assert.False(result.Success);
-        Assert.Equal(UIAutomationErrorType.PatternNotSupported.ToString(), result.ErrorType);
-        Assert.Contains("not yet implemented", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter.ToString(), result.ErrorType);
+        Assert.Contains("Element ID", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

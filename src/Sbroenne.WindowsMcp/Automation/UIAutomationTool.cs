@@ -352,8 +352,7 @@ public sealed partial class UIAutomationTool
         // If element ID provided, use it directly
         if (!string.IsNullOrEmpty(elementId))
         {
-            // TODO: Implement direct click via element ID
-            return UIAutomationResult.CreateFailure("click", UIAutomationErrorType.PatternNotSupported, "Direct element click not yet implemented", null);
+            return await _automationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
         }
 
         // Otherwise, find and click
@@ -472,12 +471,14 @@ public sealed partial class UIAutomationTool
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
     }
 
-    private static Task<UIAutomationResult> HandleHighlightAsync(string? elementId, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleHighlightAsync(string? elementId, CancellationToken cancellationToken)
     {
-        // TODO: Implement highlight action
-        _ = elementId; // Suppress unused warning
-        _ = cancellationToken; // Suppress warning
-        return Task.FromResult(UIAutomationResult.CreateFailure("highlight", UIAutomationErrorType.PatternNotSupported, "Highlight action not yet implemented", null));
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return UIAutomationResult.CreateFailure("highlight", UIAutomationErrorType.InvalidParameter, "Element ID is required for highlight action", null);
+        }
+
+        return await _automationService.HighlightElementAsync(elementId, cancellationToken);
     }
 
     private async Task<UIAutomationResult> HandleOcrAsync(nint? windowHandle, string? language, CancellationToken cancellationToken)

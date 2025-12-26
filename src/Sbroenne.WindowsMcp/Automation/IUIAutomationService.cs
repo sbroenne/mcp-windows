@@ -133,4 +133,21 @@ public interface IUIAutomationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result with ancestor elements (ordered from immediate parent to root).</returns>
     Task<UIAutomationResult> GetAncestorsAsync(string elementId, int? maxDepth, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Clicks an element directly using its element ID.
+    /// </summary>
+    /// <param name="elementId">The element ID to click.</param>
+    /// <param name="windowHandle">Optional window handle for activation.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with clicked element.</returns>
+    Task<UIAutomationResult> ClickElementAsync(string elementId, nint? windowHandle, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Highlights an element by drawing a visible rectangle around it.
+    /// </summary>
+    /// <param name="elementId">The element ID to highlight.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result.</returns>
+    Task<UIAutomationResult> HighlightElementAsync(string elementId, CancellationToken cancellationToken = default);
 }

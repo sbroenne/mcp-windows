@@ -384,7 +384,7 @@ public sealed class UIAutomationServiceTests : IDisposable
         // Assert - Should fail to find the element
         Assert.NotNull(result);
         Assert.False(result.Success);
-        Assert.Equal("find_and_type", result.Action);
+        Assert.Equal("type", result.Action);
         // Error could be ElementNotFound or WindowNotFound depending on test environment
         Assert.True(
             result.ErrorType == UIAutomationErrorType.ElementNotFound.ToString() ||
@@ -405,7 +405,7 @@ public sealed class UIAutomationServiceTests : IDisposable
         // Assert - Should fail to find the element
         Assert.NotNull(result);
         Assert.False(result.Success);
-        Assert.Equal("find_and_select", result.Action);
+        Assert.Equal("select", result.Action);
         // Error could be ElementNotFound or WindowNotFound depending on test environment
         Assert.True(
             result.ErrorType == UIAutomationErrorType.ElementNotFound.ToString() ||

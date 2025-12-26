@@ -181,22 +181,6 @@ public static class UIA3Extensions
     }
 
     /// <summary>
-    /// Gets the process ID.
-    /// </summary>
-    public static int GetProcessId(this UIA.IUIAutomationElement element)
-    {
-        ArgumentNullException.ThrowIfNull(element);
-        try
-        {
-            return element.CurrentProcessId;
-        }
-        catch (COMException)
-        {
-            return 0;
-        }
-    }
-
-    /// <summary>
     /// Sets focus on the element.
     /// </summary>
     public static bool TrySetFocus(this UIA.IUIAutomationElement element)

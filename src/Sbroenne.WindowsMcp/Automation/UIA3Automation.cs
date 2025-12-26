@@ -19,7 +19,6 @@ public sealed class UIA3Automation : IDisposable
     private static readonly Lazy<UIA3Automation> LazyInstance = new(() => new UIA3Automation(), LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly UIA.IUIAutomation _automation;
     private readonly UIA.IUIAutomationTreeWalker _controlViewWalker;
-    private readonly UIA.IUIAutomationTreeWalker _rawViewWalker;
     private readonly UIA.IUIAutomationCondition _trueCondition;
     private bool _disposed;
 
@@ -41,7 +40,6 @@ public sealed class UIA3Automation : IDisposable
         }
 
         _controlViewWalker = _automation.ControlViewWalker;
-        _rawViewWalker = _automation.RawViewWalker;
         _trueCondition = _automation.CreateTrueCondition();
     }
 
@@ -54,11 +52,6 @@ public sealed class UIA3Automation : IDisposable
     /// Gets the control view tree walker.
     /// </summary>
     public UIA.IUIAutomationTreeWalker ControlViewWalker => _controlViewWalker;
-
-    /// <summary>
-    /// Gets the raw view tree walker.
-    /// </summary>
-    public UIA.IUIAutomationTreeWalker RawViewWalker => _rawViewWalker;
 
     /// <summary>
     /// Gets a cached TRUE condition.
@@ -140,48 +133,6 @@ public sealed class UIA3Automation : IDisposable
         return _automation.CreateAndCondition(condition1, condition2);
     }
 
-    /// <summary>
-    /// Creates an AND condition from multiple conditions.
-    /// </summary>
-    public UIA.IUIAutomationCondition CreateAndConditionFromArray(params UIA.IUIAutomationCondition[] conditions)
-    {
-        ArgumentNullException.ThrowIfNull(conditions);
-
-        if (conditions.Length == 0)
-        {
-            return _trueCondition;
-        }
-
-        if (conditions.Length == 1)
-        {
-            return conditions[0];
-        }
-
-        var result = conditions[0];
-        for (var i = 1; i < conditions.Length; i++)
-        {
-            result = _automation.CreateAndCondition(result, conditions[i]);
-        }
-
-        return result;
-    }
-
-    /// <summary>
-    /// Creates an OR condition.
-    /// </summary>
-    public UIA.IUIAutomationCondition CreateOrCondition(UIA.IUIAutomationCondition condition1, UIA.IUIAutomationCondition condition2)
-    {
-        return _automation.CreateOrCondition(condition1, condition2);
-    }
-
-    /// <summary>
-    /// Creates a NOT condition.
-    /// </summary>
-    public UIA.IUIAutomationCondition CreateNotCondition(UIA.IUIAutomationCondition condition)
-    {
-        return _automation.CreateNotCondition(condition);
-    }
-
     /// <inheritdoc/>
     public void Dispose()
     {
@@ -194,7 +145,6 @@ public sealed class UIA3Automation : IDisposable
 
         // Release COM objects in reverse order of creation
         SafeRelease(_trueCondition);
-        SafeRelease(_rawViewWalker);
         SafeRelease(_controlViewWalker);
         SafeRelease(_automation);
     }
@@ -282,59 +232,6 @@ internal static class UIA3ControlTypeIds
     internal const int Separator = 50038;
     internal const int SemanticZoom = 50039;
     internal const int AppBar = 50040;
-
-    /// <summary>
-    /// Gets the control type ID from a name.
-    /// </summary>
-    internal static int? FromName(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        return name.ToLowerInvariant() switch
-        {
-            "button" => Button,
-            "calendar" => Calendar,
-            "checkbox" => CheckBox,
-            "combobox" => ComboBox,
-            "edit" => Edit,
-            "hyperlink" => Hyperlink,
-            "image" => Image,
-            "listitem" => ListItem,
-            "list" => List,
-            "menu" => Menu,
-            "menubar" => MenuBar,
-            "menuitem" => MenuItem,
-            "progressbar" => ProgressBar,
-            "radiobutton" => RadioButton,
-            "scrollbar" => ScrollBar,
-            "slider" => Slider,
-            "spinner" => Spinner,
-            "statusbar" => StatusBar,
-            "tab" => Tab,
-            "tabitem" => TabItem,
-            "text" => Text,
-            "toolbar" => ToolBar,
-            "tooltip" => ToolTip,
-            "tree" => Tree,
-            "treeitem" => TreeItem,
-            "custom" => Custom,
-            "group" => Group,
-            "thumb" => Thumb,
-            "datagrid" => DataGrid,
-            "dataitem" => DataItem,
-            "document" => Document,
-            "splitbutton" => SplitButton,
-            "window" => Window,
-            "pane" => Pane,
-            "header" => Header,
-            "headeritem" => HeaderItem,
-            "table" => Table,
-            "titlebar" => TitleBar,
-            "separator" => Separator,
-            "semanticzoom" => SemanticZoom,
-            "appbar" => AppBar,
-            _ => null
-        };
-    }
 
     /// <summary>
     /// Gets the name from a control type ID.

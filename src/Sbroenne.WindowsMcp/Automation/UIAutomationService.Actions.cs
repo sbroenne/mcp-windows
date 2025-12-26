@@ -414,4 +414,186 @@ public sealed partial class UIAutomationService
     {
         _mouseService.ClickAsync(point.X, point.Y, ModifierKey.None, CancellationToken.None).GetAwaiter().GetResult();
     }
+
+    /// <inheritdoc/>
+    public async Task<UIAutomationResult> ClickElementAsync(string elementId, nint? windowHandle, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            return await _staThread.ExecuteAsync(() =>
+            {
+                var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+                if (element == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "click",
+                        UIAutomationErrorType.ElementNotFound,
+                        $"Element with ID '{elementId}' could not be resolved. The element may have been removed from the UI.",
+                        CreateDiagnostics(stopwatch));
+                }
+
+                // Ensure window is activated before clicking
+                TryActivateWindowForElement(element, windowHandle);
+
+                var rootElement = GetRootElementForScroll(element);
+
+                // Try InvokePattern first
+                if (element.TryInvoke())
+                {
+                    var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                }
+
+                // Fall back to clicking at element's clickable point
+                var clickablePoint = GetClickablePointForClick(element);
+                if (clickablePoint.HasValue)
+                {
+                    PerformPhysicalClick(clickablePoint.Value);
+                    var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                }
+
+                return UIAutomationResult.CreateFailure(
+                    "click",
+                    UIAutomationErrorType.PatternNotSupported,
+                    "Element cannot be clicked: no Invoke pattern and no clickable point available. Use the element's clickablePoint coordinates with mouse_control as fallback.",
+                    CreateDiagnostics(stopwatch));
+            }, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogFindAndClickError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "click",
+                UIAutomationErrorType.InternalError,
+                $"Click failed: {ex.Message}",
+                CreateDiagnostics(stopwatch));
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<UIAutomationResult> HighlightElementAsync(string elementId, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            return await _staThread.ExecuteAsync(() =>
+            {
+                var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+                if (element == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "highlight",
+                        UIAutomationErrorType.ElementNotFound,
+                        $"Element with ID '{elementId}' could not be resolved.",
+                        CreateDiagnostics(stopwatch));
+                }
+
+                var rect = element.CurrentBoundingRectangle;
+                if (rect.right <= rect.left || rect.bottom <= rect.top)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "highlight",
+                        UIAutomationErrorType.InvalidParameter,
+                        "Element has no visible bounding rectangle.",
+                        CreateDiagnostics(stopwatch));
+                }
+
+                // Draw highlight rectangle using GDI
+                DrawHighlightRectangle(rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+
+                var rootElement = GetRootElementForScroll(element);
+                var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+
+                return UIAutomationResult.CreateSuccess("highlight", elementInfo!, CreateDiagnostics(stopwatch));
+            }, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return UIAutomationResult.CreateFailure(
+                "highlight",
+                UIAutomationErrorType.InternalError,
+                $"Highlight failed: {ex.Message}",
+                CreateDiagnostics(stopwatch));
+        }
+    }
+
+    private static void DrawHighlightRectangle(int x, int y, int width, int height)
+    {
+        // Use a separate thread to manage the highlight lifecycle
+        var highlightThread = new Thread(() =>
+        {
+            try
+            {
+                using var form = new HighlightForm(x, y, width, height);
+                form.Show();
+
+                // Keep visible for 2 seconds
+                var endTime = DateTime.UtcNow.AddSeconds(2);
+                while (DateTime.UtcNow < endTime)
+                {
+                    System.Windows.Forms.Application.DoEvents();
+                    Thread.Sleep(50);
+                }
+            }
+            catch
+            {
+                // Best effort highlight - ignore errors
+            }
+        });
+        highlightThread.SetApartmentState(ApartmentState.STA);
+        highlightThread.Start();
+
+        // Don't wait for the highlight to finish - return immediately
+    }
+
+    /// <summary>
+    /// A transparent form with a colored border for highlighting UI elements.
+    /// </summary>
+    private sealed class HighlightForm : System.Windows.Forms.Form
+    {
+        private const int BorderThickness = 3;
+
+        public HighlightForm(int x, int y, int width, int height)
+        {
+            // Set form properties for a transparent overlay
+            FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+            ShowInTaskbar = false;
+            TopMost = true;
+            StartPosition = System.Windows.Forms.FormStartPosition.Manual;
+            BackColor = System.Drawing.Color.Red;
+            TransparencyKey = System.Drawing.Color.Magenta;
+
+            // Position and size
+            Location = new System.Drawing.Point(x - BorderThickness, y - BorderThickness);
+            Size = new System.Drawing.Size(width + 2 * BorderThickness, height + 2 * BorderThickness);
+        }
+
+        protected override void OnPaint(System.Windows.Forms.PaintEventArgs e)
+        {
+            base.OnPaint(e);
+
+            // Draw outer rectangle (border)
+            using var pen = new System.Drawing.Pen(System.Drawing.Color.Red, BorderThickness);
+            e.Graphics.DrawRectangle(pen, BorderThickness / 2, BorderThickness / 2, Width - BorderThickness, Height - BorderThickness);
+
+            // Fill inner area with transparency key color
+            using var brush = new System.Drawing.SolidBrush(System.Drawing.Color.Magenta);
+            e.Graphics.FillRectangle(brush, BorderThickness, BorderThickness, Width - 2 * BorderThickness, Height - 2 * BorderThickness);
+        }
+
+        protected override System.Windows.Forms.CreateParams CreateParams
+        {
+            get
+            {
+                var cp = base.CreateParams;
+                // WS_EX_TRANSPARENT | WS_EX_LAYERED | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE
+                cp.ExStyle |= 0x00000020 | 0x00080000 | 0x00000080 | 0x08000000;
+                return cp;
+            }
+        }
+    }
 }

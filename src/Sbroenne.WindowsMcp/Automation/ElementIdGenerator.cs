@@ -1,5 +1,4 @@
 using System.Runtime.Versioning;
-using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -92,59 +91,6 @@ public sealed class ElementIdGenerator
             }
 
             return element;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Resolves an element ID to its current element info.
-    /// </summary>
-    /// <param name="elementId">The element ID to resolve.</param>
-    /// <param name="coordinateConverter">The coordinate converter.</param>
-    /// <returns>The element info, or null if the element is stale.</returns>
-    public static UIElementInfo? ResolveElement(string elementId, CoordinateConverter coordinateConverter)
-    {
-        ArgumentNullException.ThrowIfNull(elementId);
-        ArgumentNullException.ThrowIfNull(coordinateConverter);
-
-        var parts = ParseElementId(elementId);
-        if (parts == null)
-        {
-            return null;
-        }
-
-        try
-        {
-            UIA.IUIAutomationElement? element = null;
-
-            // Try to find by runtime ID first (most reliable)
-            if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
-            {
-                var runtimeId = parts.RuntimeId.Split('.').Select(int.Parse).ToArray();
-                element = FindByRuntimeId(parts.WindowHandle, runtimeId);
-            }
-
-            // Fall back to tree path if runtime ID didn't work
-            if (element == null && !string.IsNullOrEmpty(parts.TreePath) && parts.TreePath != "stale")
-            {
-                element = FindByTreePath(parts.WindowHandle, parts.TreePath);
-            }
-
-            if (element == null)
-            {
-                return null;
-            }
-
-            var rootElement = UIA3Automation.Instance.ElementFromHandle(parts.WindowHandle);
-            if (rootElement == null)
-            {
-                return null;
-            }
-
-            return UIAutomationService.ConvertToElementInfo(element, rootElement, coordinateConverter);
         }
         catch
         {

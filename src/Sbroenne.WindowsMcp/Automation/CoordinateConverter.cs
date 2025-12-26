@@ -78,25 +78,4 @@ public sealed class CoordinateConverter
 
         return (fallbackRect, primaryIndex);
     }
-
-    /// <summary>
-    /// Converts monitor-relative coordinates to screen coordinates.
-    /// </summary>
-    /// <param name="relativeRect">The monitor-relative rectangle.</param>
-    /// <param name="monitorIndex">The monitor index.</param>
-    /// <returns>The bounding rectangle in screen coordinates.</returns>
-    public BoundingRect ToScreen(MonitorRelativeRect relativeRect, int monitorIndex)
-    {
-        ArgumentNullException.ThrowIfNull(relativeRect);
-
-        var monitor = _monitorService.GetMonitor(monitorIndex) ?? _monitorService.GetPrimaryMonitor();
-
-        return new BoundingRect
-        {
-            X = relativeRect.X + monitor.X,
-            Y = relativeRect.Y + monitor.Y,
-            Width = relativeRect.Width,
-            Height = relativeRect.Height
-        };
-    }
 }

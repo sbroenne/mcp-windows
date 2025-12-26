@@ -229,9 +229,4 @@ public sealed partial class UIAutomationService
             return (false, $"Scroll failed: {ex.Message}");
         }
     }
-
-    private static string[] GetAvailablePatterns(UIA.IUIAutomationElement element)
-    {
-        return element.GetSupportedPatternNames();
-    }
 }
