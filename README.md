@@ -6,7 +6,8 @@ AI-powered Windows automation — A Model Context Protocol (MCP) server with UI 
 
 ## Features
 
-### � UI Automation & OCR- **UIA3 COM API** - Direct COM interop for ~40% faster performance vs managed wrappers- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
+### � UI Automation & OCR- **UIA3 COM API** - Direct COM interop for ~40% faster performance vs managed wrappers- **18 actions** - find, click, type, select, toggle, invoke, focus, scroll, get_text, wait_for, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated
+- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
 - **Element discovery** - Find UI elements by name, control type, or automation ID
 - **UI tree navigation** - Traverse the accessibility tree with depth limiting
 - **Wait for elements** - Wait for UI elements to appear with configurable timeout
@@ -136,12 +137,26 @@ Interact with Windows UI elements using the UI Automation API and OCR.
 | `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
 | `click` | Find and click element | Query filters |
 | `type` | Type text into edit control | Query filters + `text` |
+| `select` | Select item from list or combo box | Query filters + `value` |
+| `toggle` | Toggle checkbox or toggle button | `elementId` |
+| `invoke` | Invoke pattern on element | `elementId` |
+| `focus` | Set keyboard focus to element | `elementId` |
+| `scroll_into_view` | Scroll element into view | `elementId` or query |
+| `get_text` | Get text from element | `elementId` or query |
 | `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
+| `get_element_at_cursor` | Get element under mouse cursor | none |
+| `get_focused_element` | Get element with keyboard focus | none |
+| `get_ancestors` | Get parent chain to root | `elementId` |
+| `highlight` | Visually highlight element | `elementId` |
+| `hide_highlight` | Hide highlight rectangle | none |
 | `ocr` | OCR text in screen region | Region parameters |
+| `ocr_element` | OCR on element bounds | `elementId` |
+| `ocr_status` | Check OCR availability | none |
+| `capture_annotated` | Screenshot with numbered labels on interactive elements | `windowHandle`, `controlType` (filter) |
 
 **Key Features:**
 - Pattern-based interaction (no coordinates needed)
-- Multi-window support with `activateFirst` and `targetWindowHandle`
+- Multi-window support with `windowHandle`
 - Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
 
 ### mouse_control

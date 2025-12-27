@@ -65,6 +65,7 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 | `focus` | Set keyboard focus to element | `elementId` |
 | `scroll_into_view` | Scroll element into view | `elementId` or query parameters |
 | `highlight` | Visually highlight element (debugging) | `elementId` |
+| `hide_highlight` | Hide the current highlight rectangle | none |
 
 ### Text Actions
 
@@ -79,6 +80,12 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 | `ocr` | Recognize text in region | `windowHandle` (optional), `language` |
 | `ocr_element` | OCR on element's bounding rect | `elementId` |
 | `ocr_status` | Check OCR engine availability | none |
+
+### Screenshot Actions
+
+| Action | Description | Key Parameters |
+|--------|-------------|----------------|
+| `capture_annotated` | Capture screenshot with numbered labels on interactive elements | `windowHandle`, `controlType` (filter), `maxElements` |
 
 ---
 
@@ -222,6 +229,60 @@ Get the parent chain from an element up to the root window.
   ]
 }
 ```
+
+### capture_annotated
+
+Capture an annotated screenshot with numbered labels overlaid on interactive UI elements. Returns both the image and a mapping of element numbers to their properties.
+
+**Request:**
+```json
+{
+  "action": "capture_annotated",
+  "windowHandle": 12345678,
+  "controlType": "Button"
+}
+```
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `windowHandle` | integer | Window to capture (optional, uses foreground) |
+| `controlType` | string | Filter to specific control types (optional) |
+| `maxElements` | integer | Maximum elements to annotate (default: 50) |
+
+**Response:**
+```json
+{
+  "success": true,
+  "annotatedImage": "data:image/png;base64,...",
+  "elements": [
+    {
+      "index": 1,
+      "name": "Save",
+      "controlType": "Button",
+      "automationId": "btnSave",
+      "elementId": "window:12345|runtime:67890|path:Button:Save",
+      "clickablePoint": { "x": 490, "y": 312, "monitorIndex": 0 },
+      "boundingBox": { "x": 450, "y": 300, "width": 80, "height": 24 }
+    },
+    {
+      "index": 2,
+      "name": "Cancel",
+      "controlType": "Button",
+      "automationId": "btnCancel",
+      "elementId": "window:12345|runtime:67891|path:Button:Cancel",
+      "clickablePoint": { "x": 550, "y": 312, "monitorIndex": 0 },
+      "boundingBox": { "x": 540, "y": 300, "width": 80, "height": 24 }
+    }
+  ]
+}
+```
+
+**Use Cases:**
+- Visual element discovery for LLM agents
+- Debugging UI automation queries
+- Creating visual documentation of UI structure
+- Quick identification of clickable elements
 
 ---
 

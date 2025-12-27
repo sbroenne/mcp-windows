@@ -45,7 +45,7 @@ It works with any MCP-compatible AI assistant like GitHub Copilot, Claude Deskto
 <div class="features-grid">
 <div class="feature-card">
 <h3>🔍 UI Automation & OCR</h3>
-<p>15 actions for pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes, type text. OCR fallback for text extraction. Multi-window workflow support with activateFirst.</p>
+<p>18 actions for pattern-based interaction without coordinates. Find elements, click buttons, toggle checkboxes, type text, capture annotated screenshots. OCR fallback for text extraction. Multi-window workflow support.</p>
 </div>
 <div class="feature-card">
 <h3>🖱️ Mouse Control</h3>
