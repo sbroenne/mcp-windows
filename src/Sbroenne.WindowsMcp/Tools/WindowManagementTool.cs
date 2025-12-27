@@ -64,7 +64,7 @@ public sealed partial class WindowManagementTool
     /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
-    /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
+    /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
     /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state).</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
@@ -78,14 +78,15 @@ public sealed partial class WindowManagementTool
     /// <param name="target">Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups).</param>
     /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Alternative to target for 3+ monitor setups.</param>
     /// <param name="state">Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'.</param>
+    /// <param name="excludeTitle">Exclude windows whose title contains this text (for list action).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Manage windows on Windows. This is usually the workflow start. Common flow: (1) window_management(action='find' or 'list') to get a window handle, (2) window_management(action='activate') to focus it, (3) pass the returned handle verbatim as ui_automation.windowHandle or screenshot_control.windowHandle. Handle format: decimal string (digits only) from window_management output. Supports actions: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor. Troubleshooting: if find returns no results, use list (optionally regex=true). If activate fails, try restore first.")]
+    [Description("Manage windows on Windows. This is usually the workflow start. Common flow: (1) window_management(action='find' or 'list') to get a window handle, (2) window_management(action='activate') to focus it, (3) pass the returned handle verbatim as ui_automation.windowHandle or screenshot_control.windowHandle. Handle format: decimal string (digits only) from window_management output. Supports actions: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, ensure_visible. Use move_and_activate to move and activate a window in one call. Use ensure_visible to restore a minimized window and activate it. Troubleshooting: if find returns no results, use list (optionally regex=true). If activate fails, try ensure_visible first.")]
     [return: Description("The result includes success status, window list or single window info (handle, title, process_name, state, is_foreground), and error details if failed. Save the 'handle' value to use with activate, close, or other window operations.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
+        [Description("The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible")] string action,
         [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state)")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
@@ -99,6 +100,7 @@ public sealed partial class WindowManagementTool
         [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
         [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
         [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
+        [Description("Exclude windows whose title contains this text (for list action). Useful for filtering out dialogs or popups.")] string? excludeTitle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -136,7 +138,7 @@ public sealed partial class WindowManagementTool
             switch (windowAction.Value)
             {
                 case WindowAction.List:
-                    operationResult = await HandleListAsync(filter, regex, includeAllDesktops, cancellationToken);
+                    operationResult = await HandleListAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
                     break;
 
                 case WindowAction.Find:
@@ -195,6 +197,14 @@ public sealed partial class WindowManagementTool
                     operationResult = await HandleWaitForStateAsync(handle, state, timeoutMs, cancellationToken);
                     break;
 
+                case WindowAction.MoveAndActivate:
+                    operationResult = await HandleMoveAndActivateAsync(handle, x, y, cancellationToken);
+                    break;
+
+                case WindowAction.EnsureVisible:
+                    operationResult = await HandleEnsureVisibleAsync(handle, cancellationToken);
+                    break;
+
                 default:
                     operationResult = WindowManagementResult.CreateFailure(
                         WindowManagementErrorCode.InvalidAction,
@@ -237,9 +247,22 @@ public sealed partial class WindowManagementTool
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
+        string? excludeTitle,
         CancellationToken cancellationToken)
     {
-        return await _windowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
+        var result = await _windowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
+
+        // Apply excludeTitle filter if specified
+        if (result.Success && !string.IsNullOrEmpty(excludeTitle) && result.Windows is not null)
+        {
+            var filteredWindows = result.Windows
+                .Where(w => !w.Title.Contains(excludeTitle, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return WindowManagementResult.CreateListSuccess(filteredWindows);
+        }
+
+        return result;
     }
 
     private async Task<WindowManagementResult> HandleFindAsync(
@@ -530,6 +553,71 @@ public sealed partial class WindowManagementTool
         return await _windowService.WaitForStateAsync(handle, targetState.Value, timeoutMs, cancellationToken);
     }
 
+    private async Task<WindowManagementResult> HandleMoveAndActivateAsync(
+        string? handleString,
+        int? x,
+        int? y,
+        CancellationToken cancellationToken)
+    {
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Valid handle is required for move_and_activate action");
+        }
+
+        if (!x.HasValue || !y.HasValue)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Both x and y coordinates are required for move_and_activate action");
+        }
+
+        // Move the window first
+        var moveResult = await _windowService.MoveWindowAsync(handle, x.Value, y.Value, cancellationToken);
+        if (!moveResult.Success)
+        {
+            return moveResult;
+        }
+
+        // Then activate it
+        var activateResult = await _windowService.ActivateWindowAsync(handle, cancellationToken);
+        if (!activateResult.Success)
+        {
+            return activateResult;
+        }
+
+        // Return combined success result with window info from the activate result
+        return WindowManagementResult.CreateWindowSuccess(
+            activateResult.Window!,
+            "Window moved and activated successfully");
+    }
+
+    private async Task<WindowManagementResult> HandleEnsureVisibleAsync(
+        string? handleString,
+        CancellationToken cancellationToken)
+    {
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Valid handle is required for ensure_visible action");
+        }
+
+        // Check if window is minimized and restore it if needed
+        if (NativeMethods.IsIconic(handle))
+        {
+            var restoreResult = await _windowService.RestoreWindowAsync(handle, cancellationToken);
+            if (!restoreResult.Success)
+            {
+                return restoreResult;
+            }
+        }
+
+        // Then activate it to bring to foreground
+        return await _windowService.ActivateWindowAsync(handle, cancellationToken);
+    }
+
     private static WindowState? ParseWindowState(string? state)
     {
         if (string.IsNullOrWhiteSpace(state))
@@ -592,6 +680,8 @@ public sealed partial class WindowManagementTool
             "move_to_monitor" => WindowAction.MoveToMonitor,
             "get_state" => WindowAction.GetState,
             "wait_for_state" => WindowAction.WaitForState,
+            "move_and_activate" or "moveandactivate" => WindowAction.MoveAndActivate,
+            "ensure_visible" or "ensurevisible" => WindowAction.EnsureVisible,
             _ => null,
         };
     }

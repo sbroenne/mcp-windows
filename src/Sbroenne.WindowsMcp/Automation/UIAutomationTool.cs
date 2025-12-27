@@ -89,6 +89,8 @@ public sealed partial class UIAutomationTool
     /// <param name="interactiveOnly">For capture_annotated: filter to only interactive control types (default: true).</param>
     /// <param name="outputPath">For capture_annotated: save image to file instead of returning base64.</param>
     /// <param name="returnImageData">For capture_annotated: include base64 image in response (default: true). Set false with outputPath to reduce response size.</param>
+    /// <param name="inRegion">Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates.</param>
+    /// <param name="nearElement">Find elements near a reference element. Pass the elementId of the reference. Results sorted by distance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
@@ -166,6 +168,12 @@ public sealed partial class UIAutomationTool
         [Description("For capture_annotated: whether to include base64 image data in response. Set to false when using outputPath to reduce response size. Default: true.")]
         bool returnImageData = true,
 
+        [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
+        string? inRegion = null,
+
+        [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
+        string? nearElement = null,
+
         CancellationToken cancellationToken = default)
     {
         LogActionStarted(_logger, action, name, controlType, automationId);
@@ -207,7 +215,7 @@ public sealed partial class UIAutomationTool
         {
             var result = action switch
             {
-                UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, timeoutMs, cancellationToken),
+                UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, inRegion, nearElement, timeoutMs, cancellationToken),
                 UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
@@ -371,7 +379,7 @@ public sealed partial class UIAutomationTool
     private async Task<UIAutomationResult> HandleFindAsync(
         string? windowHandle, string? parentElementId, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
-        bool includeChildren, bool sortByProminence, int timeoutMs, CancellationToken cancellationToken)
+        bool includeChildren, bool sortByProminence, string? inRegion, string? nearElement, int timeoutMs, CancellationToken cancellationToken)
     {
         var query = new ElementQuery
         {
@@ -387,6 +395,8 @@ public sealed partial class UIAutomationTool
             FoundIndex = foundIndex,
             IncludeChildren = includeChildren,
             SortByProminence = sortByProminence,
+            InRegion = inRegion,
+            NearElement = nearElement,
             TimeoutMs = timeoutMs
         };
 

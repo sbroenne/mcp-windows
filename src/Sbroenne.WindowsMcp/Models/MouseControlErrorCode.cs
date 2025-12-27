@@ -25,6 +25,12 @@ public enum MouseControlErrorCode
     /// <summary>The specified scroll direction is not valid.</summary>
     InvalidScrollDirection = 104,
 
+    /// <summary>The UI element could not be found or is stale.</summary>
+    ElementNotFound = 105,
+
+    /// <summary>The element has no visible bounding rectangle.</summary>
+    ElementNotVisible = 106,
+
     #endregion
 
     #region Security/Permission Errors (200-299)
