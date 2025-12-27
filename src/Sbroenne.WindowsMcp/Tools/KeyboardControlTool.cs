@@ -76,7 +76,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. PREFER ui_automation Type action FIRST for text input - it directly sets text in edit controls without focus issues. Use keyboard_control when: 1) ui_automation type fails, 2) sending hotkeys/shortcuts (Ctrl+S, Alt+Tab), 3) non-standard input fields, 4) navigating with arrow keys or Tab. Use 'wait_for_idle' after launching an application to ensure it's ready for input. IMPORTANT: Use 'expectedWindowTitle' or 'expectedProcessName' to verify the target window BEFORE sending input - the operation will fail with 'wrong_target_window' if the foreground window doesn't match. TROUBLESHOOTING: If input goes to wrong window, always use window_management(action='activate') first. For combo actions, use modifiers parameter (e.g., key='s', modifiers='ctrl' for Ctrl+S).")]
+    [Description("Control keyboard input on Windows. Prefer ui_automation(action='type') for normal text entry into Edit controls (more reliable, less focus-dependent). Use keyboard_control for hotkeys/shortcuts (Ctrl+S, Alt+Tab), non-standard fields, navigation (Tab/arrows), or when UIA typing fails. Safe workflow: (1) window_management(action='activate') to focus the app, (2) keyboard_control with expectedWindowTitle/expectedProcessName to prevent typing into the wrong window (fails with error_code='wrong_target_window'), (3) screenshot_control or ui_automation(get_text) to verify. Supports: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, wait_for_idle.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -136,7 +136,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             {
                 var result = KeyboardControlResult.CreateFailure(
                     KeyboardControlErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout");
+                    $"Unknown action: '{action}'. Valid actions are: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, wait_for_idle");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
