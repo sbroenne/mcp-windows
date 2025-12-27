@@ -23,7 +23,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     private readonly ScreenshotService _screenshotService;
     private readonly LegacyOcrService _ocrService;
     private readonly VisualDiffService _visualDiffService;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandleString;
 
     public AnnotatedScreenshotElectronTests(ElectronHarnessFixture fixture)
     {
@@ -31,7 +31,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(300);
 
-        _windowHandle = _fixture.WindowHandle;
+        _windowHandleString = _fixture.WindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();
@@ -98,7 +98,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -113,7 +113,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Use default searchDepth of 15 for Electron
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Save screenshot for manual verification
         SaveScreenshotForVerification(result, nameof(CaptureAsync_ElectronWindow_FindsMultipleInteractiveElements));
@@ -132,7 +132,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -151,7 +151,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -180,7 +180,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // The default searchDepth of 15 should find deeply nested Electron elements
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 15);
 
         // Assert
@@ -196,11 +196,11 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // With a shallow searchDepth, we should find fewer elements
         var shallowResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 5);
 
         var deepResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 15);
 
         // Save both for comparison
@@ -222,7 +222,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Test the maximum searchDepth
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 20);
 
         // Assert
@@ -235,7 +235,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Test the minimum searchDepth
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 1);
 
         // Assert - With depth 1, we might not find any interactive elements,
@@ -254,7 +254,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Filter to only buttons
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             controlTypeFilter: "Button",
             searchDepth: 15);
 
@@ -274,7 +274,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Filter to Edit (text input) controls
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             controlTypeFilter: "Edit",
             searchDepth: 15);
 
@@ -294,7 +294,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Filter to Button and Edit
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             controlTypeFilter: "Button,Edit",
             searchDepth: 15);
 
@@ -320,7 +320,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             format: ImageFormat.Jpeg);
 
         // Assert
@@ -341,7 +341,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             format: ImageFormat.Png);
 
         // Assert
@@ -367,7 +367,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -391,7 +391,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -414,7 +414,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Capture annotated screenshot
         var captureResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             controlTypeFilter: "Button");
 
         // Assert - Capture succeeded and has elements
@@ -428,7 +428,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         var getTextResult = await _automationService.GetTextAsync(
             elementId: firstElement.ElementId,
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             includeChildren: false);
 
         // GetText should succeed (even if text is empty)
@@ -446,7 +446,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             searchDepth: 15);
 
         stopwatch.Stop();
@@ -463,7 +463,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Limit to 5 elements
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             maxElements: 5);
 
         // Assert
@@ -482,7 +482,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -499,7 +499,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Get all elements
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle);
+            windowHandle: _windowHandleString);
 
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
@@ -526,7 +526,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = _windowHandle,
+            WindowHandle = _windowHandleString,
             ImageFormat = ImageFormat.Png,
             Quality = 100,
             OutputMode = OutputMode.Inline
@@ -536,7 +536,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         // Capture annotated screenshot
         var annotatedResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             format: ImageFormat.Png);
         Assert.True(annotatedResult.Success, $"Annotated capture failed: {annotatedResult.ErrorMessage}");
 
@@ -566,7 +566,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         // Act - Capture annotated screenshot
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             format: ImageFormat.Png);
 
         // Save for manual verification
@@ -582,8 +582,10 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         using var stream = new MemoryStream(imageBytes);
         using var bitmap = new Bitmap(stream);
 
-        // Perform OCR on the annotated image
-        var ocrResult = await _ocrService.RecognizeAsync(bitmap);
+        // Perform OCR on a scaled-up copy of the annotated image.
+        // Small numeric labels are frequently missed at native resolution.
+        using var scaledForOcr = ScaleBitmapForOcr(bitmap, scale: 2);
+        var ocrResult = await _ocrService.RecognizeAsync(scaledForOcr);
 
         Assert.True(ocrResult.Success, $"OCR failed: {ocrResult.ErrorMessage}");
         Assert.NotNull(ocrResult.Text);
@@ -615,13 +617,13 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         // Capture with max 3 elements
         var fewElementsResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             maxElements: 3,
             format: ImageFormat.Png);
 
         // Capture with max 10 elements
         var manyElementsResult = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             maxElements: 10,
             format: ImageFormat.Png);
 
@@ -631,11 +633,13 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         // Perform OCR on both
         using var fewStream = new MemoryStream(Convert.FromBase64String(fewElementsResult.ImageData!));
         using var fewBitmap = new Bitmap(fewStream);
-        var fewOcr = await _ocrService.RecognizeAsync(fewBitmap);
+        using var fewScaledForOcr = ScaleBitmapForOcr(fewBitmap, scale: 2);
+        var fewOcr = await _ocrService.RecognizeAsync(fewScaledForOcr);
 
         using var manyStream = new MemoryStream(Convert.FromBase64String(manyElementsResult.ImageData!));
         using var manyBitmap = new Bitmap(manyStream);
-        var manyOcr = await _ocrService.RecognizeAsync(manyBitmap);
+        using var manyScaledForOcr = ScaleBitmapForOcr(manyBitmap, scale: 2);
+        var manyOcr = await _ocrService.RecognizeAsync(manyScaledForOcr);
 
         // Count how many number labels are found in each
         var fewLabelsFound = CountNumberLabelsInText(fewOcr.Text ?? "", 1, 15);
@@ -651,7 +655,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         // Act - Capture annotated screenshot
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: _windowHandle,
+            windowHandle: _windowHandleString,
             format: ImageFormat.Png);
 
         Assert.True(result.Success);
@@ -718,6 +722,21 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         }
 
         return count;
+    }
+
+    private static Bitmap ScaleBitmapForOcr(Bitmap source, int scale)
+    {
+        if (scale <= 1)
+        {
+            return (Bitmap)source.Clone();
+        }
+
+        var scaled = new Bitmap(source.Width * scale, source.Height * scale);
+        using var graphics = Graphics.FromImage(scaled);
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+        graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+        graphics.DrawImage(source, new Rectangle(0, 0, scaled.Width, scaled.Height));
+        return scaled;
     }
 
     private static bool IsColorSimilar(Color a, Color b, int tolerance)

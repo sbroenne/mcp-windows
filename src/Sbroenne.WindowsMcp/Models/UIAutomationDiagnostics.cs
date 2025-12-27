@@ -18,7 +18,7 @@ public sealed record UIAutomationDiagnostics
     /// <summary>
     /// Window handle.
     /// </summary>
-    public nint? WindowHandle { get; init; }
+    public string? WindowHandle { get; init; }
 
     /// <summary>
     /// Query that was used.
@@ -100,7 +100,7 @@ public sealed record ElementQuery
     /// <summary>
     /// Window handle to search within.
     /// </summary>
-    public nint? WindowHandle { get; init; }
+    public string? WindowHandle { get; init; }
 
     /// <summary>
     /// Maximum depth to search (0 = immediate children only, null = unlimited).
@@ -129,4 +129,10 @@ public sealed record ElementQuery
     /// Timeout in milliseconds for implicit wait (0 = no wait).
     /// </summary>
     public int TimeoutMs { get; init; }
+
+    /// <summary>
+    /// Sort results by element prominence (bounding box area, largest first).
+    /// Useful for disambiguation when multiple elements match - larger elements are typically more prominent/important.
+    /// </summary>
+    public bool SortByProminence { get; init; }
 }

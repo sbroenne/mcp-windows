@@ -24,7 +24,7 @@ public interface IUIAutomationService
     /// <param name="controlTypeFilter">Optional comma-separated list of control types to include.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result with element tree.</returns>
-    Task<UIAutomationResult> GetTreeAsync(nint? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default);
+    Task<UIAutomationResult> GetTreeAsync(string? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Waits for an element matching the query to appear.
@@ -34,6 +34,26 @@ public interface IUIAutomationService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result with the found element or timeout error.</returns>
     Task<UIAutomationResult> WaitForElementAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for an element matching the query to disappear (no longer found).
+    /// Useful for waiting until dialogs close, spinners disappear, or overlays are removed.
+    /// </summary>
+    /// <param name="query">The search criteria.</param>
+    /// <param name="timeoutMs">Maximum wait time in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result indicating success (element disappeared) or timeout error.</returns>
+    Task<UIAutomationResult> WaitForElementDisappearAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for an element to reach a desired state.
+    /// </summary>
+    /// <param name="elementId">The element ID to monitor.</param>
+    /// <param name="desiredState">The state to wait for: enabled, disabled, on, off, indeterminate, visible, offscreen.</param>
+    /// <param name="timeoutMs">Maximum wait time in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with the element in the desired state or timeout error.</returns>
+    Task<UIAutomationResult> WaitForElementStateAsync(string elementId, string desiredState, int timeoutMs, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Scrolls the parent container to make an element visible.
@@ -53,7 +73,7 @@ public interface IUIAutomationService
     /// <param name="includeChildren">Whether to include text from child elements.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result with text content.</returns>
-    Task<UIAutomationResult> GetTextAsync(string? elementId, nint? windowHandle, bool includeChildren, CancellationToken cancellationToken = default);
+    Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Invokes a UI Automation pattern on an element.
@@ -141,7 +161,7 @@ public interface IUIAutomationService
     /// <param name="windowHandle">Optional window handle for activation.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result with clicked element.</returns>
-    Task<UIAutomationResult> ClickElementAsync(string elementId, nint? windowHandle, CancellationToken cancellationToken = default);
+    Task<UIAutomationResult> ClickElementAsync(string elementId, string? windowHandle, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Highlights an element by drawing a visible rectangle around it.

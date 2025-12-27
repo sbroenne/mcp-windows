@@ -60,10 +60,10 @@ public sealed partial class KeyboardControlTool : IDisposable
     }
 
     /// <summary>
-    /// Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions.
+    /// Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions.
     /// </summary>
     /// <param name="context">The MCP request context for logging and server access.</param>
-    /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout.</param>
+    /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
     /// <param name="text">Text to type (required for type action).</param>
     /// <param name="key">Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot.</param>
     /// <param name="modifiers">Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions).</param>
@@ -72,14 +72,15 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
     /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
+    /// <param name="clearFirst">For type action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, and get_keyboard_layout actions. PREFER ui_automation Type action FIRST for text input - it directly sets text in edit controls without focus issues. Use keyboard_control when: 1) ui_automation type fails, 2) sending hotkeys/shortcuts (Ctrl+S, Alt+Tab), 3) non-standard input fields, 4) navigating with arrow keys or Tab. IMPORTANT: Use 'expectedWindowTitle' or 'expectedProcessName' to verify the target window BEFORE sending input - the operation will fail with 'wrong_target_window' if the foreground window doesn't match. TROUBLESHOOTING: If input goes to wrong window, always use window_management(action='activate') first. For combo actions, use modifiers parameter (e.g., key='s', modifiers='ctrl' for Ctrl+S).")]
+    [Description("Control keyboard input on Windows. Prefer ui_automation(action='type') for normal text entry into Edit controls (more reliable, less focus-dependent). Use keyboard_control for hotkeys/shortcuts (Ctrl+S, Alt+Tab), non-standard fields, navigation (Tab/arrows), or when UIA typing fails. Safe workflow: (1) window_management(action='activate') to focus the app, (2) keyboard_control with expectedWindowTitle/expectedProcessName to prevent typing into the wrong window (fails with error_code='wrong_target_window'), (3) screenshot_control or ui_automation(get_text) to verify. Supports: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, wait_for_idle.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, or get_keyboard_layout")] string action,
+        [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle")] string action,
         [Description("Text to type (required for type action)")] string? text = null,
         [Description("Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
         [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions)")] string? modifiers = null,
@@ -88,6 +89,7 @@ public sealed partial class KeyboardControlTool : IDisposable
         [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
         [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string? expectedWindowTitle = null,
         [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string? expectedProcessName = null,
+        [Description("For 'type' action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text. Default is false.")] bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -134,7 +136,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             {
                 var result = KeyboardControlResult.CreateFailure(
                     KeyboardControlErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout");
+                    $"Unknown action: '{action}'. Valid actions are: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, wait_for_idle");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
@@ -144,7 +146,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             switch (keyboardAction.Value)
             {
                 case KeyboardAction.Type:
-                    operationResult = await HandleTypeAsync(text, linkedToken);
+                    operationResult = await HandleTypeAsync(text, clearFirst, linkedToken);
                     break;
 
                 case KeyboardAction.Press:
@@ -175,6 +177,10 @@ public sealed partial class KeyboardControlTool : IDisposable
                     operationResult = await HandleGetKeyboardLayoutAsync(linkedToken);
                     break;
 
+                case KeyboardAction.WaitForIdle:
+                    operationResult = await HandleWaitForIdleAsync(linkedToken);
+                    break;
+
                 default:
                     operationResult = KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.InvalidAction,
@@ -186,7 +192,7 @@ public sealed partial class KeyboardControlTool : IDisposable
 
             // For successful operations that send input, attach the target window info
             // This helps LLM agents verify the input went to the correct window
-            if (operationResult.Success && keyboardAction.Value != KeyboardAction.GetKeyboardLayout)
+            if (operationResult.Success && keyboardAction.Value != KeyboardAction.GetKeyboardLayout && keyboardAction.Value != KeyboardAction.WaitForIdle)
             {
                 operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
             }
@@ -232,7 +238,7 @@ public sealed partial class KeyboardControlTool : IDisposable
         }
     }
 
-    private async Task<KeyboardControlResult> HandleTypeAsync(string? text, CancellationToken cancellationToken)
+    private async Task<KeyboardControlResult> HandleTypeAsync(string? text, bool clearFirst, CancellationToken cancellationToken)
     {
         // Check for secure desktop
         if (_secureDesktopDetector.IsSecureDesktopActive())
@@ -248,6 +254,22 @@ public sealed partial class KeyboardControlTool : IDisposable
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
                 "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
+        }
+
+        // If clearFirst is true, select all existing content first (Ctrl+A)
+        // The new text will replace the selection
+        if (clearFirst)
+        {
+            var selectAllResult = await _keyboardInputService.PressKeyAsync("a", ModifierKey.Ctrl, 1, cancellationToken);
+            if (!selectAllResult.Success)
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.SendInputFailed,
+                    $"Failed to select all before typing: {selectAllResult.Error}");
+            }
+
+            // Small delay to ensure selection is complete
+            await Task.Delay(50, cancellationToken);
         }
 
         // Empty text is valid - returns success with 0 characters
@@ -408,6 +430,11 @@ public sealed partial class KeyboardControlTool : IDisposable
         return await _keyboardInputService.GetKeyboardLayoutAsync(cancellationToken);
     }
 
+    private async Task<KeyboardControlResult> HandleWaitForIdleAsync(CancellationToken cancellationToken)
+    {
+        return await _keyboardInputService.WaitForIdleAsync(cancellationToken);
+    }
+
     private static KeyboardAction? ParseAction(string action)
     {
         return action.ToLowerInvariant() switch
@@ -420,6 +447,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             "sequence" => KeyboardAction.Sequence,
             "release_all" or "releaseall" => KeyboardAction.ReleaseAll,
             "get_keyboard_layout" or "getkeyboardlayout" or "layout" => KeyboardAction.GetKeyboardLayout,
+            "wait_for_idle" or "waitforidle" or "idle" => KeyboardAction.WaitForIdle,
             _ => null
         };
     }

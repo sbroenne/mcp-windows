@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -53,7 +54,7 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private async Task<UIAutomationResult> PerformClickAsync(string elementId, nint? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> PerformClickAsync(string elementId, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         return await _staThread.ExecuteAsync(() =>
         {
@@ -67,8 +68,23 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
+            nint? activationHandle = null;
+            if (!string.IsNullOrWhiteSpace(windowHandle))
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out var parsedHandle))
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "click",
+                        UIAutomationErrorType.InvalidParameter,
+                        $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                        CreateDiagnostics(stopwatch));
+                }
+
+                activationHandle = parsedHandle;
+            }
+
             // Ensure window is activated before clicking
-            TryActivateWindowForElement(element, windowHandle);
+            TryActivateWindowForElement(element, activationHandle);
 
             var rootElement = GetRootElementForScroll(element);
 
@@ -139,7 +155,7 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private async Task<UIAutomationResult> PerformTypeAsync(string elementId, string text, bool clearFirst, nint? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> PerformTypeAsync(string elementId, string text, bool clearFirst, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         // First phase: resolve element and try ValuePattern (on STA thread)
         var staResult = await _staThread.ExecuteAsync(() =>
@@ -154,8 +170,23 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
+            nint? activationHandle = null;
+            if (!string.IsNullOrWhiteSpace(windowHandle))
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out var parsedHandle))
+                {
+                    return (Success: false, Result: UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.InvalidParameter,
+                        $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                        CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                }
+
+                activationHandle = parsedHandle;
+            }
+
             // Ensure window is activated before typing
-            TryActivateWindowForElement(element, windowHandle);
+            TryActivateWindowForElement(element, activationHandle);
 
             // Try to set focus
             element.TrySetFocus();
@@ -260,7 +291,7 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private async Task<UIAutomationResult> PerformSelectAsync(string elementId, string value, nint? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> PerformSelectAsync(string elementId, string value, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         return await _staThread.ExecuteAsync(() =>
         {
@@ -274,8 +305,23 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
+            nint? activationHandle = null;
+            if (!string.IsNullOrWhiteSpace(windowHandle))
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out var parsedHandle))
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "select",
+                        UIAutomationErrorType.InvalidParameter,
+                        $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                        CreateDiagnostics(stopwatch));
+                }
+
+                activationHandle = parsedHandle;
+            }
+
             // Ensure window is activated
-            TryActivateWindowForElement(element, windowHandle);
+            TryActivateWindowForElement(element, activationHandle);
 
             var rootElement = GetRootElementForScroll(element);
 
@@ -444,7 +490,7 @@ public sealed partial class UIAutomationService
     }
 
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> ClickElementAsync(string elementId, nint? windowHandle, CancellationToken cancellationToken = default)
+    public async Task<UIAutomationResult> ClickElementAsync(string elementId, string? windowHandle, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -462,8 +508,23 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
+                nint? activationHandle = null;
+                if (!string.IsNullOrWhiteSpace(windowHandle))
+                {
+                    if (!WindowHandleParser.TryParse(windowHandle, out var parsedHandle))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "click",
+                            UIAutomationErrorType.InvalidParameter,
+                            $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                            CreateDiagnostics(stopwatch));
+                    }
+
+                    activationHandle = parsedHandle;
+                }
+
                 // Ensure window is activated before clicking
-                TryActivateWindowForElement(element, windowHandle);
+                TryActivateWindowForElement(element, activationHandle);
 
                 var rootElement = GetRootElementForScroll(element);
 

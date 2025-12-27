@@ -26,7 +26,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     private readonly UITestHarnessFixture _fixture;
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
 
     public UIAutomationAdvancedSearchTests(UITestHarnessFixture fixture)
     {
@@ -35,7 +35,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();

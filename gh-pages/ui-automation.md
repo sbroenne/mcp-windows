@@ -49,6 +49,8 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 | `find` | Find elements matching query | `name`, `controlType`, `automationId`, `windowHandle` |
 | `get_tree` | Get UI element tree | `windowHandle`, `parentElementId`, `maxDepth` |
 | `wait_for` | Wait for element to appear | `name`, `controlType`, `timeoutMs` |
+| `wait_for_disappear` | Wait for element to disappear | `name`, `controlType`, `timeoutMs` |
+| `wait_for_state` | Wait for element to reach a specific state | `elementId`, `desiredState`, `timeoutMs` |
 | `get_element_at_cursor` | Get element under mouse cursor | none |
 | `get_focused_element` | Get element with keyboard focus | none |
 | `get_ancestors` | Get parent chain to root | `elementId` |
@@ -58,9 +60,10 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 | Action | Description | Key Parameters |
 |--------|-------------|----------------|
 | `click` | Find element and click its center | `name`, `controlType`, `automationId` |
-| `type` | Find edit control and type text | `controlType`, `automationId`, `text` |
+| `type` | Find edit control and type text | `controlType`, `automationId`, `text`, `clearFirst` |
 | `select` | Find selection control and select item | `controlType`, `automationId`, `value` |
 | `toggle` | Toggle a checkbox or toggle button | `elementId` |
+| `ensure_state` | Ensure checkbox/toggle is in specific state (on/off) | `elementId`, `desiredState` |
 | `invoke` | Invoke a pattern on an element | `elementId`, `value` |
 | `focus` | Set keyboard focus to element | `elementId` |
 | `scroll_into_view` | Scroll element into view | `elementId` or query parameters |
@@ -114,6 +117,7 @@ For more flexible element matching, use these advanced parameters:
 | `foundIndex` | integer | Return the Nth matching element (1-based, default: 1) |
 | `exactDepth` | integer | Only match elements at this exact tree depth |
 | `maxDepth` | integer | Maximum tree depth to traverse (performance optimization) |
+| `sortByProminence` | boolean | Sort results by bounding box area (largest first) for disambiguation |
 
 #### Using foundIndex for Multiple Matches
 
@@ -207,6 +211,64 @@ Get the element that currently has keyboard focus.
 }
 ```
 
+### wait_for_disappear
+
+Wait for an element to disappear from the UI. Useful for waiting until dialogs close, spinners disappear, or overlays are removed.
+
+```json
+{
+  "action": "wait_for_disappear",
+  "name": "Loading...",
+  "controlType": "Text",
+  "timeoutMs": 10000
+}
+```
+
+### wait_for_state
+
+Wait for an element to reach a specific state (enabled, disabled, on, off, visible, offscreen).
+
+```json
+{
+  "action": "wait_for_state",
+  "elementId": "window:12345|runtime:67890|path:Button:Submit",
+  "desiredState": "enabled",
+  "timeoutMs": 5000
+}
+```
+
+**Valid states:** `enabled`, `disabled`, `on`, `off`, `indeterminate`, `visible`, `offscreen`
+
+### ensure_state
+
+Atomically check and toggle a checkbox or toggle button to reach a desired state. Only toggles if the current state differs from the desired state.
+
+```json
+{
+  "action": "ensure_state",
+  "elementId": "window:12345|runtime:67890|path:CheckBox:DarkMode",
+  "desiredState": "on"
+}
+```
+
+**Response when already in desired state:**
+```json
+{
+  "success": true,
+  "action": "ensure_state",
+  "usageHint": "Element was already in 'On' state. No action taken."
+}
+```
+
+**Response when toggled:**
+```json
+{
+  "success": true,
+  "action": "ensure_state",
+  "usageHint": "Element toggled to 'On' state (took 1 toggle(s))."
+}
+```
+
 ### get_ancestors
 
 Get the parent chain from an element up to the root window.
@@ -249,6 +311,9 @@ Capture an annotated screenshot with numbered labels overlaid on interactive UI 
 | `windowHandle` | integer | Window to capture (optional, uses foreground) |
 | `controlType` | string | Filter to specific control types (optional) |
 | `maxElements` | integer | Maximum elements to annotate (default: 50) |
+| `interactiveOnly` | boolean | Filter to interactive control types only (default: true) |
+| `outputPath` | string | Save image to file instead of returning base64 |
+| `returnImageData` | boolean | Include base64 image data in response (default: true) |
 
 **Response:**
 ```json

@@ -27,5 +27,8 @@ public enum KeyboardAction
     ReleaseAll,
 
     /// <summary>Query the current keyboard layout information.</summary>
-    GetKeyboardLayout
+    GetKeyboardLayout,
+
+    /// <summary>Wait for the UI thread of the foreground window to be idle.</summary>
+    WaitForIdle
 }

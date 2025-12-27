@@ -6,6 +6,7 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
+using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
 using Sbroenne.WindowsMcp.Window;
@@ -74,6 +75,7 @@ builder.Services
     .WithTools<WindowManagementTool>()
     .WithTools<ScreenshotControlTool>()
     .WithTools<UIAutomationTool>()
+    .WithPrompts<WindowsAutomationPrompts>()
     .WithResources<SystemResources>();
 
 var host = builder.Build();

@@ -23,7 +23,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
     private readonly UIAutomationThread _staThread;
     private readonly AnnotatedScreenshotService _annotatedScreenshotService;
     private readonly ScreenshotService _screenshotService;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
     private readonly ITestOutputHelper _output;
 
     // Screenshot folder for manual verification (not git-tracked)
@@ -40,7 +40,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();
@@ -334,7 +334,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
     {
         // Act
         var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle: (nint)999999);
+            windowHandle: "999999");
 
         // Assert
         Assert.False(result.Success);

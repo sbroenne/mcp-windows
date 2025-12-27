@@ -42,5 +42,11 @@ public enum WindowAction
     WaitFor,
 
     /// <summary>Move window to a specific monitor by index.</summary>
-    MoveToMonitor
+    MoveToMonitor,
+
+    /// <summary>Get window state (minimized, maximized, normal).</summary>
+    GetState,
+
+    /// <summary>Wait for window to reach a specific state.</summary>
+    WaitForState
 }

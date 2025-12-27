@@ -4,6 +4,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit.Automation;
@@ -167,7 +168,7 @@ public sealed class UIAutomationServiceTests : IDisposable
         // Arrange
         var query = new ElementQuery
         {
-            WindowHandle = unchecked((nint)0xDEADBEEF), // Invalid handle
+            WindowHandle = WindowHandleParser.Format(unchecked((nint)0xDEADBEEF)), // Invalid handle
             Name = "TestButton"
         };
 

@@ -1,5 +1,7 @@
 using System.Runtime.InteropServices;
 
+using Sbroenne.WindowsMcp.Native;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 
 /// <summary>
@@ -44,6 +46,11 @@ public sealed class TestHarnessFixture : IDisposable
     /// Gets the window handle of the test harness form.
     /// </summary>
     public nint TestWindowHandle => _form?.Handle ?? nint.Zero;
+
+    /// <summary>
+    /// Gets the window handle of the test harness form as a decimal string.
+    /// </summary>
+    public string TestWindowHandleString => WindowHandleParser.Format(TestWindowHandle);
 
     public TestHarnessFixture()
     {

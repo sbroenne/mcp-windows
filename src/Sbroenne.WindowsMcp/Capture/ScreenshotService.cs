@@ -227,18 +227,14 @@ public sealed class ScreenshotService : IScreenshotService
         ScreenshotControlRequest request,
         CancellationToken cancellationToken)
     {
-        // Convert from nullable long to nint
-        nint windowHandle = request.WindowHandle.HasValue
-            ? new IntPtr(request.WindowHandle.Value)
-            : IntPtr.Zero;
-
-        // Validate window handle
-        if (windowHandle == IntPtr.Zero)
+        // Window handle is a decimal string (digits only)
+        if (!WindowHandleParser.TryParse(request.WindowHandle, out nint windowHandle))
         {
             return Task.FromResult(ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidWindowHandle,
-                "Window handle is required for window capture"));
+                "Valid window_handle (decimal string) is required for window capture"));
         }
+
 
         // Check if window exists
         if (!NativeMethods.IsWindow(windowHandle))

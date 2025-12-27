@@ -8,6 +8,7 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -55,7 +56,7 @@ public sealed partial class WindowManagementTool
     }
 
     /// <summary>
-    /// Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions.
+    /// Manage windows on Windows. Supports list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions.
     /// </summary>
     /// <remarks>
     /// Use move_to_monitor to move a window to a specific monitor:
@@ -63,8 +64,8 @@ public sealed partial class WindowManagementTool
     /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
-    /// <param name="action">The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
-    /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor).</param>
+    /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor.</param>
+    /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state).</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
@@ -73,18 +74,19 @@ public sealed partial class WindowManagementTool
     /// <param name="y">Y-coordinate for move or set_bounds action.</param>
     /// <param name="width">Width for resize or set_bounds action.</param>
     /// <param name="height">Height for resize or set_bounds action.</param>
-    /// <param name="timeoutMs">Timeout in milliseconds for wait_for action.</param>
+    /// <param name="timeoutMs">Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000).</param>
     /// <param name="target">Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups).</param>
     /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Alternative to target for 3+ monitor setups.</param>
+    /// <param name="state">Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Manage windows on Windows. Supports list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions. WORKFLOW START: This is often the first step - use 'find' to get a window handle, then pass windowHandle to ui_automation for element interaction. BEST PRACTICE: Before sending keyboard/mouse input to a specific window, use 'activate' with the window handle to ensure it has focus. Use 'get_foreground' to verify which window is currently active. TROUBLESHOOTING: If 'find' returns no results, use 'list' to see all available windows and check the exact title. Use regex=true for partial title matching. If window doesn't activate, it may be minimized - use 'restore' first.")]
-    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, is_foreground), and error details if failed. Save the 'handle' value to use with activate, close, or other window operations.")]
+    [Description("Manage windows on Windows. This is usually the workflow start. Common flow: (1) window_management(action='find' or 'list') to get a window handle, (2) window_management(action='activate') to focus it, (3) pass the returned handle verbatim as ui_automation.windowHandle or screenshot_control.windowHandle. Handle format: decimal string (digits only) from window_management output. Supports actions: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor. Troubleshooting: if find returns no results, use list (optionally regex=true). If activate fails, try restore first.")]
+    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, state, is_foreground), and error details if failed. Save the 'handle' value to use with activate, close, or other window operations.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The window action to perform: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
-        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor)")] string? handle = null,
+        [Description("The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, or move_to_monitor")] string action,
+        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state)")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
         [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
@@ -93,9 +95,10 @@ public sealed partial class WindowManagementTool
         [Description("Y-coordinate for move or set_bounds action")] int? y = null,
         [Description("Width for resize or set_bounds action")] int? width = null,
         [Description("Height for resize or set_bounds action")] int? height = null,
-        [Description("Timeout in milliseconds for wait_for action")] int? timeoutMs = null,
+        [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int? timeoutMs = null,
         [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
         [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
+        [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -123,7 +126,7 @@ public sealed partial class WindowManagementTool
             {
                 var result = WindowManagementResult.CreateFailure(
                     WindowManagementErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor");
+                    $"Unknown action: '{action}'. Valid actions are: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor");
                 _logger?.LogWindowOperation(action, success: false, errorMessage: result.Error);
                 return result;
             }
@@ -182,6 +185,14 @@ public sealed partial class WindowManagementTool
 
                 case WindowAction.MoveToMonitor:
                     operationResult = await HandleMoveToMonitorAsync(handle, target, monitorIndex, cancellationToken);
+                    break;
+
+                case WindowAction.GetState:
+                    operationResult = await HandleGetStateAsync(handle, cancellationToken);
+                    break;
+
+                case WindowAction.WaitForState:
+                    operationResult = await HandleWaitForStateAsync(handle, state, timeoutMs, cancellationToken);
                     break;
 
                 default:
@@ -250,7 +261,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -269,7 +280,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -283,7 +294,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -297,7 +308,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -311,7 +322,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -327,7 +338,7 @@ public sealed partial class WindowManagementTool
         int? y,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -350,7 +361,7 @@ public sealed partial class WindowManagementTool
         int? height,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -375,7 +386,7 @@ public sealed partial class WindowManagementTool
         int? height,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -422,7 +433,7 @@ public sealed partial class WindowManagementTool
         int? monitorIndex,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -481,6 +492,61 @@ public sealed partial class WindowManagementTool
         return await _windowService.MoveToMonitorAsync(handle, resolvedMonitorIndex.Value, cancellationToken);
     }
 
+    private async Task<WindowManagementResult> HandleGetStateAsync(
+        string? handleString,
+        CancellationToken cancellationToken)
+    {
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Valid handle is required for get_state action");
+        }
+
+        return await _windowService.GetWindowStateAsync(handle, cancellationToken);
+    }
+
+    private async Task<WindowManagementResult> HandleWaitForStateAsync(
+        string? handleString,
+        string? stateString,
+        int? timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                "Valid handle is required for wait_for_state action");
+        }
+
+        var targetState = ParseWindowState(stateString);
+        if (targetState is null)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                $"Invalid state: '{stateString}'. Valid states are: normal, minimized, maximized, hidden");
+        }
+
+        return await _windowService.WaitForStateAsync(handle, targetState.Value, timeoutMs, cancellationToken);
+    }
+
+    private static WindowState? ParseWindowState(string? state)
+    {
+        if (string.IsNullOrWhiteSpace(state))
+        {
+            return null;
+        }
+
+        return state.ToLowerInvariant() switch
+        {
+            "normal" or "restored" => WindowState.Normal,
+            "minimized" or "min" => WindowState.Minimized,
+            "maximized" or "max" => WindowState.Maximized,
+            "hidden" => WindowState.Hidden,
+            _ => null
+        };
+    }
+
     private static MonitorTarget? ParseMonitorTarget(string? target)
     {
         if (string.IsNullOrWhiteSpace(target))
@@ -507,24 +573,6 @@ public sealed partial class WindowManagementTool
         SecondaryScreen
     }
 
-    private static bool TryParseHandle(string? handleString, out nint handle)
-    {
-        handle = IntPtr.Zero;
-
-        if (string.IsNullOrWhiteSpace(handleString))
-        {
-            return false;
-        }
-
-        if (long.TryParse(handleString, out long handleValue) && handleValue != 0)
-        {
-            handle = (nint)handleValue;
-            return true;
-        }
-
-        return false;
-    }
-
     private static WindowAction? ParseAction(string action)
     {
         return action.ToLowerInvariant() switch
@@ -542,6 +590,8 @@ public sealed partial class WindowManagementTool
             "set_bounds" => WindowAction.SetBounds,
             "wait_for" => WindowAction.WaitFor,
             "move_to_monitor" => WindowAction.MoveToMonitor,
+            "get_state" => WindowAction.GetState,
+            "wait_for_state" => WindowAction.WaitForState,
             _ => null,
         };
     }

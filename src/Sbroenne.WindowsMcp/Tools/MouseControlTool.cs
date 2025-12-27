@@ -103,7 +103,7 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Control mouse input on Windows. PREFER ui_automation FIRST - only use mouse_control as fallback when ui_automation patterns don't work (e.g., custom-drawn controls, canvas elements, games). Use clickablePoint coordinates from ui_automation or capture_annotated results for reliable clicking. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions. Use 'target' parameter with 'primary_screen' or 'secondary_screen' for easy monitor targeting, or 'monitorIndex' for 3+ monitor setups. IMPORTANT: Use 'expectedWindowTitle' or 'expectedProcessName' to verify the target window BEFORE clicking - the operation will fail with 'wrong_target_window' if the foreground window doesn't match. TROUBLESHOOTING: If clicks don't work, verify: 1) window is activated first, 2) coordinates are correct (use get_position to check cursor location), 3) element is visible and not behind another window.")]
+    [Description("Control mouse input on Windows. Prefer ui_automation first; use mouse_control as a fallback when UIA patterns don't work (custom-drawn controls/canvas/games) or when you already have screen coordinates. Safe workflow: (1) window_management(action='activate') to focus the target app, (2) ui_automation(action='capture_annotated') to get reliable clickablePoint coordinates, (3) mouse_control(click) using those coordinates, (4) screenshot_control to verify. Supports: move, click, double_click, right_click, middle_click, drag, scroll, get_position. Safety: set expectedWindowTitle/expectedProcessName to prevent clicks in the wrong app (fails with error_code='wrong_target_window').")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -166,7 +166,7 @@ public sealed partial class MouseControlTool
             {
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: move, click, double_click, right_click, middle_click, drag, scroll");
+                    $"Unknown action: '{action}'. Valid actions are: move, click, double_click, right_click, middle_click, drag, scroll, get_position");
                 _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }

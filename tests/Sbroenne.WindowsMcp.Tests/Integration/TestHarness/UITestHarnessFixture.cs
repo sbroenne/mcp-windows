@@ -1,3 +1,5 @@
+using Sbroenne.WindowsMcp.Native;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 
 /// <summary>
@@ -19,6 +21,11 @@ public sealed class UITestHarnessFixture : IDisposable
     /// Gets the window handle of the test form.
     /// </summary>
     public nint TestWindowHandle => _form?.Handle ?? IntPtr.Zero;
+
+    /// <summary>
+    /// Gets the window handle of the test form as a decimal string.
+    /// </summary>
+    public string TestWindowHandleString => WindowHandleParser.Format(TestWindowHandle);
 
     public UITestHarnessFixture()
     {
@@ -109,8 +116,9 @@ public sealed class UITestHarnessFixture : IDisposable
 
 /// <summary>
 /// Collection definition for UI test harness tests.
+/// Parallelization is disabled to avoid competing for foreground window and input focus.
 /// </summary>
-[CollectionDefinition("UITestHarness")]
+[CollectionDefinition("UITestHarness", DisableParallelization = true)]
 public sealed class UITestHarnessTestDefinition : ICollectionFixture<UITestHarnessFixture>
 {
 }

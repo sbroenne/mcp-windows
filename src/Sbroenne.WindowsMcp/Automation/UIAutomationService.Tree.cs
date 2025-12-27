@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 public sealed partial class UIAutomationService
 {
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> GetTreeAsync(nint? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default)
+    public async Task<UIAutomationResult> GetTreeAsync(string? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -134,6 +134,145 @@ public sealed partial class UIAutomationService
                 Query = query,
                 ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
             });
+    }
+
+    /// <inheritdoc/>
+    public async Task<UIAutomationResult> WaitForElementDisappearAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        var stopwatch = Stopwatch.StartNew();
+        var delay = 50;
+        const int MaxDelay = 500;
+
+        while (stopwatch.ElapsedMilliseconds < timeoutMs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
+            if (!result.Success || (result.Elements?.Length ?? 0) == 0)
+            {
+                // Element no longer found - success!
+                stopwatch.Stop();
+                return UIAutomationResult.CreateSuccess(
+                    "wait_for_disappear",
+                    new UIAutomationDiagnostics
+                    {
+                        DurationMs = stopwatch.ElapsedMilliseconds,
+                        Query = query
+                    });
+            }
+
+            await Task.Delay(delay, cancellationToken);
+            delay = Math.Min(delay * 2, MaxDelay);
+        }
+
+        stopwatch.Stop();
+
+        return UIAutomationResult.CreateFailure(
+            "wait_for_disappear",
+            UIAutomationErrorType.Timeout,
+            $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
+            new UIAutomationDiagnostics
+            {
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                Query = query,
+                ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
+            });
+    }
+
+    /// <inheritdoc/>
+    public async Task<UIAutomationResult> WaitForElementStateAsync(string elementId, string desiredState, int timeoutMs, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(elementId);
+        ArgumentException.ThrowIfNullOrEmpty(desiredState);
+
+        var stopwatch = Stopwatch.StartNew();
+        var delay = 50;
+        const int MaxDelay = 500;
+
+        // Parse the desired state
+        var (targetProperty, targetValue) = ParseDesiredState(desiredState.ToLowerInvariant());
+        if (targetProperty == null)
+        {
+            return UIAutomationResult.CreateFailure(
+                "wait_for_state",
+                UIAutomationErrorType.InvalidParameter,
+                $"Invalid desiredState '{desiredState}'. Valid values: enabled, disabled, on, off, indeterminate, visible, offscreen",
+                null);
+        }
+
+        while (stopwatch.ElapsedMilliseconds < timeoutMs)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var element = await ResolveElementAsync(elementId, cancellationToken);
+            if (element == null)
+            {
+                stopwatch.Stop();
+                return UIAutomationResult.CreateFailure(
+                    "wait_for_state",
+                    UIAutomationErrorType.ElementNotFound,
+                    $"Element '{elementId}' no longer exists (stale reference)",
+                    new UIAutomationDiagnostics { DurationMs = stopwatch.ElapsedMilliseconds });
+            }
+
+            // Check if the element has reached the desired state
+            var currentValue = GetElementPropertyValue(element, targetProperty);
+            if (Equals(currentValue, targetValue))
+            {
+                stopwatch.Stop();
+                return UIAutomationResult.CreateSuccess(
+                    "wait_for_state",
+                    [element],
+                    new UIAutomationDiagnostics { DurationMs = stopwatch.ElapsedMilliseconds });
+            }
+
+            await Task.Delay(delay, cancellationToken);
+            delay = Math.Min(delay * 2, MaxDelay);
+        }
+
+        stopwatch.Stop();
+
+        // Get final state for diagnostics
+        var finalElement = await ResolveElementAsync(elementId, cancellationToken);
+        var finalValue = finalElement != null ? GetElementPropertyValue(finalElement, targetProperty) : "unknown";
+
+        return UIAutomationResult.CreateFailure(
+            "wait_for_state",
+            UIAutomationErrorType.Timeout,
+            $"Element did not reach state '{desiredState}' within {timeoutMs}ms. Current {targetProperty}: {finalValue}",
+            new UIAutomationDiagnostics
+            {
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
+            });
+    }
+
+    private static (string? property, object? value) ParseDesiredState(string state)
+    {
+        return state switch
+        {
+            "enabled" => ("IsEnabled", true),
+            "disabled" => ("IsEnabled", false),
+            "on" => ("ToggleState", "On"),
+            "off" => ("ToggleState", "Off"),
+            "indeterminate" => ("ToggleState", "Indeterminate"),
+            "visible" => ("IsOffscreen", false),
+            "offscreen" => ("IsOffscreen", true),
+            _ => (null, null)
+        };
+    }
+
+    private static object? GetElementPropertyValue(UIElementInfo element, string property)
+    {
+        return property switch
+        {
+            "IsEnabled" => element.IsEnabled,
+            "IsOffscreen" => element.IsOffscreen,
+            "ToggleState" => element.ToggleState,
+            _ => null
+        };
     }
 
     private UIElementInfo? BuildElementTree(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxDepth, int currentDepth, HashSet<string>? controlTypeFilter, ref int elementsScanned)

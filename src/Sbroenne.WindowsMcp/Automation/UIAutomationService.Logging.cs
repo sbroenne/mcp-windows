@@ -20,7 +20,7 @@ public sealed partial class UIAutomationService
     private static partial void LogFindElementsError(ILogger logger, Exception ex);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error in GetTreeAsync for window handle {WindowHandle}")]
-    private static partial void LogGetTreeError(ILogger logger, nint? windowHandle, Exception ex);
+    private static partial void LogGetTreeError(ILogger logger, string? windowHandle, Exception ex);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error in InvokePatternAsync for pattern {Pattern} on element {ElementId}")]
     private static partial void LogInvokePatternError(ILogger logger, string pattern, string elementId, Exception ex);

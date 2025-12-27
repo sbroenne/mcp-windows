@@ -156,4 +156,28 @@ public interface IWindowService
         nint handle,
         int monitorIndex,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the current state of a window by its handle.
+    /// </summary>
+    /// <param name="handle">Window handle to query.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Result with window info including state or error.</returns>
+    Task<WindowManagementResult> GetWindowStateAsync(
+        nint handle,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for a window to reach a specific state.
+    /// </summary>
+    /// <param name="handle">Window handle to monitor.</param>
+    /// <param name="targetState">The state to wait for.</param>
+    /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Result with window info when state is reached or timeout error.</returns>
+    Task<WindowManagementResult> WaitForStateAsync(
+        nint handle,
+        WindowState targetState,
+        int? timeoutMs = null,
+        CancellationToken cancellationToken = default);
 }

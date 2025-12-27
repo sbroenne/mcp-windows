@@ -201,13 +201,36 @@ public sealed class MouseScrollTests : IDisposable
         await Task.Delay(50);
         _fixture.Reset();
 
+        async Task ScrollAndWaitAsync(ScrollDirection direction, int expectedScrollEventCount)
+        {
+            // First attempt
+            await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+
+            if (await _fixture.WaitForScrollEventAsync(expectedScrollEventCount, TimeSpan.FromSeconds(2)))
+            {
+                return;
+            }
+
+            // Retry once with stronger preconditions (focus + hover)
+            _fixture.EnsureTestWindowForeground();
+            await _fixture.MouseInputService.MoveAsync(panelCenter.X, panelCenter.Y);
+            await Task.Delay(50);
+            await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+
+            var ok = await _fixture.WaitForScrollEventAsync(expectedScrollEventCount, TimeSpan.FromSeconds(2));
+            if (!ok)
+            {
+                var history = string.Join(" | ", _fixture.GetEventHistory().TakeLast(15));
+                throw new Xunit.Sdk.XunitException(
+                    $"Expected at least {expectedScrollEventCount} scroll events after {direction} scroll, got {_fixture.GetScrollEventCount()}. " +
+                    $"Recent events: {history}");
+            }
+        }
+
         // Act - scroll down twice, then up once
-        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
-        await Task.Delay(50);
-        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
-        await Task.Delay(50);
-        await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Up, 1, panelCenter.X, panelCenter.Y);
-        await Task.Delay(100);
+        await ScrollAndWaitAsync(ScrollDirection.Down, expectedScrollEventCount: 1);
+        await ScrollAndWaitAsync(ScrollDirection.Down, expectedScrollEventCount: 2);
+        await ScrollAndWaitAsync(ScrollDirection.Up, expectedScrollEventCount: 3);
 
         // Assert - scroll count should reflect 3 events
         var scrollCount = _fixture.GetScrollEventCount();

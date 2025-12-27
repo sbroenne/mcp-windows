@@ -45,7 +45,7 @@ canonical_url: "https://windowsmcpserver.dev/"
 
 <div class="feature-card">
 <h3>🔍 UI Automation with UIA3</h3>
-<p>Direct COM interop for ~40% faster performance. 20 actions including find, click, type, toggle, and <code>capture_annotated</code> for LLM-friendly numbered screenshots.</p>
+<p>Direct COM interop for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and <code>capture_annotated</code> for LLM-friendly numbered screenshots.</p>
 </div>
 
 <div class="feature-card">

@@ -5,6 +5,7 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -62,7 +63,7 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = windowHandle.ToInt64(),
+            WindowHandle = WindowHandleParser.Format(windowHandle),
             ImageFormat = ImageFormat.Png
         };
 
@@ -88,7 +89,7 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = windowHandle.ToInt64(),
+            WindowHandle = WindowHandleParser.Format(windowHandle),
             ImageFormat = ImageFormat.Png
         };
 
@@ -113,7 +114,7 @@ public sealed class ScreenshotWindowTests
     public async Task CaptureWindow_InvalidHandle_ReturnsInvalidWindowHandleError()
     {
         // Arrange
-        var invalidHandle = 0x12345678L; // Invalid handle
+        var invalidHandle = "305419896"; // 0x12345678 in decimal, invalid handle
         var request = new ScreenshotControlRequest
         {
             Action = ScreenshotAction.Capture,
@@ -137,7 +138,7 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = 0
+            WindowHandle = "0"
         };
 
         // Act
@@ -178,7 +179,7 @@ public sealed class ScreenshotWindowTests
         {
             Action = ScreenshotAction.Capture,
             Target = CaptureTarget.Window,
-            WindowHandle = windowHandle.ToInt64(),
+            WindowHandle = WindowHandleParser.Format(windowHandle),
             IncludeCursor = true
         };
 

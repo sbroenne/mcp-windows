@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Sbroenne.WindowsMcp.Native;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration.ElectronHarness;
 
 /// <summary>
@@ -33,6 +35,11 @@ public sealed class ElectronHarnessFixture : IDisposable
     /// Gets the window handle of the Electron test harness.
     /// </summary>
     public nint WindowHandle => _windowHandle;
+
+    /// <summary>
+    /// Gets the window handle of the Electron test harness as a decimal string.
+    /// </summary>
+    public string WindowHandleString => WindowHandleParser.Format(WindowHandle);
 
     /// <summary>
     /// Gets whether the Electron harness is running and ready.

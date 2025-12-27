@@ -65,6 +65,13 @@ public interface IKeyboardInputService
     Task<KeyboardControlResult> GetKeyboardLayoutAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Waits for the UI thread of the foreground window to become idle.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the operation.</returns>
+    Task<KeyboardControlResult> WaitForIdleAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the names of all currently held keys.
     /// </summary>
     /// <returns>A list of held key names.</returns>

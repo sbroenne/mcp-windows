@@ -71,6 +71,13 @@ public sealed record KeyboardControlResult
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
+    /// Gets or sets a message describing the result (e.g., for wait_for_idle action).
+    /// </summary>
+    [JsonPropertyName("message")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Message { get; init; }
+
+    /// <summary>
     /// Creates a successful result for a type operation.
     /// </summary>
     /// <param name="charactersTyped">Number of characters typed.</param>
@@ -168,6 +175,20 @@ public sealed record KeyboardControlResult
         {
             Success = true,
             KeyboardLayout = layoutInfo
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful result for a wait for idle operation.
+    /// </summary>
+    /// <param name="message">A message describing the idle state.</param>
+    /// <returns>A successful KeyboardControlResult.</returns>
+    public static KeyboardControlResult CreateWaitForIdleSuccess(string message)
+    {
+        return new KeyboardControlResult
+        {
+            Success = true,
+            Message = message
         };
     }
 

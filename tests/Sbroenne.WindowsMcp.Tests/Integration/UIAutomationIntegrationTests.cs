@@ -21,7 +21,7 @@ public sealed class UIAutomationIntegrationTests : IDisposable
     private readonly UIAutomationThread _staThread;
     private readonly WindowEnumerator _windowEnumerator;
     private readonly WindowService _windowService;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
 
     public UIAutomationIntegrationTests(UITestHarnessFixture fixture)
     {
@@ -30,7 +30,7 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();

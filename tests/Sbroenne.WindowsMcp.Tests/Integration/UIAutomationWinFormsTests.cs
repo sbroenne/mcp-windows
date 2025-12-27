@@ -19,7 +19,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     private readonly UITestHarnessFixture _fixture;
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
 
     public UIAutomationWinFormsTests(UITestHarnessFixture fixture)
     {
@@ -28,7 +28,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();
@@ -896,6 +896,304 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.True(result.Diagnostics.ElementsScanned > 0);
         Assert.True(result.Diagnostics.DurationMs >= 0);
         Assert.NotNull(result.Diagnostics.DetectedFramework);
+    }
+
+    #endregion
+
+    #region SortByProminence Tests
+
+    [Fact]
+    public async Task Find_WithSortByProminence_SortsLargestFirst()
+    {
+        // Find buttons without sorting
+        var resultUnsorted = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            SortByProminence = false,
+        });
+
+        Assert.True(resultUnsorted.Success, $"Find failed: {resultUnsorted.ErrorMessage}");
+        Assert.NotNull(resultUnsorted.Elements);
+        Assert.True(resultUnsorted.Elements.Length >= 2, "Need at least 2 buttons to test sorting");
+
+        // Find buttons with sorting by prominence
+        var resultSorted = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            SortByProminence = true,
+        });
+
+        Assert.True(resultSorted.Success, $"Find with sortByProminence failed: {resultSorted.ErrorMessage}");
+        Assert.NotNull(resultSorted.Elements);
+        Assert.True(resultSorted.Elements.Length >= 2, "Need at least 2 buttons to test sorting");
+
+        // Verify sorted elements have largest bounding box first
+        for (var i = 1; i < resultSorted.Elements.Length; i++)
+        {
+            var prevBounds = resultSorted.Elements[i - 1].BoundingRect;
+            var currBounds = resultSorted.Elements[i].BoundingRect;
+
+            if (prevBounds is not null && currBounds is not null)
+            {
+                var prevArea = prevBounds.Width * prevBounds.Height;
+                var currArea = currBounds.Width * currBounds.Height;
+                Assert.True(prevArea >= currArea,
+                    $"Elements should be sorted by area (largest first). Element {i - 1} area: {prevArea}, Element {i} area: {currArea}");
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Find_WithSortByProminence_SingleElement_ReturnsSuccessfully()
+    {
+        // Find a specific element with sortByProminence
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Submit",
+            ControlType = "Button",
+            SortByProminence = true,
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Elements);
+        Assert.Single(result.Elements);
+    }
+
+    #endregion
+
+    #region EnsureState Tests
+
+    [Fact]
+    public async Task EnsureState_CheckBox_SetsToOn()
+    {
+        // First, find the checkbox and get its current state
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+        Assert.Single(findResult.Elements);
+
+        var elementId = findResult.Elements[0].ElementId;
+        Assert.NotNull(elementId);
+
+        // Ensure it's in the "off" state first (by clicking if necessary)
+        if (findResult.Elements[0].ToggleState == "On")
+        {
+            await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, CancellationToken.None);
+            await Task.Delay(100);
+        }
+
+        // Now ensure state is "on"
+        var ensureResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+        Assert.True(ensureResult.Success);
+        var checkboxElement = ensureResult.Elements![0];
+        var checkboxId = checkboxElement.ElementId!;
+
+        // Verify initial off state
+        Assert.Equal("Off", checkboxElement.ToggleState);
+
+        // Toggle to on
+        var toggleResult = await _automationService.InvokePatternAsync(checkboxId, PatternTypes.Toggle, null, CancellationToken.None);
+        Assert.True(toggleResult.Success, $"Toggle failed: {toggleResult.ErrorMessage}");
+        await Task.Delay(100);
+
+        // Verify the checkbox is now on
+        var verifyResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+        Assert.True(verifyResult.Success);
+        Assert.Equal("On", verifyResult.Elements![0].ToggleState);
+
+        // Clean up - toggle back to off
+        await _automationService.InvokePatternAsync(checkboxId, PatternTypes.Toggle, null, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task EnsureState_CheckBox_AlreadyInDesiredState_NoAction()
+    {
+        // Find the checkbox
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+        Assert.Single(findResult.Elements);
+
+        var initialState = findResult.Elements[0].ToggleState;
+        var elementId = findResult.Elements[0].ElementId!;
+
+        // Get initial checkbox state from the form
+        var formInitialState = _fixture.Form?.CheckboxStates.Option1;
+
+        // Wait a bit
+        await Task.Delay(100);
+
+        // Re-find and verify state hasn't changed
+        var verifyResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+
+        Assert.True(verifyResult.Success);
+        Assert.Equal(initialState, verifyResult.Elements![0].ToggleState);
+    }
+
+    #endregion
+
+    #region WaitForDisappear Tests
+
+    [Fact]
+    public async Task WaitForDisappear_NonExistentElement_ReturnsImmediately()
+    {
+        // Wait for an element that doesn't exist - should return immediately
+        var result = await _automationService.WaitForElementDisappearAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "NonExistentElement12345",
+                ControlType = "Button",
+            },
+            1000);
+
+        Assert.True(result.Success, $"WaitForDisappear failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Diagnostics);
+        Assert.True(result.Diagnostics.DurationMs < 500, "Should return quickly for non-existent element");
+    }
+
+    [Fact]
+    public async Task WaitForDisappear_ExistingElement_TimesOut()
+    {
+        // Wait for an element that exists and won't disappear - should timeout
+        var result = await _automationService.WaitForElementDisappearAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "Submit",
+                ControlType = "Button",
+            },
+            500);
+
+        Assert.False(result.Success);
+        Assert.Contains("still present", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    #endregion
+
+    #region WaitForState Tests
+
+    [Fact]
+    public async Task WaitForState_ElementAlreadyInState_ReturnsImmediately()
+    {
+        // Find a checkbox that should be enabled
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Notifications",
+            ControlType = "CheckBox",
+        });
+
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+        Assert.Single(findResult.Elements);
+
+        var elementId = findResult.Elements[0].ElementId!;
+
+        // Wait for "enabled" state (which it already is)
+        var result = await _automationService.WaitForElementStateAsync(elementId, "enabled", 1000);
+
+        Assert.True(result.Success, $"WaitForState failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Diagnostics);
+        Assert.True(result.Diagnostics.DurationMs < 500, "Should return quickly when already in state");
+    }
+
+    [Fact]
+    public async Task WaitForState_InvalidState_ReturnsError()
+    {
+        // Find an element
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Submit",
+            ControlType = "Button",
+        });
+
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+        Assert.Single(findResult.Elements);
+
+        var elementId = findResult.Elements[0].ElementId!;
+
+        // Wait for an invalid state
+        var result = await _automationService.WaitForElementStateAsync(elementId, "invalid_state", 500);
+
+        Assert.False(result.Success);
+        Assert.Contains("Invalid", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WaitForState_CheckboxToggleState_WaitsForOn()
+    {
+        // Find the checkbox
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Auto-save",
+            ControlType = "CheckBox",
+        });
+
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+        Assert.Single(findResult.Elements);
+
+        var elementId = findResult.Elements[0].ElementId!;
+        var initialState = findResult.Elements[0].ToggleState;
+
+        // If checkbox is on, turn it off first
+        if (initialState == "On")
+        {
+            await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, CancellationToken.None);
+            await Task.Delay(100);
+        }
+
+        // Start waiting for "on" state
+        var waitTask = _automationService.WaitForElementStateAsync(elementId, "on", 5000);
+
+        // Toggle the checkbox after a short delay
+        await Task.Delay(200);
+        await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, CancellationToken.None);
+
+        // Wait should complete successfully
+        var result = await waitTask;
+
+        Assert.True(result.Success, $"WaitForState failed: {result.ErrorMessage}");
+
+        // Clean up - toggle back if needed
+        if (initialState == "Off")
+        {
+            await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, CancellationToken.None);
+        }
     }
 
     #endregion

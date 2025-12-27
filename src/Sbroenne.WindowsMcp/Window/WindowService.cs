@@ -578,4 +578,88 @@ public sealed class WindowService : IWindowService
 
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
+
+    /// <inheritdoc/>
+    public async Task<WindowManagementResult> GetWindowStateAsync(
+        nint handle,
+        CancellationToken cancellationToken = default)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.InvalidHandle,
+                "Invalid window handle (zero)");
+        }
+
+        // Check for secure desktop
+        if (_secureDesktopDetector.IsSecureDesktopActive())
+        {
+            _logger?.LogWindowOperation("get_state", success: false, errorMessage: "Secure desktop active");
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.SecureDesktopActive,
+                "Secure desktop (UAC prompt or lock screen) is active");
+        }
+
+        var windowInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+        if (windowInfo is null)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.WindowNotFound,
+                $"Window with handle {handle} not found");
+        }
+
+        _logger?.LogWindowOperation("get_state", success: true, handle: handle, windowTitle: windowInfo.Title);
+
+        return WindowManagementResult.CreateWindowSuccess(windowInfo);
+    }
+
+    /// <inheritdoc/>
+    public async Task<WindowManagementResult> WaitForStateAsync(
+        nint handle,
+        WindowState targetState,
+        int? timeoutMs = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (handle == IntPtr.Zero)
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.InvalidHandle,
+                "Invalid window handle (zero)");
+        }
+
+        var timeout = timeoutMs ?? 5000;
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        const int pollIntervalMs = 100;
+
+        while (stopwatch.ElapsedMilliseconds < timeout)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var windowInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+            if (windowInfo is null)
+            {
+                return WindowManagementResult.CreateFailure(
+                    WindowManagementErrorCode.WindowNotFound,
+                    $"Window with handle {handle} not found while waiting for state");
+            }
+
+            if (windowInfo.State == targetState)
+            {
+                _logger?.LogWindowOperation("wait_for_state", success: true, handle: handle, windowTitle: windowInfo.Title);
+                return WindowManagementResult.CreateWindowSuccess(windowInfo);
+            }
+
+            await Task.Delay(pollIntervalMs, cancellationToken);
+        }
+
+        // Timeout - get final state for error message
+        var finalInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+        var currentState = finalInfo?.State.ToString() ?? "unknown";
+
+        _logger?.LogWindowOperation("wait_for_state", success: false, handle: handle, errorMessage: $"Timeout waiting for state {targetState}");
+
+        return WindowManagementResult.CreateFailure(
+            WindowManagementErrorCode.Timeout,
+            $"Timeout after {timeout}ms waiting for window to reach state '{targetState}'. Current state: '{currentState}'");
+    }
 }
