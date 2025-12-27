@@ -582,8 +582,10 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         using var stream = new MemoryStream(imageBytes);
         using var bitmap = new Bitmap(stream);
 
-        // Perform OCR on the annotated image
-        var ocrResult = await _ocrService.RecognizeAsync(bitmap);
+        // Perform OCR on a scaled-up copy of the annotated image.
+        // Small numeric labels are frequently missed at native resolution.
+        using var scaledForOcr = ScaleBitmapForOcr(bitmap, scale: 2);
+        var ocrResult = await _ocrService.RecognizeAsync(scaledForOcr);
 
         Assert.True(ocrResult.Success, $"OCR failed: {ocrResult.ErrorMessage}");
         Assert.NotNull(ocrResult.Text);
@@ -631,11 +633,13 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         // Perform OCR on both
         using var fewStream = new MemoryStream(Convert.FromBase64String(fewElementsResult.ImageData!));
         using var fewBitmap = new Bitmap(fewStream);
-        var fewOcr = await _ocrService.RecognizeAsync(fewBitmap);
+        using var fewScaledForOcr = ScaleBitmapForOcr(fewBitmap, scale: 2);
+        var fewOcr = await _ocrService.RecognizeAsync(fewScaledForOcr);
 
         using var manyStream = new MemoryStream(Convert.FromBase64String(manyElementsResult.ImageData!));
         using var manyBitmap = new Bitmap(manyStream);
-        var manyOcr = await _ocrService.RecognizeAsync(manyBitmap);
+        using var manyScaledForOcr = ScaleBitmapForOcr(manyBitmap, scale: 2);
+        var manyOcr = await _ocrService.RecognizeAsync(manyScaledForOcr);
 
         // Count how many number labels are found in each
         var fewLabelsFound = CountNumberLabelsInText(fewOcr.Text ?? "", 1, 15);
@@ -718,6 +722,21 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         }
 
         return count;
+    }
+
+    private static Bitmap ScaleBitmapForOcr(Bitmap source, int scale)
+    {
+        if (scale <= 1)
+        {
+            return (Bitmap)source.Clone();
+        }
+
+        var scaled = new Bitmap(source.Width * scale, source.Height * scale);
+        using var graphics = Graphics.FromImage(scaled);
+        graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.NearestNeighbor;
+        graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.Half;
+        graphics.DrawImage(source, new Rectangle(0, 0, scaled.Width, scaled.Height));
+        return scaled;
     }
 
     private static bool IsColorSimilar(Color a, Color b, int tolerance)
