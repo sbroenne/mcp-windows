@@ -27,7 +27,8 @@ public sealed class WindowsAutomationPrompts
             new(ChatRole.System,
                 "You are operating a Windows automation MCP server. Prefer semantic UI automation. " +
                 "Window handles are decimal strings (digits-only). Copy handles verbatim between tools. " +
-                "Use expectedWindowTitle/expectedProcessName guards when sending keyboard/mouse input."),
+                "Use expectedWindowTitle/expectedProcessName guards when sending keyboard/mouse input. " +
+                "For toggles/checkboxes, use ensure_state for atomic operations. Use wait_for_disappear to verify dialogs closed."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
                 (string.IsNullOrWhiteSpace(target) ? "" : $"Target: {target}\n") +
@@ -35,11 +36,12 @@ public sealed class WindowsAutomationPrompts
                 "Do this workflow:\n" +
                 "1) Use window_management(action='find' or 'list') to locate the target window.\n" +
                 "2) Use window_management(action='activate', handle=...) to focus it.\n" +
-                "3) Use ui_automation(action='capture_annotated') to discover clickable elements and their labels.\n" +
+                "3) Use ui_automation(action='capture_annotated', interactiveOnly=true) to discover clickable elements.\n" +
                 "4) Use ui_automation(action='find') to locate the element (prefer automationId or nameContains).\n" +
-                "5) Use ui_automation(action='click' or 'invoke') with elementId.\n" +
+                "5) For toggles: use ui_automation(action='ensure_state', elementId=..., desiredState='on'/'off') for atomic toggle.\n" +
+                "   For buttons: use ui_automation(action='click' or 'invoke') with elementId.\n" +
                 "6) If UIA click fails, fall back to mouse_control(click) using the element's clickablePoint.\n" +
-                "7) Verify result with screenshot_control(action='window') or ui_automation(action='capture_annotated').")
+                "7) Verify: use wait_for_disappear for dialogs, wait_for_state for element states, or capture_annotated.")
         ];
     }
 
@@ -94,7 +96,8 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer ui_automation elementId interactions. Use mouse_control only as fallback, with target guards to avoid misclicks."),
+                "Prefer ui_automation elementId interactions. For toggles/checkboxes, use ensure_state instead of click. " +
+                "Use mouse_control only as fallback, with target guards to avoid misclicks."),
             new(ChatRole.User,
                 $"Window handle: {windowHandle}\n" +
                 $"Click target: {elementDescription}\n" +
@@ -102,11 +105,12 @@ public sealed class WindowsAutomationPrompts
                 (string.IsNullOrWhiteSpace(nameContains) ? "" : $"nameContains: {nameContains}\n") +
                 "\n" +
                 "Steps:\n" +
-                "1) ui_automation(action='capture_annotated', windowHandle=...) to see available controls.\n" +
-                "2) ui_automation(action='find', windowHandle=..., automationId=... OR nameContains=..., controlType='Button' if applicable).\n" +
-                "3) ui_automation(action='click', elementId=...).\n" +
+                "1) ui_automation(action='capture_annotated', windowHandle=..., interactiveOnly=true) to see available controls.\n" +
+                "2) ui_automation(action='find', windowHandle=..., automationId=... OR nameContains=..., controlType='Button'/'CheckBox' if applicable).\n" +
+                "3) For CheckBox/ToggleButton: use ui_automation(action='ensure_state', elementId=..., desiredState='on'/'off').\n" +
+                "   For Button: use ui_automation(action='click', elementId=...).\n" +
                 "4) If click fails, use the element's clickablePoint with mouse_control(action='click', x=..., y=..., expectedWindowTitle=..., expectedProcessName=...).\n" +
-                "5) Verify with ui_automation(action='capture_annotated') or screenshot_control(action='window', windowHandle=...).")
+                "5) Verify with wait_for_disappear (dialogs), wait_for_state, or capture_annotated.")
         ];
     }
 
@@ -171,17 +175,21 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Electron apps expose large accessibility trees; use hierarchical search and screenshots to reduce traversal."),
+                "Electron apps expose large accessibility trees; use hierarchical search and capture_annotated to reduce traversal. " +
+                "Use sortByProminence=true when multiple matches to prioritize larger/more visible elements. " +
+                "Use outputPath to save images to disk and reduce base64 payload size."),
             new(ChatRole.User,
                 $"Window handle: {windowHandle}\n" +
                 $"Intent: {intent}\n" +
                 "\n" +
                 "Strategy:\n" +
-                "1) ui_automation(action='capture_annotated', windowHandle=...) to quickly see interactable elements and labels.\n" +
-                "2) If you need structure, ui_automation(action='get_tree', windowHandle=..., maxDepth=2) to find a likely container.\n" +
-                "3) Re-run ui_automation(action='find') scoped with parentElementId to reduce traversal.\n" +
+                "1) ui_automation(action='capture_annotated', windowHandle=..., interactiveOnly=true) to see interactable elements.\n" +
+                "   Tip: Use outputPath='C:/temp/ui.png' and returnImageData=false to reduce response size.\n" +
+                "2) If you need structure, ui_automation(action='get_tree', windowHandle=..., maxDepth=2) to find a container.\n" +
+                "3) Re-run ui_automation(action='find', sortByProminence=true) scoped with parentElementId.\n" +
                 "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
-                "5) Use ui_automation(action='scroll_into_view') before clicking if element is off-screen.")
+                "5) Use ui_automation(action='scroll_into_view') before clicking if element is off-screen.\n" +
+                "6) For toggles, use ensure_state(desiredState='on'/'off') instead of click.")
         ];
     }
 
@@ -200,16 +208,98 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer deterministic verification. When in doubt, use capture_annotated + OCR as a fallback."),
+                "Prefer deterministic verification with wait actions. These block until condition is met or timeout. " +
+                "Use wait_for_disappear for dialogs closing, wait_for_state for element state changes."),
             new(ChatRole.User,
                 $"Window handle: {windowHandle}\n" +
                 $"Expected outcome: {expectedOutcome}\n" +
                 "\n" +
                 "Verification options (choose the most deterministic):\n" +
-                "1) ui_automation(action='find' or 'wait_for') for a specific element appearing/disappearing.\n" +
-                "2) ui_automation(action='get_text') on a specific elementId when available.\n" +
-                "3) screenshot_control(action='window', windowHandle=...) and compare visually.\n" +
-                "4) ui_automation(action='ocr_element') on a stable region/element if needed.")
+                "1) ui_automation(action='wait_for_disappear', elementId=...) — verify dialog/element closed.\n" +
+                "2) ui_automation(action='wait_for_state', elementId=..., desiredState='on'/'off'/'enabled') — verify element state.\n" +
+                "3) ui_automation(action='wait_for') for a specific element appearing.\n" +
+                "4) window_management(action='wait_for_state', handle=..., state='minimized') — verify window state.\n" +
+                "5) ui_automation(action='get_text', elementId=...) when text content changed.\n" +
+                "6) screenshot_control or capture_annotated as visual fallback.\n" +
+                "7) ui_automation(action='ocr_element') for custom-rendered text.")
+        ];
+    }
+
+    /// <summary>
+    /// Atomic toggle operation using ensure_state (avoids find → check → toggle roundtrips).
+    /// </summary>
+    /// <param name="windowHandle">The window handle (digits-only decimal string) from window_management.</param>
+    /// <param name="toggleDescription">What toggle/checkbox you want to set.</param>
+    /// <param name="desiredState">The desired state: 'on' or 'off'.</param>
+    /// <param name="nameContains">Optional element name substring.</param>
+    /// <param name="automationId">Optional AutomationId if known.</param>
+    /// <returns>A multi-message prompt template.</returns>
+    [McpServerPrompt(Name = "windows_mcp_toggle_element")]
+    [Description("Atomic toggle operation using ensure_state (avoids find → check → toggle roundtrips).")]
+    public static IEnumerable<ChatMessage> ToggleElement(
+        [Description("The window handle (digits-only decimal string) from window_management.")] string windowHandle,
+        [Description("What toggle/checkbox you want to set. Example: 'Dark Mode toggle', 'Enable notifications'.")] string toggleDescription,
+        [Description("The desired state: 'on' or 'off'.")] string desiredState,
+        [Description("Optional element name substring.")] string? nameContains = null,
+        [Description("Optional AutomationId if known (most reliable).")] string? automationId = null)
+    {
+        return
+        [
+            new(ChatRole.System,
+                "Use ensure_state for atomic toggle operations. It checks current state and only toggles if needed, " +
+                "returning the previous and new state. This avoids the find → check → toggle roundtrip pattern."),
+            new(ChatRole.User,
+                $"Window handle: {windowHandle}\n" +
+                $"Toggle target: {toggleDescription}\n" +
+                $"Desired state: {desiredState}\n" +
+                (string.IsNullOrWhiteSpace(automationId) ? "" : $"AutomationId: {automationId}\n") +
+                (string.IsNullOrWhiteSpace(nameContains) ? "" : $"nameContains: {nameContains}\n") +
+                "\n" +
+                "Steps:\n" +
+                "1) ui_automation(action='find', windowHandle=..., controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=...).\n" +
+                "2) ui_automation(action='ensure_state', elementId=..., desiredState='" + desiredState + "').\n" +
+                "   Response includes: previousState, currentState, actionTaken ('toggled' or 'already_in_state').\n" +
+                "3) If ensure_state fails, fall back to toggle action or mouse click.\n" +
+                "4) Verify with wait_for_state if additional confirmation needed.")
+        ];
+    }
+
+    /// <summary>
+    /// Wait for UI changes to complete before proceeding (dialogs closing, states changing).
+    /// </summary>
+    /// <param name="windowHandle">The window handle (digits-only decimal string) from window_management.</param>
+    /// <param name="waitType">What kind of wait: 'element_disappear', 'element_state', 'window_state', or 'input_idle'.</param>
+    /// <param name="targetDescription">What you're waiting for.</param>
+    /// <returns>A multi-message prompt template.</returns>
+    [McpServerPrompt(Name = "windows_mcp_wait_for_change")]
+    [Description("Wait for UI changes to complete before proceeding (dialogs closing, states changing).")]
+    public static IEnumerable<ChatMessage> WaitForChange(
+        [Description("The window handle (digits-only decimal string) from window_management.")] string windowHandle,
+        [Description("What kind of wait: 'element_disappear', 'element_state', 'window_state', or 'input_idle'.")] string waitType,
+        [Description("What you're waiting for. Example: 'Save dialog to close', 'Toggle to be ON', 'Window to minimize'.")] string targetDescription)
+    {
+        return
+        [
+            new(ChatRole.System,
+                "Use wait actions to block until UI changes complete. This is more reliable than polling or fixed delays. " +
+                "All wait actions have configurable timeoutMs (default: 5000ms)."),
+            new(ChatRole.User,
+                $"Window handle: {windowHandle}\n" +
+                $"Wait type: {waitType}\n" +
+                $"Waiting for: {targetDescription}\n" +
+                "\n" +
+                "Choose the appropriate wait action:\n" +
+                "• element_disappear: ui_automation(action='wait_for_disappear', elementId=..., timeoutMs=5000)\n" +
+                "  Use for: dialogs closing, loading spinners vanishing, popups dismissing.\n" +
+                "\n" +
+                "• element_state: ui_automation(action='wait_for_state', elementId=..., desiredState='on'/'off'/'enabled'/'disabled')\n" +
+                "  Use for: toggle state changes, button becoming enabled, element becoming visible.\n" +
+                "\n" +
+                "• window_state: window_management(action='wait_for_state', handle=..., state='normal'/'minimized'/'maximized')\n" +
+                "  Use for: window state transitions after minimize/maximize/restore.\n" +
+                "\n" +
+                "• input_idle: keyboard_control(action='wait_for_idle')\n" +
+                "  Use for: waiting for application to process input before sending more keystrokes.")
         ];
     }
 }
