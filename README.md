@@ -1,6 +1,7 @@
 # 🪟 Windows MCP
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![NuGet](https://img.shields.io/nuget/v/Sbroenne.WindowsMcp.svg)](https://www.nuget.org/packages/Sbroenne.WindowsMcp)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
 
@@ -46,11 +47,28 @@ Install the Windows MCP extension from the [VS Code Marketplace](https://marketp
 
 The extension automatically configures the MCP server and makes it available to GitHub Copilot.
 
-### Option 2: Download from Releases
+### Option 2: .NET Tool (Recommended for Developers)
+
+Install as a global .NET tool:
+
+```powershell
+# Install
+dotnet tool install --global Sbroenne.WindowsMcp
+
+# Run
+mcp-windows
+
+# Update
+dotnet tool update --global Sbroenne.WindowsMcp
+```
+
+**Requirements:** [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+
+### Option 3: Download from Releases
 
 Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases):
 
-1. Download the latest `mcp-windows-v*.zip`
+1. Download the latest `windows-mcp-server-*.zip`
 2. Extract to your preferred location
 3. Add to your MCP client configuration (see [MCP Configuration](#mcp-configuration))
 
@@ -60,17 +78,45 @@ Download pre-built binaries from the [GitHub Releases page](https://github.com/s
 
 If you installed via the VS Code extension, the MCP server is automatically configured. No manual setup required.
 
-### Manual Configuration (For Downloaded Releases)
+### .NET Tool Configuration
 
-If you downloaded from the releases page, add to your MCP client configuration:
+If you installed via `dotnet tool install`, configure your MCP client:
+
+**VS Code (settings.json):**
+```json
+{
+  "mcp": {
+    "servers": {
+      "windows-mcp": {
+        "type": "stdio",
+        "command": "mcp-windows"
+      }
+    }
+  }
+}
+```
+
+**Claude Desktop / Other Clients:**
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "mcp-windows"
+    }
+  }
+}
+```
+
+### Binary Configuration (For Downloaded Releases)
+
+If you downloaded from the releases page:
 
 ```json
 {
-  "servers": {
-    "windows": {
+  "mcpServers": {
+    "windows-mcp": {
       "command": "dotnet",
-      "args": ["path/to/extracted/Sbroenne.WindowsMcp.dll"],
-      "env": {}
+      "args": ["path/to/extracted/Sbroenne.WindowsMcp.dll"]
     }
   }
 }

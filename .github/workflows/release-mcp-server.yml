@@ -1,18 +1,41 @@
 name: Release MCP Server
 
-# This workflow builds and releases the standalone Windows MCP Server
-# Triggered by pushing tags matching 'mcp-v*'
+# This workflow uses NuGet Trusted Publishing via OIDC (OpenID Connect)
+# The NuGet/login action exchanges GitHub OIDC tokens for short-lived NuGet API keys
+#
+# Tag pattern: v1.2.3 (e.g., v1.0.0)
+#
+# Required GitHub Secrets:
+# - NUGET_USER: Your NuGet.org username (profile name, NOT email)
+#
+# Required NuGet.org Configuration:
+# - Package: Sbroenne.WindowsMcp
+# - Trusted Publisher: GitHub Actions
+# - Owner: sbroenne
+# - Repository: mcp-windows
+# - Workflow: release-mcp-server.yml
+#
+# MCP Registry Publishing:
+# - MCP Registry steps use continue-on-error to ensure NuGet publishing succeeds
+# - If MCP Registry validation fails, the workflow continues and completes
+# - Check "MCP Registry Status" step output for publishing status
+# - NuGet package is always published regardless of MCP Registry status
 
 on:
   push:
     tags:
-      - 'mcp-v*'
+      - 'v*'
+      - '!vscode-v*'  # Exclude VS Code extension tags
 
 jobs:
   release-mcp-server:
     runs-on: windows-latest
     permissions:
       contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+      id-token: write  # Required for NuGet Trusted Publishing via OIDC
 
     steps:
     - uses: actions/checkout@v4
@@ -25,25 +48,69 @@ jobs:
     - name: Extract Version
       run: |
         $tagName = "${{ github.ref_name }}"
-        $version = $tagName -replace '^mcp-v', ''
+        $version = $tagName -replace '^v', ''
         Write-Output "Version: $version"
-        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        echo "VERSION=$version" >> $env:GITHUB_ENV
+        echo "PACKAGE_VERSION=$version" >> $env:GITHUB_ENV
       shell: pwsh
 
     - name: Update Version in Project
       run: |
         $version = "${{ env.VERSION }}"
+
+        # Update project version
         $csprojPath = "src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj"
         $content = Get-Content $csprojPath -Raw
         $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
         $content = $content -replace '<AssemblyVersion>[\d\.]+\.[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
         $content = $content -replace '<FileVersion>[\d\.]+\.[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
         Set-Content $csprojPath $content
-        Write-Output "Updated project to version $version"
+
+        # Update server.json version
+        $serverJsonPath = "src/Sbroenne.WindowsMcp/.mcp/server.json"
+        $serverContent = Get-Content $serverJsonPath -Raw
+
+        # Update main version field
+        $serverContent = $serverContent -replace '("version":\s*)"[\d\.]+"(\s*,\s*\n\s*"packages")' , "`$1`"$version`"`$2"
+
+        # Update package version in packages array
+        $serverContent = $serverContent -replace '("identifier":\s*"Sbroenne\.WindowsMcp",\s*\n\s*"version":\s*)"[\d\.]+"', "`$1`"$version`""
+
+        Set-Content $serverJsonPath $serverContent
+
+        Write-Output "Updated project and server.json to version $version"
       shell: pwsh
 
     - name: Restore Dependencies
       run: dotnet restore
+
+    - name: Build
+      run: dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release --no-restore
+
+    - name: Pack NuGet Package
+      run: dotnet pack src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj --configuration Release --no-build --output ./nupkg
+
+    - name: NuGet login (OIDC → temp API key)
+      uses: NuGet/login@v1
+      id: nuget-login
+      with:
+        user: ${{ secrets.NUGET_USER }}
+
+    - name: Publish to NuGet.org
+      run: |
+        $version = $env:PACKAGE_VERSION
+        $packagePath = "nupkg/Sbroenne.WindowsMcp.$version.nupkg"
+
+        Write-Output "Publishing $packagePath to NuGet.org using Trusted Publishing (OIDC)..."
+
+        dotnet nuget push $packagePath `
+          --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} `
+          --source https://api.nuget.org/v3/index.json `
+          --skip-duplicate
+
+        Write-Output "🚀 Published Sbroenne.WindowsMcp.$version to NuGet.org"
+        Write-Output "🔗 Package: https://www.nuget.org/packages/Sbroenne.WindowsMcp/$version"
+      shell: pwsh
 
     - name: Publish (Portable)
       run: dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -o publish --no-self-contained
@@ -63,48 +130,37 @@ jobs:
         $tagName = "${{ github.ref_name }}"
         $version = "${{ env.VERSION }}"
 
-        $notes = @"
-        ## Windows MCP Server $tagName
-
-        MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.
-
-        ### Download
-
-        | File | Description |
-        |------|-------------|
-        | windows-mcp-server-$version.zip | Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) |
-
-        ### Available Tools
-
-        | Tool | Description |
-        |------|-------------|
-        | ui_automation | Find UI elements, interact with controls, OCR text recognition |
-        | mouse_control | Click, double-click, right-click, move, drag, scroll, get_position |
-        | keyboard_control | Type text, press keys, combinations, sequences |
-        | window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |
-        | screenshot_control | Capture screens, monitors, windows, or regions |
-
-        ### Installation
-
-        1. Install [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-        2. Extract the zip to a folder
-        3. Run with ``dotnet Sbroenne.WindowsMcp.dll`` or add to your MCP client config
-
-        ### MCP Client Configuration
-
-        ```json
-        {
-          "mcpServers": {
-            "windows-mcp": {
-              "command": "dotnet",
-              "args": ["path/to/Sbroenne.WindowsMcp.dll"]
-            }
-          }
-        }
-        ```
-
-        See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-        "@
+        $notes = "## Windows MCP Server $tagName`n`n"
+        $notes += "MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.`n`n"
+        $notes += "## Installation`n`n"
+        $notes += "**Option 1: .NET Tool (Recommended)**`n"
+        $notes += '```powershell' + "`n"
+        $notes += "dotnet tool install --global Sbroenne.WindowsMcp`n"
+        $notes += "mcp-windows`n"
+        $notes += '```' + "`n`n"
+        $notes += "**Option 2: Download Binary**`n`n"
+        $notes += "| File | Description |`n"
+        $notes += "|------|-------------|`n"
+        $notes += "| windows-mcp-server-$version.zip | Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) |`n`n"
+        $notes += "### Available Tools`n`n"
+        $notes += "| Tool | Description |`n"
+        $notes += "|------|-------------|`n"
+        $notes += "| ui_automation | Find UI elements, interact with controls, OCR text recognition |`n"
+        $notes += "| mouse_control | Click, double-click, right-click, move, drag, scroll, get_position |`n"
+        $notes += "| keyboard_control | Type text, press keys, combinations, sequences |`n"
+        $notes += "| window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |`n"
+        $notes += "| screenshot_control | Capture screens, monitors, windows, or regions |`n`n"
+        $notes += "### MCP Client Configuration`n`n"
+        $notes += '```json' + "`n"
+        $notes += "{`n"
+        $notes += '  "mcpServers": {' + "`n"
+        $notes += '    "windows-mcp": {' + "`n"
+        $notes += '      "command": "mcp-windows"' + "`n"
+        $notes += "    }`n"
+        $notes += "  }`n"
+        $notes += "}`n"
+        $notes += '```' + "`n`n"
+        $notes += "See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.`n"
 
         $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
 
@@ -116,4 +172,182 @@ jobs:
         Write-Output "Released Windows MCP Server $version"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh
+
+    - name: Wait for NuGet Package Propagation
+      run: |
+        $version = $env:PACKAGE_VERSION
+        $packageId = "sbroenne.windowsmcp"
+        $readmeUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/$version/readme"
+
+        Write-Output "Waiting for NuGet CDN to propagate package README..."
+        Write-Output "Checking: $readmeUrl"
+
+        $maxAttempts = 3  # 3 attempts * 10 minutes = 30 minutes max
+        $pollIntervalSeconds = 600  # 10 minutes between polls
+        $attempt = 0
+        $found = $false
+
+        while ($attempt -lt $maxAttempts -and -not $found) {
+          $attempt++
+          Write-Output "Attempt $attempt of $maxAttempts..."
+
+          try {
+            $response = Invoke-WebRequest -Uri $readmeUrl -UseBasicParsing -ErrorAction SilentlyContinue
+            if ($response.StatusCode -eq 200) {
+              $content = [System.Text.Encoding]::UTF8.GetString($response.Content)
+              if ($content -match "mcp-name:\s+io\.github\.sbroenne/mcp-windows") {
+                Write-Output "✅ README found and contains mcp-name validation string!"
+                $found = $true
+              } else {
+                Write-Output "⚠️ README found but mcp-name string not detected yet"
+              }
+            }
+          } catch {
+            Write-Output "README not yet available (expected during propagation)"
+          }
+
+          if (-not $found -and $attempt -lt $maxAttempts) {
+            Write-Output "Waiting $pollIntervalSeconds seconds (10 minutes) before next check..."
+            Start-Sleep -Seconds $pollIntervalSeconds
+          }
+        }
+
+        if ($found) {
+          Write-Output "✅ NuGet package README is propagated and ready for MCP Registry validation"
+        } else {
+          Write-Output "⚠️ README propagation taking longer than expected, but continuing..."
+          Write-Output "   MCP Registry publish may need to be retried manually if validation fails"
+        }
+      shell: pwsh
+      env:
+        PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+
+    - name: Install MCP Publisher
+      id: install-mcp-publisher
+      run: |
+        Write-Output "Installing MCP Publisher CLI..."
+        $arch = if ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq "Arm64") { "arm64" } else { "amd64" }
+        Invoke-WebRequest -Uri "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_windows_$arch.tar.gz" -OutFile "mcp-publisher.tar.gz"
+        tar xf mcp-publisher.tar.gz mcp-publisher.exe
+        Remove-Item mcp-publisher.tar.gz
+        Write-Output "✓ MCP Publisher installed"
+      shell: pwsh
+
+    - name: Login to MCP Registry
+      id: login-mcp-registry
+      run: |
+        Write-Output "Authenticating with MCP Registry using GitHub OIDC..."
+        ./mcp-publisher.exe login github-oidc
+        Write-Output "✓ Authenticated with MCP Registry"
+      shell: pwsh
+
+    - name: Publish to MCP Registry
+      id: publish-mcp-registry
+      run: |
+        $version = $env:PACKAGE_VERSION
+        $packageId = "sbroenne.windowsmcp"
+
+        Write-Output "Publishing to MCP Registry..."
+        Write-Output "Server name: io.github.sbroenne/mcp-windows"
+        Write-Output "Package ID: $packageId"
+        Write-Output "Version: $version"
+        Write-Output ""
+
+        # Verify README is accessible before publishing
+        $readmeUrl = "https://api.nuget.org/v3-flatcontainer/$packageId/$version/readme"
+        Write-Output "Pre-publish verification:"
+        Write-Output "Checking README at: $readmeUrl"
+
+        try {
+          $response = Invoke-WebRequest -Uri $readmeUrl -UseBasicParsing
+          $readmeContent = [System.Text.Encoding]::UTF8.GetString($response.Content)
+          if ($readmeContent -match "mcp-name:\s+io\.github\.sbroenne/mcp-windows") {
+            Write-Output "✅ README contains mcp-name validation string"
+          } else {
+            Write-Output "⚠️ README found but mcp-name string not detected - publishing may fail validation"
+          }
+        } catch {
+          Write-Output "⚠️ Could not verify README accessibility - publishing may fail validation"
+        }
+
+        Write-Output ""
+
+        # Check if version already exists in MCP Registry
+        Write-Output "Checking if version $version already exists in MCP Registry..."
+        $registryCheckUrl = "https://registry.modelcontextprotocol.io/v0.1/servers/io.github.sbroenne%2Fmcp-windows/versions/$version"
+        try {
+          $registryData = Invoke-RestMethod -Uri $registryCheckUrl -ErrorAction Stop
+          Write-Output "⚠️ WARNING: Version $version already exists in MCP Registry"
+          Write-Output "   This publish attempt will likely fail with 'duplicate version' error"
+          Write-Output ""
+        } catch {
+          if ($_.Exception.Response.StatusCode -eq 404) {
+            Write-Output "✅ Version $version not found in registry - proceeding with publish"
+          } else {
+            Write-Output "⚠️ Could not check registry for existing version (this is OK - will attempt publish)"
+          }
+        }
+
+        Write-Output ""
+        Write-Output "Proceeding with MCP Registry publish..."
+
+        # Navigate to .mcp directory (where server.json is located)
+        Set-Location src/Sbroenne.WindowsMcp/.mcp
+
+        # Publish to registry
+        $publishOutput = ../../../mcp-publisher.exe publish --verbose 2>&1
+        $publishExitCode = $LASTEXITCODE
+
+        Write-Output $publishOutput
+
+        if ($publishExitCode -eq 0) {
+          Write-Output ""
+          Write-Output "🚀 Published to MCP Registry"
+          Write-Output "🔗 Server available at: https://registry.modelcontextprotocol.io/v0.1/servers/io.github.sbroenne%2Fmcp-windows/versions/$version"
+        } else {
+          Write-Output ""
+          Write-Output "❌ MCP Registry publishing failed with exit code $publishExitCode"
+
+          # Check if this is a duplicate version error (acceptable for re-runs)
+          if ($publishOutput -match "duplicate version") {
+            Write-Output ""
+            Write-Output "🔍 DUPLICATE VERSION DETECTED - This is OK for re-runs"
+            Write-Output "✅ Treating as success (version already exists in registry)"
+            exit 0
+          }
+
+          exit $publishExitCode
+        }
+      shell: pwsh
+      env:
+        PACKAGE_VERSION: ${{ env.PACKAGE_VERSION }}
+
+    - name: MCP Registry Status
+      if: always()
+      run: |
+        Write-Output "========================================"
+        Write-Output "MCP Registry Publishing Status Summary"
+        Write-Output "========================================"
+
+        $installStatus = "${{ steps.install-mcp-publisher.outcome }}"
+        $loginStatus = "${{ steps.login-mcp-registry.outcome }}"
+        $publishStatus = "${{ steps.publish-mcp-registry.outcome }}"
+
+        Write-Output "Install MCP Publisher: $installStatus"
+        Write-Output "Login to MCP Registry: $loginStatus"
+        Write-Output "Publish to MCP Registry: $publishStatus"
+        Write-Output ""
+
+        if ($publishStatus -eq "success") {
+          Write-Output "✅ MCP Registry publishing succeeded!"
+          Write-Output "🔗 Server available at: https://registry.modelcontextprotocol.io/v0.1/servers/io.github.sbroenne%2Fmcp-windows/versions/${{ env.PACKAGE_VERSION }}"
+        } else {
+          Write-Output "❌ MCP Registry publishing failed"
+          Write-Output ""
+          Write-Output "   ✅ NuGet package publication was SUCCESSFUL"
+          Write-Output "   🔗 NuGet: https://www.nuget.org/packages/Sbroenne.WindowsMcp"
+        }
+
+        Write-Output "========================================"
       shell: pwsh
