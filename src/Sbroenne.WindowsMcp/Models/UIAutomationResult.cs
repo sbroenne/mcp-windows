@@ -65,6 +65,32 @@ public sealed record UIAutomationResult
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
+    /// Base64-encoded annotated screenshot image data (for capture_annotated action).
+    /// </summary>
+    public string? AnnotatedImageData { get; init; }
+
+    /// <summary>
+    /// Format of the annotated image (jpeg or png).
+    /// </summary>
+    public string? AnnotatedImageFormat { get; init; }
+
+    /// <summary>
+    /// Width of the annotated image in pixels.
+    /// </summary>
+    public int? AnnotatedImageWidth { get; init; }
+
+    /// <summary>
+    /// Height of the annotated image in pixels.
+    /// </summary>
+    public int? AnnotatedImageHeight { get; init; }
+
+    /// <summary>
+    /// Array of annotated elements with their numbered indices matching the labels on the screenshot.
+    /// Use these to reference elements by number in subsequent operations.
+    /// </summary>
+    public AnnotatedElement[]? AnnotatedElements { get; init; }
+
+    /// <summary>
     /// Creates a success result with a single element (wrapped in an array for consistency).
     /// </summary>
     /// <param name="action">The action performed.</param>

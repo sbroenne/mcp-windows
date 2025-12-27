@@ -54,6 +54,8 @@ builder.Services.AddSingleton<IOcrService, LegacyOcrService>();
 // Register UI Automation services
 builder.Services.AddSingleton<UIAutomationThread>();
 builder.Services.AddSingleton<IUIAutomationService, UIAutomationService>();
+builder.Services.AddSingleton<AnnotatedScreenshotLogger>();
+builder.Services.AddSingleton<IAnnotatedScreenshotService, AnnotatedScreenshotService>();
 
 // Configure MCP server with stdio transport
 builder.Services

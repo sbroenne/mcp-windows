@@ -17,6 +17,7 @@ public sealed class UIAutomationToolTests
     private readonly IUIAutomationService _mockService;
     private readonly IOcrService _mockOcrService;
     private readonly IScreenshotService _mockScreenshotService;
+    private readonly IAnnotatedScreenshotService _mockAnnotatedScreenshotService;
     private readonly IWindowEnumerator _mockWindowEnumerator;
     private readonly IWindowService _mockWindowService;
     private readonly ILogger<UIAutomationTool> _mockLogger;
@@ -27,10 +28,11 @@ public sealed class UIAutomationToolTests
         _mockService = Substitute.For<IUIAutomationService>();
         _mockOcrService = Substitute.For<IOcrService>();
         _mockScreenshotService = Substitute.For<IScreenshotService>();
+        _mockAnnotatedScreenshotService = Substitute.For<IAnnotatedScreenshotService>();
         _mockWindowEnumerator = Substitute.For<IWindowEnumerator>();
         _mockWindowService = Substitute.For<IWindowService>();
         _mockLogger = Substitute.For<ILogger<UIAutomationTool>>();
-        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger);
+        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger);
     }
 
     #region Test Helpers
@@ -71,7 +73,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger));
+            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger));
     }
 
     [Fact]
@@ -79,7 +81,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockWindowService, null!));
+            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, null!));
     }
 
     #endregion

@@ -21,6 +21,7 @@ public sealed partial class UIAutomationTool
     private readonly IUIAutomationService _automationService;
     private readonly IOcrService _ocrService;
     private readonly IScreenshotService _screenshotService;
+    private readonly IAnnotatedScreenshotService _annotatedScreenshotService;
     private readonly IWindowEnumerator _windowEnumerator;
     private readonly IWindowService _windowService;
     private readonly ILogger<UIAutomationTool> _logger;
@@ -31,6 +32,7 @@ public sealed partial class UIAutomationTool
     /// <param name="automationService">The UI Automation service.</param>
     /// <param name="ocrService">The OCR service.</param>
     /// <param name="screenshotService">The screenshot service for OCR captures.</param>
+    /// <param name="annotatedScreenshotService">The annotated screenshot service.</param>
     /// <param name="windowEnumerator">The window enumerator for getting target window info.</param>
     /// <param name="windowService">The window service for window activation.</param>
     /// <param name="logger">The logger.</param>
@@ -38,6 +40,7 @@ public sealed partial class UIAutomationTool
         IUIAutomationService automationService,
         IOcrService ocrService,
         IScreenshotService screenshotService,
+        IAnnotatedScreenshotService annotatedScreenshotService,
         IWindowEnumerator windowEnumerator,
         IWindowService windowService,
         ILogger<UIAutomationTool> logger)
@@ -45,6 +48,7 @@ public sealed partial class UIAutomationTool
         ArgumentNullException.ThrowIfNull(automationService);
         ArgumentNullException.ThrowIfNull(ocrService);
         ArgumentNullException.ThrowIfNull(screenshotService);
+        ArgumentNullException.ThrowIfNull(annotatedScreenshotService);
         ArgumentNullException.ThrowIfNull(windowEnumerator);
         ArgumentNullException.ThrowIfNull(windowService);
         ArgumentNullException.ThrowIfNull(logger);
@@ -52,6 +56,7 @@ public sealed partial class UIAutomationTool
         _automationService = automationService;
         _ocrService = ocrService;
         _screenshotService = screenshotService;
+        _annotatedScreenshotService = annotatedScreenshotService;
         _windowEnumerator = windowEnumerator;
         _windowService = windowService;
         _logger = logger;
@@ -82,9 +87,9 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), click, type, select, toggle, invoke (patterns), focus, scroll_into_view, get_text, highlight (draws red box for human observer - persists until hide_highlight called), hide_highlight (removes the red box), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain). MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth.")]
+    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), click, type, select, toggle, invoke (patterns), focus, scroll_into_view, get_text, highlight (draws red box for human observer - persists until hide_highlight called), hide_highlight (removes the red box), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain), capture_annotated (screenshot with numbered element labels - returns image + index mapping for easy reference). MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
+        [Description("Action: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
         UIAutomationAction action,
 
         [Description("Window handle to target. For interactive actions (click, type, select, toggle, invoke, focus), the window is automatically activated before the action. Get from window_management(action='find'). If not specified, uses the current foreground window.")]
@@ -185,6 +190,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
+                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(action.ToString(), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -643,6 +649,39 @@ public sealed partial class UIAutomationTool
         return await _automationService.GetAncestorsAsync(elementId, depthLimit, cancellationToken);
     }
 
+    private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
+        nint? windowHandle, string? controlTypeFilter, CancellationToken cancellationToken)
+    {
+        var result = await _annotatedScreenshotService.CaptureAsync(
+            windowHandle,
+            controlTypeFilter,
+            maxElements: 50,
+            Models.ImageFormat.Jpeg,
+            quality: 85,
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
+                result.ErrorMessage ?? "Failed to capture annotated screenshot", null);
+        }
+
+        // Return success with annotated screenshot data
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = "capture_annotated",
+            AnnotatedImageData = result.ImageData,
+            AnnotatedImageFormat = result.ImageFormat,
+            AnnotatedImageWidth = result.Width,
+            AnnotatedImageHeight = result.Height,
+            AnnotatedElements = result.Elements,
+            ElementCount = result.ElementCount,
+            UsageHint = $"Screenshot with {result.ElementCount} numbered elements. Reference elements by their index number (1-{result.ElementCount}). " +
+                        "Each element has an elementId you can use for subsequent operations like click, type, toggle."
+        };
+    }
+
     #endregion
 
     #region LoggerMessage Methods
@@ -739,5 +778,9 @@ public enum UIAutomationAction
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
     [Description("Get all ancestor elements of an element up to the window root")]
-    GetAncestors
+    GetAncestors,
+
+    /// <summary>Capture annotated screenshot with numbered labels on interactive elements.</summary>
+    [Description("Capture annotated screenshot with numbered labels on interactive elements. Returns image + element mapping.")]
+    CaptureAnnotated
 }
