@@ -112,19 +112,19 @@ public sealed partial class KeyboardOperationLogger
         return Guid.NewGuid().ToString("N")[..12];
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Keyboard operation started. CorrelationId={CorrelationId}, Action={Action}, Parameters={Parameters}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Keyboard operation started. CorrelationId={CorrelationId}, Action={Action}, Parameters={Parameters}")]
     private static partial void LogOperationStarted(ILogger logger, string correlationId, string action, string? parameters);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Type operation succeeded. CorrelationId={CorrelationId}, CharactersTyped={CharactersTyped}, DurationMs={DurationMs}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Type operation succeeded. CorrelationId={CorrelationId}, CharactersTyped={CharactersTyped}, DurationMs={DurationMs}")]
     private static partial void LogTypeSucceeded(ILogger logger, string correlationId, int charactersTyped, long durationMs);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Press operation succeeded. CorrelationId={CorrelationId}, KeyPressed={KeyPressed}, Modifiers={Modifiers}, DurationMs={DurationMs}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Press operation succeeded. CorrelationId={CorrelationId}, KeyPressed={KeyPressed}, Modifiers={Modifiers}, DurationMs={DurationMs}")]
     private static partial void LogPressSucceeded(ILogger logger, string correlationId, string keyPressed, string? modifiers, long durationMs);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Sequence operation succeeded. CorrelationId={CorrelationId}, SequenceLength={SequenceLength}, DurationMs={DurationMs}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Sequence operation succeeded. CorrelationId={CorrelationId}, SequenceLength={SequenceLength}, DurationMs={DurationMs}")]
     private static partial void LogSequenceSucceeded(ILogger logger, string correlationId, int sequenceLength, long durationMs);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Layout query succeeded. CorrelationId={CorrelationId}, LanguageTag={LanguageTag}, DurationMs={DurationMs}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Layout query succeeded. CorrelationId={CorrelationId}, LanguageTag={LanguageTag}, DurationMs={DurationMs}")]
     private static partial void LogLayoutQuerySucceeded(ILogger logger, string correlationId, string languageTag, long durationMs);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Keyboard operation failed. CorrelationId={CorrelationId}, Action={Action}, ErrorCode={ErrorCode}, Error={Error}, DurationMs={DurationMs}")]

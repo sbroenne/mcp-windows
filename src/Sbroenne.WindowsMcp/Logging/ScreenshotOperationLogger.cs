@@ -23,19 +23,19 @@ public sealed partial class ScreenshotOperationLogger
     /// <summary>
     /// Logs the start of a screenshot operation.
     /// </summary>
-    [LoggerMessage(Level = LogLevel.Information, Message = "Screenshot operation started: Action={Action}, Target={Target}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Screenshot operation started: Action={Action}, Target={Target}")]
     public partial void LogOperationStarted(ScreenshotAction action, CaptureTarget target);
 
     /// <summary>
     /// Logs a successful capture with dimensions (but not image data).
     /// </summary>
-    [LoggerMessage(Level = LogLevel.Information, Message = "Screenshot captured successfully: {Width}x{Height} pixels")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Screenshot captured successfully: {Width}x{Height} pixels")]
     public partial void LogCaptureSuccess(int width, int height);
 
     /// <summary>
     /// Logs a monitor list operation.
     /// </summary>
-    [LoggerMessage(Level = LogLevel.Information, Message = "Listed {MonitorCount} monitors")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Listed {MonitorCount} monitors")]
     public partial void LogMonitorListSuccess(int monitorCount);
 
     /// <summary>
