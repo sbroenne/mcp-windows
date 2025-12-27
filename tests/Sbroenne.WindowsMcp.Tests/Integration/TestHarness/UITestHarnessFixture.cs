@@ -109,8 +109,9 @@ public sealed class UITestHarnessFixture : IDisposable
 
 /// <summary>
 /// Collection definition for UI test harness tests.
+/// Parallelization is disabled to avoid competing for foreground window and input focus.
 /// </summary>
-[CollectionDefinition("UITestHarness")]
+[CollectionDefinition("UITestHarness", DisableParallelization = true)]
 public sealed class UITestHarnessTestDefinition : ICollectionFixture<UITestHarnessFixture>
 {
 }

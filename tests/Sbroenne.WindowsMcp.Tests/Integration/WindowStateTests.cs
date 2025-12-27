@@ -217,4 +217,231 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.False(result.Success);
         Assert.NotNull(result.Error);
     }
+
+    #region GetState Tests
+
+    [Fact]
+    public async Task GetWindowState_ReturnsCurrentState()
+    {
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+
+        // First ensure window is in normal state
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Act
+        var result = await _windowService.GetWindowStateAsync(handle);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"GetState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Normal, result.Window.State);
+    }
+
+    [Fact]
+    public async Task GetWindowState_MinimizedWindow_ReturnsMinimized()
+    {
+        // Arrange - Use the test harness window and minimize it
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.MinimizeWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Act
+        var result = await _windowService.GetWindowStateAsync(handle);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"GetState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Minimized, result.Window.State);
+
+        // Clean up
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+    }
+
+    [Fact]
+    public async Task GetWindowState_MaximizedWindow_ReturnsMaximized()
+    {
+        // Arrange - Use the test harness window and maximize it
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.MaximizeWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Act
+        var result = await _windowService.GetWindowStateAsync(handle);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"GetState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Maximized, result.Window.State);
+
+        // Clean up
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+    }
+
+    [Fact]
+    public async Task GetWindowState_ZeroHandle_ReturnsError()
+    {
+        // Arrange
+        nint zeroHandle = IntPtr.Zero;
+
+        // Act
+        var result = await _windowService.GetWindowStateAsync(zeroHandle);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public async Task GetWindowState_InvalidHandle_ReturnsError()
+    {
+        // Arrange - Use an invalid handle
+        nint invalidHandle = (nint)0x12345678;
+
+        // Act
+        var result = await _windowService.GetWindowStateAsync(invalidHandle);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+    }
+
+    #endregion
+
+    #region WaitForState Tests
+
+    [Fact]
+    public async Task WaitForState_AlreadyInState_ReturnsImmediately()
+    {
+        // Arrange - Use the test harness window in normal state
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Act
+        var result = await _windowService.WaitForStateAsync(handle, WindowState.Normal, 1000);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"WaitForState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Normal, result.Window.State);
+    }
+
+    [Fact]
+    public async Task WaitForState_WaitsForMinimize()
+    {
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Start waiting for minimized state
+        var waitTask = _windowService.WaitForStateAsync(handle, WindowState.Minimized, 5000);
+
+        // Minimize while waiting
+        await Task.Delay(100);
+        await _windowService.MinimizeWindowAsync(handle);
+
+        // Act
+        var result = await waitTask;
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"WaitForState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Minimized, result.Window.State);
+
+        // Clean up
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+    }
+
+    [Fact]
+    public async Task WaitForState_WaitsForMaximize()
+    {
+        // Arrange - Use the test harness window
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Start waiting for maximized state
+        var waitTask = _windowService.WaitForStateAsync(handle, WindowState.Maximized, 5000);
+
+        // Maximize while waiting
+        await Task.Delay(100);
+        await _windowService.MaximizeWindowAsync(handle);
+
+        // Act
+        var result = await waitTask;
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.Success, $"WaitForState failed: {result.Error}");
+        Assert.NotNull(result.Window);
+        Assert.Equal(WindowState.Maximized, result.Window.State);
+
+        // Clean up
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+    }
+
+    [Fact]
+    public async Task WaitForState_Timeout_ReturnsError()
+    {
+        // Arrange - Use the test harness window in normal state
+        nint handle = _fixture.TestWindowHandle;
+
+        await _windowService.RestoreWindowAsync(handle);
+        await Task.Delay(100);
+
+        // Act - Wait for minimized but don't minimize
+        var result = await _windowService.WaitForStateAsync(handle, WindowState.Minimized, 500);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.Contains("Timeout", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task WaitForState_ZeroHandle_ReturnsError()
+    {
+        // Arrange
+        nint zeroHandle = IntPtr.Zero;
+
+        // Act
+        var result = await _windowService.WaitForStateAsync(zeroHandle, WindowState.Normal, 1000);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public async Task WaitForState_InvalidHandle_ReturnsError()
+    {
+        // Arrange - Use an invalid handle
+        nint invalidHandle = (nint)0x12345678;
+
+        // Act
+        var result = await _windowService.WaitForStateAsync(invalidHandle, WindowState.Normal, 1000);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+    }
+
+    #endregion
 }

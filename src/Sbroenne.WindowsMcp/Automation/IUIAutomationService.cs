@@ -36,6 +36,26 @@ public interface IUIAutomationService
     Task<UIAutomationResult> WaitForElementAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Waits for an element matching the query to disappear (no longer found).
+    /// Useful for waiting until dialogs close, spinners disappear, or overlays are removed.
+    /// </summary>
+    /// <param name="query">The search criteria.</param>
+    /// <param name="timeoutMs">Maximum wait time in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result indicating success (element disappeared) or timeout error.</returns>
+    Task<UIAutomationResult> WaitForElementDisappearAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Waits for an element to reach a desired state.
+    /// </summary>
+    /// <param name="elementId">The element ID to monitor.</param>
+    /// <param name="desiredState">The state to wait for: enabled, disabled, on, off, indeterminate, visible, offscreen.</param>
+    /// <param name="timeoutMs">Maximum wait time in milliseconds.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result with the element in the desired state or timeout error.</returns>
+    Task<UIAutomationResult> WaitForElementStateAsync(string elementId, string desiredState, int timeoutMs, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Scrolls the parent container to make an element visible.
     /// </summary>
     /// <param name="elementId">The element ID to scroll into view.</param>

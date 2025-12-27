@@ -84,15 +84,20 @@ public sealed partial class UIAutomationTool
     /// <param name="clearFirst">Clear existing text before typing.</param>
     /// <param name="value">Value for select or invoke actions.</param>
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.</param>
+    /// <param name="desiredState">Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.</param>
+    /// <param name="sortByProminence">Sort results by element prominence (bounding box area, largest first). Useful for disambiguation.</param>
+    /// <param name="interactiveOnly">For capture_annotated: filter to only interactive control types (default: true).</param>
+    /// <param name="outputPath">For capture_annotated: save image to file instead of returning base64.</param>
+    /// <param name="returnImageData">For capture_annotated: include base64 image in response (default: true). Set false with outputPath to reduce response size.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), click, type, select, toggle, invoke (patterns), focus, scroll_into_view, get_text, highlight (draws red box for human verification or demos - persists until hide_highlight called), hide_highlight (removes the red box), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain), capture_annotated (screenshot with numbered element labels - use to discover clickable elements visually). DISCOVERY TIP: Use capture_annotated first to see all interactive elements with numbers, then reference by index. MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth. TEXT EXTRACTION: Use get_text first; use ocr_element only for images, custom-rendered controls, or when get_text returns empty. TROUBLESHOOTING: If find returns no results, use get_tree to see actual element hierarchy and adjust your query.")]
+    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), wait_for_disappear (wait until element gone), wait_for_state (wait for element state), click, type, select, toggle, ensure_state (set checkbox to on/off - only toggles if needed), invoke (patterns), focus, scroll_into_view, get_text, highlight (draws red box for human verification or demos - persists until hide_highlight called), hide_highlight (removes the red box), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain), capture_annotated (screenshot with numbered element labels - use to discover clickable elements visually). DISCOVERY TIP: Use capture_annotated first to see all interactive elements with numbers, then reference by index. MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth. TEXT EXTRACTION: Use get_text first; use ocr_element only for images, custom-rendered controls, or when get_text returns empty. TROUBLESHOOTING: If find returns no results, check diagnostics.detectedFramework - for Chromium/Electron apps try nameContains instead of exact name match.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
+        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
         UIAutomationAction action,
 
-        [Description("Window handle to target. For interactive actions (click, type, select, toggle, invoke, focus), the window is automatically activated before the action. Get from window_management(action='find'). If not specified, uses the current foreground window.")]
+        [Description("Window handle to target. For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. Get from window_management(action='find'). If not specified, uses the current foreground window.")]
         nint? windowHandle = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
@@ -146,6 +151,21 @@ public sealed partial class UIAutomationTool
         [Description("OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.")]
         string? language = null,
 
+        [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
+        string? desiredState = null,
+
+        [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
+        bool sortByProminence = false,
+
+        [Description("For capture_annotated: filter to only interactive control types (Button, Edit, CheckBox, etc.). Default: true.")]
+        bool interactiveOnly = true,
+
+        [Description("For capture_annotated: save image to this file path instead of returning base64. Supports .png and .jpg extensions.")]
+        string? outputPath = null,
+
+        [Description("For capture_annotated: whether to include base64 image data in response. Set to false when using outputPath to reduce response size. Default: true.")]
+        bool returnImageData = true,
+
         CancellationToken cancellationToken = default)
     {
         LogActionStarted(_logger, action, name, controlType, automationId);
@@ -171,13 +191,16 @@ public sealed partial class UIAutomationTool
         {
             var result = action switch
             {
-                UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, timeoutMs, cancellationToken),
+                UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, timeoutMs, cancellationToken),
                 UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, desiredState, timeoutMs, cancellationToken),
                 UIAutomationAction.Click => await HandleClickAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
                 UIAutomationAction.Type => await HandleTypeAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, text, clearFirst, cancellationToken),
                 UIAutomationAction.Select => await HandleSelectAsync(elementId, windowHandle, name, controlType, automationId, value, cancellationToken),
                 UIAutomationAction.Toggle => await HandleToggleAsync(elementId, cancellationToken),
+                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, desiredState, cancellationToken),
                 UIAutomationAction.Invoke => await HandleInvokeAsync(elementId, value, cancellationToken),
                 UIAutomationAction.Focus => await HandleFocusAsync(elementId, cancellationToken),
                 UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
@@ -190,7 +213,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
-                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, cancellationToken),
+                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, interactiveOnly, outputPath, returnImageData, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(action.ToString(), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -223,7 +246,8 @@ public sealed partial class UIAutomationTool
     private static bool IsInteractiveAction(UIAutomationAction action) =>
         action is UIAutomationAction.Click or UIAutomationAction.Type
             or UIAutomationAction.Select or UIAutomationAction.Toggle
-            or UIAutomationAction.Invoke or UIAutomationAction.Focus;
+            or UIAutomationAction.EnsureState or UIAutomationAction.Invoke
+            or UIAutomationAction.Focus;
 
     /// <summary>
     /// Attaches information about the current foreground window to the result.
@@ -302,7 +326,7 @@ public sealed partial class UIAutomationTool
     private async Task<UIAutomationResult> HandleFindAsync(
         nint? windowHandle, string? parentElementId, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
-        bool includeChildren, int timeoutMs, CancellationToken cancellationToken)
+        bool includeChildren, bool sortByProminence, int timeoutMs, CancellationToken cancellationToken)
     {
         var query = new ElementQuery
         {
@@ -317,6 +341,7 @@ public sealed partial class UIAutomationTool
             ExactDepth = exactDepth,
             FoundIndex = foundIndex,
             IncludeChildren = includeChildren,
+            SortByProminence = sortByProminence,
             TimeoutMs = timeoutMs
         };
 
@@ -349,6 +374,59 @@ public sealed partial class UIAutomationTool
         };
 
         return await _automationService.WaitForElementAsync(query, timeoutMs, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for an element matching the query to disappear (no longer found).
+    /// Useful for waiting until dialogs close, spinners disappear, or overlays are removed.
+    /// </summary>
+    private async Task<UIAutomationResult> HandleWaitForDisappearAsync(
+        nint? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
+        int timeoutMs, CancellationToken cancellationToken)
+    {
+        var query = new ElementQuery
+        {
+            WindowHandle = windowHandle,
+            Name = name,
+            NameContains = nameContains,
+            NamePattern = namePattern,
+            ControlType = controlType,
+            AutomationId = automationId,
+            ClassName = className,
+            ExactDepth = exactDepth,
+            FoundIndex = foundIndex,
+            TimeoutMs = timeoutMs
+        };
+
+        return await _automationService.WaitForElementDisappearAsync(query, timeoutMs, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for an element to reach a desired state (e.g., enabled, not offscreen, specific toggle state).
+    /// </summary>
+    private async Task<UIAutomationResult> HandleWaitForStateAsync(
+        string? elementId, string? desiredState, int timeoutMs, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return UIAutomationResult.CreateFailure(
+                nameof(UIAutomationAction.WaitForState),
+                UIAutomationErrorType.InvalidParameter,
+                "elementId is required for WaitForState action",
+                null);
+        }
+
+        if (string.IsNullOrEmpty(desiredState))
+        {
+            return UIAutomationResult.CreateFailure(
+                nameof(UIAutomationAction.WaitForState),
+                UIAutomationErrorType.InvalidParameter,
+                "desiredState is required for WaitForState action. Valid values: enabled, disabled, on, off, indeterminate, visible, offscreen",
+                null);
+        }
+
+        return await _automationService.WaitForElementStateAsync(elementId, desiredState, timeoutMs, cancellationToken);
     }
 
     private async Task<UIAutomationResult> HandleClickAsync(
@@ -431,6 +509,86 @@ public sealed partial class UIAutomationTool
         }
 
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
+    }
+
+    private async Task<UIAutomationResult> HandleEnsureStateAsync(string? elementId, string? desiredState, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InvalidParameter, "Element ID is required for ensure_state action", null);
+        }
+
+        if (string.IsNullOrEmpty(desiredState))
+        {
+            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InvalidParameter, "desiredState is required for ensure_state action. Use 'on', 'off', or 'indeterminate'.", null);
+        }
+
+        // Normalize desired state
+        var normalizedDesiredState = desiredState.Trim().ToUpperInvariant() switch
+        {
+            "ON" or "TRUE" or "CHECKED" or "1" => "On",
+            "OFF" or "FALSE" or "UNCHECKED" or "0" => "Off",
+            "INDETERMINATE" or "MIXED" => "Indeterminate",
+            _ => null
+        };
+
+        if (normalizedDesiredState == null)
+        {
+            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InvalidParameter, $"Invalid desiredState: '{desiredState}'. Use 'on', 'off', or 'indeterminate'.", null);
+        }
+
+        // Get current element state
+        var elementInfo = await _automationService.ResolveElementAsync(elementId, cancellationToken);
+        if (elementInfo == null)
+        {
+            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementNotFound, $"Element not found or stale: {elementId}", null);
+        }
+
+        var currentState = elementInfo.ToggleState;
+        if (currentState == null)
+        {
+            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.PatternNotSupported, "Element does not support TogglePattern. Use toggle action only on checkboxes, toggle buttons, or similar controls.", null);
+        }
+
+        // Check if already in desired state
+        if (string.Equals(currentState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
+        {
+            // Already in desired state - return success without toggling
+            return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+            {
+                UsageHint = $"Element was already in '{normalizedDesiredState}' state. No action taken."
+            };
+        }
+
+        // Need to toggle to reach desired state
+        // Note: Some controls cycle through 3 states (Off → On → Indeterminate → Off)
+        // We may need multiple toggles to reach the desired state
+        var maxAttempts = 3; // Off → On → Indeterminate → Off
+        for (var attempt = 0; attempt < maxAttempts; attempt++)
+        {
+            var toggleResult = await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
+            if (!toggleResult.Success)
+            {
+                return toggleResult with { Action = "ensure_state" };
+            }
+
+            // Check new state
+            elementInfo = await _automationService.ResolveElementAsync(elementId, cancellationToken);
+            if (elementInfo == null)
+            {
+                return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementStale, "Element became stale after toggling", null);
+            }
+
+            if (string.Equals(elementInfo.ToggleState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
+            {
+                return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+                {
+                    UsageHint = $"Element toggled to '{normalizedDesiredState}' state (took {attempt + 1} toggle(s))."
+                };
+            }
+        }
+
+        return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InternalError, $"Could not reach desired state '{normalizedDesiredState}' after {maxAttempts} toggles. Current state: {elementInfo.ToggleState}", null);
     }
 
     private async Task<UIAutomationResult> HandleInvokeAsync(string? elementId, string? value, CancellationToken cancellationToken)
@@ -650,7 +808,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
-        nint? windowHandle, string? controlTypeFilter, int maxDepth, CancellationToken cancellationToken)
+        nint? windowHandle, string? controlTypeFilter, int maxDepth, bool interactiveOnly, string? outputPath, bool returnImageData, CancellationToken cancellationToken)
     {
         // Use maxDepth for capture_annotated, with sensible defaults:
         // - If maxDepth is default (5), use 15 for Electron compatibility
@@ -664,6 +822,7 @@ public sealed partial class UIAutomationTool
             searchDepth: searchDepth,
             Models.ImageFormat.Jpeg,
             quality: 85,
+            interactiveOnly: interactiveOnly,
             cancellationToken);
 
         if (!result.Success)
@@ -672,19 +831,48 @@ public sealed partial class UIAutomationTool
                 result.ErrorMessage ?? "Failed to capture annotated screenshot", null);
         }
 
+        // Save to file if outputPath is specified
+        string? savedFilePath = null;
+        if (!string.IsNullOrEmpty(outputPath))
+        {
+            try
+            {
+                var imageBytes = Convert.FromBase64String(result.ImageData!);
+                var directory = Path.GetDirectoryName(outputPath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                await File.WriteAllBytesAsync(outputPath, imageBytes, cancellationToken);
+                savedFilePath = outputPath;
+            }
+            catch (Exception ex)
+            {
+                return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
+                    $"Failed to save image to '{outputPath}': {ex.Message}", null);
+            }
+        }
+
+        // Build usage hint based on options
+        var usageHint = $"Screenshot with {result.ElementCount} numbered elements. Reference elements by their index number (1-{result.ElementCount}). " +
+                        "Each element has an elementId you can use for subsequent operations like click, type, toggle.";
+        if (savedFilePath != null)
+        {
+            usageHint = $"Image saved to '{savedFilePath}'. " + usageHint;
+        }
+
         // Return success with annotated screenshot data
         return new UIAutomationResult
         {
             Success = true,
             Action = "capture_annotated",
-            AnnotatedImageData = result.ImageData,
+            AnnotatedImageData = returnImageData ? result.ImageData : null,
             AnnotatedImageFormat = result.ImageFormat,
             AnnotatedImageWidth = result.Width,
             AnnotatedImageHeight = result.Height,
             AnnotatedElements = result.Elements,
             ElementCount = result.ElementCount,
-            UsageHint = $"Screenshot with {result.ElementCount} numbered elements. Reference elements by their index number (1-{result.ElementCount}). " +
-                        "Each element has an elementId you can use for subsequent operations like click, type, toggle."
+            UsageHint = usageHint
         };
     }
 
@@ -722,6 +910,14 @@ public enum UIAutomationAction
     [Description("Wait for an element to appear")]
     WaitFor,
 
+    /// <summary>Wait for an element to disappear.</summary>
+    [Description("Wait for an element to disappear (inverse of wait_for)")]
+    WaitForDisappear,
+
+    /// <summary>Wait for an element to reach a specific state.</summary>
+    [Description("Wait for an element to reach a specific state (toggleState, isEnabled, isOffscreen). Use with desiredState parameter.")]
+    WaitForState,
+
     /// <summary>Click an element.</summary>
     [Description("Click an element")]
     Click,
@@ -737,6 +933,10 @@ public enum UIAutomationAction
     /// <summary>Toggle a checkbox or toggle button.</summary>
     [Description("Toggle a checkbox or toggle button")]
     Toggle,
+
+    /// <summary>Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if needed.</summary>
+    [Description("Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if current state differs from desiredState.")]
+    EnsureState,
 
     /// <summary>Invoke a pattern on an element.</summary>
     [Description("Invoke a pattern on an element")]

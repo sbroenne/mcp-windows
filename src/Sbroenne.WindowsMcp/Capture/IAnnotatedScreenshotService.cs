@@ -16,6 +16,7 @@ public interface IAnnotatedScreenshotService
     /// <param name="searchDepth">Maximum depth to search for elements. Default: 15 (optimized for Electron/Chromium apps). Use 5-8 for WinForms, 8-10 for WPF.</param>
     /// <param name="format">Image format (jpeg or png). Default: jpeg.</param>
     /// <param name="quality">JPEG quality 1-100. Default: 85.</param>
+    /// <param name="interactiveOnly">Filter to only interactive control types (Button, Edit, CheckBox, etc.). Default: true.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result containing annotated image and element mapping.</returns>
     Task<AnnotatedScreenshotResult> CaptureAsync(
@@ -25,5 +26,6 @@ public interface IAnnotatedScreenshotService
         int searchDepth = 15,
         ImageFormat format = ImageFormat.Jpeg,
         int quality = 85,
+        bool interactiveOnly = true,
         CancellationToken cancellationToken = default);
 }

@@ -496,6 +496,59 @@ public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
         return _heldKeyTracker.GetHeldKeyNames();
     }
 
+    /// <inheritdoc />
+    public Task<KeyboardControlResult> WaitForIdleAsync(CancellationToken cancellationToken = default)
+    {
+        var foregroundWindow = NativeMethods.GetForegroundWindow();
+        if (foregroundWindow == IntPtr.Zero)
+        {
+            return Task.FromResult(KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.InvalidKey,
+                "No foreground window available to wait for idle."));
+        }
+
+        _ = NativeMethods.GetWindowThreadProcessId(foregroundWindow, out var processId);
+        if (processId == 0)
+        {
+            return Task.FromResult(KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.InvalidKey,
+                "Could not get process ID for foreground window."));
+        }
+
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById((int)processId);
+
+            // WaitForInputIdle with a timeout of 5 seconds (5000 ms)
+            // Returns true if the process has entered idle state, false if timeout
+            var result = process.WaitForInputIdle(5000);
+
+            if (result)
+            {
+                return Task.FromResult(KeyboardControlResult.CreateWaitForIdleSuccess(
+                    $"Foreground window process '{process.ProcessName}' is idle and ready for input."));
+            }
+            else
+            {
+                return Task.FromResult(KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.OperationTimeout,
+                    $"Timeout waiting for process '{process.ProcessName}' to become idle."));
+            }
+        }
+        catch (ArgumentException)
+        {
+            return Task.FromResult(KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.InvalidKey,
+                $"Process with ID {processId} not found or has exited."));
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Process doesn't have a graphical interface or has exited
+            return Task.FromResult(KeyboardControlResult.CreateWaitForIdleSuccess(
+                $"Process idle check completed: {ex.Message}"));
+        }
+    }
+
     /// <summary>
     /// Converts a Windows LANGID to a BCP-47 language tag.
     /// </summary>

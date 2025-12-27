@@ -64,6 +64,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         int searchDepth = 15,
         ImageFormat format = ImageFormat.Jpeg,
         int quality = 85,
+        bool interactiveOnly = true,
         CancellationToken cancellationToken = default)
     {
         try
@@ -73,8 +74,8 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             // Clamp searchDepth to valid range (1-20)
             searchDepth = Math.Clamp(searchDepth, 1, 20);
 
-            // Step 1: Get interactive UI elements
-            var elementsResult = await GetInteractiveElementsAsync(windowHandle, controlTypeFilter, maxElements, searchDepth, cancellationToken);
+            // Step 1: Get UI elements (interactive only or all based on parameter)
+            var elementsResult = await GetInteractiveElementsAsync(windowHandle, controlTypeFilter, maxElements, searchDepth, interactiveOnly, cancellationToken);
             if (!elementsResult.Success || elementsResult.Elements == null || elementsResult.Elements.Length == 0)
             {
                 return AnnotatedScreenshotResult.CreateFailure(
@@ -128,24 +129,47 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// <param name="controlTypeFilter">Optional control type filter.</param>
     /// <param name="maxElements">Maximum number of elements to return.</param>
     /// <param name="searchDepth">Maximum depth to search. Use 15 for Electron/Chromium, 5-8 for WinForms, 8-10 for WPF.</param>
+    /// <param name="interactiveOnly">Filter to only interactive control types (default: true).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     private async Task<UIAutomationResult> GetInteractiveElementsAsync(
         nint? windowHandle,
         string? controlTypeFilter,
         int maxElements,
         int searchDepth,
+        bool interactiveOnly,
         CancellationToken cancellationToken)
     {
         // Default control types that are typically interactive
         // Includes Document for Electron apps and TreeItem for file explorers
         var defaultInteractiveTypes = "Button,Edit,CheckBox,RadioButton,ComboBox,List,ListItem,Tab,TabItem,MenuItem,Hyperlink,Slider,Spinner,TreeItem,Document";
-        var filterTypes = string.IsNullOrEmpty(controlTypeFilter) ? defaultInteractiveTypes : controlTypeFilter;
+
+        // Determine filter types based on interactiveOnly setting
+        string? filterTypes;
+        if (!string.IsNullOrEmpty(controlTypeFilter))
+        {
+            // User provided explicit filter - use it
+            filterTypes = controlTypeFilter;
+        }
+        else if (interactiveOnly)
+        {
+            // Use default interactive types
+            filterTypes = defaultInteractiveTypes;
+        }
+        else
+        {
+            // Include all elements (no filtering by control type)
+            filterTypes = null;
+        }
 
         // Parse the control type filter into a set for efficient lookup
-        var allowedControlTypes = filterTypes
-            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(s => s.ToLowerInvariant())
-            .ToHashSet();
+        HashSet<string>? allowedControlTypes = null;
+        if (!string.IsNullOrEmpty(filterTypes))
+        {
+            allowedControlTypes = filterTypes
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => s.ToLowerInvariant())
+                .ToHashSet();
+        }
 
         // Get the full tree WITHOUT control type filter to avoid pruning branches
         // The tree walker prunes branches when parent elements don't match the filter,
@@ -169,9 +193,9 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             FlattenTree(element, allElements);
         }
 
-        // Filter to only allowed control types, visible elements, and limit count
+        // Filter elements based on settings
         var visibleElements = allElements
-            .Where(e => IsInteractiveControlType(e, allowedControlTypes) && IsVisibleOnScreen(e))
+            .Where(e => (allowedControlTypes == null || IsInteractiveControlType(e, allowedControlTypes)) && IsVisibleOnScreen(e))
             .Take(maxElements)
             .ToArray();
 
@@ -180,7 +204,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             return UIAutomationResult.CreateFailure(
                 "get_interactive_elements",
                 UIAutomationErrorType.ElementNotFound,
-                $"No interactive elements found matching control types: {filterTypes}",
+                $"No elements found{(filterTypes != null ? $" matching control types: {filterTypes}" : "")}",
                 result.Diagnostics);
         }
 

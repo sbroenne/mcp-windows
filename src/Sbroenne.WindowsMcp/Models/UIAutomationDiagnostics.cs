@@ -129,4 +129,10 @@ public sealed record ElementQuery
     /// Timeout in milliseconds for implicit wait (0 = no wait).
     /// </summary>
     public int TimeoutMs { get; init; }
+
+    /// <summary>
+    /// Sort results by element prominence (bounding box area, largest first).
+    /// Useful for disambiguation when multiple elements match - larger elements are typically more prominent/important.
+    /// </summary>
+    public bool SortByProminence { get; init; }
 }

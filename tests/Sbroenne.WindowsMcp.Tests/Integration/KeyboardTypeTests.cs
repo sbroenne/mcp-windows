@@ -308,4 +308,59 @@ public class KeyboardTypeTests : IDisposable
         var textReceived = await _fixture.WaitForInputTextAsync(text);
         Assert.True(textReceived, $"Test harness did not receive expected text '{text}', got '{_fixture.GetInputText()}'");
     }
+
+    #region WaitForIdle Tests
+
+    /// <summary>
+    /// Tests that WaitForIdle returns success when called (basic functionality).
+    /// </summary>
+    [Fact]
+    public async Task WaitForIdle_ReturnsSuccessOrAppropriateError()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(100);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.WaitForIdleAsync();
+
+        // Assert - should either succeed or fail with a clear reason
+        // On some test systems, there may be no foreground window
+        if (!result.Success)
+        {
+            Assert.NotNull(result.Error);
+            Assert.True(result.Error.Contains("foreground", StringComparison.OrdinalIgnoreCase) ||
+                       result.Error.Contains("window", StringComparison.OrdinalIgnoreCase) ||
+                       result.Error.Contains("process", StringComparison.OrdinalIgnoreCase),
+                       $"Unexpected error: {result.Error}");
+        }
+        else
+        {
+            Assert.True(result.Success);
+            // When successful, should include a message about the process being idle
+            Assert.NotNull(result.Message);
+        }
+    }
+
+    /// <summary>
+    /// Tests that WaitForIdle can be called with a cancellation token.
+    /// Note: Current implementation may not honor cancellation immediately since
+    /// it uses WaitForInputIdle which is a blocking call.
+    /// </summary>
+    [Fact]
+    public async Task WaitForIdle_WithCancellationToken_CompletesNormally()
+    {
+        // Arrange
+        using var cts = new CancellationTokenSource();
+
+        // Act - call with a cancellation token (not cancelled)
+        var result = await _fixture.KeyboardInputService.WaitForIdleAsync(cts.Token);
+
+        // Assert - should complete (either success or error, but not throw)
+        Assert.NotNull(result);
+    }
+
+    #endregion
 }
+
+
