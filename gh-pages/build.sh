@@ -13,6 +13,28 @@ echo "📁 Copying shared content files..."
 # Create _includes directory if it doesn't exist
 mkdir -p "$SCRIPT_DIR/_includes"
 
+# Copy FEATURES.md from root
+# Strip top block (H1 title, blank, description line, blank) and convert remaining H1 to H2
+if [ -f "$ROOT_DIR/FEATURES.md" ]; then
+    awk '
+        BEGIN { skip_next_blank=0; skip_description=0; headerdone=0 }
+        {
+            # Skip the H1 title line
+            if (headerdone==0 && /^# Windows MCP Features/) { skip_description=1; next }
+            # Skip description line if we just skipped the title
+            if (skip_description==1 && /^Comprehensive/) { skip_description=0; skip_next_blank=1; next }
+            # Skip blank lines while still in header section
+            if (headerdone==0 && /^$/) { next }
+            # First content line marks header as done
+            if (headerdone==0 && !/^$/) { headerdone=1 }
+            # Convert any remaining H1 to H2
+            if (/^# /) { sub(/^# /, "## "); print; next }
+            print
+        }
+    ' "$ROOT_DIR/FEATURES.md" > "$SCRIPT_DIR/_includes/features.md"
+    echo "   ✓ Copied FEATURES.md (stripped top block, H1→H2)"
+fi
+
 # Copy CHANGELOG.md from vscode-extension if it exists
 # Strip top H1 block (title + paragraph) and convert remaining H1 to H2
 if [ -f "$ROOT_DIR/vscode-extension/CHANGELOG.md" ]; then

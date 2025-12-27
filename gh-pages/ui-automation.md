@@ -826,8 +826,8 @@ Find with:
 
 ## Related Tools
 
-- [Mouse Control](/features/#-mouse-control) - Click at coordinates from UI Automation
-- [Keyboard Control](/features/#-keyboard-control) - Type text, press keys
+- [Mouse Control](/features/#%EF%B8%8F-mouse-control) - Click at coordinates from UI Automation
+- [Keyboard Control](/features/#%EF%B8%8F-keyboard-control) - Type text, press keys
 - [Window Management](/features/#-window-management) - Get window handles for scoping
 - [Screenshot Capture](/features/#-screenshot-capture) - Visual verification
 

@@ -7,5 +7,6 @@ vendor/
 Gemfile.lock
 
 # Generated content files (copied by build.sh from project root)
+_includes/features.md
 _includes/contributing.md
 _includes/changelog.md

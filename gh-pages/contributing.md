@@ -9,11 +9,13 @@ permalink: /contributing/
   <div class="container">
     <div class="hero-content">
       <h1 class="hero-title">Contributing</h1>
-      <p class="hero-subtitle">Guidelines for contributing to Windows MCP Server</p>
+      <p class="hero-subtitle">How to contribute to Windows MCP Server development</p>
     </div>
   </div>
 </div>
 
+<div class="container content-section" markdown="1">
 {% capture contributing_content %}{% include contributing.md %}{% endcapture %}
 
 {{ contributing_content | markdownify }}
+</div>

@@ -185,7 +185,7 @@ Before submitting a PR, ensure:
 
 ### Updating README
 
-Update [README.md](README.md) when:
+Update [README.md](https://github.com/sbroenne/mcp-windows/blob/main/README.md) when:
 - Adding new features or tools
 - Changing configuration options
 - Updating installation instructions
