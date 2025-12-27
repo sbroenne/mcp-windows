@@ -96,3 +96,8 @@ node_modules/
 # Electron harness build output
 tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/dist/
 
+# Test screenshots for manual verification (not committed)
+tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/screenshots/
+
+# Runtime screenshots generated during test execution (not committed)
+**/bin/**/screenshots/

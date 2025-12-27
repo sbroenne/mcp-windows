@@ -61,6 +61,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         nint? windowHandle = null,
         string? controlTypeFilter = null,
         int maxElements = 50,
+        int searchDepth = 15,
         ImageFormat format = ImageFormat.Jpeg,
         int quality = 85,
         CancellationToken cancellationToken = default)
@@ -69,8 +70,11 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         {
             _logger.LogCaptureStarted(windowHandle);
 
+            // Clamp searchDepth to valid range (1-20)
+            searchDepth = Math.Clamp(searchDepth, 1, 20);
+
             // Step 1: Get interactive UI elements
-            var elementsResult = await GetInteractiveElementsAsync(windowHandle, controlTypeFilter, maxElements, cancellationToken);
+            var elementsResult = await GetInteractiveElementsAsync(windowHandle, controlTypeFilter, maxElements, searchDepth, cancellationToken);
             if (!elementsResult.Success || elementsResult.Elements == null || elementsResult.Elements.Length == 0)
             {
                 return AnnotatedScreenshotResult.CreateFailure(
@@ -120,24 +124,37 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// <summary>
     /// Gets interactive UI elements from the specified window.
     /// </summary>
+    /// <param name="windowHandle">Window handle to search.</param>
+    /// <param name="controlTypeFilter">Optional control type filter.</param>
+    /// <param name="maxElements">Maximum number of elements to return.</param>
+    /// <param name="searchDepth">Maximum depth to search. Use 15 for Electron/Chromium, 5-8 for WinForms, 8-10 for WPF.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     private async Task<UIAutomationResult> GetInteractiveElementsAsync(
         nint? windowHandle,
         string? controlTypeFilter,
         int maxElements,
+        int searchDepth,
         CancellationToken cancellationToken)
     {
-        // Use a reasonable depth for finding interactive elements
-        const int SearchDepth = 10;
-
         // Default control types that are typically interactive
-        var defaultInteractiveTypes = "Button,Edit,CheckBox,RadioButton,ComboBox,List,ListItem,Tab,TabItem,MenuItem,Hyperlink,Slider,Spinner";
+        // Includes Document for Electron apps and TreeItem for file explorers
+        var defaultInteractiveTypes = "Button,Edit,CheckBox,RadioButton,ComboBox,List,ListItem,Tab,TabItem,MenuItem,Hyperlink,Slider,Spinner,TreeItem,Document";
         var filterTypes = string.IsNullOrEmpty(controlTypeFilter) ? defaultInteractiveTypes : controlTypeFilter;
 
+        // Parse the control type filter into a set for efficient lookup
+        var allowedControlTypes = filterTypes
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(s => s.ToLowerInvariant())
+            .ToHashSet();
+
+        // Get the full tree WITHOUT control type filter to avoid pruning branches
+        // The tree walker prunes branches when parent elements don't match the filter,
+        // which causes us to miss deeply nested elements in apps like Electron/Chromium
         var result = await _automationService.GetTreeAsync(
             windowHandle,
             parentElementId: null,
-            maxDepth: SearchDepth,
-            controlTypeFilter: filterTypes,
+            maxDepth: searchDepth,
+            controlTypeFilter: null, // No filter - we'll filter after flattening
             cancellationToken);
 
         if (!result.Success || result.Elements == null)
@@ -145,13 +162,62 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             return result;
         }
 
-        // Filter to only visible, on-screen elements and limit count
-        var visibleElements = result.Elements
-            .Where(e => IsVisibleOnScreen(e))
+        // GetTreeAsync returns a hierarchical tree - flatten it to get all elements
+        var allElements = new List<UIElementInfo>();
+        foreach (var element in result.Elements)
+        {
+            FlattenTree(element, allElements);
+        }
+
+        // Filter to only allowed control types, visible elements, and limit count
+        var visibleElements = allElements
+            .Where(e => IsInteractiveControlType(e, allowedControlTypes) && IsVisibleOnScreen(e))
             .Take(maxElements)
             .ToArray();
 
+        if (visibleElements.Length == 0)
+        {
+            return UIAutomationResult.CreateFailure(
+                "get_interactive_elements",
+                UIAutomationErrorType.ElementNotFound,
+                $"No interactive elements found matching control types: {filterTypes}",
+                result.Diagnostics);
+        }
+
         return UIAutomationResult.CreateSuccess(result.Action, visibleElements, result.Diagnostics);
+    }
+
+    /// <summary>
+    /// Flattens a hierarchical UI element tree into a flat list.
+    /// </summary>
+    /// <param name="element">The element to flatten.</param>
+    /// <param name="result">The list to add elements to.</param>
+    private static void FlattenTree(UIElementInfo element, List<UIElementInfo> result)
+    {
+        // Add this element (without children to avoid duplication in the flat list)
+        result.Add(element with { Children = null });
+
+        // Recursively process children
+        if (element.Children != null)
+        {
+            foreach (var child in element.Children)
+            {
+                FlattenTree(child, result);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks if an element's control type is in the allowed set.
+    /// </summary>
+    private static bool IsInteractiveControlType(UIElementInfo element, HashSet<string> allowedControlTypes)
+    {
+        if (string.IsNullOrEmpty(element.ControlType))
+        {
+            return false;
+        }
+
+        return allowedControlTypes.Contains(element.ControlType.ToLowerInvariant());
     }
 
     /// <summary>
@@ -211,6 +277,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         using var annotatedBitmap = new Bitmap(originalBitmap.Width, originalBitmap.Height, PixelFormat.Format32bppArgb);
 
         var annotatedElements = new List<AnnotatedElement>();
+        var placedLabels = new List<Rectangle>(); // Track placed label positions to avoid overlaps
 
         using (var graphics = Graphics.FromImage(annotatedBitmap))
         {
@@ -256,27 +323,25 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                     relativeRight - relativeLeft, relativeBottom - relativeTop);
                 graphics.DrawRectangle(pen, rect);
 
-                // Draw label background and text
+                // Calculate label position with anti-overlap logic
                 var labelText = index.ToString(CultureInfo.InvariantCulture);
                 var labelSize = graphics.MeasureString(labelText, font);
                 var labelWidth = (int)labelSize.Width + (LabelPadding * 2);
                 var labelHeight = (int)labelSize.Height + (LabelPadding * 2);
 
-                // Position label at top-right corner of bounding box
-                var labelX = Math.Max(0, Math.Min(relativeRight - labelWidth, originalBitmap.Width - labelWidth));
-                var labelY = Math.Max(0, relativeTop - labelHeight);
+                var labelRect = FindNonOverlappingLabelPosition(
+                    relativeLeft, relativeTop, relativeRight, relativeBottom,
+                    labelWidth, labelHeight,
+                    originalBitmap.Width, originalBitmap.Height,
+                    placedLabels);
 
-                // If no room above, put it inside the top of the box
-                if (labelY < 0)
-                {
-                    labelY = relativeTop;
-                }
+                placedLabels.Add(labelRect);
 
                 using var brush = new SolidBrush(color);
-                graphics.FillRectangle(brush, labelX, labelY, labelWidth, labelHeight);
+                graphics.FillRectangle(brush, labelRect);
 
                 using var textBrush = new SolidBrush(Color.White);
-                graphics.DrawString(labelText, font, textBrush, labelX + LabelPadding, labelY + LabelPadding);
+                graphics.DrawString(labelText, font, textBrush, labelRect.X + LabelPadding, labelRect.Y + LabelPadding);
 
                 // Create annotated element entry
                 annotatedElements.Add(new AnnotatedElement
@@ -297,5 +362,90 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         var base64 = Convert.ToBase64String(processed.Data);
 
         return (base64, [.. annotatedElements.OrderBy(e => e.Index)]);
+    }
+
+    /// <summary>
+    /// Finds a non-overlapping position for a label near an element's bounding box.
+    /// Tries multiple positions around the element and offsets if all primary positions overlap.
+    /// </summary>
+    private static Rectangle FindNonOverlappingLabelPosition(
+        int elementLeft, int elementTop, int elementRight, int elementBottom,
+        int labelWidth, int labelHeight,
+        int imageWidth, int imageHeight,
+        List<Rectangle> placedLabels)
+    {
+        // Define candidate positions (in order of preference):
+        // 1. Top-right corner (above element)
+        // 2. Top-left corner (above element)
+        // 3. Bottom-right corner (below element)
+        // 4. Bottom-left corner (below element)
+        // 5. Inside top-right corner
+        // 6. Inside top-left corner
+        var candidatePositions = new System.Drawing.Point[]
+        {
+            new System.Drawing.Point(Math.Max(0, Math.Min(elementRight - labelWidth, imageWidth - labelWidth)),
+                      Math.Max(0, elementTop - labelHeight)),
+            new System.Drawing.Point(Math.Max(0, elementLeft),
+                      Math.Max(0, elementTop - labelHeight)),
+            new System.Drawing.Point(Math.Max(0, Math.Min(elementRight - labelWidth, imageWidth - labelWidth)),
+                      Math.Min(elementBottom, imageHeight - labelHeight)),
+            new System.Drawing.Point(Math.Max(0, elementLeft),
+                      Math.Min(elementBottom, imageHeight - labelHeight)),
+            new System.Drawing.Point(Math.Max(0, Math.Min(elementRight - labelWidth, imageWidth - labelWidth)),
+                      Math.Max(0, elementTop)),
+            new System.Drawing.Point(Math.Max(0, elementLeft),
+                      Math.Max(0, elementTop)),
+        };
+
+        // Try each candidate position
+        foreach (var pos in candidatePositions)
+        {
+            var candidateRect = new Rectangle(pos.X, pos.Y, labelWidth, labelHeight);
+            if (!OverlapsAnyLabel(candidateRect, placedLabels))
+            {
+                return candidateRect;
+            }
+        }
+
+        // All preferred positions overlap - find an offset position
+        // Start from top-right and try shifting down or left
+        var baseX = Math.Max(0, Math.Min(elementRight - labelWidth, imageWidth - labelWidth));
+        var baseY = Math.Max(0, elementTop - labelHeight);
+
+        // Try offsets in a spiral pattern
+        for (int offset = labelHeight; offset < imageHeight; offset += labelHeight)
+        {
+            // Try below
+            var offsetRect = new Rectangle(baseX, Math.Min(baseY + offset, imageHeight - labelHeight), labelWidth, labelHeight);
+            if (!OverlapsAnyLabel(offsetRect, placedLabels))
+            {
+                return offsetRect;
+            }
+
+            // Try to the left
+            offsetRect = new Rectangle(Math.Max(0, baseX - offset), baseY, labelWidth, labelHeight);
+            if (!OverlapsAnyLabel(offsetRect, placedLabels))
+            {
+                return offsetRect;
+            }
+        }
+
+        // Fallback: return the original preferred position even if it overlaps
+        return new Rectangle(baseX, baseY, labelWidth, labelHeight);
+    }
+
+    /// <summary>
+    /// Checks if a rectangle overlaps with any previously placed labels.
+    /// </summary>
+    private static bool OverlapsAnyLabel(Rectangle candidate, List<Rectangle> placedLabels)
+    {
+        foreach (var placed in placedLabels)
+        {
+            if (candidate.IntersectsWith(placed))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

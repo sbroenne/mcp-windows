@@ -190,7 +190,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
-                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, cancellationToken),
+                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(action.ToString(), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -650,12 +650,18 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
-        nint? windowHandle, string? controlTypeFilter, CancellationToken cancellationToken)
+        nint? windowHandle, string? controlTypeFilter, int maxDepth, CancellationToken cancellationToken)
     {
+        // Use maxDepth for capture_annotated, with sensible defaults:
+        // - If maxDepth is default (5), use 15 for Electron compatibility
+        // - Otherwise use the caller's value, clamped to valid range
+        var searchDepth = maxDepth == 5 ? 15 : Math.Clamp(maxDepth, 1, 20);
+
         var result = await _annotatedScreenshotService.CaptureAsync(
             windowHandle,
             controlTypeFilter,
             maxElements: 50,
+            searchDepth: searchDepth,
             Models.ImageFormat.Jpeg,
             quality: 85,
             cancellationToken);

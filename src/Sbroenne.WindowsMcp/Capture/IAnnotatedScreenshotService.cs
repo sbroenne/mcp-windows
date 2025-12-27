@@ -13,6 +13,7 @@ public interface IAnnotatedScreenshotService
     /// <param name="windowHandle">Optional window handle to capture. If null, captures foreground window.</param>
     /// <param name="controlTypeFilter">Optional control type to filter elements (e.g., "Button", "Edit").</param>
     /// <param name="maxElements">Maximum number of elements to annotate (default: 50).</param>
+    /// <param name="searchDepth">Maximum depth to search for elements. Default: 15 (optimized for Electron/Chromium apps). Use 5-8 for WinForms, 8-10 for WPF.</param>
     /// <param name="format">Image format (jpeg or png). Default: jpeg.</param>
     /// <param name="quality">JPEG quality 1-100. Default: 85.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -21,6 +22,7 @@ public interface IAnnotatedScreenshotService
         nint? windowHandle = null,
         string? controlTypeFilter = null,
         int maxElements = 50,
+        int searchDepth = 15,
         ImageFormat format = ImageFormat.Jpeg,
         int quality = 85,
         CancellationToken cancellationToken = default);

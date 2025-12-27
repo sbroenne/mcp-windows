@@ -1,10 +1,10 @@
+using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
-using Microsoft.Extensions.Logging.Abstractions;
-using System.Runtime.InteropServices;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 

@@ -7,6 +7,7 @@ using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
+using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -23,10 +24,18 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
     private readonly AnnotatedScreenshotService _annotatedScreenshotService;
     private readonly ScreenshotService _screenshotService;
     private readonly nint _windowHandle;
+    private readonly ITestOutputHelper _output;
 
-    public AnnotatedScreenshotIntegrationTests(UITestHarnessFixture fixture)
+    // Screenshot folder for manual verification (not git-tracked)
+    private static readonly string ScreenshotFolder = Path.Combine(
+        Path.GetDirectoryName(typeof(AnnotatedScreenshotIntegrationTests).Assembly.Location)!,
+        "screenshots",
+        "winforms");
+
+    public AnnotatedScreenshotIntegrationTests(UITestHarnessFixture fixture, ITestOutputHelper output)
     {
         _fixture = fixture;
+        _output = output;
         _fixture.Reset();
         _fixture.BringToFront();
         Thread.Sleep(200);
@@ -100,6 +109,9 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         Assert.NotEmpty(result.ImageData);
         Assert.True(result.Width > 0, "Width should be positive");
         Assert.True(result.Height > 0, "Height should be positive");
+
+        // Save for manual verification
+        SaveScreenshotForVerification(result, "WinForms_AllElements");
     }
 
     [Fact]
@@ -174,6 +186,9 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         // Should find at least some buttons
         Assert.True(result.Elements.Length >= 1, $"Expected at least 1 button, found {result.Elements.Length}");
         Assert.All(result.Elements, e => Assert.Equal("Button", e.ControlType));
+
+        // Save for manual verification
+        SaveScreenshotForVerification(result, "WinForms_ButtonsOnly");
     }
 
     [Fact]
@@ -262,6 +277,9 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         Assert.Equal(0x50, imageBytes[1]); // P
         Assert.Equal(0x4E, imageBytes[2]); // N
         Assert.Equal(0x47, imageBytes[3]); // G
+
+        // Save for manual verification
+        SaveScreenshotForVerification(result, "WinForms_PngFormat");
     }
 
     [Fact]
@@ -334,6 +352,37 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         // Assert - Should fail because no elements match
         Assert.False(result.Success);
         Assert.NotNull(result.ErrorMessage);
+    }
+
+    #endregion
+
+    #region Helper Methods
+
+    /// <summary>
+    /// Saves an annotated screenshot for manual verification.
+    /// Screenshots are saved to a folder that is not tracked by git.
+    /// </summary>
+    private void SaveScreenshotForVerification(AnnotatedScreenshotResult result, string testName)
+    {
+        if (!result.Success || string.IsNullOrEmpty(result.ImageData))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(ScreenshotFolder);
+            var extension = result.ImageFormat ?? "jpeg";
+            var fileName = $"{testName}.{extension}";
+            var filePath = Path.Combine(ScreenshotFolder, fileName);
+            var imageBytes = Convert.FromBase64String(result.ImageData);
+            File.WriteAllBytes(filePath, imageBytes);
+            _output.WriteLine($"Screenshot saved: {filePath}");
+        }
+        catch (Exception ex)
+        {
+            _output.WriteLine($"Failed to save screenshot: {ex.Message}");
+        }
     }
 
     #endregion
