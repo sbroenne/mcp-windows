@@ -23,7 +23,7 @@ function createWindow(): void {
         mainWindow?.webContents.executeJavaScript(`
             // Force accessibility tree to be built
             document.body.setAttribute('role', 'application');
-            
+
             // Ensure all interactive elements have accessibility properties
             const buttons = document.querySelectorAll('button');
             buttons.forEach((btn, i) => {
@@ -32,12 +32,12 @@ function createWindow(): void {
                     btn.setAttribute('aria-label', 'Button ' + i);
                 }
             });
-            
+
             const inputs = document.querySelectorAll('input, textarea');
             inputs.forEach((input, i) => {
                 if (!input.id) input.id = 'input-' + i;
             });
-            
+
             console.log('[A11y] Accessibility attributes applied');
         `).catch(() => {});
     });
@@ -67,7 +67,7 @@ function setupIpcHandlers(): void {
 app.whenReady().then(() => {
     // Enable accessibility support for UI Automation integration
     app.accessibilitySupportEnabled = true;
-    
+
     // Try setting specific accessibility features if available (Electron 29+)
     try {
         const features = ['nativeAPIs', 'webContents', 'inlineTextBoxes', 'extendedProperties', 'screenReader', 'html'];
@@ -78,12 +78,12 @@ app.whenReady().then(() => {
     } catch (e) {
         console.log('[A11y] setAccessibilitySupportFeatures not available, using legacy method');
     }
-    
+
     console.log('[A11y] accessibilitySupportEnabled:', app.accessibilitySupportEnabled);
-    
+
     // Setup IPC handlers before creating window
     setupIpcHandlers();
-    
+
     createWindow();
 
     app.on('activate', () => {

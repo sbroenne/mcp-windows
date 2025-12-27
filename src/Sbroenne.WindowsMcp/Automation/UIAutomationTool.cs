@@ -82,9 +82,9 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation")]
-    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), click, type, select, toggle, invoke (patterns), focus, scroll_into_view, get_text, highlight (visual debug), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain). MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth.")]
+    [Description("Windows UI Automation - interact with UI elements by semantic properties. RECOMMENDED WORKFLOW: 1) Use window_management to find target window handle. 2) Use ui_automation with windowHandle to find/interact with elements. 3) Only use mouse_control as fallback with clickablePoint coordinates. 4) Use screenshot_control for verification or OCR. Actions: find (search elements), get_tree (hierarchy view), wait_for (element appears), click, type, select, toggle, invoke (patterns), focus, scroll_into_view, get_text, highlight (draws red box for human observer - persists until hide_highlight called), hide_highlight (removes the red box), ocr (screen region), ocr_element (element bounds), ocr_status (engine info), get_element_at_cursor (element under mouse), get_focused_element (keyboard focus), get_ancestors (parent chain). MULTI-WINDOW: Pass windowHandle to target a specific window - interactive actions automatically activate the window first. ELECTRON APPS (VS Code, Teams, Slack): These work via Chromium accessibility - use get_tree first to discover element names and types. Element names come from ARIA labels. PERFORMANCE TIP: For apps with large UI trees, use hierarchical search - first find a container with get_tree(maxDepth=2), then use parentElementId to search within it. This dramatically reduces traversal time. MULTI-MONITOR: Results include 'clickablePoint' with ready-to-use coordinates for mouse_control (x, y, monitorIndex). ADVANCED SEARCH: Use nameContains for partial matching, namePattern for regex, foundIndex for Nth match (e.g., foundIndex=2 for 2nd button), exactDepth to search at specific depth.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
+        [Description("Action: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
         UIAutomationAction action,
 
         [Description("Window handle to target. For interactive actions (click, type, select, toggle, invoke, focus), the window is automatically activated before the action. Get from window_management(action='find'). If not specified, uses the current foreground window.")]
@@ -178,6 +178,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
                 UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, includeChildren, cancellationToken),
                 UIAutomationAction.Highlight => await HandleHighlightAsync(elementId, cancellationToken),
+                UIAutomationAction.HideHighlight => await _automationService.HideHighlightAsync(cancellationToken),
                 UIAutomationAction.Ocr => await HandleOcrAsync(windowHandle, language, cancellationToken),
                 UIAutomationAction.OcrElement => await HandleOcrElementAsync(elementId, language, cancellationToken),
                 UIAutomationAction.OcrStatus => HandleOcrStatus(),
@@ -708,9 +709,13 @@ public enum UIAutomationAction
     [Description("Get text content from an element")]
     GetText,
 
-    /// <summary>Visually highlight an element for debugging.</summary>
-    [Description("Visually highlight an element for debugging")]
+    /// <summary>Visually highlight an element for debugging. Persists until HideHighlight is called.</summary>
+    [Description("Visually highlight an element for debugging. Persists until HideHighlight is called.")]
     Highlight,
+
+    /// <summary>Hide the current highlight rectangle.</summary>
+    [Description("Hide the current highlight rectangle")]
+    HideHighlight,
 
     /// <summary>Extract text from screen or window using OCR.</summary>
     [Description("Extract text from screen or window using OCR")]

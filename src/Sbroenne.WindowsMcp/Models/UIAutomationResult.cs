@@ -87,6 +87,22 @@ public sealed record UIAutomationResult
     }
 
     /// <summary>
+    /// Creates a success result without elements (for actions like hide_highlight).
+    /// </summary>
+    /// <param name="action">The action performed.</param>
+    /// <param name="diagnostics">Optional diagnostics.</param>
+    /// <returns>A success result.</returns>
+    public static UIAutomationResult CreateSuccess(string action, UIAutomationDiagnostics? diagnostics = null)
+    {
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            Diagnostics = diagnostics
+        };
+    }
+
+    /// <summary>
     /// Creates a success result with multiple elements.
     /// </summary>
     /// <param name="action">The action performed.</param>

@@ -521,33 +521,109 @@ public sealed partial class UIAutomationService
         }
     }
 
+    // Static field to track the current highlight form for explicit hide control
+    private static HighlightForm? s_currentHighlightForm;
+    private static readonly object s_highlightLock = new();
+
+    /// <inheritdoc/>
+    public Task<UIAutomationResult> HideHighlightAsync(CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        lock (s_highlightLock)
+        {
+            if (s_currentHighlightForm == null)
+            {
+                return Task.FromResult(UIAutomationResult.CreateSuccess("hide_highlight", CreateDiagnostics(stopwatch)));
+            }
+
+            try
+            {
+                // Close the form on its owning thread
+                var form = s_currentHighlightForm;
+                s_currentHighlightForm = null;
+
+                if (form.InvokeRequired)
+                {
+                    form.BeginInvoke(() => form.Close());
+                }
+                else
+                {
+                    form.Close();
+                }
+
+                return Task.FromResult(UIAutomationResult.CreateSuccess("hide_highlight", CreateDiagnostics(stopwatch)));
+            }
+            catch (Exception ex)
+            {
+                return Task.FromResult(UIAutomationResult.CreateFailure(
+                    "hide_highlight",
+                    UIAutomationErrorType.InternalError,
+                    $"Failed to hide highlight: {ex.Message}",
+                    CreateDiagnostics(stopwatch)));
+            }
+        }
+    }
+
     private static void DrawHighlightRectangle(int x, int y, int width, int height)
     {
-        // Use a separate thread to manage the highlight lifecycle
+        // Close any existing highlight first
+        lock (s_highlightLock)
+        {
+            if (s_currentHighlightForm != null)
+            {
+                try
+                {
+                    var oldForm = s_currentHighlightForm;
+                    s_currentHighlightForm = null;
+                    if (oldForm.InvokeRequired)
+                    {
+                        oldForm.BeginInvoke(() => oldForm.Close());
+                    }
+                    else
+                    {
+                        oldForm.Close();
+                    }
+                }
+                catch
+                {
+                    // Best effort cleanup
+                }
+            }
+        }
+
+        // Use a separate thread to manage the highlight (STA required for WinForms)
         var highlightThread = new Thread(() =>
         {
             try
             {
-                using var form = new HighlightForm(x, y, width, height);
+                var form = new HighlightForm(x, y, width, height);
+                lock (s_highlightLock)
+                {
+                    s_currentHighlightForm = form;
+                }
                 form.Show();
 
-                // Keep visible for 2 seconds
-                var endTime = DateTime.UtcNow.AddSeconds(2);
-                while (DateTime.UtcNow < endTime)
-                {
-                    System.Windows.Forms.Application.DoEvents();
-                    Thread.Sleep(50);
-                }
+                // Run message loop until form is closed
+                System.Windows.Forms.Application.Run(form);
             }
             catch
             {
                 // Best effort highlight - ignore errors
             }
+            finally
+            {
+                lock (s_highlightLock)
+                {
+                    s_currentHighlightForm = null;
+                }
+            }
         });
         highlightThread.SetApartmentState(ApartmentState.STA);
+        highlightThread.IsBackground = true;
         highlightThread.Start();
 
-        // Don't wait for the highlight to finish - return immediately
+        // Don't wait for the highlight - return immediately
     }
 
     /// <summary>

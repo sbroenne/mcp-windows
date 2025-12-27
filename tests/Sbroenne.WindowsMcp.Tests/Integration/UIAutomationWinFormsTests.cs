@@ -136,7 +136,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.Contains("Data Grid", tabNames);
     }
 
-    [Fact(Skip = "ListView on non-selected tab may not be accessible in WinForms UI Automation")]
+    [Fact]
     public async Task Click_TabItem_SwitchesTab()
     {
         // Click on List View tab
@@ -296,7 +296,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
     #region ListView Tests
 
-    [Fact(Skip = "ListView on non-selected tab may not be accessible in WinForms UI Automation")]
+    [Fact]
     public async Task Find_ListView_AfterTabSwitch()
     {
         // Switch to List View tab first
@@ -324,7 +324,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
     #region TreeView Tests
 
-    [Fact(Skip = "TreeView on non-selected tab may not be accessible in WinForms UI Automation")]
+    [Fact]
     public async Task Find_TreeView_AfterTabSwitch()
     {
         // Switch to Tree View tab
@@ -348,7 +348,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.True(result.Elements.Length >= 1, "Expected at least 1 tree control");
     }
 
-    [Fact(Skip = "TreeView on non-selected tab may not be accessible in WinForms UI Automation")]
+    [Fact]
     public async Task Find_TreeItems_InTreeView()
     {
         // Switch to Tree View tab
@@ -376,7 +376,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
     #region DataGrid Tests
 
-    [Fact(Skip = "DataGrid on non-selected tab may not be accessible in WinForms UI Automation")]
+    [Fact]
     public async Task Find_DataGrid_AfterTabSwitch()
     {
         // Switch to Data Grid tab

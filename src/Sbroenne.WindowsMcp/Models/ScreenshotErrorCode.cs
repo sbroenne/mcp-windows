@@ -63,5 +63,10 @@ public enum ScreenshotErrorCode
     /// <summary>
     /// Request validation failed.
     /// </summary>
-    InvalidRequest = 11
+    InvalidRequest = 11,
+
+    /// <summary>
+    /// Secondary screen target requires exactly 2 monitors.
+    /// </summary>
+    NoSecondaryScreen = 12
 }

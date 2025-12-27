@@ -364,6 +364,23 @@ public sealed class UIAutomationToolTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_HideHighlightAction_CallsServiceAsync()
+    {
+        // Arrange
+        var expectedResult = UIAutomationResult.CreateSuccess("hide_highlight", null);
+        _mockService.HideHighlightAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(expectedResult));
+
+        // Act
+        var result = await _tool.ExecuteAsync(UIAutomationAction.HideHighlight);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal("hide_highlight", result.Action);
+        await _mockService.Received(1).HideHighlightAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task ExecuteAsync_OcrAction_WithInvalidWindowHandle_ReturnsErrorAsync()
     {
         // Act - calling OCR with an invalid window handle

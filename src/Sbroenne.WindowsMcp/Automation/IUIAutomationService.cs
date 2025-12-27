@@ -145,9 +145,17 @@ public interface IUIAutomationService
 
     /// <summary>
     /// Highlights an element by drawing a visible rectangle around it.
+    /// The highlight persists until HideHighlightAsync is called.
     /// </summary>
     /// <param name="elementId">The element ID to highlight.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result.</returns>
     Task<UIAutomationResult> HighlightElementAsync(string elementId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Hides the currently visible highlight rectangle.
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The UI Automation result.</returns>
+    Task<UIAutomationResult> HideHighlightAsync(CancellationToken cancellationToken = default);
 }
