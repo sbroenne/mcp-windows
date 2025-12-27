@@ -19,6 +19,7 @@ canonical_url: "https://windowsmcpserver.dev/"
 <div class="badges-section">
   <div class="container">
     <div class="hero-badges">
+      <a href="https://www.nuget.org/packages/Sbroenne.WindowsMcp"><img src="https://img.shields.io/nuget/v/Sbroenne.WindowsMcp?label=NuGet" alt="NuGet"></a>
       <a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"><img src="https://img.shields.io/visual-studio-marketplace/i/sbroenne.windows-mcp?label=VS%20Code%20Installs" alt="VS Code Marketplace Installs"></a>
       <a href="https://github.com/sbroenne/mcp-windows"><img src="https://img.shields.io/github/stars/sbroenne/mcp-windows?style=flat&label=GitHub%20Stars" alt="GitHub Stars"></a>
       <a href="https://github.com/sbroenne/mcp-windows/releases"><img src="https://img.shields.io/github/downloads/sbroenne/mcp-windows/total?label=GitHub%20Downloads" alt="GitHub Downloads"></a>
@@ -110,9 +111,50 @@ Ask your AI assistant to automate Windows tasks using natural language:
 
 The extension automatically configures the MCP server for GitHub Copilot.
 
-### Option 2: Download from Releases
+### Option 2: .NET Tool
+
+Install as a global .NET tool:
+
+```powershell
+# Install
+dotnet tool install --global Sbroenne.WindowsMcp
+
+# Run
+mcp-windows
+```
+
+Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+### Option 3: Download from Releases
 
 Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases).
+
+## MCP Configuration
+
+**VS Code (settings.json):**
+```json
+{
+  "mcp": {
+    "servers": {
+      "windows-mcp": {
+        "type": "stdio",
+        "command": "mcp-windows"
+      }
+    }
+  }
+}
+```
+
+**Claude Desktop / Other Clients:**
+```json
+{
+  "mcpServers": {
+    "windows-mcp": {
+      "command": "mcp-windows"
+    }
+  }
+}
+```
 
 ## Documentation
 

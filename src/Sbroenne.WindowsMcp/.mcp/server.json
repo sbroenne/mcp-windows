@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sbroenne/mcp-windows",
+  "title": "MCP Server for Windows",
+  "description": "Windows automation for AI - UI automation, mouse, keyboard, window management, and screenshots. Windows only.",
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "Sbroenne.WindowsMcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": []
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/sbroenne/mcp-windows",
+    "source": "github"
+  }
+}

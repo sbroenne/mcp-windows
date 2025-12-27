@@ -25,6 +25,21 @@
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
 
+    <!-- NuGet Package Configuration -->
+    <PackageId>Sbroenne.WindowsMcp</PackageId>
+    <Title>MCP Server for Windows</Title>
+    <PackageTags>mcp;model-context-protocol;windows;automation;ui-automation;uia3;mouse;keyboard;window-management;screenshot;rpa;testing;copilot;ai;github-copilot</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>See https://github.com/sbroenne/mcp-windows/releases for release notes</PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+
+    <!-- .NET Tool Configuration -->
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>mcp-windows</ToolCommandName>
+
+    <!-- Package Validation -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+
     <!-- Production optimization: exclude debug symbols and XML docs from publish -->
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
@@ -33,6 +48,20 @@
     <!-- WinRT/C#/Win projection trimming for smaller output -->
     <CsWinRTEnableLogging>false</CsWinRTEnableLogging>
   </PropertyGroup>
+
+  <!-- Workaround for .NET SDK unconditionally setting PackageType=DotnetTool when PackAsTool=true.
+       This target runs before Pack and appends McpServer to the package type.
+       In .NET 10+, just setting <PackageType>McpServer</PackageType> would work. -->
+  <Target Name="_AddMcpServerPackageType" BeforeTargets="GenerateNuspec;Pack">
+    <PropertyGroup>
+      <PackageType>$(PackageType);McpServer</PackageType>
+    </PropertyGroup>
+  </Target>
+
+  <!-- Include README.md in NuGet package -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol" />
