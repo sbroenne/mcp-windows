@@ -20,7 +20,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     private readonly UIAutomationThread _staThread;
     private readonly WindowEnumerator _windowEnumerator;
     private readonly WindowService _windowService;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
 
     public UIAutomationElectronTests(ElectronHarnessFixture fixture)
     {
@@ -28,7 +28,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(300);
 
-        _windowHandle = _fixture.WindowHandle;
+        _windowHandle = _fixture.WindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();

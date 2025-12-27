@@ -23,7 +23,7 @@ public sealed partial class AnnotatedScreenshotLogger
     /// Logs the start of an annotated screenshot capture.
     /// </summary>
     [LoggerMessage(Level = LogLevel.Information, Message = "Capturing annotated screenshot for window handle: {WindowHandle}")]
-    public partial void LogCaptureStarted(nint? windowHandle);
+    public partial void LogCaptureStarted(string? windowHandle);
 
     /// <summary>
     /// Logs successful annotated screenshot creation.

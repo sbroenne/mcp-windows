@@ -8,6 +8,7 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -260,7 +261,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -279,7 +280,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -293,7 +294,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -307,7 +308,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -321,7 +322,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -337,7 +338,7 @@ public sealed partial class WindowManagementTool
         int? y,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -360,7 +361,7 @@ public sealed partial class WindowManagementTool
         int? height,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -385,7 +386,7 @@ public sealed partial class WindowManagementTool
         int? height,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -432,7 +433,7 @@ public sealed partial class WindowManagementTool
         int? monitorIndex,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -495,7 +496,7 @@ public sealed partial class WindowManagementTool
         string? handleString,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -511,7 +512,7 @@ public sealed partial class WindowManagementTool
         int? timeoutMs,
         CancellationToken cancellationToken)
     {
-        if (!TryParseHandle(handleString, out nint handle))
+        if (!WindowHandleParser.TryParse(handleString, out nint handle))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
@@ -570,24 +571,6 @@ public sealed partial class WindowManagementTool
         PrimaryScreen,
         /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
         SecondaryScreen
-    }
-
-    private static bool TryParseHandle(string? handleString, out nint handle)
-    {
-        handle = IntPtr.Zero;
-
-        if (string.IsNullOrWhiteSpace(handleString))
-        {
-            return false;
-        }
-
-        if (long.TryParse(handleString, out long handleValue) && handleValue != 0)
-        {
-            handle = (nint)handleValue;
-            return true;
-        }
-
-        return false;
     }
 
     private static WindowAction? ParseAction(string action)

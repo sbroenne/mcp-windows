@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -9,11 +10,11 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 public sealed partial class UIAutomationService
 {
-    private static UIA.IUIAutomationElement? GetRootElement(nint? windowHandle)
+    private static UIA.IUIAutomationElement? GetRootElement(string? windowHandle)
     {
-        if (windowHandle.HasValue && windowHandle.Value != IntPtr.Zero)
+        if (WindowHandleParser.TryParse(windowHandle, out var parsedHandle) && parsedHandle != IntPtr.Zero)
         {
-            return Uia.Automation.ElementFromHandle(windowHandle.Value);
+            return Uia.Automation.ElementFromHandle(parsedHandle);
         }
 
         var foregroundWindow = GetForegroundWindowHandle();
@@ -40,7 +41,7 @@ public sealed partial class UIAutomationService
             if (endIdx > 7)
             {
                 var hwndStr = elementId.Substring(7, endIdx - 7);
-                if (nint.TryParse(hwndStr, out var hwnd) && hwnd != IntPtr.Zero)
+                if (WindowHandleParser.TryParse(hwndStr, out var hwnd) && hwnd != IntPtr.Zero)
                 {
                     return Uia.Automation.ElementFromHandle(hwnd);
                 }
@@ -241,7 +242,7 @@ public sealed partial class UIAutomationService
         ElementQuery? query,
         int elementsScanned,
         string? windowTitle,
-        nint? windowHandle)
+        string? windowHandle)
     {
         return new UIAutomationDiagnostics
         {

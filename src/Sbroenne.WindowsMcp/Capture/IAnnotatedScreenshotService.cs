@@ -10,7 +10,7 @@ public interface IAnnotatedScreenshotService
     /// <summary>
     /// Captures an annotated screenshot with numbered labels on interactive UI elements.
     /// </summary>
-    /// <param name="windowHandle">Optional window handle to capture. If null, captures foreground window.</param>
+    /// <param name="windowHandle">Optional window handle (HWND) as a decimal string. If null, captures foreground window.</param>
     /// <param name="controlTypeFilter">Optional control type to filter elements (e.g., "Button", "Edit").</param>
     /// <param name="maxElements">Maximum number of elements to annotate (default: 50).</param>
     /// <param name="searchDepth">Maximum depth to search for elements. Default: 15 (optimized for Electron/Chromium apps). Use 5-8 for WinForms, 8-10 for WPF.</param>
@@ -20,7 +20,7 @@ public interface IAnnotatedScreenshotService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Result containing annotated image and element mapping.</returns>
     Task<AnnotatedScreenshotResult> CaptureAsync(
-        nint? windowHandle = null,
+        string? windowHandle = null,
         string? controlTypeFilter = null,
         int maxElements = 50,
         int searchDepth = 15,

@@ -19,7 +19,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     private readonly UITestHarnessFixture _fixture;
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
 
     public UIAutomationWinFormsTests(UITestHarnessFixture fixture)
     {
@@ -28,7 +28,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();

@@ -30,7 +30,7 @@ public sealed record ScreenshotControlRequest
     /// Gets the window handle (HWND). Required when Target is <see cref="CaptureTarget.Window"/>.
     /// </summary>
     [JsonPropertyName("window_handle")]
-    public long? WindowHandle { get; init; }
+    public string? WindowHandle { get; init; }
 
     /// <summary>
     /// Gets the region coordinates. Required when Target is <see cref="CaptureTarget.Region"/>.

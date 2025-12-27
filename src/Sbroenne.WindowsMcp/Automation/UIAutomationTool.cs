@@ -97,8 +97,8 @@ public sealed partial class UIAutomationTool
         [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
         UIAutomationAction action,
 
-        [Description("Window handle to target. For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. Get from window_management(action='find'). If not specified, uses the current foreground window.")]
-        nint? windowHandle = null,
+        [Description("Window handle to target as a decimal string (copy verbatim from window_management output). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
+        string? windowHandle = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
         string? name = null,
@@ -174,10 +174,26 @@ public sealed partial class UIAutomationTool
         maxDepth = Math.Clamp(maxDepth, 0, 20);
         timeoutMs = Math.Clamp(timeoutMs, 0, 60000);
 
-        // Auto-activate target window for interactive actions when windowHandle is specified
-        if (windowHandle.HasValue && windowHandle.Value != nint.Zero && IsInteractiveAction(action))
+        // Validate/parse window handle once (decimal string only)
+        nint? parsedWindowHandle = null;
+        if (!string.IsNullOrWhiteSpace(windowHandle))
         {
-            var activateResult = await ActivateTargetWindowAsync(windowHandle.Value, action.ToString().ToLowerInvariant(), cancellationToken);
+            if (!WindowHandleParser.TryParse(windowHandle, out var parsed) || parsed == nint.Zero)
+            {
+                return UIAutomationResult.CreateFailure(
+                    GetActionName(action),
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                    null);
+            }
+
+            parsedWindowHandle = parsed;
+        }
+
+        // Auto-activate target window for interactive actions when windowHandle is specified
+        if (parsedWindowHandle.HasValue && IsInteractiveAction(action))
+        {
+            var activateResult = await ActivateTargetWindowAsync(parsedWindowHandle.Value, GetActionName(action), cancellationToken);
             if (!activateResult.Success)
             {
                 return activateResult;
@@ -214,7 +230,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
                 UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, interactiveOnly, outputPath, returnImageData, cancellationToken),
-                _ => UIAutomationResult.CreateFailure(action.ToString(), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
+                _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
             // Attach target window info for actions that interact with the UI
@@ -233,7 +249,7 @@ public sealed partial class UIAutomationTool
         {
             LogActionError(_logger, action, ex);
             return UIAutomationResult.CreateFailure(
-                action.ToString(),
+                GetActionName(action),
                 UIAutomationErrorType.InternalError,
                 $"An error occurred: {ex.Message}",
                 null);
@@ -248,6 +264,35 @@ public sealed partial class UIAutomationTool
             or UIAutomationAction.Select or UIAutomationAction.Toggle
             or UIAutomationAction.EnsureState or UIAutomationAction.Invoke
             or UIAutomationAction.Focus;
+
+    private static string GetActionName(UIAutomationAction action) =>
+        action switch
+        {
+            UIAutomationAction.Find => "find",
+            UIAutomationAction.GetTree => "get_tree",
+            UIAutomationAction.WaitFor => "wait_for",
+            UIAutomationAction.WaitForDisappear => "wait_for_disappear",
+            UIAutomationAction.WaitForState => "wait_for_state",
+            UIAutomationAction.Click => "click",
+            UIAutomationAction.Type => "type",
+            UIAutomationAction.Select => "select",
+            UIAutomationAction.Toggle => "toggle",
+            UIAutomationAction.EnsureState => "ensure_state",
+            UIAutomationAction.Invoke => "invoke",
+            UIAutomationAction.Focus => "focus",
+            UIAutomationAction.ScrollIntoView => "scroll_into_view",
+            UIAutomationAction.GetText => "get_text",
+            UIAutomationAction.Highlight => "highlight",
+            UIAutomationAction.HideHighlight => "hide_highlight",
+            UIAutomationAction.Ocr => "ocr",
+            UIAutomationAction.OcrElement => "ocr_element",
+            UIAutomationAction.OcrStatus => "ocr_status",
+            UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
+            UIAutomationAction.GetFocusedElement => "get_focused_element",
+            UIAutomationAction.GetAncestors => "get_ancestors",
+            UIAutomationAction.CaptureAnnotated => "capture_annotated",
+            _ => action.ToString().ToLowerInvariant()
+        };
 
     /// <summary>
     /// Attaches information about the current foreground window to the result.
@@ -324,7 +369,7 @@ public sealed partial class UIAutomationTool
     #region Action Handlers
 
     private async Task<UIAutomationResult> HandleFindAsync(
-        nint? windowHandle, string? parentElementId, string? name, string? nameContains, string? namePattern,
+        string? windowHandle, string? parentElementId, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
         bool includeChildren, bool sortByProminence, int timeoutMs, CancellationToken cancellationToken)
     {
@@ -349,13 +394,13 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleGetTreeAsync(
-        nint? windowHandle, string? parentElementId, int maxDepth, string? controlType, CancellationToken cancellationToken)
+        string? windowHandle, string? parentElementId, int maxDepth, string? controlType, CancellationToken cancellationToken)
     {
         return await _automationService.GetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken);
     }
 
     private async Task<UIAutomationResult> HandleWaitForAsync(
-        nint? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? windowHandle, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
         int timeoutMs, CancellationToken cancellationToken)
     {
@@ -381,7 +426,7 @@ public sealed partial class UIAutomationTool
     /// Useful for waiting until dialogs close, spinners disappear, or overlays are removed.
     /// </summary>
     private async Task<UIAutomationResult> HandleWaitForDisappearAsync(
-        nint? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? windowHandle, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
         int timeoutMs, CancellationToken cancellationToken)
     {
@@ -411,7 +456,7 @@ public sealed partial class UIAutomationTool
         if (string.IsNullOrEmpty(elementId))
         {
             return UIAutomationResult.CreateFailure(
-                nameof(UIAutomationAction.WaitForState),
+                "wait_for_state",
                 UIAutomationErrorType.InvalidParameter,
                 "elementId is required for WaitForState action",
                 null);
@@ -420,7 +465,7 @@ public sealed partial class UIAutomationTool
         if (string.IsNullOrEmpty(desiredState))
         {
             return UIAutomationResult.CreateFailure(
-                nameof(UIAutomationAction.WaitForState),
+                "wait_for_state",
                 UIAutomationErrorType.InvalidParameter,
                 "desiredState is required for WaitForState action. Valid values: enabled, disabled, on, off, indeterminate, visible, offscreen",
                 null);
@@ -430,7 +475,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleClickAsync(
-        string? elementId, nint? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int foundIndex,
         CancellationToken cancellationToken)
     {
@@ -457,7 +502,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleTypeAsync(
-        string? elementId, nint? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
         string? controlType, string? automationId, string? className, int foundIndex,
         string? text, bool clearFirst, CancellationToken cancellationToken)
     {
@@ -482,7 +527,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleSelectAsync(
-        string? elementId, nint? windowHandle, string? name, string? controlType, string? automationId,
+        string? elementId, string? windowHandle, string? name, string? controlType, string? automationId,
         string? value, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(value))
@@ -612,7 +657,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleScrollIntoViewAsync(
-        string? elementId, nint? windowHandle, string? name, string? controlType, string? automationId,
+        string? elementId, string? windowHandle, string? name, string? controlType, string? automationId,
         int timeoutMs, CancellationToken cancellationToken)
     {
         ElementQuery? query = null;
@@ -631,7 +676,7 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleGetTextAsync(
-        string? elementId, nint? windowHandle, bool includeChildren, CancellationToken cancellationToken)
+        string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken)
     {
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
     }
@@ -646,17 +691,32 @@ public sealed partial class UIAutomationTool
         return await _automationService.HighlightElementAsync(elementId, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleOcrAsync(nint? windowHandle, string? language, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleOcrAsync(string? windowHandle, string? language, CancellationToken cancellationToken)
     {
         try
         {
             // Determine the area to capture
             System.Drawing.Rectangle captureRect;
 
-            if (windowHandle.HasValue && windowHandle.Value != nint.Zero)
+            nint? parsedWindowHandle = null;
+            if (!string.IsNullOrWhiteSpace(windowHandle))
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out var parsed) || parsed == nint.Zero)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "ocr",
+                        UIAutomationErrorType.InvalidParameter,
+                        $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                        null);
+                }
+
+                parsedWindowHandle = parsed;
+            }
+
+            if (parsedWindowHandle.HasValue)
             {
                 // Get window bounds using native API
-                if (!NativeMethods.GetWindowRect(windowHandle.Value, out var rect))
+                if (!NativeMethods.GetWindowRect(parsedWindowHandle.Value, out var rect))
                 {
                     return UIAutomationResult.CreateFailure("ocr", UIAutomationErrorType.ElementNotFound, "Could not get window bounds", null);
                 }
@@ -808,12 +868,24 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
-        nint? windowHandle, string? controlTypeFilter, int maxDepth, bool interactiveOnly, string? outputPath, bool returnImageData, CancellationToken cancellationToken)
+        string? windowHandle, string? controlTypeFilter, int maxDepth, bool interactiveOnly, string? outputPath, bool returnImageData, CancellationToken cancellationToken)
     {
         // Use maxDepth for capture_annotated, with sensible defaults:
         // - If maxDepth is default (5), use 15 for Electron compatibility
         // - Otherwise use the caller's value, clamped to valid range
         var searchDepth = maxDepth == 5 ? 15 : Math.Clamp(maxDepth, 1, 20);
+
+        if (!string.IsNullOrWhiteSpace(windowHandle))
+        {
+            if (!WindowHandleParser.TryParse(windowHandle, out var parsed) || parsed == nint.Zero)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "capture_annotated",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
+                    null);
+            }
+        }
 
         var result = await _annotatedScreenshotService.CaptureAsync(
             windowHandle,
@@ -895,7 +967,7 @@ public sealed partial class UIAutomationTool
 /// <summary>
 /// UI Automation action types.
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
+[JsonConverter(typeof(UIAutomationActionJsonConverter))]
 public enum UIAutomationAction
 {
     /// <summary>Search for elements matching criteria.</summary>

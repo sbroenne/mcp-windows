@@ -4,6 +4,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit.Automation;
@@ -191,7 +192,7 @@ public sealed class TreeWalkerTests : IDisposable
         // Arrange - both parentElementId and windowHandle provided
         // parentElementId should take precedence
         var invalidParentId = "window:0|runtime:88888888|path:Test";
-        var windowHandle = (nint)0x12345;
+        var windowHandle = WindowHandleParser.Format((nint)0x12345);
 
         // Act
         var result = await _service.GetTreeAsync(windowHandle, invalidParentId, 5, null);
@@ -253,7 +254,7 @@ public sealed class TreeWalkerTests : IDisposable
         // Arrange - both parentElementId and windowHandle provided
         var query = new ElementQuery
         {
-            WindowHandle = (nint)0x12345,
+            WindowHandle = WindowHandleParser.Format((nint)0x12345),
             ParentElementId = "window:0|runtime:66666666|path:Parent",
             Name = "TestChild"
         };

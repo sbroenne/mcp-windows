@@ -18,7 +18,7 @@ public sealed record UIAutomationDiagnostics
     /// <summary>
     /// Window handle.
     /// </summary>
-    public nint? WindowHandle { get; init; }
+    public string? WindowHandle { get; init; }
 
     /// <summary>
     /// Query that was used.
@@ -100,7 +100,7 @@ public sealed record ElementQuery
     /// <summary>
     /// Window handle to search within.
     /// </summary>
-    public nint? WindowHandle { get; init; }
+    public string? WindowHandle { get; init; }
 
     /// <summary>
     /// Maximum depth to search (0 = immediate children only, null = unlimited).

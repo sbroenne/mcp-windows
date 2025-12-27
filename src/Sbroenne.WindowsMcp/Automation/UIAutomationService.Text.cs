@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 public sealed partial class UIAutomationService
 {
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> GetTextAsync(string? elementId, nint? windowHandle, bool includeChildren, CancellationToken cancellationToken = default)
+    public async Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 

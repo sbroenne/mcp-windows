@@ -22,7 +22,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
     private readonly AnnotatedScreenshotService _annotatedScreenshotService;
     private readonly UIAutomationThread _staThread;
     private readonly UIAutomationService _automationService;
-    private readonly nint _windowHandle;
+    private readonly string _windowHandle;
     private readonly List<string> _createdFiles = [];
 
     public CaptureAnnotatedTests(UITestHarnessFixture fixture)
@@ -33,7 +33,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
         _fixture.BringToFront();
         Thread.Sleep(200);
 
-        _windowHandle = _fixture.TestWindowHandle;
+        _windowHandle = _fixture.TestWindowHandleString;
 
         // Create real services for integration testing
         _staThread = new UIAutomationThread();

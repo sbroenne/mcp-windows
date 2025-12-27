@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 public sealed partial class UIAutomationService
 {
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> GetTreeAsync(nint? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default)
+    public async Task<UIAutomationResult> GetTreeAsync(string? windowHandle, string? parentElementId, int maxDepth, string? controlTypeFilter, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 

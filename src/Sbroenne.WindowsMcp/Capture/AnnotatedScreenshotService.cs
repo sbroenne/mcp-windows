@@ -58,7 +58,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
 
     /// <inheritdoc />
     public async Task<AnnotatedScreenshotResult> CaptureAsync(
-        nint? windowHandle = null,
+        string? windowHandle = null,
         string? controlTypeFilter = null,
         int maxElements = 50,
         int searchDepth = 15,
@@ -71,11 +71,36 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
         {
             _logger.LogCaptureStarted(windowHandle);
 
+            nint targetWindowHandle;
+            string? targetWindowHandleString;
+
+            if (string.IsNullOrWhiteSpace(windowHandle))
+            {
+                targetWindowHandle = NativeMethods.GetForegroundWindow();
+                if (targetWindowHandle == nint.Zero)
+                {
+                    return AnnotatedScreenshotResult.CreateFailure("No foreground window found");
+                }
+
+                targetWindowHandleString = WindowHandleParser.Format(targetWindowHandle);
+            }
+            else
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out targetWindowHandle) || targetWindowHandle == nint.Zero)
+                {
+                    return AnnotatedScreenshotResult.CreateFailure(
+                        $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle)."
+                    );
+                }
+
+                targetWindowHandleString = windowHandle;
+            }
+
             // Clamp searchDepth to valid range (1-20)
             searchDepth = Math.Clamp(searchDepth, 1, 20);
 
             // Step 1: Get UI elements (interactive only or all based on parameter)
-            var elementsResult = await GetInteractiveElementsAsync(windowHandle, controlTypeFilter, maxElements, searchDepth, interactiveOnly, cancellationToken);
+            var elementsResult = await GetInteractiveElementsAsync(targetWindowHandleString, controlTypeFilter, maxElements, searchDepth, interactiveOnly, cancellationToken);
             if (!elementsResult.Success || elementsResult.Elements == null || elementsResult.Elements.Length == 0)
             {
                 return AnnotatedScreenshotResult.CreateFailure(
@@ -83,8 +108,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             }
 
             // Step 2: Capture screenshot
-            var targetHandle = windowHandle ?? NativeMethods.GetForegroundWindow();
-            var screenshotResult = await CaptureWindowScreenshotAsync(targetHandle, cancellationToken);
+            var screenshotResult = await CaptureWindowScreenshotAsync(targetWindowHandleString, cancellationToken);
             if (!screenshotResult.Success || screenshotResult.ImageData == null)
             {
                 return AnnotatedScreenshotResult.CreateFailure(
@@ -92,7 +116,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             }
 
             // Step 3: Get window bounds for coordinate translation
-            var windowRect = GetWindowRect(targetHandle);
+            var windowRect = GetWindowRect(targetWindowHandle);
             if (windowRect == null)
             {
                 return AnnotatedScreenshotResult.CreateFailure("Failed to get window bounds");
@@ -132,7 +156,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// <param name="interactiveOnly">Filter to only interactive control types (default: true).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     private async Task<UIAutomationResult> GetInteractiveElementsAsync(
-        nint? windowHandle,
+        string? windowHandle,
         string? controlTypeFilter,
         int maxElements,
         int searchDepth,
@@ -257,7 +281,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// <summary>
     /// Captures a screenshot of the specified window.
     /// </summary>
-    private async Task<ScreenshotControlResult> CaptureWindowScreenshotAsync(nint windowHandle, CancellationToken cancellationToken)
+    private async Task<ScreenshotControlResult> CaptureWindowScreenshotAsync(string windowHandle, CancellationToken cancellationToken)
     {
         var request = new ScreenshotControlRequest
         {

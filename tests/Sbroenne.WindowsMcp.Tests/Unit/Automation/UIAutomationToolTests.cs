@@ -112,7 +112,7 @@ public sealed class UIAutomationToolTests
     {
         // Arrange
         var expectedResult = UIAutomationResult.CreateSuccess("get_tree", Array.Empty<UIElementInfo>(), null);
-        _mockService.GetTreeAsync(Arg.Any<nint?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
         // Act
@@ -280,7 +280,7 @@ public sealed class UIAutomationToolTests
     {
         // Arrange
         var expectedResult = UIAutomationResult.CreateSuccess("get_text", CreateTestElementInfo(controlType: "Edit"), null);
-        _mockService.GetTextAsync(Arg.Any<string?>(), Arg.Any<nint?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
+        _mockService.GetTextAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
         // Act
@@ -303,7 +303,7 @@ public sealed class UIAutomationToolTests
     public async Task ExecuteAsync_GetTree_ClampsMaxDepthAsync(int inputDepth, int expectedClampedDepth)
     {
         // Arrange
-        _mockService.GetTreeAsync(Arg.Any<nint?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(UIAutomationResult.CreateSuccess("get_tree", Array.Empty<UIElementInfo>(), null));
 
         // Act
@@ -386,7 +386,7 @@ public sealed class UIAutomationToolTests
     public async Task ExecuteAsync_OcrAction_WithInvalidWindowHandle_ReturnsErrorAsync()
     {
         // Act - calling OCR with an invalid window handle
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Ocr, windowHandle: 12345);
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Ocr, windowHandle: "12345");
 
         // Assert - should fail because window handle is invalid
         Assert.False(result.Success);
