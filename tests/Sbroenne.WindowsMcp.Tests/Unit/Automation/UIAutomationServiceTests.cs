@@ -175,13 +175,15 @@ public sealed class UIAutomationServiceTests : IDisposable
         var result = await _service.FindElementsAsync(query);
 
         // Assert - Invalid handle throws Win32Exception which is caught as internal error
+        // or COMException which is classified as element_stale
         Assert.NotNull(result);
         Assert.False(result.Success);
-        // The error could be WindowNotFound or InternalError depending on how FromHandle fails
+        // The error could be WindowNotFound, InternalError, or ElementStale depending on how FromHandle fails
         Assert.True(
             result.ErrorType == UIAutomationErrorType.WindowNotFound.ToString() ||
-            result.ErrorType == UIAutomationErrorType.InternalError.ToString(),
-            $"Expected WindowNotFound or InternalError, but got: {result.ErrorType}");
+            result.ErrorType == UIAutomationErrorType.InternalError.ToString() ||
+            result.ErrorType == UIAutomationErrorType.ElementStale.ToString(),
+            $"Expected WindowNotFound, InternalError, or ElementStale, but got: {result.ErrorType}");
     }
 
     #endregion

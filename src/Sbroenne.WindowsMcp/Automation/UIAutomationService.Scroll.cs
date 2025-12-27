@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
@@ -109,6 +110,18 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
+        catch (COMException ex)
+        {
+            LogScrollIntoViewError(_logger, elementId, ex);
+            var errorType = COMExceptionHelper.IsElementStale(ex)
+                ? UIAutomationErrorType.ElementStale
+                : UIAutomationErrorType.InternalError;
+            return UIAutomationResult.CreateFailure(
+                "scroll_into_view",
+                errorType,
+                COMExceptionHelper.GetErrorMessage(ex, "ScrollIntoView"),
+                CreateDiagnostics(stopwatch));
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogScrollIntoViewError(_logger, elementId, ex);
@@ -130,6 +143,10 @@ public sealed partial class UIAutomationService
             }
 
             return (false, "Element does not support ScrollItemPattern.");
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "ScrollItemPattern"));
         }
         catch (Exception ex)
         {
@@ -210,6 +227,10 @@ public sealed partial class UIAutomationService
             }
 
             return (false, "No scrollable parent found.");
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "ParentScroll"));
         }
         catch (Exception ex)
         {

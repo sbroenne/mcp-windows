@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -50,6 +51,20 @@ public sealed partial class UIAutomationService
                 return UIAutomationResult.CreateSuccess("focus", elementInfo!, CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
+        catch (COMException ex)
+        {
+            LogFocusElementError(_logger, elementId, ex);
+            var errorType = COMExceptionHelper.IsElementStale(ex)
+                ? UIAutomationErrorType.ElementStale
+                : COMExceptionHelper.IsAccessDenied(ex)
+                    ? UIAutomationErrorType.ElevatedTarget
+                    : UIAutomationErrorType.InternalError;
+            return UIAutomationResult.CreateFailure(
+                "focus",
+                errorType,
+                COMExceptionHelper.GetErrorMessage(ex, "Focus"),
+                CreateDiagnostics(stopwatch));
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogFocusElementError(_logger, elementId, ex);
@@ -94,6 +109,15 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("get_focused_element", elementInfo, CreateDiagnostics(stopwatch));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogGetFocusedElementError(_logger, ex);
+            return UIAutomationResult.CreateFailure(
+                "get_focused_element",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "GetFocusedElement"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -141,6 +165,15 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("get_element_at_cursor", elementInfo, CreateDiagnostics(stopwatch));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogGetElementAtCursorError(_logger, ex);
+            return UIAutomationResult.CreateFailure(
+                "get_element_at_cursor",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "GetElementAtCursor"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -206,6 +239,15 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("get_ancestors", [.. ancestors], CreateDiagnostics(stopwatch));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogGetAncestorsError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "get_ancestors",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "GetAncestors"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

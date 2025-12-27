@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
@@ -31,6 +32,15 @@ public sealed partial class UIAutomationService
             var elementId = targetElement.ElementId;
 
             return await PerformClickAsync(elementId, query.WindowHandle, stopwatch, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
+            return UIAutomationResult.CreateFailure(
+                "click",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Click"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -108,6 +118,15 @@ public sealed partial class UIAutomationService
             var elementId = targetElement.ElementId;
 
             return await PerformTypeAsync(elementId, text, clearFirst, query.WindowHandle, stopwatch, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Type"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -220,6 +239,15 @@ public sealed partial class UIAutomationService
             var elementId = targetElement.ElementId;
 
             return await PerformSelectAsync(elementId, value, query.WindowHandle, stopwatch, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
+            return UIAutomationResult.CreateFailure(
+                "select",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Select"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -462,6 +490,15 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
+        catch (COMException ex)
+        {
+            LogFindAndClickError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "click",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Click"),
+                CreateDiagnostics(stopwatch));
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogFindAndClickError(_logger, elementId, ex);
@@ -510,6 +547,14 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("highlight", elementInfo!, CreateDiagnostics(stopwatch));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            return UIAutomationResult.CreateFailure(
+                "highlight",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Highlight"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

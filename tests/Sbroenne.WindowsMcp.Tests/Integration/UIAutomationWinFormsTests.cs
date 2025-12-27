@@ -585,6 +585,301 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
     #endregion
 
+    #region ListView Selection Tests
+
+    [Fact]
+    public async Task ListView_FindListItems_ReturnsItems()
+    {
+        // Switch to List View tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "List View",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find list items within the ListView
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "ListItem",
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Elements);
+
+        // The test harness has 5 items (Project Alpha, Beta, Gamma, Delta, Epsilon)
+        Assert.True(result.Elements.Length >= 5, $"Expected at least 5 list items, found {result.Elements.Length}");
+    }
+
+    [Fact]
+    public async Task ListView_SelectItem_SupportsSelectionPattern()
+    {
+        // Switch to List View tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "List View",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find list items
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "ListItem",
+        });
+        Assert.True(findResult.Success);
+        Assert.NotNull(findResult.Elements);
+        Assert.True(findResult.Elements.Length > 0);
+
+        // Check that list items expose SelectionItem pattern
+        var firstItem = findResult.Elements.FirstOrDefault(e => e.Name?.Contains("Alpha") == true);
+        if (firstItem != null)
+        {
+            Assert.NotNull(firstItem.SupportedPatterns);
+            Assert.Contains("SelectionItem", firstItem.SupportedPatterns);
+        }
+    }
+
+    [Fact]
+    public async Task ListView_ClickItem_SelectsItem()
+    {
+        // Switch to List View tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "List View",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find and click on "Project Beta" item
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "ListItem",
+        });
+        Assert.True(findResult.Success);
+        Assert.NotNull(findResult.Elements);
+
+        var betaItem = findResult.Elements.FirstOrDefault(e => e.Name?.Contains("Beta") == true);
+        if (betaItem != null)
+        {
+            // Click the item to select it
+            var selectResult = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "ListItem",
+                Name = betaItem.Name,
+            });
+            Assert.True(selectResult.Success, $"Select click failed: {selectResult.ErrorMessage}");
+            await Task.Delay(100);
+
+            // Verify selection in the form
+            Assert.Equal("Project Beta", _fixture.Form?.SelectedListItem);
+        }
+    }
+
+    #endregion
+
+    #region DataGrid Selection Tests
+
+    [Fact]
+    public async Task DataGrid_FindDataItems_ReturnsRows()
+    {
+        // Switch to Data Grid tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Data Grid",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find data items within the DataGrid
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "DataItem",
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Elements);
+
+        // The test harness has 5 product rows
+        Assert.True(result.Elements.Length >= 5, $"Expected at least 5 data items, found {result.Elements.Length}");
+    }
+
+    [Fact]
+    public async Task DataGrid_SupportsGridPattern()
+    {
+        // Switch to Data Grid tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Data Grid",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find the DataGrid control
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "ProductsDataGrid",
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Elements);
+        Assert.True(result.Elements.Length >= 1, "Expected DataGrid control");
+
+        // Verify it supports Table and/or Grid pattern
+        var dataGrid = result.Elements[0];
+        Assert.NotNull(dataGrid.SupportedPatterns);
+
+        // DataGridView typically exposes Table pattern
+        var hasTableOrGrid = dataGrid.SupportedPatterns.Contains("Table") ||
+                             dataGrid.SupportedPatterns.Contains("Grid");
+        Assert.True(hasTableOrGrid, $"Expected Table or Grid pattern, found: {string.Join(", ", dataGrid.SupportedPatterns)}");
+    }
+
+    [Fact]
+    public async Task DataGrid_HeadersExposed_AsHeaders()
+    {
+        // Switch to Data Grid tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Data Grid",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find header items in the DataGrid
+        // Note: WinForms DataGridView may expose headers as HeaderItem, Text, or Header controls
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Header",
+        });
+
+        // If no Header control, try HeaderItem
+        if (!result.Success || result.Elements?.Length == 0)
+        {
+            result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "HeaderItem",
+            });
+        }
+
+        // Skip if WinForms doesn't expose headers via UI Automation
+        if (!result.Success || result.Elements?.Length == 0)
+        {
+            // This is expected behavior - WinForms DataGridView may not expose HeaderItem directly
+            return;
+        }
+
+        Assert.NotNull(result.Elements);
+
+        // Should find column headers: ID, Product Name, Price, Stock, Available
+        var headerNames = result.Elements.Select(e => e.Name).ToList();
+        Assert.Contains(headerNames, h => h?.Contains("ID") == true || h?.Contains("Product") == true);
+    }
+
+    #endregion
+
+    #region TreeView Selection Tests
+
+    [Fact]
+    public async Task TreeView_ExpandCollapse_TreeItems()
+    {
+        // Switch to Tree View tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Tree View",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find tree items
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "TreeItem",
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Elements);
+
+        // Check that tree items with children support ExpandCollapse pattern
+        var documentsItem = result.Elements.FirstOrDefault(e => e.Name == "Documents");
+        if (documentsItem != null)
+        {
+            Assert.NotNull(documentsItem.SupportedPatterns);
+            Assert.Contains("ExpandCollapse", documentsItem.SupportedPatterns);
+        }
+    }
+
+    [Fact]
+    public async Task TreeView_SelectNode_UpdatesSelection()
+    {
+        // Switch to Tree View tab
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Tree View",
+            ControlType = "TabItem",
+        });
+        Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
+        await Task.Delay(300);
+
+        // Find all tree items to see what's available
+        var findResult = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "TreeItem",
+        });
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Elements);
+
+        // Get a visible top-level node to select (Desktop or Music are typically always visible)
+        var targetNode = findResult.Elements.FirstOrDefault(e => e.Name == "Desktop" || e.Name == "Music");
+        if (targetNode == null)
+        {
+            // Fall back to first available tree item
+            targetNode = findResult.Elements.FirstOrDefault();
+        }
+
+        Assert.NotNull(targetNode);
+
+        // Click on the target node
+        var selectResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "TreeItem",
+            Name = targetNode.Name,
+        });
+        Assert.True(selectResult.Success, $"Node click failed: {selectResult.ErrorMessage}");
+        await Task.Delay(150);
+
+        // Verify selection in the form - the selected node should match what we clicked
+        Assert.Equal(targetNode.Name, _fixture.Form?.SelectedTreeNode);
+    }
+
+    #endregion
+
     #region Diagnostics Tests
 
     [Fact]

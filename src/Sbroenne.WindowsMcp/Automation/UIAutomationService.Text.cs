@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
@@ -49,6 +50,15 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccessWithText("get_text", text, CreateDiagnostics(stopwatch));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogGetTextError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "get_text",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "GetText"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

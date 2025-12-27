@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
@@ -91,6 +92,20 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindElementsError(_logger, ex);
+            var errorType = COMExceptionHelper.IsElementStale(ex)
+                ? UIAutomationErrorType.ElementStale
+                : COMExceptionHelper.IsAccessDenied(ex)
+                    ? UIAutomationErrorType.ElevatedTarget
+                    : UIAutomationErrorType.InternalError;
+            return UIAutomationResult.CreateFailure(
+                "find",
+                errorType,
+                COMExceptionHelper.GetErrorMessage(ex, "Find"),
+                CreateDiagnostics(stopwatch, query));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

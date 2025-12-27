@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
@@ -70,6 +71,23 @@ public sealed partial class UIAutomationService
                 return UIAutomationResult.CreateSuccess("invoke", elementInfo!, CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
+        catch (COMException ex)
+        {
+            LogInvokePatternError(_logger, pattern ?? "Invoke", elementId, ex);
+
+            // Provide detailed error based on HRESULT
+            var errorType = COMExceptionHelper.IsElementStale(ex)
+                ? UIAutomationErrorType.ElementStale
+                : COMExceptionHelper.IsAccessDenied(ex)
+                    ? UIAutomationErrorType.ElevatedTarget
+                    : UIAutomationErrorType.InternalError;
+
+            return UIAutomationResult.CreateFailure(
+                "invoke",
+                errorType,
+                COMExceptionHelper.GetErrorMessage(ex, pattern ?? "Invoke"),
+                CreateDiagnostics(stopwatch));
+        }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogInvokePatternError(_logger, pattern ?? "Invoke", elementId, ex);
@@ -92,6 +110,10 @@ public sealed partial class UIAutomationService
 
             return (false, "Element does not support InvokePattern.");
         }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "Invoke"));
+        }
         catch (Exception ex)
         {
             return (false, $"Invoke failed: {ex.Message}");
@@ -108,6 +130,10 @@ public sealed partial class UIAutomationService
             }
 
             return (false, "Element does not support TogglePattern.");
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "Toggle"));
         }
         catch (Exception ex)
         {
@@ -136,6 +162,10 @@ public sealed partial class UIAutomationService
 
             return (false, "Element does not support ExpandCollapsePattern.");
         }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "ExpandCollapse"));
+        }
         catch (Exception ex)
         {
             return (false, $"ExpandCollapse failed: {ex.Message}");
@@ -157,6 +187,10 @@ public sealed partial class UIAutomationService
             }
 
             return (false, "Element does not support ValuePattern or is read-only.");
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "SetValue"));
         }
         catch (Exception ex)
         {
@@ -186,6 +220,10 @@ public sealed partial class UIAutomationService
 
             pattern.SetValue(numericValue);
             return (true, null);
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "SetRangeValue"));
         }
         catch (Exception ex)
         {
@@ -223,6 +261,10 @@ public sealed partial class UIAutomationService
             }
 
             return (true, null);
+        }
+        catch (COMException ex)
+        {
+            return (false, COMExceptionHelper.GetErrorMessage(ex, "Scroll"));
         }
         catch (Exception ex)
         {

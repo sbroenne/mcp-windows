@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using UIA = Interop.UIAutomationClient;
 
@@ -72,6 +73,20 @@ public sealed partial class UIAutomationService
 
                 return UIAutomationResult.CreateSuccess("get_tree", [tree], CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
             }, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogGetTreeError(_logger, windowHandle, ex);
+            var errorType = COMExceptionHelper.IsElementStale(ex)
+                ? UIAutomationErrorType.ElementStale
+                : COMExceptionHelper.IsAccessDenied(ex)
+                    ? UIAutomationErrorType.ElevatedTarget
+                    : UIAutomationErrorType.InternalError;
+            return UIAutomationResult.CreateFailure(
+                "get_tree",
+                errorType,
+                COMExceptionHelper.GetErrorMessage(ex, "GetTree"),
+                CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
