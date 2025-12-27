@@ -38,7 +38,7 @@
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
-    <PackageReference Include="Polly" />
+    <PackageReference Include="Interop.UIAutomationClient" />
   </ItemGroup>
 
   <!-- UI Automation framework references -->

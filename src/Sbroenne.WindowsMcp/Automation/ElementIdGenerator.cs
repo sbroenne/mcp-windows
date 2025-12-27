@@ -1,6 +1,5 @@
 using System.Runtime.Versioning;
-using System.Windows.Automation;
-using Sbroenne.WindowsMcp.Models;
+using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
 
@@ -17,29 +16,28 @@ public sealed class ElementIdGenerator
     /// <param name="element">The automation element.</param>
     /// <param name="rootElement">The root element (window) for path calculation.</param>
     /// <returns>A unique element ID string.</returns>
-    public static string GenerateId(AutomationElement element, AutomationElement rootElement)
+    public static string GenerateId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
     {
         ArgumentNullException.ThrowIfNull(element);
         ArgumentNullException.ThrowIfNull(rootElement);
 
         try
         {
-            var current = element.Current;
-
             // Get window handle
-            var windowHandle = current.NativeWindowHandle;
+            var windowHandle = element.GetNativeWindowHandle();
             if (windowHandle == 0)
             {
                 // Try to get from parent
-                var parent = TreeWalker.ControlViewWalker.GetParent(element);
-                while (parent != null && parent != AutomationElement.RootElement)
+                var parent = element.GetParent();
+                while (parent != null)
                 {
-                    windowHandle = parent.Current.NativeWindowHandle;
+                    windowHandle = parent.GetNativeWindowHandle();
                     if (windowHandle != 0)
                     {
                         break;
                     }
-                    parent = TreeWalker.ControlViewWalker.GetParent(parent);
+
+                    parent = parent.GetParent();
                 }
             }
 
@@ -54,22 +52,21 @@ public sealed class ElementIdGenerator
 
             return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:{treePath}";
         }
-        catch (ElementNotAvailableException)
+        catch
         {
             return $"window:0|runtime:0|path:stale";
         }
     }
 
     /// <summary>
-    /// Resolves an element ID to an AutomationElement.
+    /// Resolves an element ID to an IUIAutomationElement.
     /// </summary>
     /// <param name="elementId">The element ID to resolve.</param>
-    /// <returns>The AutomationElement, or null if the element is stale.</returns>
-    public static AutomationElement? ResolveToAutomationElement(string elementId)
+    /// <returns>The IUIAutomationElement, or null if the element is stale.</returns>
+    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId)
     {
         ArgumentNullException.ThrowIfNull(elementId);
 
-        // Parse the element ID
         var parts = ParseElementId(elementId);
         if (parts == null)
         {
@@ -78,7 +75,7 @@ public sealed class ElementIdGenerator
 
         try
         {
-            AutomationElement? element = null;
+            UIA.IUIAutomationElement? element = null;
 
             // Try to find by runtime ID first (most reliable)
             if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
@@ -95,87 +92,49 @@ public sealed class ElementIdGenerator
 
             return element;
         }
-        catch (ElementNotAvailableException)
+        catch
         {
             return null;
         }
     }
 
-    /// <summary>
-    /// Resolves an element ID to its current element info.
-    /// </summary>
-    /// <param name="elementId">The element ID to resolve.</param>
-    /// <param name="coordinateConverter">The coordinate converter.</param>
-    /// <returns>The element info, or null if the element is stale.</returns>
-    public static UIElementInfo? ResolveElement(string elementId, CoordinateConverter coordinateConverter)
-    {
-        ArgumentNullException.ThrowIfNull(elementId);
-        ArgumentNullException.ThrowIfNull(coordinateConverter);
-
-        // Parse the element ID
-        var parts = ParseElementId(elementId);
-        if (parts == null)
-        {
-            return null;
-        }
-
-        try
-        {
-            AutomationElement? element = null;
-
-            // Try to find by runtime ID first (most reliable)
-            if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
-            {
-                var runtimeId = parts.RuntimeId.Split('.').Select(int.Parse).ToArray();
-                element = FindByRuntimeId(parts.WindowHandle, runtimeId);
-            }
-
-            // Fall back to tree path if runtime ID didn't work
-            if (element == null && !string.IsNullOrEmpty(parts.TreePath) && parts.TreePath != "stale")
-            {
-                element = FindByTreePath(parts.WindowHandle, parts.TreePath);
-            }
-
-            if (element == null)
-            {
-                return null;
-            }
-
-            // Use shared conversion logic from UIAutomationService to avoid code duplication
-            var rootElement = AutomationElement.FromHandle(parts.WindowHandle);
-            return UIAutomationService.ConvertToElementInfo(element, rootElement, coordinateConverter);
-        }
-        catch (ElementNotAvailableException)
-        {
-            return null;
-        }
-    }
-
-    private static string CalculateTreePath(AutomationElement element, AutomationElement root)
+    private static string CalculateTreePath(UIA.IUIAutomationElement element, UIA.IUIAutomationElement root)
     {
         var path = new Stack<int>();
         var current = element;
-        var walker = TreeWalker.ControlViewWalker;
+        var uia = UIA3Automation.Instance;
 
-        while (current != null && current != root && current != AutomationElement.RootElement)
+        while (current != null)
         {
-            // Find index among siblings
-            var parent = walker.GetParent(current);
+            // Check if we reached root
+            if (current.IsSameElement(root))
+            {
+                break;
+            }
+
+            // Find parent
+            var parent = current.GetParent();
             if (parent == null)
             {
                 break;
             }
 
-            var siblings = parent.FindAll(TreeScope.Children, Condition.TrueCondition);
+            // Find index among siblings
+            var siblings = parent.FindAll(UIA.TreeScope.TreeScope_Children, uia.TrueCondition);
             var index = 0;
-            foreach (AutomationElement sibling in siblings)
+            if (siblings != null)
             {
-                if (Equals(sibling, current))
+                for (var i = 0; i < siblings.Length; i++)
                 {
-                    path.Push(index);
-                    break;
+                    var sibling = siblings.GetElement(i);
+                    if (sibling != null && sibling.IsSameElement(current))
+                    {
+                        path.Push(index);
+                        break;
+                    }
+
+                    index++;
                 }
-                index++;
             }
 
             current = parent;
@@ -211,16 +170,30 @@ public sealed class ElementIdGenerator
         }
     }
 
-    private static AutomationElement? FindByRuntimeId(nint windowHandle, int[] runtimeId)
+    private static UIA.IUIAutomationElement? FindByRuntimeId(nint windowHandle, int[] runtimeId)
     {
         try
         {
+            var uia = UIA3Automation.Instance;
             var root = windowHandle != 0
-                ? AutomationElement.FromHandle(windowHandle)
-                : AutomationElement.RootElement;
+                ? uia.ElementFromHandle(windowHandle)
+                : uia.RootElement;
 
-            var condition = new PropertyCondition(AutomationElement.RuntimeIdProperty, runtimeId);
-            return root.FindFirst(TreeScope.Descendants, condition);
+            if (root == null)
+            {
+                return null;
+            }
+
+            // First check if the root element itself matches the runtime ID
+            var rootRuntimeId = root.GetRuntimeId();
+            if (rootRuntimeId != null && rootRuntimeId.SequenceEqual(runtimeId))
+            {
+                return root;
+            }
+
+            // Search descendants for the runtime ID
+            var condition = uia.CreatePropertyCondition(UIA3PropertyIds.RuntimeId, runtimeId);
+            return root.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
         }
         catch
         {
@@ -228,26 +201,36 @@ public sealed class ElementIdGenerator
         }
     }
 
-    private static AutomationElement? FindByTreePath(nint windowHandle, string treePath)
+    private static UIA.IUIAutomationElement? FindByTreePath(nint windowHandle, string treePath)
     {
         try
         {
+            var uia = UIA3Automation.Instance;
             var root = windowHandle != 0
-                ? AutomationElement.FromHandle(windowHandle)
-                : AutomationElement.RootElement;
+                ? uia.ElementFromHandle(windowHandle)
+                : uia.RootElement;
+
+            if (root == null)
+            {
+                return null;
+            }
 
             var indices = treePath.Split('.').Select(int.Parse).ToArray();
             var current = root;
-            var walker = TreeWalker.ControlViewWalker;
 
             foreach (var index in indices)
             {
-                var children = current.FindAll(TreeScope.Children, Condition.TrueCondition);
-                if (index >= children.Count)
+                var children = current.FindAll(UIA.TreeScope.TreeScope_Children, uia.TrueCondition);
+                if (children == null || index >= children.Length)
                 {
                     return null;
                 }
-                current = children[index];
+
+                current = children.GetElement(index);
+                if (current == null)
+                {
+                    return null;
+                }
             }
 
             return current;
@@ -255,20 +238,6 @@ public sealed class ElementIdGenerator
         catch
         {
             return null;
-        }
-    }
-
-    private static bool Equals(AutomationElement a, AutomationElement b)
-    {
-        try
-        {
-            var aId = a.GetRuntimeId();
-            var bId = b.GetRuntimeId();
-            return aId.SequenceEqual(bId);
-        }
-        catch
-        {
-            return false;
         }
     }
 

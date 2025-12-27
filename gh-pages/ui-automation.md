@@ -17,7 +17,16 @@ permalink: /ui-automation/
 
 <div class="container content-section" markdown="1">
 
-Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API and OCR.
+Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API (UIA3) and OCR.
+
+## Architecture
+
+Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance and compatibility:
+
+- **Direct COM interop** - No managed wrapper overhead, ~40% faster than UIA2
+- **Modern framework support** - Better compatibility with WPF, UWP, WinUI, and Electron apps
+- **Efficient tree traversal** - Optimized caching and batched property requests
+- **Stable element IDs** - Reliable element references across operations
 
 ## Overview
 
@@ -40,6 +49,9 @@ Windows MCP Server provides a unified `ui_automation` tool for discovering, inte
 | `find` | Find elements matching query | `name`, `controlType`, `automationId`, `windowHandle` |
 | `get_tree` | Get UI element tree | `windowHandle`, `parentElementId`, `maxDepth` |
 | `wait_for` | Wait for element to appear | `name`, `controlType`, `timeoutMs` |
+| `get_element_at_cursor` | Get element under mouse cursor | none |
+| `get_focused_element` | Get element with keyboard focus | none |
+| `get_ancestors` | Get parent chain to root | `elementId` |
 
 ### Interaction Actions
 
@@ -53,6 +65,7 @@ Windows MCP Server provides a unified `ui_automation` tool for discovering, inte
 | `focus` | Set keyboard focus to element | `elementId` |
 | `scroll_into_view` | Scroll element into view | `elementId` or query parameters |
 | `highlight` | Visually highlight element (debugging) | `elementId` |
+| `hide_highlight` | Hide the current highlight rectangle | none |
 
 ### Text Actions
 
@@ -67,6 +80,12 @@ Windows MCP Server provides a unified `ui_automation` tool for discovering, inte
 | `ocr` | Recognize text in region | `windowHandle` (optional), `language` |
 | `ocr_element` | OCR on element's bounding rect | `elementId` |
 | `ocr_status` | Check OCR engine availability | none |
+
+### Screenshot Actions
+
+| Action | Description | Key Parameters |
+|--------|-------------|----------------|
+| `capture_annotated` | Capture screenshot with numbered labels on interactive elements | `windowHandle`, `controlType` (filter), `maxElements` |
 
 ---
 
@@ -83,47 +102,217 @@ When finding elements, you can combine multiple parameters for precise matching:
 | `parentElementId` | string | Scope search to children of this element |
 | `includeChildren` | boolean | Include child elements in response |
 
----
+### Advanced Search Parameters
 
-## Multi-Window Workflow Parameters
-
-When working with multiple windows, use these parameters to ensure actions target the correct window:
+For more flexible element matching, use these advanced parameters:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `expectedWindowTitle` | string | Verify foreground window title contains this text before action. Fails with `wrong_target_window` if mismatch. |
-| `expectedProcessName` | string | Verify foreground process name matches before action. Fails with `wrong_target_window` if mismatch. |
+| `nameContains` | string | Substring match on element Name (case-insensitive) |
+| `namePattern` | string | Regex pattern for element Name matching |
+| `className` | string | Element's ClassName property (e.g., `Chrome_WidgetWin_1`) |
+| `foundIndex` | integer | Return the Nth matching element (1-based, default: 1) |
+| `exactDepth` | integer | Only match elements at this exact tree depth |
+| `maxDepth` | integer | Maximum tree depth to traverse (performance optimization) |
+
+#### Using foundIndex for Multiple Matches
+
+When multiple elements match your query, use `foundIndex` to select a specific one:
+
+```json
+{
+  "action": "find",
+  "controlType": "Button",
+  "foundIndex": 2
+}
+```
+
+This returns only the 2nd button found, instead of all buttons.
+
+#### Using nameContains for Partial Matching
+
+Match elements containing a substring:
+
+```json
+{
+  "action": "find",
+  "controlType": "Button",
+  "nameContains": "Save"
+}
+```
+
+Matches "Save", "Save As...", "Auto-Save", etc.
+
+#### Using namePattern for Regex Matching
+
+Match elements using regular expressions:
+
+```json
+{
+  "action": "find",
+  "controlType": "Button",
+  "namePattern": "^(Save|Apply|OK)$"
+}
+```
+
+Matches buttons named exactly "Save", "Apply", or "OK".
+
+#### Using exactDepth for Precise Location
+
+Find elements at a specific depth in the UI tree:
+
+```json
+{
+  "action": "find",
+  "exactDepth": 2
+}
+```
+
+Returns only elements that are grandchildren of the root (depth 2).
+
+---
+
+## New Actions
+
+### get_element_at_cursor
+
+Get the UI element currently under the mouse cursor. Useful for interactive element discovery.
+
+```json
+{
+  "action": "get_element_at_cursor"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "element": {
+    "elementId": "window:12345|runtime:67890|path:Button:Submit",
+    "name": "Submit",
+    "controlType": "Button",
+    "boundingRect": { "x": 100, "y": 200, "width": 80, "height": 24 }
+  }
+}
+```
+
+### get_focused_element
+
+Get the element that currently has keyboard focus.
+
+```json
+{
+  "action": "get_focused_element"
+}
+```
+
+### get_ancestors
+
+Get the parent chain from an element up to the root window.
+
+```json
+{
+  "action": "get_ancestors",
+  "elementId": "window:12345|runtime:67890|path:Button:Submit"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "elements": [
+    { "name": "Dialog", "controlType": "Pane" },
+    { "name": "Content", "controlType": "Pane" },
+    { "name": "MyApp", "controlType": "Window" }
+  ]
+}
+```
+
+### capture_annotated
+
+Capture an annotated screenshot with numbered labels overlaid on interactive UI elements. Returns both the image and a mapping of element numbers to their properties.
+
+**Request:**
+```json
+{
+  "action": "capture_annotated",
+  "windowHandle": 12345678,
+  "controlType": "Button"
+}
+```
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `windowHandle` | integer | Window to capture (optional, uses foreground) |
+| `controlType` | string | Filter to specific control types (optional) |
+| `maxElements` | integer | Maximum elements to annotate (default: 50) |
+
+**Response:**
+```json
+{
+  "success": true,
+  "annotatedImage": "data:image/png;base64,...",
+  "elements": [
+    {
+      "index": 1,
+      "name": "Save",
+      "controlType": "Button",
+      "automationId": "btnSave",
+      "elementId": "window:12345|runtime:67890|path:Button:Save",
+      "clickablePoint": { "x": 490, "y": 312, "monitorIndex": 0 },
+      "boundingBox": { "x": 450, "y": 300, "width": 80, "height": 24 }
+    },
+    {
+      "index": 2,
+      "name": "Cancel",
+      "controlType": "Button",
+      "automationId": "btnCancel",
+      "elementId": "window:12345|runtime:67891|path:Button:Cancel",
+      "clickablePoint": { "x": 550, "y": 312, "monitorIndex": 0 },
+      "boundingBox": { "x": 540, "y": 300, "width": 80, "height": 24 }
+    }
+  ]
+}
+```
+
+**Use Cases:**
+- Visual element discovery for LLM agents
+- Debugging UI automation queries
+- Creating visual documentation of UI structure
+- Quick identification of clickable elements
+
+---
+
+## Multi-Window Workflow
+
+When working with multiple windows (e.g., two VS Code instances), use `windowHandle` to target the correct window. Interactive actions automatically activate the window before performing the action.
 
 ### Multi-Window Workflow Example
 
-When automating across multiple windows (e.g., two VS Code instances):
-
-**Step 1: Discover windows**
+**Step 1: Find the target window by title**
 ```json
 {
   "tool": "window_management",
-  "action": "list"
+  "action": "find",
+  "title": "MyProject - Visual Studio Code"
 }
 ```
 
-**Step 2: Activate target window first**
-```json
-{
-  "tool": "window_management",
-  "action": "activate",
-  "handle": "12345678"
-}
-```
-
-**Step 3: Perform action with verification**
+**Step 2: Use the window handle for UI automation**
 ```json
 {
   "tool": "ui_automation",
   "action": "click",
+  "windowHandle": 12345678,
   "name": "Install",
-  "controlType": "Button",
-  "expectedWindowTitle": "Excel MCP Server"
+  "controlType": "Button"
 }
+```
+
+The window is automatically activated before the click action is performed.
 ```
 
 ---
@@ -510,7 +699,7 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 | `Timeout` | Operation timed out | Increase timeout, verify element exists |
 | `InvalidQuery` | Query parameters invalid | Check parameter types and values |
 | `OcrNotAvailable` | OCR engine not available | Check Windows version, install language pack |
-| `WrongTargetWindow` | Foreground window doesn't match expected | Use `window_management` to activate correct window, then verify with `expectedWindowTitle` |
+| `WrongTargetWindow` | Window activation failed | Verify window handle is valid using `window_management(action='list')` |
 | `InternalError` | Unexpected error | Check logs, report issue |
 
 ---
@@ -529,7 +718,71 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 
 ## Electron App Support
 
-For VS Code, Teams, Slack, and other Electron apps:
+For VS Code, Teams, Slack, and other Electron/Chromium-based apps:
+
+### Framework Detection
+
+The diagnostics response includes framework detection:
+
+```json
+{
+  "success": true,
+  "diagnostics": {
+    "durationMs": 45,
+    "elementsScanned": 150,
+    "detectedFramework": "Chromium/Electron"
+  }
+}
+```
+
+Detected frameworks: `Win32`, `WinForms`, `WPF`, `Chromium/Electron`, `Qt`, `UWP/WinUI`
+
+### Limited Accessibility Warning
+
+If an Electron app has limited UI Automation support, diagnostics will include a warning:
+
+```json
+{
+  "diagnostics": {
+    "warnings": [
+      "Chromium/Electron app detected with limited accessibility tree. The app may need to be launched with --force-renderer-accessibility flag."
+    ]
+  }
+}
+```
+
+### Enabling Full Accessibility for Electron Apps
+
+Some Electron apps don't expose their full accessibility tree by default. To enable it:
+
+**VS Code:**
+```bash
+code --force-renderer-accessibility
+```
+
+**Other Electron apps:**
+```bash
+app.exe --force-renderer-accessibility
+```
+
+You can also add this to launch shortcuts or config files for persistent configuration.
+
+### ARIA Labels in Electron
+
+In Electron apps, HTML element ARIA labels become the `Name` property:
+
+```html
+<button aria-label="Submit Form">Submit</button>
+```
+
+Find with:
+```json
+{
+  "action": "find",
+  "name": "Submit Form",
+  "controlType": "Button"
+}
+```
 
 ### Find Element in VS Code
 
@@ -550,6 +803,13 @@ For VS Code, Teams, Slack, and other Electron apps:
   "name": "index.ts"
 }
 ```
+
+### Performance Tips for Electron Apps
+
+1. **Use parentElementId** - Scope searches to reduce tree traversal
+2. **Limit maxDepth** - Chromium apps can have deep hierarchies
+3. **Use nameContains** - ARIA labels may include extra text
+4. **Check diagnostics** - Monitor `elementsScanned` for performance tuning
 
 ---
 

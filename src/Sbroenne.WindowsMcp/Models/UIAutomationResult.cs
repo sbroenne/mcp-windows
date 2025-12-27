@@ -16,12 +16,8 @@ public sealed record UIAutomationResult
     public required string Action { get; init; }
 
     /// <summary>
-    /// Single element result (for find, wait_for, invoke, etc.).
-    /// </summary>
-    public UIElementInfo? Element { get; init; }
-
-    /// <summary>
-    /// Multiple element results (for find with multiple matches, get_tree).
+    /// Element results (single or multiple). Always use this property to access found elements.
+    /// For single-element results, use Elements[0]. For multiple matches, iterate the array.
     /// </summary>
     public UIElementInfo[]? Elements { get; init; }
 
@@ -69,7 +65,33 @@ public sealed record UIAutomationResult
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
-    /// Creates a success result with a single element.
+    /// Base64-encoded annotated screenshot image data (for capture_annotated action).
+    /// </summary>
+    public string? AnnotatedImageData { get; init; }
+
+    /// <summary>
+    /// Format of the annotated image (jpeg or png).
+    /// </summary>
+    public string? AnnotatedImageFormat { get; init; }
+
+    /// <summary>
+    /// Width of the annotated image in pixels.
+    /// </summary>
+    public int? AnnotatedImageWidth { get; init; }
+
+    /// <summary>
+    /// Height of the annotated image in pixels.
+    /// </summary>
+    public int? AnnotatedImageHeight { get; init; }
+
+    /// <summary>
+    /// Array of annotated elements with their numbered indices matching the labels on the screenshot.
+    /// Use these to reference elements by number in subsequent operations.
+    /// </summary>
+    public AnnotatedElement[]? AnnotatedElements { get; init; }
+
+    /// <summary>
+    /// Creates a success result with a single element (wrapped in an array for consistency).
     /// </summary>
     /// <param name="action">The action performed.</param>
     /// <param name="element">The element found.</param>
@@ -83,9 +105,25 @@ public sealed record UIAutomationResult
         {
             Success = true,
             Action = action,
-            Element = element,
+            Elements = [element],
             ElementCount = 1,
             UsageHint = GetUsageHintForElement(element),
+            Diagnostics = diagnostics
+        };
+    }
+
+    /// <summary>
+    /// Creates a success result without elements (for actions like hide_highlight).
+    /// </summary>
+    /// <param name="action">The action performed.</param>
+    /// <param name="diagnostics">Optional diagnostics.</param>
+    /// <returns>A success result.</returns>
+    public static UIAutomationResult CreateSuccess(string action, UIAutomationDiagnostics? diagnostics = null)
+    {
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
             Diagnostics = diagnostics
         };
     }

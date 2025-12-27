@@ -24,10 +24,11 @@ public class TestHarnessInputTests : IDisposable
         _originalPosition = Coordinates.FromCurrent();
 
         // Reset and bring harness to front before each test
+        // Use multiple attempts to ensure window activation succeeds
         _fixture.Reset();
         _fixture.BringToFront();
-
-        // Small delay to ensure window is ready
+        Thread.Sleep(150);
+        _fixture.BringToFront(); // Second attempt in case first one failed
         Thread.Sleep(100);
     }
 
@@ -190,22 +191,32 @@ public class TestHarnessInputTests : IDisposable
     public async Task KeyCombo_CtrlA_IsDetected()
     {
         // Arrange - First put some text in the box
+        _fixture.BringToFront();
         _fixture.FocusTextBox();
-        await Task.Delay(50);
+        await Task.Delay(100);
 
         await _keyboardInputService.TypeTextAsync("Select me");
-        await Task.Delay(50);
+        await Task.Delay(100);
+
+        // Verify text was typed
+        var inputText = _fixture.GetValue(f => f.InputText);
+        Assert.Equal("Select me", inputText);
+
+        // Record keys before Ctrl+A
+        var keysBefore = _fixture.GetValue(f => f.KeysPressed.Count);
 
         // Act - Press Ctrl+A
         var result = await _keyboardInputService.PressKeyAsync("a", Models.ModifierKey.Ctrl);
-        await Task.Delay(50);
+        await Task.Delay(100);
 
-        // Assert - Verify the combo was sent (text should be selected but we can't easily verify that)
-        // Just verify the operation succeeded
+        // Assert - Verify the combo was sent
         Assert.True(result.Success, $"Key combo failed: {result.Error}");
 
-        // The events log should show both Ctrl and A key presses
-        var events = _fixture.GetValue(f => f.EventHistory);
-        Assert.Contains(events, e => e.Contains("Key pressed", StringComparison.OrdinalIgnoreCase));
+        // Verify the 'A' key was pressed with Ctrl modifier
+        var keysAfter = _fixture.GetValue(f => f.KeysPressed.Count);
+        var allKeys = _fixture.GetValue(f => f.KeysPressed.ToList());
+
+        // The Ctrl+A should have added at least one key
+        Assert.True(keysAfter > keysBefore, $"Expected more keys after Ctrl+A. Before: {keysBefore}, After: {keysAfter}. Keys: {string.Join(", ", allKeys)}");
     }
 }

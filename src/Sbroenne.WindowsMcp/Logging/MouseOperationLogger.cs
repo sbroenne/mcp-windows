@@ -87,10 +87,10 @@ public sealed partial class MouseOperationLogger
         return Guid.NewGuid().ToString("N")[..12];
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Mouse operation started. CorrelationId={CorrelationId}, Action={Action}, Parameters={Parameters}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Mouse operation started. CorrelationId={CorrelationId}, Action={Action}, Parameters={Parameters}")]
     private static partial void LogOperationStarted(ILogger logger, string correlationId, string action, string? parameters);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Mouse operation succeeded. CorrelationId={CorrelationId}, Action={Action}, FinalPosition=({FinalX}, {FinalY}), WindowTitle={WindowTitle}, DurationMs={DurationMs}")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Mouse operation succeeded. CorrelationId={CorrelationId}, Action={Action}, FinalPosition=({FinalX}, {FinalY}), WindowTitle={WindowTitle}, DurationMs={DurationMs}")]
     private static partial void LogOperationSucceeded(ILogger logger, string correlationId, string action, int finalX, int finalY, string? windowTitle, long durationMs);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Mouse operation failed. CorrelationId={CorrelationId}, Action={Action}, ErrorCode={ErrorCode}, Error={Error}, DurationMs={DurationMs}")]

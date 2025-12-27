@@ -89,3 +89,15 @@ launchSettings.json
 
 # LLM Integration Test Results (screenshots and logs)
 specs/007-llm-integration-testing/results/
+
+# Node.js
+node_modules/
+
+# Electron harness build output
+tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/dist/
+
+# Test screenshots for manual verification (not committed)
+tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/screenshots/
+
+# Runtime screenshots generated during test execution (not committed)
+**/bin/**/screenshots/

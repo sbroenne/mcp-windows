@@ -17,7 +17,9 @@ public sealed class UIAutomationToolTests
     private readonly IUIAutomationService _mockService;
     private readonly IOcrService _mockOcrService;
     private readonly IScreenshotService _mockScreenshotService;
+    private readonly IAnnotatedScreenshotService _mockAnnotatedScreenshotService;
     private readonly IWindowEnumerator _mockWindowEnumerator;
+    private readonly IWindowService _mockWindowService;
     private readonly ILogger<UIAutomationTool> _mockLogger;
     private readonly UIAutomationTool _tool;
 
@@ -26,9 +28,11 @@ public sealed class UIAutomationToolTests
         _mockService = Substitute.For<IUIAutomationService>();
         _mockOcrService = Substitute.For<IOcrService>();
         _mockScreenshotService = Substitute.For<IScreenshotService>();
+        _mockAnnotatedScreenshotService = Substitute.For<IAnnotatedScreenshotService>();
         _mockWindowEnumerator = Substitute.For<IWindowEnumerator>();
+        _mockWindowService = Substitute.For<IWindowService>();
         _mockLogger = Substitute.For<ILogger<UIAutomationTool>>();
-        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockLogger);
+        _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger);
     }
 
     #region Test Helpers
@@ -69,7 +73,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, _mockLogger));
+            new UIAutomationTool(null!, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger));
     }
 
     [Fact]
@@ -77,7 +81,7 @@ public sealed class UIAutomationToolTests
     {
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockWindowEnumerator, null!));
+            new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, null!));
     }
 
     #endregion
@@ -330,18 +334,52 @@ public sealed class UIAutomationToolTests
 
     #endregion
 
-    #region Not Yet Implemented Actions Tests
+    #region Highlight Action Tests
 
     [Fact]
-    public async Task ExecuteAsync_HighlightAction_ReturnsNotImplementedAsync()
+    public async Task ExecuteAsync_HighlightAction_WithElementId_CallsServiceAsync()
     {
+        // Arrange
+        var expectedResult = UIAutomationResult.CreateSuccess("highlight", CreateTestElementInfo("test-id"));
+        _mockService.HighlightElementAsync("test-id", Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(expectedResult));
+
         // Act
         var result = await _tool.ExecuteAsync(UIAutomationAction.Highlight, elementId: "test-id");
 
         // Assert
+        Assert.True(result.Success);
+        Assert.Equal("highlight", result.Action);
+        await _mockService.Received(1).HighlightElementAsync("test-id", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HighlightAction_WithoutElementId_ReturnsErrorAsync()
+    {
+        // Act
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Highlight);
+
+        // Assert
         Assert.False(result.Success);
-        Assert.Equal(UIAutomationErrorType.PatternNotSupported.ToString(), result.ErrorType);
-        Assert.Contains("not yet implemented", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter.ToString(), result.ErrorType);
+        Assert.Contains("Element ID", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_HideHighlightAction_CallsServiceAsync()
+    {
+        // Arrange
+        var expectedResult = UIAutomationResult.CreateSuccess("hide_highlight", null);
+        _mockService.HideHighlightAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(expectedResult));
+
+        // Act
+        var result = await _tool.ExecuteAsync(UIAutomationAction.HideHighlight);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal("hide_highlight", result.Action);
+        await _mockService.Received(1).HideHighlightAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -491,21 +529,20 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndClickAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
+        // Act - test without windowHandle since that triggers auto-activation
+        // The parameter passing is the same regardless of window handle
         await _tool.ExecuteAsync(
             UIAutomationAction.Click,
             name: "Button",
             controlType: "Button",
-            automationId: "btn123",
-            windowHandle: 12345);
+            automationId: "btn123");
 
         // Assert
         await _mockService.Received(1).FindAndClickAsync(
             Arg.Is<ElementQuery>(q =>
                 q.Name == "Button" &&
                 q.ControlType == "Button" &&
-                q.AutomationId == "btn123" &&
-                q.WindowHandle == 12345),
+                q.AutomationId == "btn123"),
             Arg.Any<CancellationToken>());
     }
 

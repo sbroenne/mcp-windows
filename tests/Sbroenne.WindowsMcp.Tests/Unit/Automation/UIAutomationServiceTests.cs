@@ -175,13 +175,15 @@ public sealed class UIAutomationServiceTests : IDisposable
         var result = await _service.FindElementsAsync(query);
 
         // Assert - Invalid handle throws Win32Exception which is caught as internal error
+        // or COMException which is classified as element_stale
         Assert.NotNull(result);
         Assert.False(result.Success);
-        // The error could be WindowNotFound or InternalError depending on how FromHandle fails
+        // The error could be WindowNotFound, InternalError, or ElementStale depending on how FromHandle fails
         Assert.True(
             result.ErrorType == UIAutomationErrorType.WindowNotFound.ToString() ||
-            result.ErrorType == UIAutomationErrorType.InternalError.ToString(),
-            $"Expected WindowNotFound or InternalError, but got: {result.ErrorType}");
+            result.ErrorType == UIAutomationErrorType.InternalError.ToString() ||
+            result.ErrorType == UIAutomationErrorType.ElementStale.ToString(),
+            $"Expected WindowNotFound, InternalError, or ElementStale, but got: {result.ErrorType}");
     }
 
     #endregion
@@ -384,7 +386,7 @@ public sealed class UIAutomationServiceTests : IDisposable
         // Assert - Should fail to find the element
         Assert.NotNull(result);
         Assert.False(result.Success);
-        Assert.Equal("find_and_type", result.Action);
+        Assert.Equal("type", result.Action);
         // Error could be ElementNotFound or WindowNotFound depending on test environment
         Assert.True(
             result.ErrorType == UIAutomationErrorType.ElementNotFound.ToString() ||
@@ -405,7 +407,7 @@ public sealed class UIAutomationServiceTests : IDisposable
         // Assert - Should fail to find the element
         Assert.NotNull(result);
         Assert.False(result.Success);
-        Assert.Equal("find_and_select", result.Action);
+        Assert.Equal("select", result.Action);
         // Error could be ElementNotFound or WindowNotFound depending on test environment
         Assert.True(
             result.ErrorType == UIAutomationErrorType.ElementNotFound.ToString() ||

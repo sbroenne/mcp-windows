@@ -1,72 +1,42 @@
-# Windows MCP Server - VS Code Extension
+# 🪟 Windows MCP - VS Code Extension
 
-AI-powered Windows automation — A Model Context Protocol (MCP) server with UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA.
+High-performance MCP server for AI-powered Windows automation. Enables GitHub Copilot and other AI assistants to control Windows through UI Automation, mouse, keyboard, window management, and screenshots.
 
-## Why Windows MCP?
+> Built with .NET 10 and native Windows APIs for maximum performance and reliability.
 
-- **Purpose-Built for Windows** - Native API integration handles Windows-specific challenges (UIPI, secure desktop, virtual desktops) that generic solutions miss
-- **Multi-Monitor & DPI-Aware** - Correctly handles multi-monitor setups and DPI scaling with monitor-relative coordinates
-- **Full Windows API Coverage** - Direct P/Invoke to Windows APIs (SendInput, SetWindowPos, GdiPlus) for reliable, low-level control
-- **Security-Conscious** - Detects and gracefully handles elevated windows, UAC prompts, and lock screens
+## ✨ Key Features
 
-## Features
+- **🖥️ True Multi-Monitor Support**  
+  Full awareness of multiple displays with per-monitor DPI scaling. Use `target='primary_screen'` or `'secondary_screen'` for easy targeting. Most Windows MCP servers don't handle this correctly.
 
-This extension provides Windows automation capabilities for AI assistants like GitHub Copilot:
+- **🔍 UI Automation with UIA3**  
+  Direct COM interop for ~40% faster performance. 20 actions including find, click, type, toggle, and `capture_annotated` for LLM-friendly numbered screenshots.
 
-### 🔍 UI Automation & OCR
-- **Pattern-based interaction** - Click buttons, toggle checkboxes without coordinates
-- Find UI elements by name, control type, automation ID
-- Get UI tree structure with depth limiting
-- 15 actions: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
-- Wait for elements to appear with timeout
-- OCR text recognition for controls that don't expose text
-- **Multi-window workflows** - Auto-activate windows with `activateFirst` + `targetWindowHandle`
-- **Wrong window detection** - Verify target with `expectedWindowTitle` / `expectedProcessName`
-- Scoped tree navigation with parentElementId
-- Multi-monitor coordinate integration
-- Electron app support (VS Code, Teams, Slack)
+- **🖱️ Mouse & ⌨️ Keyboard Control**  
+  Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.
 
-### 🖱️ Mouse Control
-- Click, double-click, right-click, middle-click
-- Move cursor to coordinates (monitor-relative)
-- Drag operations with modifier key support
-- Scroll in any direction
-- **Get cursor position** with `get_position` action
-- **Multi-monitor aware** - use `target='primary_screen'` or `'secondary_screen'` for easy targeting
-- DPI aware for accurate positioning
+- **🪟 Window Management**  
+  Find, activate, move, resize, and control windows. Move windows between monitors. Handles UWP apps and virtual desktops.
 
-### ⌨️ Keyboard Control
-- Type text (any language, Unicode support)
-- Press keys (Enter, Tab, F1-F24, etc.)
-- Key combinations (Ctrl+S, Alt+Tab, etc.)
-- Key sequences and macros
-- Hold/release keys for shift-select operations
-- Query current keyboard layout
+- **📸 LLM-Optimized Screenshots**  
+  JPEG format with auto-scaling to vision model limits. Capture screens, windows, regions, or all monitors.
 
-### 🪟 Window Management
-- List and find windows (with monitor info)
-- Activate, minimize, maximize, restore, close
-- Move, resize, and set_bounds for windows
-- **Move windows between monitors** with `move_to_monitor` action
-- Wait for windows to appear with `wait_for`
-- Get current foreground window with `get_foreground`
-- Regex support for window title matching
+- **🔒 Security-Aware**  
+  Gracefully handles elevated windows (UIPI), UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
-### 📸 Screenshot Capture
-- **LLM-Optimized by Default** - JPEG @ quality 85, auto-scaled to 1568px width
-- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
-- Capture specific windows by handle
-- Capture regions by coordinates
-- Capture all monitors at once with `all_monitors`
-- Format options: JPEG (default), PNG
-- Auto-scaling reduces 4K screenshots by 97% (from ~8MB to ~200KB)
-- File output mode for zero base64 overhead
-- Optional cursor inclusion
-- List available monitors with `list_monitors` action
+## Tools
+
+| Tool | Description | Key Actions |
+|------|-------------|-------------|
+| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, capture_annotated |
+| `mouse_control` | Mouse input simulation | click, move, drag, scroll, get_position |
+| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence |
+| `window_management` | Window control | find, activate, move, resize, move_to_monitor |
+| `screenshot_control` | Screenshot capture | capture (screen/window/region), list_monitors |
 
 ## Requirements
 
-- **Windows 11**
+- **Windows 10/11**
 - **.NET 10.0 Runtime** (automatically installed via the .NET Install Tool extension)
 
 ## Installation
@@ -77,78 +47,17 @@ This extension provides Windows automation capabilities for AI assistants like G
 
 ## Usage
 
-Once installed, the Windows MCP server is automatically available to AI assistants like GitHub Copilot. You can use natural language to:
+Once installed, the Windows MCP server is automatically available to AI assistants like GitHub Copilot. Use natural language to:
 
 - "Find the Save button and click it"
-- "Get the UI tree for this window"
-- "Wait for the 'File Saved' dialog to appear"
-- "Click at position 100, 200 on the primary screen"
-- "Take a screenshot of the secondary monitor"
-- "List all open windows"
-- "Move this window to the secondary screen"
-- "Type 'Hello, World!'"
+- "Take an annotated screenshot of this window"
+- "Move this window to the secondary monitor"
+- "Type 'Hello, World!' and press Enter"
 - "Press Ctrl+S to save"
 
-## Multi-Monitor Support
+## ⚠️ Caution
 
-All mouse coordinates are relative to a specific monitor (defaults to the primary monitor at index 0). This makes it easy to work with multi-monitor setups:
-
-- **Monitor 0** = Primary monitor (default)
-- **Monitor 1, 2, ...** = Additional monitors
-
-Use `screenshot_control` with `list_monitors` action to see all connected monitors.
-
-## Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `ui_automation` | Find UI elements, interact with controls, OCR text recognition |
-| `mouse_control` | Control mouse input (click, move, drag, scroll) - coordinates relative to monitor |
-| `keyboard_control` | Control keyboard input (type, press keys, combos, sequences) |
-| `window_management` | Control windows (list, activate, move, resize, move between monitors) |
-| `screenshot_control` | Capture screenshots (screen, window, region, all monitors) |
-
-## Key Parameters
-
-### UI Automation
-- `action` - One of: find, get_tree, wait_for, click, type, select, toggle, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, ocr_status
-- `name` / `controlType` / `automationId` - Element query filters
-- `elementId` - Element ID from a previous find operation (for toggle, invoke, focus actions)
-- `parentElementId` - Scope search to a subtree for performance
-- `expectedWindowTitle` / `expectedProcessName` - Verify correct window before action
-- `activateFirst` + `targetWindowHandle` - Auto-activate window before interaction
-
-### Mouse Control
-- `action` - One of: move, click, double_click, right_click, middle_click, drag, scroll, get_position
-- `target` - Monitor target: 'primary_screen' or 'secondary_screen' (for 2-monitor setups)
-- `monitorIndex` - Monitor index for 3+ monitor setups (0-based)
-- `x`, `y` - Coordinates relative to the target monitor
-- `modifiers` - Hold keys during click (ctrl, shift, alt)
-- `expectedWindowTitle` / `expectedProcessName` - Verify correct window before click
-
-### Keyboard Control
-- `text` - Text to type (supports Unicode)
-- `key` - Key to press (Enter, Tab, F1, etc.)
-- `modifiers` - Modifier keys (ctrl, shift, alt, win)
-- `sequence` - Array of keys for key sequences
-
-### Window Management
-- `action` - One of: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor
-- `handle` - Window handle from list/find operations
-- `target` - Monitor target for move_to_monitor: 'primary_screen' or 'secondary_screen'
-- `monitorIndex` - Monitor index for move_to_monitor (3+ monitors)
-- `title` - Window title for find/wait_for actions
-- `filter` - Filter for list action (matches title or process name)
-
-### Screenshot Control
-- `action` - One of: capture (default), list_monitors
-- `target` - Capture target: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'
-- `monitorIndex` - Which monitor for 'monitor' target (0-based)
-- `windowHandle` - Window handle for 'window' target
-- `includeCursor` - Include mouse cursor in capture
-- `imageFormat` - Output format: 'jpeg' (default), 'png'
-- `quality` - Compression quality 1-100 (default: 85, JPEG only)
-- `outputMode` - 'inline' (base64, default) or 'file' (returns file path)
+This MCP server interacts directly with your Windows operating system to perform actions. Use with caution and avoid deploying in environments where such risks cannot be tolerated.
 
 ## Platform Support
 
@@ -161,4 +70,5 @@ MIT
 ## Links
 
 - [GitHub Repository](https://github.com/sbroenne/mcp-windows)
+- [Full Documentation](https://windowsmcpserver.dev)
 - [Report Issues](https://github.com/sbroenne/mcp-windows/issues)

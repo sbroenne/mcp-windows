@@ -1,87 +1,74 @@
 ---
 layout: default
-title: "Complete Feature Reference"
-description: "All tools and operations: UI Automation & OCR, mouse control, keyboard input, window management, and screenshot capture."
-keywords: "Windows automation, UI automation, mouse control, keyboard input, window management, screenshot capture, MCP operations"
-permalink: /features/
+title: "Features - Windows MCP Server"
+description: "Complete reference for all Windows MCP Server tools, actions, and configuration options."
 ---
 
-<div class="hero">
-  <div class="container">
-    <div class="hero-content">
-      <h1 class="hero-title">Complete Feature Reference</h1>
-      <p class="hero-subtitle">All tools and operations for Windows automation</p>
-    </div>
-  </div>
-</div>
+# Windows MCP Features
 
-<div class="container content-section" markdown="1">
+Complete reference for all Windows MCP Server tools, actions, and configuration options.
 
-## 🔍 UI Automation & OCR
+## Tools Overview
 
-Discover, interact with, and extract text from Windows applications using the Windows UI Automation API and OCR.
+| Tool | Description |
+|------|-------------|
+| `ui_automation` | UI Automation with UIA3 COM API and OCR |
+| `mouse_control` | Mouse input simulation |
+| `keyboard_control` | Keyboard input simulation |
+| `window_management` | Window control and management |
+| `screenshot_control` | Screenshot capture |
+
+---
+
+## 🔍 UI Automation
+
+Interact with Windows UI elements using the UI Automation API and OCR.
+
+### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `find` | Find elements matching query | Query filters (see below) |
-| `get_tree` | Get UI element tree | `windowHandle` or `processName` |
-| `wait_for` | Wait for element to appear | Query filters, `timeoutMs` |
+| `find` | Find elements by name, type, or ID | `name`, `controlType`, or `automationId` |
+| `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
 | `click` | Find and click element | Query filters |
-| `type` | Find edit and type text | Query filters, `text` |
-| `select` | Find and select item | Query filters, `value` |
-| `toggle` | Toggle a checkbox/button | `elementId` |
-| `invoke` | Invoke a pattern on element | `elementId`, `value` |
-| `focus` | Set keyboard focus | `elementId` |
+| `type` | Type text into edit control | Query filters + `text` |
+| `select` | Select item from list or combo box | Query filters + `value` |
+| `toggle` | Toggle checkbox or toggle button | `elementId` |
+| `invoke` | Invoke pattern on element | `elementId` |
+| `focus` | Set keyboard focus to element | `elementId` |
 | `scroll_into_view` | Scroll element into view | `elementId` or query |
 | `get_text` | Get text from element | `elementId` or query |
+| `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
+| `get_element_at_cursor` | Get element under mouse cursor | none |
+| `get_focused_element` | Get element with keyboard focus | none |
+| `get_ancestors` | Get parent chain to root | `elementId` |
 | `highlight` | Visually highlight element | `elementId` |
-| `ocr` | Recognize text in region | `windowHandle` (optional) |
+| `hide_highlight` | Hide highlight rectangle | none |
+| `ocr` | OCR text in screen region | Region parameters |
 | `ocr_element` | OCR on element bounds | `elementId` |
 | `ocr_status` | Check OCR availability | none |
+| `capture_annotated` | Screenshot with numbered labels on interactive elements | `windowHandle`, `controlType` (filter) |
 
-**Query Filters:**
+### Capabilities
 
-| Parameter | Description |
-|-----------|-------------|
-| `name` | Element's Name property (button label, window title) |
-| `controlType` | Element type: Button, Edit, ComboBox, TreeItem, etc. |
-| `automationId` | Developer-assigned automation identifier |
-| `windowHandle` | Specific window handle |
-| `parentElementId` | Scope search to element's children |
-
-**Multi-Window Workflow Parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `expectedWindowTitle` | Verify foreground window title before action (fails with 'wrong_target_window' if mismatch) |
-| `expectedProcessName` | Verify foreground process name before action |
-
-**Supported Patterns:**
-
-| Pattern | Description | Use Case |
-|---------|-------------|----------|
-| `Invoke` | Click/activate | Buttons, menu items |
-| `Toggle` | Toggle state | Checkboxes |
-| `Expand` / `Collapse` | Expand/collapse | TreeItems, ComboBoxes |
-| `Value` | Set text value | Edit controls |
-| `RangeValue` | Set numeric value | Sliders, spinners |
-| `Scroll` | Scroll content | Scrollable containers |
-
-**Features:**
-- Pattern-based interaction (no coordinates needed)
-- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
-- Scoped tree navigation with parentElementId
-- OCR fallback for text not exposed by UI Automation
-- Multi-monitor coordinate integration with mouse_control
-- Electron app support (VS Code, Teams, Slack)
-
-See the [full UI Automation guide](/ui-automation/) for detailed examples.
+- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
+- **Element discovery** - Find UI elements by name, control type, or automation ID
+- **UI tree navigation** - Traverse the accessibility tree with depth limiting
+- **Wait for elements** - Wait for UI elements to appear with configurable timeout
+- **Text extraction** - Get text from controls via UI Automation or OCR fallback
+- **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
+- **Multi-window workflows** - Auto-activate target windows before interaction
+- **Wrong window detection** - Verify expected window is active before interactive actions
+- **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
+- **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
 
 ---
 
 ## 🖱️ Mouse Control
 
-Control mouse input on Windows with full multi-monitor and DPI support.
+Control mouse input on Windows with full multi-monitor and DPI awareness.
+
+### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
@@ -94,18 +81,24 @@ Control mouse input on Windows with full multi-monitor and DPI support.
 | `scroll` | Scroll at coordinates | `direction`, optional: `x`, `y`, `amount` |
 | `get_position` | Get current cursor position with monitor context | none |
 
-**Features:**
-- Multi-monitor support with easy targeting (`target='primary_screen'` or `'secondary_screen'`)
-- DPI awareness for accurate positioning
+### Capabilities
+
+- Click, double-click, right-click, middle-click
+- Move cursor to absolute coordinates
+- Drag operations with hold/release
+- Scroll up/down/left/right
+- Multi-monitor support with DPI awareness
+- Easy targeting with `target='primary_screen'` or `'secondary_screen'`
 - Modifier key support (Ctrl+click, Shift+click, etc.)
 - Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
-- Hold/release for drag operations
 
 ---
 
 ## ⌨️ Keyboard Control
 
 Control keyboard input on Windows with Unicode support.
+
+### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
@@ -118,27 +111,27 @@ Control keyboard input on Windows with Unicode support.
 | `release_all` | Release all held keys | none |
 | `get_keyboard_layout` | Query current layout | none |
 
-**Supported Keys:**
+### Supported Keys
 
-### Function Keys
+#### Function Keys
 `f1` through `f24`
 
-### Navigation
+#### Navigation
 `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `insert`, `delete`
 
-### Control
+#### Control
 `enter`, `tab`, `escape`, `space`, `backspace`
 
-### Modifiers
+#### Modifiers
 `ctrl`, `shift`, `alt`, `win`
 
-### Media
+#### Media
 `volumemute`, `volumedown`, `volumeup`, `mediaplaypause`, `medianexttrack`, `mediaprevtrack`, `mediastop`
 
-### Special
+#### Special
 `copilot` (Windows 11 Copilot+ PCs)
 
-### Browser
+#### Browser
 `browserback`, `browserforward`, `browserrefresh`, `browserstop`, `browsersearch`, `browserfavorites`, `browserhome`
 
 ---
@@ -146,6 +139,8 @@ Control keyboard input on Windows with Unicode support.
 ## 🪟 Window Management
 
 Control windows on the Windows desktop.
+
+### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
@@ -163,12 +158,18 @@ Control windows on the Windows desktop.
 | `wait_for` | Wait for window to appear | `title` |
 | `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
 
-**Features:**
-- Multi-monitor support with easy targeting (`target='primary_screen'` or `'secondary_screen'`)
-- Monitor index for 3+ monitor setups
-- UWP/Store apps proper detection and handling
-- Cloaking detection for virtual desktop and shell-managed windows
-- Regex pattern matching for window titles
+### Capabilities
+
+- List all visible top-level windows with titles, handles, process info, and bounds
+- Locate windows by title (substring or regex matching)
+- Bring windows to foreground with focus
+- Minimize, maximize, restore, and close windows
+- Position and size windows with move, resize, or set_bounds
+- Wait for a window to appear with configurable timeout
+- Move windows between monitors
+- Full multi-monitor support with DPI awareness
+- Proper UWP/Store app detection and handling
+- Cloaking detection to filter out virtual desktop and shell-managed windows
 
 ---
 
@@ -176,12 +177,14 @@ Control windows on the Windows desktop.
 
 Capture screenshots on Windows with LLM-optimized defaults.
 
+### Actions
+
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
 | `capture` | Capture screenshot | `target` |
 | `list_monitors` | List all connected monitors | none |
 
-**Capture Targets:**
+### Capture Targets
 
 | Target | Description | Additional Parameters |
 |--------|-------------|----------------------|
@@ -192,7 +195,7 @@ Capture screenshots on Windows with LLM-optimized defaults.
 | `region` | Capture rectangular region | `regionX`, `regionY`, `regionWidth`, `regionHeight` |
 | `all_monitors` | Composite of all displays | none |
 
-**Optional Parameters:**
+### Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
@@ -202,11 +205,20 @@ Capture screenshots on Windows with LLM-optimized defaults.
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
-**Features:**
-- LLM-Optimized by Default (JPEG, auto-scaling to 1568px, quality 85)
-- Easy targeting with `target='primary_screen'` or `'secondary_screen'`
-- Multi-monitor aware with extended desktop support
-- DPI aware for correct pixel dimensions on high-DPI displays
+### Capabilities
+
+- **LLM-Optimized by Default** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
+- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
+- **Capture any monitor** - screenshot any connected display by index
+- **Capture windows** - screenshot a specific window (even if partially obscured)
+- **Capture regions** - screenshot an arbitrary rectangular area
+- **Capture all monitors** - composite screenshot of entire virtual desktop
+- **Format options** - JPEG (default) or PNG with configurable quality (1-100)
+- **Auto-scaling** - defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
+- **Output modes** - inline base64 (default) or file path for zero-overhead file workflows
+- **Cursor inclusion** - optionally include mouse cursor in captures
+- **Multi-monitor aware** - supports extended desktop configurations
+- **DPI aware** - correct pixel dimensions on high-DPI displays
 
 ---
 
@@ -228,7 +240,7 @@ The server handles common Windows security scenarios:
 | `InvalidRegion` | Capture region has invalid dimensions |
 | `CaptureFailed` | Screenshot capture operation failed |
 | `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
-| `WrongTargetWindow` | Foreground window doesn't match expectedWindowTitle or expectedProcessName |
+| `WrongTargetWindow` | Window activation failed or target window not found |
 
 ---
 
@@ -251,4 +263,10 @@ The server handles common Windows security scenarios:
 | `MCP_WINDOWS_SCREENSHOT_TIMEOUT_MS` | `5000` | Screenshot operation timeout |
 | `MCP_WINDOWS_SCREENSHOT_MAX_PIXELS` | `33177600` | Maximum capture size (default 8K) |
 
-</div>
+---
+
+## Security Considerations
+
+- **UIPI**: Windows User Interface Privilege Isolation blocks input to elevated windows from non-elevated processes
+- **Secure Desktop**: Input cannot be sent during UAC prompts or lock screen
+- **Input Simulation**: The server uses `SendInput` which is the standard Windows API for simulating input

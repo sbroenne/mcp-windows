@@ -169,7 +169,7 @@ public sealed class ScreenshotService : IScreenshotService
         if (monitorCount < 2)
         {
             return Task.FromResult(ScreenshotControlResult.Error(
-                ScreenshotErrorCode.InvalidRequest,
+                ScreenshotErrorCode.NoSecondaryScreen,
                 "Cannot use 'secondary_screen' target: only one monitor detected. Use 'primary_screen' instead."));
         }
 
@@ -177,7 +177,7 @@ public sealed class ScreenshotService : IScreenshotService
         {
             var availableMonitors = _monitorService.GetMonitors();
             return Task.FromResult(ScreenshotControlResult.ErrorWithMonitors(
-                ScreenshotErrorCode.InvalidRequest,
+                ScreenshotErrorCode.NoSecondaryScreen,
                 $"Cannot use 'secondary_screen' target with {monitorCount} monitors. Use 'list_monitors' to see all monitors, then use 'monitor' target with monitorIndex.",
                 availableMonitors));
         }
