@@ -14,7 +14,7 @@
   Full awareness of multiple displays with per-monitor DPI scaling. Use `target='primary_screen'` or `'secondary_screen'` for easy targeting. Most Windows MCP servers don't handle this correctly.
 
 - **🔍 UI Automation with UIA3**  
-  Direct COM interop to Windows UI Automation for ~40% faster performance. 20 actions including find, click, type, toggle, and `capture_annotated` for LLM-friendly numbered screenshots.
+  Direct COM interop to Windows UI Automation for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and `capture_annotated` for LLM-friendly numbered screenshots.
 
 - **🖱️ Mouse & ⌨️ Keyboard Control**  
   Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.
@@ -82,10 +82,10 @@ If you downloaded from the releases page, add to your MCP client configuration:
 
 | Tool | Description | Key Actions |
 |------|-------------|-------------|
-| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, capture_annotated |
+| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, ensure_state, capture_annotated |
 | `mouse_control` | Mouse input simulation | click, move, drag, scroll, get_position |
-| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence |
-| `window_management` | Window control | find, activate, move, resize, move_to_monitor |
+| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence, wait_for_idle |
+| `window_management` | Window control | find, activate, move, resize, get_state, wait_for_state |
 | `screenshot_control` | Screenshot capture | capture (screen/window/region), list_monitors |
 
 For complete action reference, see [FEATURES.md](FEATURES.md).

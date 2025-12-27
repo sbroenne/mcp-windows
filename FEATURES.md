@@ -28,11 +28,14 @@ Interact with Windows UI elements using the UI Automation API and OCR.
 | `type` | Type text into edit control | Query filters + `text` |
 | `select` | Select item from list or combo box | Query filters + `value` |
 | `toggle` | Toggle checkbox or toggle button | `elementId` |
+| `ensure_state` | Ensure checkbox/toggle is in specific state (on/off) | `elementId` + `desiredState` |
 | `invoke` | Invoke pattern on element | `elementId` |
 | `focus` | Set keyboard focus to element | `elementId` |
 | `scroll_into_view` | Scroll element into view | `elementId` or query |
 | `get_text` | Get text from element | `elementId` or query |
 | `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
+| `wait_for_disappear` | Wait for element to disappear | Query filters + `timeoutMs` |
+| `wait_for_state` | Wait for element to reach a specific state | `elementId` + `desiredState` + `timeoutMs` |
 | `get_element_at_cursor` | Get element under mouse cursor | none |
 | `get_focused_element` | Get element with keyboard focus | none |
 | `get_ancestors` | Get parent chain to root | `elementId` |
@@ -48,13 +51,17 @@ Interact with Windows UI elements using the UI Automation API and OCR.
 - **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
 - **Element discovery** - Find UI elements by name, control type, or automation ID
 - **UI tree navigation** - Traverse the accessibility tree with depth limiting
-- **Wait for elements** - Wait for UI elements to appear with configurable timeout
+- **Wait for elements** - Wait for UI elements to appear or disappear with configurable timeout
+- **Wait for state** - Wait for elements to reach specific states (enabled, disabled, on, off, visible, offscreen)
+- **Ensure state** - Atomic get + conditional toggle for checkboxes (only toggles if needed)
+- **Sort by prominence** - Order results by bounding box area (largest first) for disambiguation
 - **Text extraction** - Get text from controls via UI Automation or OCR fallback
 - **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
 - **Multi-window workflows** - Auto-activate target windows before interaction
 - **Wrong window detection** - Verify expected window is active before interactive actions
 - **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
 - **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
+- **Annotated screenshots** - Capture numbered screenshots with `interactiveOnly` filter, `outputPath` file saving, and optional base64 via `returnImageData`
 
 ---
 
@@ -104,6 +111,7 @@ Control keyboard input on Windows with Unicode support.
 | `sequence` | Multiple keys in order | `keys` |
 | `release_all` | Release all held keys | none |
 | `get_keyboard_layout` | Query current layout | none |
+| `wait_for_idle` | Wait for keyboard input to be processed | none |
 
 ### Supported Keys
 
@@ -137,6 +145,8 @@ Control keyboard input on Windows with Unicode support.
 - **Hold/release keys** - for Shift-select and other hold operations
 - **Special keys** - Copilot key (Windows 11), media controls, browser keys
 - **Layout detection** - query current keyboard layout (BCP-47 format)
+- **Clear before typing** - use `clearFirst` to select all (Ctrl+A) before typing new text
+- **Wait for idle** - wait for keyboard input to be processed before continuing
 
 ---
 
@@ -152,6 +162,7 @@ Control windows on the Windows desktop.
 | `find` | Find windows by title | `title` |
 | `activate` | Bring window to foreground | `handle` |
 | `get_foreground` | Get current foreground window | none |
+| `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` |
 | `minimize` | Minimize window | `handle` |
 | `maximize` | Maximize window | `handle` |
 | `restore` | Restore window from min/max | `handle` |
@@ -160,6 +171,7 @@ Control windows on the Windows desktop.
 | `resize` | Resize window | `handle`, `width`, `height` |
 | `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
+| `wait_for_state` | Wait for window to reach a specific state | `handle`, `state`, `timeoutMs` |
 | `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
 
 ### Capabilities
@@ -237,14 +249,17 @@ The server handles common Windows security scenarios:
 | `InvalidKey` | Unrecognized key name |
 | `InputBlocked` | Input was blocked by UIPI |
 | `Timeout` | Operation timed out |
+| `OperationTimeout` | Operation timed out (with configured timeout duration) |
 | `InvalidMonitorIndex` | Monitor index out of range |
 | `InvalidWindowHandle` | Window handle is invalid or window no longer exists |
+| `MissingRequiredParameter` | A required parameter was not provided |
+| `CoordinatesOutOfBounds` | Coordinates are outside monitor boundaries |
 | `WindowMinimized` | Cannot capture minimized window |
 | `WindowNotVisible` | Window is not visible |
 | `InvalidRegion` | Capture region has invalid dimensions |
 | `CaptureFailed` | Screenshot capture operation failed |
 | `SizeLimitExceeded` | Requested capture exceeds maximum allowed size |
-| `WrongTargetWindow` | Window activation failed or target window not found |
+| `WrongTargetWindow` | Foreground window doesn't match expected title/process (use expectedWindowTitle/expectedProcessName) |
 
 ---
 
