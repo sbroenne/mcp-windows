@@ -198,13 +198,24 @@ public sealed class SystemResources
             4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(app='...', nameContains='...', desiredState='on')`
             5. **Use wait_for_disappear for dialogs** - block until dialog closes
 
+            ## When to Use `find` (Optional)
+
+            All actions support direct search, so `find` is rarely needed. Use it when:
+
+            - **Getting clickable_point** for mouse fallback: `find` returns coordinates
+            - **Multiple matches** - see all matching elements, pick the right one
+            - **Element inspection** - check patterns, children, properties
+
             ## Fallback Strategy
 
-            If ui_automation doesn't work (custom controls, games, etc.):
+            If ui_automation click/type doesn't work (custom controls, games, etc.):
 
-            1. Get element's `clickable_point` from ui_automation(find)
-            2. Use `mouse_control(app="...", action="click", x=..., y=...)`
-            3. For typing: `keyboard_control(app="...", action="type", text="...")`
+            ```
+            ui_automation(action="find", app="App", nameContains="Button")
+            → Get clickable_point: { x: 450, y: 300 }
+            mouse_control(app="App", action="click", x=450, y=300)
+            keyboard_control(app="App", action="type", text="...")
+            ```
 
             ## Advanced: Window Handles
 
