@@ -49,8 +49,7 @@ public sealed class UIAutomationActionJsonConverter : JsonConverter<UIAutomation
             "get_element_at_cursor" => UIAutomationAction.GetElementAtCursor,
             "get_focused_element" => UIAutomationAction.GetFocusedElement,
             "get_ancestors" => UIAutomationAction.GetAncestors,
-            "capture_annotated" => UIAutomationAction.CaptureAnnotated,
-            _ => throw new JsonException($"Unknown ui_automation action '{raw}'. Expected one of: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")
+            _ => throw new JsonException($"Unknown ui_automation action '{raw}'. Expected one of: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")
         };
     }
 
@@ -83,7 +82,6 @@ public sealed class UIAutomationActionJsonConverter : JsonConverter<UIAutomation
             UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
-            UIAutomationAction.CaptureAnnotated => "capture_annotated",
             _ => throw new JsonException($"Unsupported UIAutomationAction value: {value}")
         };
 

@@ -17,9 +17,6 @@ public enum KeyboardAction
     /// <summary>Release a previously held key.</summary>
     KeyUp,
 
-    /// <summary>Press a key combination with modifiers (alias for press with modifiers).</summary>
-    Combo,
-
     /// <summary>Execute a sequence of key presses with optional timing.</summary>
     Sequence,
 

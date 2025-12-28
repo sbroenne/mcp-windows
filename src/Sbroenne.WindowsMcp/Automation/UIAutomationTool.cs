@@ -87,9 +87,6 @@ public sealed partial class UIAutomationTool
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.</param>
     /// <param name="desiredState">Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.</param>
     /// <param name="sortByProminence">Sort results by element prominence (bounding box area, largest first). Useful for disambiguation.</param>
-    /// <param name="interactiveOnly">For capture_annotated: filter to only interactive control types (default: true).</param>
-    /// <param name="outputPath">For capture_annotated: save image to file instead of returning base64.</param>
-    /// <param name="returnImageData">For capture_annotated: include base64 image in response (default: true). Set false with outputPath to reduce response size.</param>
     /// <param name="inRegion">Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates.</param>
     /// <param name="nearElement">Find elements near a reference element. Pass the elementId of the reference. Results sorted by distance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -97,7 +94,7 @@ public sealed partial class UIAutomationTool
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("UI element interaction via Windows UIA. Use click/type/ensure_state directly with app+nameContains - no find step needed. Example: click(app='Notepad', nameContains='Save'). Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element. For element discovery, use screenshot_control(annotate=true) instead. Prefer over mouse_control. See system://best-practices.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors. (capture_annotated is deprecated - use screenshot_control(annotate=true) instead)")]
+        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
         UIAutomationAction action,
 
         [Description("Window handle to target as a decimal string (copy verbatim from window_management output). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
@@ -162,15 +159,6 @@ public sealed partial class UIAutomationTool
 
         [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
         bool sortByProminence = false,
-
-        [Description("For capture_annotated: filter to only interactive control types (Button, Edit, CheckBox, etc.). Default: true.")]
-        bool interactiveOnly = true,
-
-        [Description("For capture_annotated: save image to this file path instead of returning base64. Supports .png and .jpg extensions.")]
-        string? outputPath = null,
-
-        [Description("For capture_annotated: whether to include base64 image data in response. Set to false when using outputPath to reduce response size. Default: true.")]
-        bool returnImageData = true,
 
         [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
         string? inRegion = null,
@@ -243,7 +231,7 @@ public sealed partial class UIAutomationTool
                     automationId, className, elementId, parentElementId,
                     maxDepth, exactDepth, foundIndex, includeChildren, timeoutMs,
                     text, clearFirst, value, language, desiredState, sortByProminence,
-                    interactiveOnly, outputPath, returnImageData, inRegion, nearElement,
+                    inRegion, nearElement,
                     cancellationToken);
             }
         }
@@ -303,7 +291,6 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
-                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, interactiveOnly, outputPath, returnImageData, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -372,7 +359,6 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
-            UIAutomationAction.CaptureAnnotated => "capture_annotated",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -1042,87 +1028,6 @@ public sealed partial class UIAutomationTool
         return await _automationService.GetAncestorsAsync(elementId, depthLimit, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
-        string? windowHandle, string? controlTypeFilter, int maxDepth, bool interactiveOnly, string? outputPath, bool returnImageData, CancellationToken cancellationToken)
-    {
-        // Use maxDepth for capture_annotated, with sensible defaults:
-        // - If maxDepth is default (5), use 15 for Electron compatibility
-        // - Otherwise use the caller's value, clamped to valid range
-        var searchDepth = maxDepth == 5 ? 15 : Math.Clamp(maxDepth, 1, 20);
-
-        if (!string.IsNullOrWhiteSpace(windowHandle))
-        {
-            if (!WindowHandleParser.TryParse(windowHandle, out var parsed) || parsed == nint.Zero)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "capture_annotated",
-                    UIAutomationErrorType.InvalidParameter,
-                    $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
-                    null);
-            }
-        }
-
-        var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle,
-            controlTypeFilter,
-            maxElements: 50,
-            searchDepth: searchDepth,
-            Models.ImageFormat.Jpeg,
-            quality: 85,
-            interactiveOnly: interactiveOnly,
-            cancellationToken);
-
-        if (!result.Success)
-        {
-            return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
-                result.ErrorMessage ?? "Failed to capture annotated screenshot", null);
-        }
-
-        // Save to file if outputPath is specified
-        string? savedFilePath = null;
-        if (!string.IsNullOrEmpty(outputPath))
-        {
-            try
-            {
-                var imageBytes = Convert.FromBase64String(result.ImageData!);
-                var directory = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                await File.WriteAllBytesAsync(outputPath, imageBytes, cancellationToken);
-                savedFilePath = outputPath;
-            }
-            catch (Exception ex)
-            {
-                return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
-                    $"Failed to save image to '{outputPath}': {ex.Message}", null);
-            }
-        }
-
-        // Build usage hint based on options
-        var usageHint = $"Screenshot with {result.ElementCount} numbered elements. Reference elements by their index number (1-{result.ElementCount}). " +
-                        "Each element has an elementId you can use for subsequent operations like click, type, toggle.";
-        if (savedFilePath != null)
-        {
-            usageHint = $"Image saved to '{savedFilePath}'. " + usageHint;
-        }
-
-        // Return success with annotated screenshot data
-        return new UIAutomationResult
-        {
-            Success = true,
-            Action = "capture_annotated",
-            AnnotatedImageData = returnImageData ? result.ImageData : null,
-            AnnotatedImageFormat = result.ImageFormat,
-            AnnotatedImageWidth = result.Width,
-            AnnotatedImageHeight = result.Height,
-            AnnotatedElements = result.Elements,
-            ElementCount = result.ElementCount,
-            UsageHint = usageHint
-        };
-    }
-
     #endregion
 
     #region LoggerMessage Methods
@@ -1234,9 +1139,5 @@ public enum UIAutomationAction
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
     [Description("Get all ancestor elements of an element up to the window root")]
-    GetAncestors,
-
-    /// <summary>Capture annotated screenshot with numbered labels on interactive elements.</summary>
-    [Description("Capture annotated screenshot with numbered labels on interactive elements. Returns image + element mapping.")]
-    CaptureAnnotated
+    GetAncestors
 }

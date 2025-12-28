@@ -143,8 +143,8 @@ public sealed class SystemResources
             All tools accept an `app` parameter that automatically finds and activates windows by title (partial match):
 
             ```
-            ui_automation(action="find", app="Visual Studio Code", nameContains="Save")
-            keyboard_control(action="combo", app="Notepad", key="s", modifiers="ctrl")
+            ui_automation(action="click", app="Visual Studio Code", nameContains="Save")
+            keyboard_control(action="press", app="Notepad", key="s", modifiers="ctrl")
             mouse_control(action="click", app="Settings", x=100, y=200)
             screenshot_control(app="Chrome")
             ```
@@ -247,10 +247,10 @@ public sealed class SystemResources
 
             | Error Code | Recovery Action |
             |------------|-----------------|
-            | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or call `capture_annotated` first to discover available elements. |
+            | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or use `screenshot_control(annotate=true)` first to discover available elements. |
             | `element_stale` | Element was removed from UI. Re-run `find` to get fresh elementId. |
             | `pattern_not_supported` | Element doesn't support this action. Check `supportedPatterns` in element info. Use `invoke` for buttons, `toggle` for checkboxes. |
-            | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `capture_annotated`. |
+            | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `screenshot_control(annotate=true)`. |
             | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
 
             ## Mouse/Keyboard Errors
@@ -282,7 +282,7 @@ public sealed class SystemResources
 
             ### Element Not Found → Discovery Workflow
             ```
-            1. capture_annotated → see all interactive elements
+            1. screenshot_control(annotate=true) → see all interactive elements
             2. find with broader criteria (nameContains, controlType only)
             3. get_tree → see element hierarchy for parent scoping
             ```
@@ -357,7 +357,7 @@ public sealed class SystemResources
               ],
               "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
             }
-            // capture_annotated returns elements + image:
+            // screenshot_control(annotate=true) returns elements + image:
             {
               "success": true,
               "annotated_elements": [
@@ -428,7 +428,7 @@ public sealed class SystemResources
             {
               "success": false,
               "error_code": "element_not_found",
-              "error": "Element matching criteria not found. Try capture_annotated to discover elements.",
+              "error": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
               "target_window": { "handle": "12345678", "title": "...", "process_name": "..." }
             }
             ```

@@ -43,7 +43,7 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 "Fallbacks (only if ui_automation fails):\n" +
                 $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from result\n" +
-                $"• keyboard_control(app='{target}', action='combo', key='s', modifiers='ctrl') — for hotkeys")
+                $"• keyboard_control(app='{target}', action='press', key='s', modifiers='ctrl') — for hotkeys")
         ];
     }
 

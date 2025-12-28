@@ -27,8 +27,5 @@ public enum MouseAction
     Scroll,
 
     /// <summary>Get current cursor position with monitor context.</summary>
-    GetPosition,
-
-    /// <summary>Click on a UI element by its element ID (from ui_automation).</summary>
-    ClickElement
+    GetPosition
 }
