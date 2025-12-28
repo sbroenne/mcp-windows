@@ -199,33 +199,33 @@ public sealed record UIAutomationResult
     private static string GetDefaultRecoverySuggestion(string errorType) => errorType switch
     {
         UIAutomationErrorType.ElementNotFound =>
-            "Try: 1) Use get_tree action to explore the UI hierarchy. 2) Verify the window is visible and not minimized. 3) For Electron apps (VS Code, Teams), use window_management to activate the window first. 4) Check if element name/type is correct using screenshot_control.",
+            "Element not found after auto-retry with partial matching. Use get_tree to explore available elements, or verify the window is visible.",
 
         UIAutomationErrorType.MultipleMatches =>
-            "Try: 1) Add automationId if available (more precise). 2) Use parentElementId to scope the search to a specific container. 3) Add more filters like controlType. 4) Use get_tree to examine the element hierarchy.",
+            "Multiple elements matched. Add automationId, use parentElementId to scope search, or specify foundIndex to select which match.",
 
         UIAutomationErrorType.PatternNotSupported =>
-            "Try: 1) Use 'find' action to get clickablePoint, then use mouse_control with those coordinates. 2) Check element's supportedPatterns array for available patterns.",
+            "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",
 
         UIAutomationErrorType.ElementStale =>
-            "The element reference expired. Try: 1) Use 'find' action to get a fresh elementId. 2) Element may have been removed from UI - verify with get_tree.",
+            "Element reference expired. Use find action to get a fresh elementId.",
 
         UIAutomationErrorType.ElevatedTarget =>
-            "Target window runs as Administrator. Try: 1) Run MCP server with elevated privileges. 2) Target a different non-elevated window.",
+            "Target window runs as Administrator. Run MCP server elevated or target a non-admin window.",
 
         UIAutomationErrorType.WindowNotFound =>
-            "Try: 1) Use window_management action='list' to find available windows. 2) Window may have closed - check if application is still running.",
+            "Window not found. Verify the application is running.",
 
         UIAutomationErrorType.Timeout =>
-            "Try: 1) Increase timeoutMs parameter. 2) Verify the expected UI change is actually happening. 3) Use screenshot_control to check current UI state.",
+            "Operation timed out. Increase timeoutMs or verify the expected UI state.",
 
         UIAutomationErrorType.WrongTargetWindow =>
-            "A different window has focus. Try: 1) Use ui_automation with 'targetWindowHandle' and 'activateFirst=true' to auto-activate the correct window. 2) Or use window_management(action='activate', handle=<handle>) first. 3) Verify expectedWindowTitle/expectedProcessName values are correct.",
+            "Wrong window has focus. Use app='...' to target the correct window.",
 
         UIAutomationErrorType.InvalidParameter =>
-            "Check parameter values. Try: 1) Review parameter requirements for this action. 2) Ensure required parameters like 'text' for type action are provided.",
+            "Invalid parameter value. Check the parameter requirements.",
 
-        _ => "Check the error message and try the operation again with corrected parameters."
+        _ => string.Empty
     };
 
     /// <summary>

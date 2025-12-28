@@ -19,6 +19,37 @@ permalink: /ui-automation/
 
 Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API (UIA3) and OCR.
 
+## Quick Start: Just Use the `app` Parameter
+
+The simplest way to automate any Windows application is with the `app` parameter:
+
+```json
+{
+  "action": "capture_annotated",
+  "app": "Visual Studio Code"
+}
+```
+
+The `app` parameter:
+- **Finds the window automatically** using partial title matching
+- **Activates the window** before performing any action
+- **Works with all tools**: `ui_automation`, `mouse_control`, `keyboard_control`, `screenshot_control`
+
+**No need to manually find window handles** - the server handles this complexity for you.
+
+### Example Workflow
+
+```json
+// Step 1: See what's clickable
+{ "action": "capture_annotated", "app": "Notepad" }
+
+// Step 2: Find an element
+{ "action": "find", "app": "Notepad", "controlType": "Button", "nameContains": "Save" }
+
+// Step 3: Click it
+{ "action": "click", "elementId": "..." }
+```
+
 ## Architecture
 
 Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance and compatibility:
@@ -99,10 +130,11 @@ When finding elements, you can combine multiple parameters for precise matching:
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
+| `app` | string | **Recommended.** Application name (partial title match). Auto-finds and activates window. |
 | `name` | string | Element's Name property (button label, window title) |
 | `controlType` | string | Element type: `Button`, `Edit`, `ComboBox`, `TreeItem`, etc. |
 | `automationId` | string | Developer-assigned automation identifier |
-| `windowHandle` | integer | Specific window handle to search within |
+| `windowHandle` | integer | Specific window handle (use `app` instead for simpler workflow) |
 | `parentElementId` | string | Scope search to children of this element |
 | `includeChildren` | boolean | Include child elements in response |
 
@@ -354,31 +386,57 @@ Capture an annotated screenshot with numbered labels overlaid on interactive UI 
 
 ## Multi-Window Workflow
 
-When working with multiple windows (e.g., two VS Code instances), use `windowHandle` to target the correct window. Interactive actions automatically activate the window before performing the action.
+When working with multiple windows (e.g., two VS Code instances), use the `app` parameter with a unique portion of the window title:
 
-### Multi-Window Workflow Example
+### Simple Approach: Use `app` Parameter
 
-**Step 1: Find the target window by title**
 ```json
 {
-  "tool": "window_management",
-  "action": "find",
-  "title": "MyProject - Visual Studio Code"
-}
-```
-
-**Step 2: Use the window handle for UI automation**
-```json
-{
-  "tool": "ui_automation",
   "action": "click",
-  "windowHandle": 12345678,
+  "app": "MyProject - Visual Studio Code",
   "name": "Install",
   "controlType": "Button"
 }
 ```
 
-The window is automatically activated before the click action is performed.
+The `app` parameter:
+- Finds the window by partial title match
+- Activates the window automatically
+- Then performs the action
+
+### When Multiple Windows Match
+
+If you have two VS Code windows open, use a unique part of the title:
+
+```json
+// Target the "MyProject" window specifically
+{ "action": "find", "app": "MyProject", "controlType": "Button" }
+
+// Target the "OtherProject" window
+{ "action": "find", "app": "OtherProject", "controlType": "Button" }
+```
+
+### Advanced: Using windowHandle Directly
+
+For advanced scenarios, you can still use `windowHandle`:
+
+**Step 1: Find the target window**
+```json
+{
+  "tool": "window_management",
+  "action": "find",
+  "title": "MyProject"
+}
+```
+
+**Step 2: Use the window handle**
+```json
+{
+  "action": "click",
+  "windowHandle": 12345678,
+  "name": "Install",
+  "controlType": "Button"
+}
 ```
 
 ---
@@ -498,11 +556,12 @@ When you don't know the UI structure, use this workflow:
 
 ### Step 1: Get the UI Tree
 
-First activate the target window, then get the tree:
+Use the `app` parameter to target the window:
 
 ```json
 {
   "action": "get_tree",
+  "app": "Notepad",
   "maxDepth": 3
 }
 ```
@@ -772,13 +831,14 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 
 ## Best Practices
 
-1. **Prefer patterns over coordinates** - Use `invoke`, `click`, `type` when possible
-2. **Start with get_tree** - Discover UI structure before writing queries  
-3. **Use multiple filters** - Combine `name`, `controlType`, `automationId` for unique matches
-4. **Scope with parentElementId** - Limit search to relevant subtrees for performance
-5. **Handle timeouts** - Use `wait_for` with appropriate timeouts for dynamic UI
-6. **Fall back to OCR** - When UI Automation doesn't expose text
-7. **Use expectedWindowTitle** - Verify correct window before interactive actions
+1. **Just use the `app` parameter** - Simplest way to target any window: `ui_automation(app='Notepad', action='find', ...)`
+2. **Start with capture_annotated** - See all interactive elements with numbered labels
+3. **Prefer patterns over coordinates** - Use `invoke`, `click`, `type` when possible
+4. **Use multiple filters** - Combine `name`, `controlType`, `automationId` for unique matches
+5. **Scope with parentElementId** - Limit search to relevant subtrees for performance
+6. **Handle timeouts** - Use `wait_for` with appropriate timeouts for dynamic UI
+7. **Fall back to OCR** - When UI Automation doesn't expose text
+8. **Use ensure_state for toggles** - Atomic check-and-toggle instead of find → check → toggle
 
 ---
 

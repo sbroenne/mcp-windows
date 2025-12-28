@@ -30,8 +30,16 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var mouseService = new MouseInputService();
         var monitorService = new MonitorService();
         var elevationDetector = new ElevationDetector();
-        var windowEnumerator = new WindowEnumerator(elevationDetector, WindowConfiguration.FromEnvironment());
+        var windowConfig = WindowConfiguration.FromEnvironment();
+        var windowEnumerator = new WindowEnumerator(elevationDetector, windowConfig);
+        var windowActivator = new WindowActivator(windowConfig);
         var secureDesktopDetector = new SecureDesktopDetector();
+        var windowService = new WindowService(
+            windowEnumerator,
+            windowActivator,
+            monitorService,
+            secureDesktopDetector,
+            windowConfig);
         var logger = new MouseOperationLogger(NullLogger<MouseOperationLogger>.Instance);
         var config = MouseConfiguration.FromEnvironment();
 
@@ -39,6 +47,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             mouseService,
             monitorService,
             windowEnumerator,
+            windowService,
             elevationDetector,
             secureDesktopDetector,
             logger,

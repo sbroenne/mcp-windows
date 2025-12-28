@@ -132,89 +132,83 @@ public sealed class SystemResources
     /// </summary>
     /// <returns>Markdown document with best practices.</returns>
     [McpServerResource(UriTemplate = "system://best-practices", Name = "best-practices", Title = "Windows Automation Best Practices", MimeType = "text/markdown")]
-    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications to avoid common pitfalls like sending input to wrong windows.")]
+    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications.")]
     public static string GetBestPractices()
     {
         return """
             # Windows Automation Best Practices
 
-            ## Critical: Always Verify Target Window
+            ## The Simple Workflow: Just Use `app` Parameter
 
-            Every keyboard, mouse, and UI automation response includes a `target_window` object showing which window received the input:
-            ```json
-            {
-              "success": true,
-              "target_window": {
-                "handle": "123456",
-                "title": "My Application",
-                "process_name": "myapp",
-                "process_id": 1234
-              }
-            }
+            All tools accept an `app` parameter that automatically finds and activates windows by title (partial match):
+
+            ```
+            ui_automation(action="find", app="Visual Studio Code", nameContains="Save")
+            keyboard_control(action="combo", app="Notepad", key="s", modifiers="ctrl")
+            mouse_control(action="click", app="Settings", x=100, y=200)
+            screenshot_control(app="Chrome")
             ```
 
-            **ALWAYS check `target_window.title` or `target_window.process_name` matches your intended target.**
+            **That's it.** No need to manually find handles or activate windows.
 
-            ## Recommended Workflow for UI Automation
+            ## Recommended Workflow
 
-            ### 1. Find the Target Window
+            ### 1. Discover Elements
             ```
-            window_management(action="find", title="My Application")
-            → Save the handle from the response
-            ```
-
-            ### 2. Activate the Window
-            ```
-            window_management(action="activate", handle="<saved_handle>")
+            ui_automation(action="capture_annotated", app="My Application")
+            → See all interactive elements with numbered annotations
             ```
 
-            ### 3. Verify Activation
+            ### 2. Find and Interact
             ```
-            window_management(action="get_foreground")
-            → Confirm the returned window matches your target
-            ```
-
-            ### 4. Perform Input Operations
-            Use keyboard_control, mouse_control, or ui_automation.
-            Check `target_window` in each response to verify input went to the correct window.
-
-            ### 5. Verify Results with Screenshot
-            ```
-            screenshot_control(target="primary_screen")
-            → Visually confirm the expected UI state
+            ui_automation(action="find", app="My Application", nameContains="Save")
+            ui_automation(action="click", elementId="...")
             ```
 
-            ## Common Pitfalls
+            ### 3. Verify Results
+            ```
+            ui_automation(action="wait_for_disappear", elementId="...") // for dialogs
+            ui_automation(action="capture_annotated", app="My Application") // visual check
+            ```
 
-            1. **Window focus changed**: Another application stole focus between operations
-               - Solution: Re-activate the target window before each critical operation
+            ## When to Use Each Tool
 
-            2. **Dialog appeared**: A modal dialog blocked the expected UI
-               - Solution: Use ui_automation(action="find") to check for dialogs
+            | Goal | Primary Tool | Fallback |
+            |------|-------------|----------|
+            | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(app=...) |
+            | Type in text field | ui_automation(type) | keyboard_control(app=...) |
+            | Press hotkey (Ctrl+S) | keyboard_control(app=..., combo) | - |
+            | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
+            | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
+            | Take screenshot | screenshot_control(app=...) | - |
+            | Find visible elements | ui_automation(capture_annotated) | ui_automation(get_tree) |
 
-            3. **Wrong window received input**: Multiple windows with similar titles
-               - Solution: Use process_name or handle to identify windows uniquely
+            ## Key Principles
 
-            4. **UI element not found**: Element hasn't loaded yet
-               - Solution: Use ui_automation(action="wait_for", timeoutMs=5000) before interacting
+            1. **Start with ui_automation** - it's the most reliable for standard UI elements
+            2. **Use capture_annotated for discovery** - see what's clickable before searching
+            3. **Use app parameter everywhere** - simpler than managing handles
+            4. **Use ensure_state for toggles** - atomic on/off without checking first
+            5. **Use wait_for_disappear for dialogs** - block until dialog closes
 
-            5. **Coordinates outside bounds**: Click/move coordinates outside visible area
-               - Solution: Use screenshot_control(action="list_monitors") to understand display layout
+            ## Fallback Strategy
 
-            ## Tool Integration Quick Reference
+            If ui_automation doesn't work (custom controls, games, etc.):
 
-            | Task | Tool | Action |
-            |------|------|--------|
-            | Find a window | window_management | find, list |
-            | Activate a window | window_management | activate |
-            | Check active window | window_management | get_foreground |
-            | Find UI element | ui_automation | find, wait_for |
-            | Type text | keyboard_control | type |
-            | Press key combo | keyboard_control | combo |
-            | Click coordinates | mouse_control | click |
-            | Click UI element | ui_automation | click, invoke |
-            | Verify UI state | screenshot_control | capture |
-            | Read text | ui_automation | get_text, ocr |
+            1. Get element's `clickable_point` from ui_automation(find)
+            2. Use `mouse_control(app="...", action="click", x=..., y=...)`
+            3. For typing: `keyboard_control(app="...", action="type", text="...")`
+
+            ## Advanced: Window Handles
+
+            For complex scenarios with multiple similar windows, use window_management:
+            ```
+            window_management(action="find", title="Untitled - Notepad")
+            → Get specific handle
+            ui_automation(action="find", windowHandle="<handle>", ...)
+            ```
+
+            But for most cases, just use `app` parameter.
             """;
     }
 

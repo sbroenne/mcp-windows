@@ -63,7 +63,7 @@ public sealed class PromptDiscoveryTests
             var promptNames = ExtractPromptNames(listResponse);
 
             Assert.Contains("windows_mcp_quickstart", promptNames);
-            Assert.Contains("windows_mcp_target_window", promptNames);
+            Assert.Contains("windows_mcp_find_and_click", promptNames);
 
             await SendJsonRpcAsync(process, new
             {
@@ -83,7 +83,7 @@ public sealed class PromptDiscoveryTests
                 "Expected prompts/get result.messages array");
 
             var allText = string.Join("\n", EnumerateAllText(messages));
-            Assert.Contains("window_management", allText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("app", allText, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("ui_automation", allText, StringComparison.OrdinalIgnoreCase);
         }
         finally

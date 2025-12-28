@@ -68,5 +68,10 @@ public enum ScreenshotErrorCode
     /// <summary>
     /// Secondary screen target requires exactly 2 monitors.
     /// </summary>
-    NoSecondaryScreen = 12
+    NoSecondaryScreen = 12,
+
+    /// <summary>
+    /// Window specified by app parameter was not found.
+    /// </summary>
+    WindowNotFound = 13
 }

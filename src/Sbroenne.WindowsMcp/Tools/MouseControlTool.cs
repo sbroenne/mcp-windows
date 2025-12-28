@@ -32,6 +32,7 @@ public sealed partial class MouseControlTool
     private readonly IMouseInputService _mouseInputService;
     private readonly IMonitorService _monitorService;
     private readonly IWindowEnumerator _windowEnumerator;
+    private readonly IWindowService _windowService;
     private readonly IElevationDetector _elevationDetector;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly MouseOperationLogger _logger;
@@ -43,6 +44,7 @@ public sealed partial class MouseControlTool
     /// <param name="mouseInputService">The mouse input service.</param>
     /// <param name="monitorService">The monitor service.</param>
     /// <param name="windowEnumerator">The window enumerator for getting target window info.</param>
+    /// <param name="windowService">The window service for finding and activating windows.</param>
     /// <param name="elevationDetector">The elevation detector.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="logger">The operation logger.</param>
@@ -51,6 +53,7 @@ public sealed partial class MouseControlTool
         IMouseInputService mouseInputService,
         IMonitorService monitorService,
         IWindowEnumerator windowEnumerator,
+        IWindowService windowService,
         IElevationDetector elevationDetector,
         ISecureDesktopDetector secureDesktopDetector,
         MouseOperationLogger logger,
@@ -59,6 +62,7 @@ public sealed partial class MouseControlTool
         _mouseInputService = mouseInputService ?? throw new ArgumentNullException(nameof(mouseInputService));
         _monitorService = monitorService ?? throw new ArgumentNullException(nameof(monitorService));
         _windowEnumerator = windowEnumerator ?? throw new ArgumentNullException(nameof(windowEnumerator));
+        _windowService = windowService ?? throw new ArgumentNullException(nameof(windowService));
         _elevationDetector = elevationDetector ?? throw new ArgumentNullException(nameof(elevationDetector));
         _secureDesktopDetector = secureDesktopDetector ?? throw new ArgumentNullException(nameof(secureDesktopDetector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -88,6 +92,7 @@ public sealed partial class MouseControlTool
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position.</param>
+    /// <param name="app">Application window to target by title (partial match). The server automatically finds and activates the window.</param>
     /// <param name="target">Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.</param>
     /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
     /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>
@@ -105,11 +110,12 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Mouse input: move, click, double_click, right_click, middle_click, drag, scroll, get_position, click_element. Prefer ui_automation for clicking UI elements; use mouse_control as fallback for custom-drawn controls or when you have screen coordinates. Use click_element with elementId from ui_automation. Safety: set expectedWindowTitle/expectedProcessName to prevent wrong-window clicks. See system://best-practices for workflows.")]
+    [Description("Mouse input: move, click, double_click, right_click, middle_click, drag, scroll, get_position, click_element. Prefer ui_automation for clicking UI elements; use mouse_control as fallback for custom-drawn controls or when you have screen coordinates. Use 'app' parameter to auto-activate target window before mouse action. See system://best-practices for workflows.")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, get_position, or click_element (click on UI element by elementId)")] string action,
+        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds and activates the window before the mouse action.")] string? app = null,
         [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
         [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
         [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
@@ -144,6 +150,35 @@ public sealed partial class MouseControlTool
 
         try
         {
+            // Resolve 'app' parameter to windowHandle if specified
+            Models.WindowInfo? resolvedWindow = null;
+            if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
+            {
+                var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
+                if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
+                {
+                    // Try listing all windows to provide helpful suggestions
+                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: linkedToken);
+                    var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
+                    var suggestion = availableWindows.Length > 0
+                        ? $"Available windows: {string.Join(", ", availableWindows)}"
+                        : "No windows found. Ensure the application is running.";
+
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.WrongTargetWindow,
+                        $"No window found matching app='{app}'. {suggestion}");
+                    _logger.LogOperationFailure(correlationId, action ?? "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                // If multiple windows match, use the first one (most recently active)
+                resolvedWindow = findResult.Windows![0];
+                windowHandle = resolvedWindow.Handle;
+
+                // Activate the window before performing mouse action
+                await _windowService.ActivateWindowAsync(nint.Parse(windowHandle), linkedToken);
+            }
+
             // Pre-flight check: verify target window if expected values are specified
             if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
             {
