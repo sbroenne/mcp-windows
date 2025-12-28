@@ -239,9 +239,12 @@ public sealed partial class UIAutomationService
             // Get monitor-relative rect and clickable point
             var (monitorRelativeRect, monitorIndex) = coordinateConverter.ToMonitorRelative(boundingRect);
 
+            // Use fast element ID using RuntimeId (resolution primarily uses RuntimeId anyway)
+            var elementId = GenerateFastElementIdFromCurrent(element, rootElement);
+
             var info = new UIElementInfo
             {
-                ElementId = ElementIdGenerator.GenerateId(element, rootElement),
+                ElementId = elementId,
                 Name = element.GetName(),
                 AutomationId = element.GetAutomationId(),
                 ControlType = element.GetControlTypeName(),
@@ -326,6 +329,40 @@ public sealed partial class UIAutomationService
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Generates a fast element ID using Current properties (not cached).
+    /// This avoids the expensive tree path calculation of ElementIdGenerator.
+    /// Format: "window:{hwnd}|runtime:{id}|path:fast"
+    /// </summary>
+    private static string GenerateFastElementIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        try
+        {
+            // Get window handle from current properties
+            var windowHandle = element.GetNativeWindowHandle();
+
+            // If no handle on element, use root's handle
+            if (windowHandle == 0)
+            {
+                windowHandle = rootElement.GetNativeWindowHandle();
+            }
+
+            // Get runtime ID
+            var runtimeId = element.GetRuntimeId();
+            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
+                ? string.Join(".", runtimeId)
+                : "0";
+
+            // Simplified format - no tree path (expensive to calculate)
+            // Resolution primarily uses RuntimeId anyway
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast";
+        }
+        catch
+        {
+            return "window:0|runtime:0|path:error";
         }
     }
 
