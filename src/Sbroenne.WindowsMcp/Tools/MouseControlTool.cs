@@ -100,14 +100,16 @@ public sealed partial class MouseControlTool
     /// <param name="monitorIndex">Monitor index (0-based). Alternative to target for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices.</param>
     /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
+    /// <param name="elementId">Element ID from ui_automation (required for click_element action). Clicks at the element's center.</param>
+    /// <param name="windowHandle">Window handle for window-relative coordinates. When provided, x/y are relative to the window's top-left corner.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Control mouse input on Windows. Prefer ui_automation first; use mouse_control as a fallback when UIA patterns don't work (custom-drawn controls/canvas/games) or when you already have screen coordinates. Safe workflow: (1) window_management(action='activate') to focus the target app, (2) ui_automation(action='capture_annotated') to get reliable clickablePoint coordinates, (3) mouse_control(click) using those coordinates, (4) screenshot_control to verify. Supports: move, click, double_click, right_click, middle_click, drag, scroll, get_position. Safety: set expectedWindowTitle/expectedProcessName to prevent clicks in the wrong app (fails with error_code='wrong_target_window').")]
+    [Description("Control mouse input on Windows. Prefer ui_automation first; use mouse_control as a fallback when UIA patterns don't work (custom-drawn controls/canvas/games) or when you already have screen coordinates. Safe workflow: (1) window_management(action='activate') to focus the target app, (2) ui_automation(action='capture_annotated') to get reliable clickablePoint coordinates, (3) mouse_control(click) using those coordinates, (4) screenshot_control to verify. Supports: move, click, double_click, right_click, middle_click, drag, scroll, get_position, click_element. Use click_element with an elementId for direct clicking without coordinates. Safety: set expectedWindowTitle/expectedProcessName to prevent clicks in the wrong app (fails with error_code='wrong_target_window').")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position (query current cursor position with monitor context)")] string action,
+        [Description("The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, get_position, or click_element (click on UI element by elementId)")] string action,
         [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
         [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
         [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
@@ -120,6 +122,8 @@ public sealed partial class MouseControlTool
         [Description("Monitor index (0-based). Alternative to 'target' for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
         [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent clicking in the wrong application.")] string? expectedWindowTitle = null,
         [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent clicking in the wrong application.")] string? expectedProcessName = null,
+        [Description("Element ID from ui_automation (required for click_element action). Directly clicks the element's center without needing coordinates.")] string? elementId = null,
+        [Description("Window handle (decimal string from window_management). When provided with x/y, coordinates are relative to the window's top-left corner instead of the monitor. Useful for clicking fixed positions within a specific window.")] string? windowHandle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -174,6 +178,55 @@ public sealed partial class MouseControlTool
             // NEW VALIDATION: Check if coordinates are provided
             var hasCoordinates = (x.HasValue && y.HasValue) || (endX.HasValue && endY.HasValue);
 
+            // Window-relative coordinate mode: if windowHandle is provided, coordinates are relative to window
+            bool isWindowRelativeMode = !string.IsNullOrEmpty(windowHandle) && hasCoordinates;
+            int? windowBasedMonitorIndex = null;
+            int windowLeft = 0, windowTop = 0;
+
+            if (isWindowRelativeMode)
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out nint parsedWindowHandle) || parsedWindowHandle == nint.Zero)
+                {
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates,
+                        $"Invalid windowHandle: '{windowHandle}'. Expected decimal string from window_management.");
+                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                // Get window rect
+                if (!NativeMethods.GetWindowRect(parsedWindowHandle, out var windowRect))
+                {
+                    var result = MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates,
+                        $"Could not get window position for handle {windowHandle}. The window may no longer exist.");
+                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                windowLeft = windowRect.Left;
+                windowTop = windowRect.Top;
+
+                // Determine which monitor contains this window's center
+                var windowCenterX = windowRect.Left + (windowRect.Right - windowRect.Left) / 2;
+                var windowCenterY = windowRect.Top + (windowRect.Bottom - windowRect.Top) / 2;
+                var monitors = _monitorService.GetMonitors();
+
+                for (int i = 0; i < monitors.Count; i++)
+                {
+                    var mon = monitors[i];
+                    if (windowCenterX >= mon.X && windowCenterX < mon.X + mon.Width &&
+                        windowCenterY >= mon.Y && windowCenterY < mon.Y + mon.Height)
+                    {
+                        windowBasedMonitorIndex = i;
+                        break;
+                    }
+                }
+
+                // Default to primary monitor if not found
+                windowBasedMonitorIndex ??= 0;
+            }
+
             // Resolve target to monitorIndex if provided
             int? resolvedMonitorIndex = monitorIndex;
             if (!string.IsNullOrWhiteSpace(target))
@@ -220,13 +273,13 @@ public sealed partial class MouseControlTool
                 }
             }
 
-            // NEW VALIDATION: Require target or monitorIndex when coordinates are provided
-            if (hasCoordinates && !resolvedMonitorIndex.HasValue)
+            // NEW VALIDATION: Require target, monitorIndex, or windowHandle when coordinates are provided
+            if (hasCoordinates && !resolvedMonitorIndex.HasValue && !isWindowRelativeMode)
             {
                 var availableIndices = Enumerable.Range(0, _monitorService.MonitorCount).ToList();
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.MissingRequiredParameter,
-                    "Either 'target' or 'monitorIndex' is required when using x/y coordinates. Use target='primary_screen' or target='secondary_screen' for easy targeting.",
+                    "Either 'target', 'monitorIndex', or 'windowHandle' is required when using x/y coordinates. Use target='primary_screen' or target='secondary_screen' for easy targeting, or windowHandle for window-relative coordinates.",
                     errorDetails: new Dictionary<string, object>
                     {
                         { "valid_targets", ValidTargets },
@@ -236,8 +289,8 @@ public sealed partial class MouseControlTool
                 return result;
             }
 
-            // Use resolved monitorIndex, or default to 0 for coordinate-less actions
-            var targetMonitorIndex = resolvedMonitorIndex ?? 0;
+            // Use resolved monitorIndex, windowBasedMonitorIndex, or default to 0 for coordinate-less actions
+            var targetMonitorIndex = resolvedMonitorIndex ?? windowBasedMonitorIndex ?? 0;
 
             // NEW VALIDATION: Validate monitorIndex is in valid range
             if (resolvedMonitorIndex.HasValue && (targetMonitorIndex < 0 || targetMonitorIndex >= _monitorService.MonitorCount))
@@ -255,7 +308,9 @@ public sealed partial class MouseControlTool
                 return result;
             }
 
-            // Translate monitor-relative coordinates to absolute screen coordinates
+            // Translate coordinates to absolute screen coordinates
+            // - If windowHandle provided: coordinates are relative to window's top-left corner
+            // - If target/monitorIndex provided: coordinates are relative to monitor's top-left corner
             int? absoluteX = x, absoluteY = y, absoluteEndX = endX, absoluteEndY = endY;
             var monitor = _monitorService.GetMonitor(targetMonitorIndex);
             if (monitor == null)
@@ -267,25 +322,51 @@ public sealed partial class MouseControlTool
                 return result;
             }
 
-            // Translate coordinates relative to monitor origin
-            if (x.HasValue)
+            if (isWindowRelativeMode)
             {
-                absoluteX = monitor.X + x.Value;
-            }
+                // Translate coordinates relative to window origin
+                if (x.HasValue)
+                {
+                    absoluteX = windowLeft + x.Value;
+                }
 
-            if (y.HasValue)
-            {
-                absoluteY = monitor.Y + y.Value;
-            }
+                if (y.HasValue)
+                {
+                    absoluteY = windowTop + y.Value;
+                }
 
-            if (endX.HasValue)
-            {
-                absoluteEndX = monitor.X + endX.Value;
-            }
+                if (endX.HasValue)
+                {
+                    absoluteEndX = windowLeft + endX.Value;
+                }
 
-            if (endY.HasValue)
+                if (endY.HasValue)
+                {
+                    absoluteEndY = windowTop + endY.Value;
+                }
+            }
+            else
             {
-                absoluteEndY = monitor.Y + endY.Value;
+                // Translate coordinates relative to monitor origin
+                if (x.HasValue)
+                {
+                    absoluteX = monitor.X + x.Value;
+                }
+
+                if (y.HasValue)
+                {
+                    absoluteY = monitor.Y + y.Value;
+                }
+
+                if (endX.HasValue)
+                {
+                    absoluteEndX = monitor.X + endX.Value;
+                }
+
+                if (endY.HasValue)
+                {
+                    absoluteEndY = monitor.Y + endY.Value;
+                }
             }
 
             // NEW VALIDATION: Check if coordinates are within monitor bounds (using logical dimensions)
@@ -378,6 +459,10 @@ public sealed partial class MouseControlTool
                     operationResult = await GetCurrentPositionAsync(linkedToken);
                     break;
 
+                case MouseAction.ClickElement:
+                    operationResult = await HandleClickElementAsync(elementId, modifiers, linkedToken);
+                    break;
+
                 default:
                     operationResult = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidAction,
@@ -390,7 +475,7 @@ public sealed partial class MouseControlTool
             if (operationResult.Success)
             {
                 // Add monitor context and convert coordinates to monitor-relative for operations with explicit coordinates
-                if (resolvedMonitorIndex.HasValue)
+                if (resolvedMonitorIndex.HasValue || isWindowRelativeMode)
                 {
                     var monitorInfo = _monitorService.GetMonitor(targetMonitorIndex);
                     if (monitorInfo != null)
@@ -729,6 +814,61 @@ public sealed partial class MouseControlTool
         return await _mouseInputService.ScrollAsync(direction.Value, amount, x, y, cancellationToken);
     }
 
+    private async Task<MouseControlResult> HandleClickElementAsync(string? elementId, string? modifiersString, CancellationToken cancellationToken)
+    {
+        // Validate required elementId parameter
+        if (string.IsNullOrWhiteSpace(elementId))
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.MissingRequiredParameter,
+                "click_element action requires an elementId parameter. Use ui_automation(action='find') to get element IDs.");
+        }
+
+        // Resolve the element from its ID
+        var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+        if (element == null)
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.ElementNotFound,
+                $"Element with ID '{elementId}' could not be resolved. The element may have been removed from the UI or the ID is stale.");
+        }
+
+        // Get the element's bounding rectangle
+        var rect = element.CurrentBoundingRectangle;
+        if (rect.right <= rect.left || rect.bottom <= rect.top)
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.ElementNotVisible,
+                "Element has no visible bounding rectangle. It may be off-screen or collapsed.");
+        }
+
+        // Calculate center point of the element (in absolute screen coordinates)
+        int centerX = rect.left + (rect.right - rect.left) / 2;
+        int centerY = rect.top + (rect.bottom - rect.top) / 2;
+
+        // Check if secure desktop is active
+        if (_secureDesktopDetector.IsSecureDesktopActive())
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.SecureDesktopActive,
+                "Cannot perform click operation: secure desktop (UAC, lock screen) is active");
+        }
+
+        // Check if the target window is elevated
+        if (_elevationDetector.IsTargetElevated(centerX, centerY))
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.ElevatedProcessTarget,
+                "Cannot click on elevated (administrator) window. The target window requires elevated privileges that this tool does not have.");
+        }
+
+        // Parse modifier keys
+        var modifiers = ParseModifiers(modifiersString);
+
+        // Perform the click at the element's center
+        return await _mouseInputService.ClickAsync(centerX, centerY, modifiers, cancellationToken);
+    }
+
     private static ScrollDirection? ParseScrollDirection(string? directionString)
     {
         if (string.IsNullOrWhiteSpace(directionString))
@@ -782,6 +922,7 @@ public sealed partial class MouseControlTool
             "drag" => MouseAction.Drag,
             "scroll" => MouseAction.Scroll,
             "get_position" => MouseAction.GetPosition,
+            "click_element" or "clickelement" => MouseAction.ClickElement,
             _ => null,
         };
     }

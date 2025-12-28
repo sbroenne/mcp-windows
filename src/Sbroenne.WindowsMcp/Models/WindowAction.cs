@@ -48,5 +48,11 @@ public enum WindowAction
     GetState,
 
     /// <summary>Wait for window to reach a specific state.</summary>
-    WaitForState
+    WaitForState,
+
+    /// <summary>Move window to position and activate it in one step.</summary>
+    MoveAndActivate,
+
+    /// <summary>Ensure window is visible (restore if minimized, activate).</summary>
+    EnsureVisible
 }
