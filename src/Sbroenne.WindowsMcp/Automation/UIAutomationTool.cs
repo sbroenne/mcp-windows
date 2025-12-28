@@ -285,16 +285,16 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
-                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, desiredState, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, timeoutMs, cancellationToken),
                 UIAutomationAction.Click => await HandleClickAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
                 UIAutomationAction.Type => await HandleTypeAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, text, clearFirst, cancellationToken),
                 UIAutomationAction.Select => await HandleSelectAsync(elementId, windowHandle, name, controlType, automationId, value, cancellationToken),
-                UIAutomationAction.Toggle => await HandleToggleAsync(elementId, cancellationToken),
-                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, desiredState, cancellationToken),
+                UIAutomationAction.Toggle => await HandleToggleAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
+                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, cancellationToken),
                 UIAutomationAction.Invoke => await HandleInvokeAsync(elementId, value, cancellationToken),
                 UIAutomationAction.Focus => await HandleFocusAsync(elementId, cancellationToken),
                 UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
-                UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, includeChildren, cancellationToken),
+                UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, includeChildren, cancellationToken),
                 UIAutomationAction.Highlight => await HandleHighlightAsync(elementId, cancellationToken),
                 UIAutomationAction.HideHighlight => await _automationService.HideHighlightAsync(cancellationToken),
                 UIAutomationAction.Ocr => await HandleOcrAsync(windowHandle, language, cancellationToken),
@@ -535,15 +535,33 @@ public sealed partial class UIAutomationTool
     /// Waits for an element to reach a desired state (e.g., enabled, not offscreen, specific toggle state).
     /// </summary>
     private async Task<UIAutomationResult> HandleWaitForStateAsync(
-        string? elementId, string? desiredState, int timeoutMs, CancellationToken cancellationToken)
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, string? desiredState,
+        int timeoutMs, CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure(
-                "wait_for_state",
-                UIAutomationErrorType.InvalidParameter,
-                "elementId is required for WaitForState action",
-                null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("wait_for_state", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -630,21 +648,67 @@ public sealed partial class UIAutomationTool
         return await _automationService.FindAndSelectAsync(query, value, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleToggleAsync(string? elementId, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleToggleAsync(
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.InvalidParameter, "Element ID is required for toggle action", null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleEnsureStateAsync(string? elementId, string? desiredState, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleEnsureStateAsync(
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, string? desiredState,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InvalidParameter, "Element ID is required for ensure_state action", null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -760,8 +824,35 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleGetTextAsync(
-        string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken)
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, bool includeChildren,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
+        if (string.IsNullOrEmpty(elementId))
+        {
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
+        }
+
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
     }
 
