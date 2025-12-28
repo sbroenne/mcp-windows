@@ -217,4 +217,211 @@ public sealed class SystemResources
             | Read text | ui_automation | get_text, ocr |
             """;
     }
+
+    /// <summary>
+    /// Gets error recovery guidance for common error codes.
+    /// </summary>
+    /// <returns>Markdown document with error code recovery actions.</returns>
+    [McpServerResource(UriTemplate = "system://error-recovery", Name = "error-recovery", Title = "Error Recovery Guide", MimeType = "text/markdown")]
+    [Description("Error code → recovery action mapping. Fetch when you encounter an error to get specific recovery guidance.")]
+    public static string GetErrorRecovery()
+    {
+        return """
+            # Error Recovery Guide
+
+            Quick lookup: error_code → recovery action.
+
+            ## UI Automation Errors
+
+            | Error Code | Recovery Action |
+            |------------|-----------------|
+            | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or call `capture_annotated` first to discover available elements. |
+            | `element_stale` | Element was removed from UI. Re-run `find` to get fresh elementId. |
+            | `pattern_not_supported` | Element doesn't support this action. Check `supportedPatterns` in element info. Use `invoke` for buttons, `toggle` for checkboxes. |
+            | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `capture_annotated`. |
+            | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
+
+            ## Mouse/Keyboard Errors
+
+            | Error Code | Recovery Action |
+            |------------|-----------------|
+            | `wrong_target_window` | Focus changed. Re-run `window_management(action='activate')` then retry. |
+            | `elevated_process_target` | Target is admin window. Cannot interact without elevation. Ask user to close UAC prompt or run as admin. |
+            | `secure_desktop_active` | UAC prompt or lock screen active. Wait for user to dismiss it, or skip this operation. |
+            | `coordinates_out_of_bounds` | Verify coordinates with `screenshot_control(action='list_monitors')`. Use monitor-relative coordinates. |
+
+            ## Window Management Errors
+
+            | Error Code | Recovery Action |
+            |------------|-----------------|
+            | `window_not_found` | Window may have closed. Use `list` action to see available windows. |
+            | `activation_failed` | Window may be minimized or blocked. Try `ensure_visible` action first. |
+            | `timeout` | Window didn't appear in time. Increase `timeoutMs` or verify app is launching. |
+
+            ## Screenshot Errors
+
+            | Error Code | Recovery Action |
+            |------------|-----------------|
+            | `invalid_window_handle` | Handle is stale. Re-run `window_management(action='find')` to get fresh handle. |
+            | `monitor_not_found` | Use `list_monitors` action to see available monitor indices. |
+            | `region_out_of_bounds` | Verify region coordinates with `list_monitors` action. |
+
+            ## Common Patterns
+
+            ### Element Not Found → Discovery Workflow
+            ```
+            1. capture_annotated → see all interactive elements
+            2. find with broader criteria (nameContains, controlType only)
+            3. get_tree → see element hierarchy for parent scoping
+            ```
+
+            ### Wrong Window → Re-focus Workflow
+            ```
+            1. window_management(action='find') → get fresh handle
+            2. window_management(action='activate') → focus window
+            3. Retry original operation with expectedWindowTitle guard
+            ```
+            """;
+    }
+
+    /// <summary>
+    /// Gets result schema documentation for all tools.
+    /// </summary>
+    /// <returns>Markdown document with result schema examples.</returns>
+    [McpServerResource(UriTemplate = "system://result-schemas", Name = "result-schemas", Title = "Result Schema Reference", MimeType = "text/markdown")]
+    [Description("JSON result schema examples for all tools. Fetch to understand what fields to expect in responses for planning multi-step workflows.")]
+    public static string GetResultSchemas()
+    {
+        return """
+            # Result Schema Reference
+
+            JSON examples showing key fields in tool responses. Use for planning multi-step workflows.
+
+            ## window_management
+
+            ```json
+            // find/list returns windows array:
+            {
+              "success": true,
+              "windows": [
+                {
+                  "handle": "12345678",
+                  "title": "Visual Studio Code",
+                  "process_name": "Code",
+                  "process_id": 1234,
+                  "state": "normal",
+                  "is_foreground": true,
+                  "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 }
+                }
+              ]
+            }
+            // activate/single window returns window object:
+            {
+              "success": true,
+              "window": { "handle": "12345678", "title": "...", "state": "normal" }
+            }
+            ```
+
+            **Key field:** `handle` - pass verbatim to other tools as `windowHandle`.
+
+            ## ui_automation
+
+            ```json
+            // find returns elements array:
+            {
+              "success": true,
+              "elements": [
+                {
+                  "element_id": "path:fast:12345678:1.2.3",
+                  "name": "Save",
+                  "control_type": "Button",
+                  "automation_id": "SaveButton",
+                  "clickable_point": { "x": 450, "y": 300 },
+                  "bounding_rect": { "x": 400, "y": 280, "width": 100, "height": 40 },
+                  "is_enabled": true,
+                  "supported_patterns": ["Invoke"],
+                  "framework_type": "WPF"
+                }
+              ],
+              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+            }
+            // capture_annotated returns elements + image:
+            {
+              "success": true,
+              "annotated_elements": [
+                { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem" },
+                { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem" }
+              ],
+              "element_count": 25,
+              "annotated_image_data": "base64...",
+              "annotated_image_format": "jpeg"
+            }
+            ```
+
+            **Key fields:**
+            - `element_id` - pass to click/type/toggle actions
+            - `clickable_point` - fallback coords for mouse_control
+            - `framework_type` - "Electron", "WPF", "WinForms" (affects search strategy)
+
+            ## mouse_control
+
+            ```json
+            {
+              "success": true,
+              "final_position": { "x": 450, "y": 300 },
+              "monitor_index": 0,
+              "monitor_width": 1920,
+              "monitor_height": 1080,
+              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+            }
+            ```
+
+            **Key field:** `target_window` - verify clicks went to correct window.
+
+            ## keyboard_control
+
+            ```json
+            {
+              "success": true,
+              "characters_typed": 15,
+              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+            }
+            ```
+
+            **Key field:** `target_window` - verify input went to correct window.
+
+            ## screenshot_control
+
+            ```json
+            // capture:
+            {
+              "success": true,
+              "image_data": "base64...",
+              "width": 1920,
+              "height": 1080,
+              "format": "jpeg"
+            }
+            // list_monitors:
+            {
+              "success": true,
+              "monitors": [
+                { "index": 0, "is_primary": true, "width": 1920, "height": 1080, "x": 0, "y": 0 }
+              ]
+            }
+            ```
+
+            ## Error Response (all tools)
+
+            ```json
+            {
+              "success": false,
+              "error_code": "element_not_found",
+              "error": "Element matching criteria not found. Try capture_annotated to discover elements.",
+              "target_window": { "handle": "12345678", "title": "...", "process_name": "..." }
+            }
+            ```
+
+            **Key field:** `error_code` - look up in system://error-recovery for recovery actions.
+            """;
+    }
 }
