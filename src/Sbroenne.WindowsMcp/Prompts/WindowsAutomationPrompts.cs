@@ -42,8 +42,9 @@ public sealed class WindowsAutomationPrompts
                 $"• screenshot_control(app='{target}') — see all interactive elements with numbered labels (default)\n" +
                 "\n" +
                 "Fallbacks (only if ui_automation fails):\n" +
-                $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from result\n" +
-                $"• keyboard_control(app='{target}', action='press', key='s', modifiers='ctrl') — for hotkeys")
+                $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from find result\n" +
+                $"• keyboard_control(app='{target}', action='press', key='s', modifiers='ctrl') — for hotkeys\n" +
+                $"• keyboard_control(app='{target}', action='type', text='...') — for text input")
         ];
     }
 
@@ -212,11 +213,11 @@ public sealed class WindowsAutomationPrompts
                 (string.IsNullOrWhiteSpace(automationId) ? "" : $"AutomationId: {automationId}\n") +
                 (string.IsNullOrWhiteSpace(nameContains) ? "" : $"nameContains: {nameContains}\n") +
                 "\n" +
-                "Steps:\n" +
-                $"1) ui_automation(action='find', app='{app}', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=...).\n" +
-                $"2) ui_automation(action='ensure_state', elementId=..., desiredState='{desiredState}').\n" +
-                "   Response includes: previousState, currentState, actionTaken ('toggled' or 'already_in_state').\n" +
-                "3) Verify with wait_for_state if additional confirmation needed.")
+                "Just do it directly (no find step needed):\n" +
+                $"ui_automation(action='ensure_state', app='{app}', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=..., desiredState='{desiredState}')\n" +
+                "\n" +
+                "Response includes: previousState, currentState, actionTaken ('toggled' or 'already_in_state').\n" +
+                "Verify with wait_for_state if additional confirmation needed.")
         ];
     }
 

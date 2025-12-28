@@ -184,7 +184,7 @@ public sealed class SystemResources
             |------|-------------|----------|
             | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(app=...) |
             | Type in text field | ui_automation(type) | keyboard_control(app=...) |
-            | Press hotkey (Ctrl+S) | keyboard_control(app=..., combo) | - |
+            | Press hotkey (Ctrl+S) | keyboard_control(app=..., action='press', key='s', modifiers='ctrl') | - |
             | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
             | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
             | Take screenshot | screenshot_control(app=..., annotate=false) | - |
