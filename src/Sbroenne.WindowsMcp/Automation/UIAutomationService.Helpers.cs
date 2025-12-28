@@ -265,6 +265,66 @@ public sealed partial class UIAutomationService
         }
     }
 
+    /// <summary>
+    /// Converts a UIA element to UIElementInfo using cached properties.
+    /// This is significantly faster than ConvertToElementInfo as it uses
+    /// pre-fetched property values instead of making individual COM calls.
+    /// </summary>
+    /// <param name="element">The element with cached properties.</param>
+    /// <param name="rootElement">The root element for generating element IDs.</param>
+    /// <param name="coordinateConverter">Coordinate converter for monitor-relative positions.</param>
+    /// <param name="children">Optional child elements.</param>
+    /// <param name="skipPatterns">If true, skips pattern detection (expensive) for tree operations.</param>
+    /// <returns>The element info, or null if conversion fails.</returns>
+    internal static UIElementInfo? ConvertToElementInfoFromCache(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        CoordinateConverter coordinateConverter,
+        UIElementInfo[]? children = null,
+        bool skipPatterns = true)
+    {
+        try
+        {
+            var rect = element.CachedBoundingRectangle;
+            var boundingRect = new BoundingRect
+            {
+                X = rect.left,
+                Y = rect.top,
+                Width = rect.right - rect.left,
+                Height = rect.bottom - rect.top
+            };
+
+            // Get monitor-relative rect and clickable point
+            var (monitorRelativeRect, monitorIndex) = coordinateConverter.ToMonitorRelative(boundingRect);
+
+            var info = new UIElementInfo
+            {
+                ElementId = ElementIdGenerator.GenerateId(element, rootElement),
+                Name = element.GetCachedName(),
+                AutomationId = element.GetCachedAutomationId(),
+                ControlType = element.GetCachedControlTypeName(),
+                BoundingRect = boundingRect,
+                MonitorRelativeRect = monitorRelativeRect,
+                MonitorIndex = monitorIndex,
+                ClickablePoint = ClickablePoint.FromCenter(monitorRelativeRect, monitorIndex),
+                // Skip expensive pattern detection for tree operations - patterns are only
+                // needed when performing actions, not for discovery/navigation
+                SupportedPatterns = skipPatterns ? [] : element.GetSupportedPatternNames(),
+                Value = skipPatterns ? null : element.TryGetValue(),
+                ToggleState = skipPatterns ? null : element.GetToggleState(),
+                IsEnabled = element.GetCachedIsEnabled(),
+                IsOffscreen = element.GetCachedIsOffscreen(),
+                Children = children
+            };
+
+            return info;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private UIElementInfo[]? GetChildren(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxChildren = 100)
     {
         var children = new List<UIElementInfo>();

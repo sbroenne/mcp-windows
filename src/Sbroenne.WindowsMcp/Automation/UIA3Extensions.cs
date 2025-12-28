@@ -10,6 +10,182 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public static class UIA3Extensions
 {
+    #region Cached Property Access
+
+    /// <summary>
+    /// Gets the element name from cache.
+    /// </summary>
+    public static string? GetCachedName(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedName;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the element automation ID from cache.
+    /// </summary>
+    public static string? GetCachedAutomationId(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedAutomationId;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached control type ID.
+    /// </summary>
+    public static int GetCachedControlTypeId(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedControlType;
+        }
+        catch (COMException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached control type name.
+    /// </summary>
+    public static string GetCachedControlTypeName(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        return UIA3ControlTypeIds.ToName(element.GetCachedControlTypeId());
+    }
+
+    /// <summary>
+    /// Gets the cached bounding rectangle.
+    /// </summary>
+    public static (double X, double Y, double Width, double Height) GetCachedBoundingRectangle(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            var rect = element.CachedBoundingRectangle;
+            return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+        }
+        catch (COMException)
+        {
+            return (0, 0, 0, 0);
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached IsEnabled state.
+    /// </summary>
+    public static bool GetCachedIsEnabled(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedIsEnabled != 0;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached IsOffscreen state.
+    /// </summary>
+    public static bool GetCachedIsOffscreen(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedIsOffscreen != 0;
+        }
+        catch (COMException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached framework ID.
+    /// </summary>
+    public static string? GetCachedFrameworkId(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedFrameworkId;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached class name.
+    /// </summary>
+    public static string? GetCachedClassName(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedClassName;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached native window handle.
+    /// </summary>
+    public static nint GetCachedNativeWindowHandle(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.CachedNativeWindowHandle;
+        }
+        catch (COMException)
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// Gets the cached children elements.
+    /// </summary>
+    public static UIA.IUIAutomationElementArray? GetCachedChildren(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            return element.GetCachedChildren();
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+    }
+
+    #endregion
+
+    #region Current Property Access
+
     /// <summary>
     /// Gets the element name safely.
     /// </summary>
@@ -677,4 +853,6 @@ public static class UIA3Extensions
             return false;
         }
     }
+
+    #endregion
 }

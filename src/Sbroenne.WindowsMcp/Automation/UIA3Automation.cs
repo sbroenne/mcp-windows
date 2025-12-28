@@ -133,6 +133,49 @@ public sealed class UIA3Automation : IDisposable
         return _automation.CreateAndCondition(condition1, condition2);
     }
 
+    /// <summary>
+    /// Creates a cache request for batch property retrieval.
+    /// Using a cache request significantly reduces cross-process COM calls
+    /// by fetching all needed properties in a single operation.
+    /// </summary>
+    public UIA.IUIAutomationCacheRequest CreateCacheRequest()
+    {
+        return _automation.CreateCacheRequest();
+    }
+
+    /// <summary>
+    /// Creates a pre-configured cache request for tree operations.
+    /// Includes all commonly needed properties for element info conversion.
+    /// </summary>
+    /// <param name="includeChildren">Whether to include TreeScope.Children for subtree operations.</param>
+    /// <returns>A configured cache request ready for use with FindAllBuildCache.</returns>
+    public UIA.IUIAutomationCacheRequest CreateTreeCacheRequest(bool includeChildren = true)
+    {
+        var request = _automation.CreateCacheRequest();
+
+        // Add all properties needed for UIElementInfo conversion
+        request.AddProperty(UIA3PropertyIds.Name);
+        request.AddProperty(UIA3PropertyIds.AutomationId);
+        request.AddProperty(UIA3PropertyIds.ControlType);
+        request.AddProperty(UIA3PropertyIds.BoundingRectangle);
+        request.AddProperty(UIA3PropertyIds.IsEnabled);
+        request.AddProperty(UIA3PropertyIds.IsOffscreen);
+        request.AddProperty(UIA3PropertyIds.FrameworkId);
+        request.AddProperty(UIA3PropertyIds.ClassName);
+        request.AddProperty(UIA3PropertyIds.NativeWindowHandle);
+        request.AddProperty(UIA3PropertyIds.RuntimeId);
+
+        // Set tree scope - Element for consistent behavior with FindAllBuildCache
+        // Note: TreeScope affects what gets cached when retrieving the element,
+        // not what FindAllBuildCache returns (that's controlled by its scope parameter)
+        request.TreeScope = UIA.TreeScope.TreeScope_Element;
+
+        // Don't set TreeFilter - let FindAllBuildCache use default (control view)
+        // The condition passed to FindAllBuildCache controls filtering
+
+        return request;
+    }
+
     /// <inheritdoc/>
     public void Dispose()
     {
