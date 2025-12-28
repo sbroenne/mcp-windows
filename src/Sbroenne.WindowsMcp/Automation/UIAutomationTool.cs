@@ -95,7 +95,7 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, capture_annotated. Fast tree traversal (~60-130ms). Framework auto-detection (WinForms/WPF/Electron). Use capture_annotated for discovery, then click/type by elementId. Prefer over mouse_control for UI interaction. See system://best-practices for workflows.")]
+    [Description("UI element interaction via Windows UIA. Use click/type/ensure_state directly with app+nameContains - no find step needed. Example: click(app='Notepad', nameContains='Save'). Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, capture_annotated. Use capture_annotated only when you don't know element names. Prefer over mouse_control. See system://best-practices.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
         UIAutomationAction action,

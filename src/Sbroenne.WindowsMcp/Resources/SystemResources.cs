@@ -153,21 +153,28 @@ public sealed class SystemResources
 
             ## Recommended Workflow
 
-            ### 1. Discover Elements
+            ### 1. Just Click It (Direct Interaction)
+            ```
+            ui_automation(action="click", app="Notepad", nameContains="Save")
+            ui_automation(action="type", app="Notepad", controlType="Edit", text="Hello")
+            ```
+            **No find step needed!** Click and type actions search for the element directly.
+
+            ### 2. If You Don't Know the Element Name → Discover First
             ```
             ui_automation(action="capture_annotated", app="My Application")
             → See all interactive elements with numbered annotations
             ```
 
-            ### 2. Find and Interact
+            ### 3. For Toggles → Use ensure_state
             ```
-            ui_automation(action="find", app="My Application", nameContains="Save")
-            ui_automation(action="click", elementId="...")
+            ui_automation(action="ensure_state", app="Settings", nameContains="Dark Mode", desiredState="on")
             ```
+            Atomic operation - checks state and toggles only if needed.
 
-            ### 3. Verify Results
+            ### 4. Verify Results
             ```
-            ui_automation(action="wait_for_disappear", elementId="...") // for dialogs
+            ui_automation(action="wait_for_disappear", app="My Application", nameContains="Save") // wait for dialog to close
             ui_automation(action="capture_annotated", app="My Application") // visual check
             ```
 
@@ -185,10 +192,10 @@ public sealed class SystemResources
 
             ## Key Principles
 
-            1. **Start with ui_automation** - it's the most reliable for standard UI elements
-            2. **Use capture_annotated for discovery** - see what's clickable before searching
+            1. **Just click/type directly** - no find step needed: `click(app='...', nameContains='...')`
+            2. **Use capture_annotated only when you don't know element names**
             3. **Use app parameter everywhere** - simpler than managing handles
-            4. **Use ensure_state for toggles** - atomic on/off without checking first
+            4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(app='...', nameContains='...', desiredState='on')`
             5. **Use wait_for_disappear for dialogs** - block until dialog closes
 
             ## Fallback Strategy

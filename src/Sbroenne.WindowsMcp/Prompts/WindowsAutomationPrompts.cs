@@ -26,23 +26,24 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "You are operating a Windows automation MCP server. Use the 'app' parameter to target windows automatically. " +
-                "The server will find and activate the window for you. Prefer ui_automation for all interactions. " +
-                "Use mouse_control and keyboard_control only as fallbacks when ui_automation patterns don't work."),
+                "You are operating a Windows automation MCP server. Use ui_automation with the 'app' parameter directly. " +
+                "No find step needed - click/type/ensure_state all search for elements directly. " +
+                "Use mouse_control and keyboard_control only as fallbacks."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
                 $"App: {target}\n" +
                 "\n" +
-                "Simple workflow:\n" +
-                "1) ui_automation(action='capture_annotated', app='{target}') — see what's clickable.\n" +
-                "2) ui_automation(action='find', app='{target}', nameContains='...') — locate element.\n" +
-                "3) ui_automation(action='click'/'invoke', elementId=...) — interact with element.\n" +
-                "   For toggles: use action='ensure_state', desiredState='on'/'off'.\n" +
-                "4) Verify with wait_for_disappear (dialogs) or capture_annotated.\n" +
+                "Direct interaction (no find step needed):\n" +
+                $"• Click: ui_automation(action='click', app='{target}', nameContains='...')\n" +
+                $"• Type: ui_automation(action='type', app='{target}', controlType='Edit', text='...')\n" +
+                $"• Toggle: ui_automation(action='ensure_state', app='{target}', nameContains='...', desiredState='on'/'off')\n" +
+                "\n" +
+                "If you don't know element names:\n" +
+                $"• ui_automation(action='capture_annotated', app='{target}') — see all interactive elements\n" +
                 "\n" +
                 "Fallbacks (only if ui_automation fails):\n" +
-                "• mouse_control(app='{target}', action='click', x=..., y=...) — using clickablePoint from find.\n" +
-                "• keyboard_control(app='{target}', action='combo', key='s', modifiers='ctrl') — for hotkeys.")
+                $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from result\n" +
+                $"• keyboard_control(app='{target}', action='combo', key='s', modifiers='ctrl') — for hotkeys")
         ];
     }
 
@@ -65,20 +66,19 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer ui_automation with elementId for all interactions. For toggles/checkboxes, use ensure_state instead of click. " +
-                "Use mouse_control only as fallback, and always specify the app parameter to ensure correct window targeting."),
+                "Use ui_automation click/type directly - no find step needed. For toggles/checkboxes, use ensure_state. " +
+                "Use mouse_control only as fallback when ui_automation patterns fail."),
             new(ChatRole.User,
                 $"App: {app}\n" +
                 $"Click target: {elementDescription}\n" +
                 (string.IsNullOrWhiteSpace(automationId) ? "" : $"AutomationId: {automationId}\n") +
                 (string.IsNullOrWhiteSpace(nameContains) ? "" : $"nameContains: {nameContains}\n") +
                 "\n" +
-                "Steps:\n" +
-                $"1) ui_automation(action='find', app='{app}', automationId=... OR nameContains=..., controlType='Button'/'CheckBox').\n" +
-                "2) For CheckBox/ToggleButton: ui_automation(action='ensure_state', elementId=..., desiredState='on'/'off').\n" +
-                "   For Button: ui_automation(action='click', elementId=...).\n" +
-                $"3) If click fails, use mouse_control(app='{app}', action='click', x=..., y=...) with element's clickablePoint.\n" +
-                "4) Verify with wait_for_disappear (dialogs), wait_for_state, or capture_annotated.")
+                "Just do it directly:\n" +
+                $"• For Button: ui_automation(action='click', app='{app}', automationId=... OR nameContains=...).\n" +
+                $"• For CheckBox/Toggle: ui_automation(action='ensure_state', app='{app}', nameContains=..., desiredState='on'/'off').\n" +
+                "\n" +
+                $"If click fails, use mouse_control(app='{app}', action='click', x=..., y=...) with element's clickablePoint.")
         ];
     }
 
@@ -106,7 +106,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer ui_automation Type into Edit controls. Only use keyboard_control as fallback, and always specify the app parameter."),
+                "Use ui_automation type directly - no find step needed. Only use keyboard_control as fallback."),
             new(ChatRole.User,
                 $"App: {app}\n" +
                 $"Field: {fieldDescription}\n" +
@@ -115,12 +115,10 @@ public sealed class WindowsAutomationPrompts
                 (string.IsNullOrWhiteSpace(nameContains) ? "" : $"nameContains: {nameContains}\n") +
                 $"clearFirst: {clearFirst}\n" +
                 "\n" +
-                "Steps:\n" +
-                $"1) ui_automation(action='find', app='{app}', controlType='Edit', automationId=... OR nameContains=...).\n" +
-                "2) ui_automation(action='click' or 'focus', elementId=...) to ensure caret focus.\n" +
-                "3) ui_automation(action='type', elementId=..., text=..., clearFirst=...).\n" +
-                $"4) If UIA typing fails: keyboard_control(app='{app}', action='type', text=..., clearFirst=...).\n" +
-                "5) Verify with ui_automation(action='get_text', elementId=...) when possible.")
+                "Just do it directly:\n" +
+                $"ui_automation(action='type', app='{app}', controlType='Edit', automationId=... OR nameContains=..., text='{text}', clearFirst={clearFirst.ToString().ToLowerInvariant()})\n" +
+                "\n" +
+                $"If UIA typing fails: keyboard_control(app='{app}', action='type', text='{text}').")
         ];
     }
 
