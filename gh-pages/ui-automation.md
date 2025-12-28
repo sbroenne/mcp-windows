@@ -27,6 +27,7 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 - **Modern framework support** - Better compatibility with WPF, UWP, WinUI, and Electron apps
 - **Efficient tree traversal** - Optimized caching and batched property requests
 - **Stable element IDs** - Reliable element references across operations
+- **Framework auto-detection** - Automatically optimizes search depth and filtering strategy based on detected UI framework (WinForms, WPF, Electron/Chromium, Win32)
 
 ## Overview
 
@@ -116,7 +117,7 @@ For more flexible element matching, use these advanced parameters:
 | `className` | string | Element's ClassName property (e.g., `Chrome_WidgetWin_1`) |
 | `foundIndex` | integer | Return the Nth matching element (1-based, default: 1) |
 | `exactDepth` | integer | Only match elements at this exact tree depth |
-| `maxDepth` | integer | Maximum tree depth to traverse (performance optimization) |
+| `maxDepth` | integer | Maximum tree depth to traverse. **Framework auto-detection sets optimal defaults**: 5 for WinForms, 10 for WPF, 15 for Electron. Only override if needed |
 | `sortByProminence` | boolean | Sort results by bounding box area (largest first) for disambiguation |
 
 #### Using foundIndex for Multiple Matches
@@ -785,7 +786,21 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 
 For VS Code, Teams, Slack, and other Electron/Chromium-based apps:
 
-### Framework Detection
+### Framework Auto-Detection
+
+The UI automation service automatically detects the UI framework and optimizes search behavior:
+
+| Framework | Default Depth | Filtering Strategy |
+|-----------|---------------|-------------------|
+| WinForms | 5 | Inline (fast for shallow trees) |
+| WPF | 10 | Inline |
+| Win32 | 5 | Inline |
+| Electron/Chromium | 15 | Post-hoc (finds deeply nested elements) |
+| Unknown | 15 | Post-hoc (safe default) |
+
+**No manual tuning required** - The framework is detected automatically and the optimal search strategy is applied.
+
+### Framework Detection in Diagnostics
 
 The diagnostics response includes framework detection:
 
@@ -872,9 +887,10 @@ Find with:
 ### Performance Tips for Electron Apps
 
 1. **Use parentElementId** - Scope searches to reduce tree traversal
-2. **Limit maxDepth** - Chromium apps can have deep hierarchies
+2. **Framework auto-detection handles depth** - No need to manually set maxDepth for Electron apps
 3. **Use nameContains** - ARIA labels may include extra text
 4. **Check diagnostics** - Monitor `elementsScanned` for performance tuning
+5. **Post-hoc filtering** - For Electron apps, tree traversal uses post-hoc filtering to find deeply nested elements
 
 ---
 

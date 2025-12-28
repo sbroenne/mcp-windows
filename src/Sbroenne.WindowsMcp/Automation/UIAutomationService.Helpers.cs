@@ -6,6 +6,81 @@ using UIA = Interop.UIAutomationClient;
 namespace Sbroenne.WindowsMcp.Automation;
 
 /// <summary>
+/// Framework-aware search strategy for UI tree traversal.
+/// Different UI frameworks have varying tree depths and structures,
+/// requiring different search approaches for optimal performance.
+/// </summary>
+public readonly struct FrameworkStrategy
+{
+    /// <summary>
+    /// Gets the detected UI framework name.
+    /// </summary>
+    public string? FrameworkName { get; init; }
+
+    /// <summary>
+    /// Gets the recommended maximum search depth for this framework.
+    /// </summary>
+    public int RecommendedMaxDepth { get; init; }
+
+    /// <summary>
+    /// Gets whether to use post-hoc filtering instead of inline filtering.
+    /// True for Electron/Chromium apps where content is deeply nested under non-matching parents.
+    /// False for WinForms/WPF where inline filtering is more efficient.
+    /// </summary>
+    public bool UsePostHocFiltering { get; init; }
+
+    /// <summary>
+    /// Creates a strategy for Electron/Chromium apps (deep trees, need post-hoc filtering).
+    /// </summary>
+    public static FrameworkStrategy Electron => new()
+    {
+        FrameworkName = "Chromium/Electron",
+        RecommendedMaxDepth = 15,
+        UsePostHocFiltering = true
+    };
+
+    /// <summary>
+    /// Creates a strategy for WinForms apps (shallow trees, inline filtering OK).
+    /// </summary>
+    public static FrameworkStrategy WinForms => new()
+    {
+        FrameworkName = "WinForms",
+        RecommendedMaxDepth = 5,
+        UsePostHocFiltering = false
+    };
+
+    /// <summary>
+    /// Creates a strategy for WPF apps (medium depth trees).
+    /// </summary>
+    public static FrameworkStrategy Wpf => new()
+    {
+        FrameworkName = "WPF",
+        RecommendedMaxDepth = 10,
+        UsePostHocFiltering = false
+    };
+
+    /// <summary>
+    /// Creates a strategy for Win32 apps (shallow trees).
+    /// </summary>
+    public static FrameworkStrategy Win32 => new()
+    {
+        FrameworkName = "Win32",
+        RecommendedMaxDepth = 5,
+        UsePostHocFiltering = false
+    };
+
+    /// <summary>
+    /// Creates a strategy for unknown frameworks (default to Electron behavior for safety).
+    /// </summary>
+    public static FrameworkStrategy Unknown => new()
+    {
+        FrameworkName = null,
+        RecommendedMaxDepth = 15,
+        UsePostHocFiltering = true
+    };
+}
+
+/// <summary>
 /// Helper methods for UI Automation service.
 /// </summary>
 public sealed partial class UIAutomationService
@@ -304,6 +379,27 @@ public sealed partial class UIAutomationService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Gets the appropriate search strategy for the detected UI framework.
+    /// </summary>
+    /// <param name="element">The root element to detect framework from.</param>
+    /// <returns>A framework strategy with optimal search parameters.</returns>
+    internal static FrameworkStrategy GetFrameworkStrategy(UIA.IUIAutomationElement element)
+    {
+        var framework = DetectFramework(element);
+
+        return framework switch
+        {
+            "Chromium/Electron" => FrameworkStrategy.Electron,
+            "WinForm" or "WindowsForms" => FrameworkStrategy.WinForms,
+            "WPF" => FrameworkStrategy.Wpf,
+            "Win32" => FrameworkStrategy.Win32,
+            "XAML" or "UWP" or "WinUI" => FrameworkStrategy.Wpf, // Use WPF-like strategy for modern XAML
+            "Qt" => FrameworkStrategy.Win32, // Qt uses Win32-like shallow trees
+            _ => FrameworkStrategy.Unknown // Default to Electron approach for safety
+        };
     }
 
     private UIAutomationResult CheckElevatedTarget(UIA.IUIAutomationElement element)

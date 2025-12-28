@@ -46,10 +46,30 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
+                // Detect framework and get optimal search strategy
+                var strategy = GetFrameworkStrategy(rootElement);
                 var controlTypeSet = ParseControlTypeFilter(controlTypeFilter);
                 var elementsScanned = 0;
 
-                var tree = BuildElementTree(rootElement, rootElement, maxDepth, 0, controlTypeSet, ref elementsScanned);
+                // Use framework-aware depth: if caller used default (5), use framework recommendation
+                // Otherwise respect explicit caller value, but still cap at 20
+                var effectiveMaxDepth = maxDepth == 5
+                    ? strategy.RecommendedMaxDepth
+                    : Math.Min(maxDepth, 20);
+
+                UIElementInfo? tree;
+                if (strategy.UsePostHocFiltering && controlTypeSet != null)
+                {
+                    // For Electron/Chromium: traverse full tree without filter, then apply filter post-hoc
+                    // This avoids pruning branches that contain matching elements deep in the tree
+                    tree = BuildElementTreeWithPostHocFiltering(rootElement, rootElement, effectiveMaxDepth, 0, controlTypeSet, ref elementsScanned);
+                }
+                else
+                {
+                    // For WinForms/WPF/Win32: use inline filtering for better performance
+                    tree = BuildElementTree(rootElement, rootElement, effectiveMaxDepth, 0, controlTypeSet, ref elementsScanned);
+                }
+
                 var wasTruncated = elementsScanned > MaxElementsToScan;
 
                 stopwatch.Stop();
@@ -325,6 +345,92 @@ public sealed partial class UIAutomationService
             }
 
             return elementInfo;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Builds element tree using post-hoc filtering strategy for Electron/Chromium apps.
+    /// Traverses the full tree without filtering, then applies filter while preserving hierarchy.
+    /// This prevents pruning branches that contain matching elements deep in the tree.
+    /// </summary>
+    private UIElementInfo? BuildElementTreeWithPostHocFiltering(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxDepth, int currentDepth, HashSet<string> controlTypeFilter, ref int elementsScanned)
+    {
+        try
+        {
+            elementsScanned++;
+
+            if (elementsScanned > MaxElementsToScan)
+            {
+                return null;
+            }
+
+            // Always convert element (we'll filter in the result composition)
+            var controlTypeName = element.GetControlTypeName().ToLowerInvariant();
+            var matchesFilter = controlTypeFilter.Contains(controlTypeName);
+            var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
+
+            // Collect children regardless of current element's match status
+            var childInfos = new List<UIElementInfo>();
+            if (currentDepth < maxDepth && elementsScanned <= MaxElementsToScan)
+            {
+                var children = element.FindAll(UIA.TreeScope.TreeScope_Children, Uia.TrueCondition);
+
+                if (children != null)
+                {
+                    for (var i = 0; i < children.Length && elementsScanned <= MaxElementsToScan; i++)
+                    {
+                        var child = children.GetElement(i);
+                        if (child == null)
+                        {
+                            continue;
+                        }
+
+                        var childInfo = BuildElementTreeWithPostHocFiltering(child, rootElement, maxDepth, currentDepth + 1, controlTypeFilter, ref elementsScanned);
+                        if (childInfo != null)
+                        {
+                            childInfos.Add(childInfo);
+                        }
+                    }
+                }
+            }
+
+            // Decision logic:
+            // 1. If this element matches filter, include it with all filtered children
+            // 2. If this element doesn't match but has children that matched, return a placeholder
+            //    that contains those children (to preserve hierarchy)
+            // 3. If nothing matches, return null
+
+            if (matchesFilter)
+            {
+                // Include this element with filtered children
+                if (childInfos.Count > 0 && elementInfo != null)
+                {
+                    return elementInfo with { Children = [.. childInfos] };
+                }
+                return elementInfo;
+            }
+            else if (childInfos.Count > 0)
+            {
+                // Don't match but have matching descendants - return first child or aggregate
+                if (childInfos.Count == 1)
+                {
+                    return childInfos[0];
+                }
+
+                // Multiple children matched - include this element as a container
+                // but mark it as non-matching by not including its own info
+                if (elementInfo != null)
+                {
+                    return elementInfo with { Children = [.. childInfos] };
+                }
+                return childInfos[0];
+            }
+
+            return null;
         }
         catch
         {
