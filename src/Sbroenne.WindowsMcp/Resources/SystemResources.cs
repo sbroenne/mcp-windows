@@ -162,8 +162,8 @@ public sealed class SystemResources
 
             ### 2. If You Don't Know the Element Name → Discover First
             ```
-            ui_automation(action="capture_annotated", app="My Application")
-            → See all interactive elements with numbered annotations
+            screenshot_control(app="My Application", annotate=true)
+            → See screenshot with numbered labels + element list
             ```
 
             ### 3. For Toggles → Use ensure_state
@@ -175,7 +175,7 @@ public sealed class SystemResources
             ### 4. Verify Results
             ```
             ui_automation(action="wait_for_disappear", app="My Application", nameContains="Save") // wait for dialog to close
-            ui_automation(action="capture_annotated", app="My Application") // visual check
+            screenshot_control(app="My Application") // visual check
             ```
 
             ## When to Use Each Tool
@@ -188,12 +188,12 @@ public sealed class SystemResources
             | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
             | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
             | Take screenshot | screenshot_control(app=...) | - |
-            | Find visible elements | ui_automation(capture_annotated) | ui_automation(get_tree) |
+            | Find visible elements | screenshot_control(annotate=true) | ui_automation(get_tree) |
 
             ## Key Principles
 
             1. **Just click/type directly** - no find step needed: `click(app='...', nameContains='...')`
-            2. **Use capture_annotated only when you don't know element names**
+            2. **Use screenshot_control(annotate=true) only when you don't know element names**
             3. **Use app parameter everywhere** - simpler than managing handles
             4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(app='...', nameContains='...', desiredState='on')`
             5. **Use wait_for_disappear for dialogs** - block until dialog closes

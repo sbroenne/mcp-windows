@@ -112,6 +112,28 @@ public sealed record ScreenshotControlResult
     public CompositeScreenshotMetadata? CompositeMetadata { get; init; }
 
     /// <summary>
+    /// Gets the list of annotated UI elements when annotate=true.
+    /// Each element has an index matching the numbered label on the screenshot.
+    /// </summary>
+    [JsonPropertyName("annotated_elements")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<AnnotatedElement>? AnnotatedElements { get; init; }
+
+    /// <summary>
+    /// Gets the count of annotated elements. Present when annotate=true.
+    /// </summary>
+    [JsonPropertyName("element_count")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ElementCount { get; init; }
+
+    /// <summary>
+    /// Gets a usage hint for the LLM when annotations are present.
+    /// </summary>
+    [JsonPropertyName("usage_hint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? UsageHint { get; init; }
+
+    /// <summary>
     /// Creates a successful capture result with LLM optimization metadata.
     /// </summary>
     /// <param name="processed">The processed image data and metadata.</param>
@@ -227,6 +249,49 @@ public sealed record ScreenshotControlResult
             Monitors = monitors,
             VirtualScreen = virtualScreen
         };
+
+    /// <summary>
+    /// Creates a successful annotated screenshot result with element discovery.
+    /// </summary>
+    /// <param name="imageData">Base64-encoded image data (null if file output).</param>
+    /// <param name="width">Image width in pixels.</param>
+    /// <param name="height">Image height in pixels.</param>
+    /// <param name="format">Image format (jpeg/png).</param>
+    /// <param name="elements">List of annotated elements with indices.</param>
+    /// <param name="filePath">File path if output mode is file.</param>
+    /// <returns>A successful annotated capture result.</returns>
+    public static ScreenshotControlResult AnnotatedSuccess(
+        string? imageData,
+        int width,
+        int height,
+        string format,
+        IReadOnlyList<AnnotatedElement> elements,
+        string? filePath = null)
+    {
+        ArgumentNullException.ThrowIfNull(elements);
+        var elementCount = elements.Count;
+        var usageHint = $"Screenshot with {elementCount} numbered elements. Reference elements by index (1-{elementCount}). " +
+                        "Each element has an elementId for ui_automation operations (click, type, toggle).";
+        if (filePath != null)
+        {
+            usageHint = $"Image saved to '{filePath}'. " + usageHint;
+        }
+
+        return new()
+        {
+            Success = true,
+            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            Message = $"Captured {width}x{height} {format} with {elementCount} annotated elements",
+            ImageData = imageData,
+            Width = width,
+            Height = height,
+            Format = format,
+            FilePath = filePath,
+            AnnotatedElements = elements,
+            ElementCount = elementCount,
+            UsageHint = usageHint
+        };
+    }
 
     /// <summary>
     /// Creates an error result.

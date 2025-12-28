@@ -39,7 +39,7 @@ public sealed class WindowsAutomationPrompts
                 $"• Toggle: ui_automation(action='ensure_state', app='{target}', nameContains='...', desiredState='on'/'off')\n" +
                 "\n" +
                 "If you don't know element names:\n" +
-                $"• ui_automation(action='capture_annotated', app='{target}') — see all interactive elements\n" +
+                $"• screenshot_control(app='{target}', annotate=true) — see all interactive elements with numbered labels\n" +
                 "\n" +
                 "Fallbacks (only if ui_automation fails):\n" +
                 $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from result\n" +
@@ -144,7 +144,7 @@ public sealed class WindowsAutomationPrompts
                 $"Intent: {intent}\n" +
                 "\n" +
                 "Strategy:\n" +
-                $"1) ui_automation(action='capture_annotated', app='{app}', interactiveOnly=true) — see interactable elements.\n" +
+                $"1) screenshot_control(app='{app}', annotate=true) — see interactable elements with numbered labels.\n" +
                 "   Tip: Use outputPath='C:/temp/ui.png' and returnImageData=false to reduce response size.\n" +
                 $"2) ui_automation(action='find', app='{app}', nameContains='...', sortByProminence=true).\n" +
                 "3) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
@@ -178,7 +178,7 @@ public sealed class WindowsAutomationPrompts
                 "2) ui_automation(action='wait_for_state', elementId=..., desiredState='on'/'off'/'enabled') — verify element state.\n" +
                 "3) ui_automation(action='wait_for') for a specific element appearing.\n" +
                 "4) ui_automation(action='get_text', elementId=...) when text content changed.\n" +
-                $"5) screenshot_control(app='{app}') or capture_annotated as visual fallback.\n" +
+                $"5) screenshot_control(app='{app}', annotate=true) for visual element discovery.\n" +
                 "6) ui_automation(action='ocr_element') for custom-rendered text.")
         ];
     }
