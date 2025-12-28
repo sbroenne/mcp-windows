@@ -94,7 +94,7 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Windows UI Automation (UIA): find and interact with UI elements using semantic properties (names, control types, automationId). Recommended workflow: (1) window_management(find/list) to get a window handle, (2) pass that handle verbatim as ui_automation.windowHandle (decimal string), (3) use capture_annotated for discovery, then click/type/toggle by elementId, (4) use screenshot_control for visual verification or OCR. Key idea: prefer elementId-based actions; use mouse_control only as fallback with clickablePoint. Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated. Electron/Chromium apps: use get_tree(maxDepth=2) then search within parentElementId; element names often come from ARIA labels, so prefer nameContains. OCR: use ocr_element only when get_text is empty (images/custom rendering).")]
+    [Description("UI element interaction via Windows UIA. Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, capture_annotated. Fast tree traversal (~60-130ms). Framework auto-detection (WinForms/WPF/Electron). Use capture_annotated for discovery, then click/type by elementId. Prefer over mouse_control for UI interaction. See system://best-practices for workflows.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
         UIAutomationAction action,
@@ -126,7 +126,7 @@ public sealed partial class UIAutomationTool
         [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
         string? parentElementId = null,
 
-        [Description("Maximum tree depth for get_tree (default: 5, max: 20). Use lower values for faster results.")]
+        [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
         int maxDepth = 5,
 
         [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]

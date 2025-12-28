@@ -1,0 +1,52 @@
+{
+  "description": "Baseline performance metrics before framework auto-detection harmonization",
+  "timestamp": "2025-12-28T11:41:00Z",
+  "testEnvironment": "Windows, .NET 10.0.1",
+  "results": {
+    "WinForms": {
+      "GetTree": {
+        "depth5": { "durationMs": 831, "elementsScanned": 48 },
+        "depth10": { "durationMs": 974, "elementsScanned": 50 },
+        "depth15": { "durationMs": 1007, "elementsScanned": 50 }
+      },
+      "Find": {
+        "allButtons": { "durationMs": 266, "elementsScanned": 12, "elementsFound": 12 },
+        "byName": { "durationMs": 74, "elementsScanned": 1, "elementsFound": 1 }
+      },
+      "FindAndClick": {
+        "byName": { "durationMs": 184 }
+      }
+    },
+    "Electron": {
+      "GetTree": {
+        "depth5": { "durationMs": 3332, "elementsScanned": 115 },
+        "depth10": { "durationMs": 4583, "elementsScanned": 158 },
+        "depth15": { "durationMs": 4544, "elementsScanned": 158 }
+      },
+      "Find": {
+        "allButtons": { "durationMs": 620, "elementsScanned": 22, "elementsFound": 22 },
+        "byName": { "durationMs": 70, "elementsScanned": 1, "elementsFound": 1 }
+      },
+      "FindAndClick": {
+        "byName": { "durationMs": 191 }
+      }
+    }
+  },
+  "summary": {
+    "observations": [
+      "WinForms GetTree is ~800-1000ms regardless of depth (already hits max elements at depth 5)",
+      "Electron GetTree is ~3300-4500ms, much slower due to Chromium IPC overhead",
+      "Find operations are fast for both: 70-266ms for button searches",
+      "FindAndClick takes ~180-190ms for both frameworks",
+      "Electron depth 10 and 15 scan same number of elements (158) - tree appears to max out",
+      "WinForms depth 5/10/15 scan same elements (48-50) - tree is shallower"
+    ],
+    "thresholds": {
+      "WinForms_GetTree_max": 1500,
+      "Electron_GetTree_max": 6000,
+      "Find_allButtons_max": 1000,
+      "Find_byName_max": 200,
+      "FindAndClick_max": 500
+    }
+  }
+}

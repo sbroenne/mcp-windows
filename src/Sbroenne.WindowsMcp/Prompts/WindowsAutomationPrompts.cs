@@ -175,7 +175,8 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Electron apps expose large accessibility trees; use hierarchical search and capture_annotated to reduce traversal. " +
+                "Electron apps expose large accessibility trees. The framework auto-detection automatically uses deeper search " +
+                "and post-hoc filtering for Electron/Chromium apps, so you don't need to manually tune maxDepth. " +
                 "Use sortByProminence=true when multiple matches to prioritize larger/more visible elements. " +
                 "Use outputPath to save images to disk and reduce base64 payload size."),
             new(ChatRole.User,
@@ -185,7 +186,8 @@ public sealed class WindowsAutomationPrompts
                 "Strategy:\n" +
                 "1) ui_automation(action='capture_annotated', windowHandle=..., interactiveOnly=true) to see interactable elements.\n" +
                 "   Tip: Use outputPath='C:/temp/ui.png' and returnImageData=false to reduce response size.\n" +
-                "2) If you need structure, ui_automation(action='get_tree', windowHandle=..., maxDepth=2) to find a container.\n" +
+                "2) If you need structure, ui_automation(action='get_tree', windowHandle=...) to find a container.\n" +
+                "   Note: Framework auto-detection will use depth=15 for Electron apps automatically.\n" +
                 "3) Re-run ui_automation(action='find', sortByProminence=true) scoped with parentElementId.\n" +
                 "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
                 "5) Use ui_automation(action='scroll_into_view') before clicking if element is off-screen.\n" +

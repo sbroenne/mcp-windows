@@ -25,8 +25,9 @@ Windows MCP uses the **UIA3 COM API** (UI Automation 3) for optimal performance 
 
 - **Direct COM interop** - No managed wrapper overhead, ~40% faster than UIA2
 - **Modern framework support** - Better compatibility with WPF, UWP, WinUI, and Electron apps
-- **Efficient tree traversal** - Optimized caching and batched property requests
-- **Stable element IDs** - Reliable element references across operations
+- **Ultra-fast tree traversal** - Single COM call caches entire tree (~60-130ms for typical apps, 10-20x faster than naive traversal)
+- **Fast element IDs** - RuntimeId-based identification without expensive tree path calculation
+- **Framework auto-detection** - Automatically optimizes search depth and filtering strategy based on detected UI framework (WinForms, WPF, Electron/Chromium, Win32)
 
 ## Overview
 
@@ -116,7 +117,7 @@ For more flexible element matching, use these advanced parameters:
 | `className` | string | Element's ClassName property (e.g., `Chrome_WidgetWin_1`) |
 | `foundIndex` | integer | Return the Nth matching element (1-based, default: 1) |
 | `exactDepth` | integer | Only match elements at this exact tree depth |
-| `maxDepth` | integer | Maximum tree depth to traverse (performance optimization) |
+| `maxDepth` | integer | Maximum tree depth to traverse. **Framework auto-detection sets optimal defaults**: 5 for WinForms, 10 for WPF, 15 for Electron. Only override if needed |
 | `sortByProminence` | boolean | Sort results by bounding box area (largest first) for disambiguation |
 
 #### Using foundIndex for Multiple Matches
@@ -193,7 +194,7 @@ Get the UI element currently under the mouse cursor. Useful for interactive elem
 {
   "success": true,
   "element": {
-    "elementId": "window:12345|runtime:67890|path:Button:Submit",
+    "elementId": "window:12345|runtime:42.67890.1|path:fast",
     "name": "Submit",
     "controlType": "Button",
     "boundingRect": { "x": 100, "y": 200, "width": 80, "height": 24 }
@@ -231,7 +232,7 @@ Wait for an element to reach a specific state (enabled, disabled, on, off, visib
 ```json
 {
   "action": "wait_for_state",
-  "elementId": "window:12345|runtime:67890|path:Button:Submit",
+  "elementId": "window:12345|runtime:42.67890.1|path:fast",
   "desiredState": "enabled",
   "timeoutMs": 5000
 }
@@ -246,7 +247,7 @@ Atomically check and toggle a checkbox or toggle button to reach a desired state
 ```json
 {
   "action": "ensure_state",
-  "elementId": "window:12345|runtime:67890|path:CheckBox:DarkMode",
+  "elementId": "window:12345|runtime:42.67890.2|path:fast",
   "desiredState": "on"
 }
 ```
@@ -276,7 +277,7 @@ Get the parent chain from an element up to the root window.
 ```json
 {
   "action": "get_ancestors",
-  "elementId": "window:12345|runtime:67890|path:Button:Submit"
+  "elementId": "window:12345|runtime:42.67890.3|path:fast"
 }
 ```
 
@@ -326,7 +327,7 @@ Capture an annotated screenshot with numbered labels overlaid on interactive UI 
       "name": "Save",
       "controlType": "Button",
       "automationId": "btnSave",
-      "elementId": "window:12345|runtime:67890|path:Button:Save",
+      "elementId": "window:12345|runtime:42.67890.1|path:fast",
       "clickablePoint": { "x": 490, "y": 312, "monitorIndex": 0 },
       "boundingBox": { "x": 450, "y": 300, "width": 80, "height": 24 }
     },
@@ -335,7 +336,7 @@ Capture an annotated screenshot with numbered labels overlaid on interactive UI 
       "name": "Cancel",
       "controlType": "Button",
       "automationId": "btnCancel",
-      "elementId": "window:12345|runtime:67891|path:Button:Cancel",
+      "elementId": "window:12345|runtime:42.67891.1|path:fast",
       "clickablePoint": { "x": 550, "y": 312, "monitorIndex": 0 },
       "boundingBox": { "x": 540, "y": 300, "width": 80, "height": 24 }
     }
@@ -444,7 +445,7 @@ Patterns define what operations an element supports:
 ```json
 {
   "action": "invoke",
-  "elementId": "window:12345|runtime:67890|path:Button:Save"
+  "elementId": "window:12345|runtime:42.67890.1|path:fast"
 }
 ```
 
@@ -475,7 +476,7 @@ Patterns define what operations an element supports:
 ```json
 {
   "action": "toggle",
-  "elementId": "window:12345|runtime:67890|path:CheckBox:RememberMe"
+  "elementId": "window:12345|runtime:42.67890.5|path:fast"
 }
 ```
 
@@ -484,7 +485,7 @@ Patterns define what operations an element supports:
 ```json
 {
   "action": "invoke",
-  "elementId": "window:12345|runtime:67890|path:ComboBox:ColorPicker",
+  "elementId": "window:12345|runtime:42.67890.6|path:fast",
   "value": "Expand"
 }
 ```
@@ -511,14 +512,14 @@ First activate the target window, then get the tree:
 {
   "success": true,
   "root": {
-    "elementId": "window:12345|runtime:1|path:Window:Notepad",
+    "elementId": "window:12345|runtime:42.1.0|path:fast",
     "name": "Untitled - Notepad",
     "controlType": "Window",
     "boundingRect": { "x": 100, "y": 100, "width": 800, "height": 600 },
     "patterns": ["TransformPattern", "WindowPattern"],
     "children": [
       {
-        "elementId": "window:12345|runtime:2|path:Edit:",
+        "elementId": "window:12345|runtime:42.2.0|path:fast",
         "name": "",
         "controlType": "Edit",
         "automationId": "15",
@@ -558,7 +559,7 @@ Or set value directly using elementId:
 ```json
 {
   "action": "invoke",
-  "elementId": "window:12345|runtime:2|path:Edit:",
+  "elementId": "window:12345|runtime:42.2.0|path:fast",
   "value": "Hello from MCP!"
 }
 ```
@@ -584,7 +585,7 @@ Navigate large UI trees efficiently using `parentElementId`:
 ```json
 {
   "action": "get_tree",
-  "parentElementId": "window:12345|runtime:100|path:Pane:Content",
+  "parentElementId": "window:12345|runtime:42.100.0|path:fast",
   "maxDepth": 3
 }
 ```
@@ -594,7 +595,7 @@ Navigate large UI trees efficiently using `parentElementId`:
 ```json
 {
   "action": "find",
-  "parentElementId": "window:12345|runtime:100|path:Pane:Sidebar",
+  "parentElementId": "window:12345|runtime:42.100.0|path:fast",
   "controlType": "TreeItem",
   "name": "Documents"
 }
@@ -785,7 +786,21 @@ UI Automation returns monitor-relative coordinates matching `mouse_control`:
 
 For VS Code, Teams, Slack, and other Electron/Chromium-based apps:
 
-### Framework Detection
+### Framework Auto-Detection
+
+The UI automation service automatically detects the UI framework and optimizes search behavior:
+
+| Framework | Default Depth | Filtering Strategy |
+|-----------|---------------|-------------------|
+| WinForms | 5 | Inline (fast for shallow trees) |
+| WPF | 10 | Inline |
+| Win32 | 5 | Inline |
+| Electron/Chromium | 15 | Post-hoc (finds deeply nested elements) |
+| Unknown | 15 | Post-hoc (safe default) |
+
+**No manual tuning required** - The framework is detected automatically and the optimal search strategy is applied.
+
+### Framework Detection in Diagnostics
 
 The diagnostics response includes framework detection:
 
@@ -871,10 +886,11 @@ Find with:
 
 ### Performance Tips for Electron Apps
 
-1. **Use parentElementId** - Scope searches to reduce tree traversal
-2. **Limit maxDepth** - Chromium apps can have deep hierarchies
-3. **Use nameContains** - ARIA labels may include extra text
-4. **Check diagnostics** - Monitor `elementsScanned` for performance tuning
+1. **Framework auto-detection handles depth** - No need to manually set maxDepth (auto-uses 15 for Electron)
+2. **Use nameContains** - ARIA labels may include extra text
+3. **Single-call tree fetch** - GetTree now fetches entire tree in one COM call (~80-130ms for Electron apps)
+4. **Use parentElementId** - Scope searches to reduce tree traversal when needed
+5. **Post-hoc filtering** - For Electron apps, tree traversal uses post-hoc filtering to find deeply nested elements
 
 ---
 

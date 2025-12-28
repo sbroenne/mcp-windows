@@ -93,7 +93,15 @@ public sealed partial class UIAutomationService
                 var elementsScanned = 0;
                 var matchCount = 0;
                 var maxResults = query.FoundIndex > 1 ? query.FoundIndex : 100;
-                var effectiveMaxDepth = query.MaxDepth.HasValue && query.MaxDepth.Value > 0 ? query.MaxDepth.Value : 20;
+
+                // Detect framework and get optimal search strategy
+                var strategy = GetFrameworkStrategy(rootElement);
+
+                // Use framework-aware depth: if caller used default (null or 20), use framework recommendation
+                // Otherwise respect explicit caller value
+                var effectiveMaxDepth = !query.MaxDepth.HasValue || query.MaxDepth.Value == 20
+                    ? strategy.RecommendedMaxDepth
+                    : query.MaxDepth.Value;
 
                 if (!hasAdvancedCriteria)
                 {
