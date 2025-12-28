@@ -18,18 +18,8 @@ mcp-name: io.github.sbroenne/mcp-windows
 **Quick Setup Options:**
 
 1. **VS Code Extension** - [One-click install](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp) for GitHub Copilot
-2. **Manual Install** - Works with Claude Desktop, Cursor, Cline, Windsurf, and other MCP clients
+2. **Download from Releases** - Get the latest binary from [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases)
 3. **MCP Registry** - Find us at [registry.modelcontextprotocol.io](https://registry.modelcontextprotocol.io/servers/io.github.sbroenne/mcp-windows)
-
-**Manual Installation (All MCP Clients):**
-
-```powershell
-# Install MCP Server
-dotnet tool install --global Sbroenne.WindowsMcp
-
-# Verify installation
-mcp-windows --help
-```
 
 **Supported AI Assistants:**
 - ✅ GitHub Copilot (VS Code, Visual Studio)
@@ -60,7 +50,8 @@ Add to your MCP client's configuration file:
     "servers": {
       "windows-mcp": {
         "type": "stdio",
-        "command": "mcp-windows"
+        "command": "dotnet",
+        "args": ["path/to/Sbroenne.WindowsMcp.dll"]
       }
     }
   }
@@ -72,7 +63,8 @@ Add to your MCP client's configuration file:
 {
   "mcpServers": {
     "windows-mcp": {
-      "command": "mcp-windows"
+      "command": "dotnet",
+      "args": ["path/to/Sbroenne.WindowsMcp.dll"]
     }
   }
 }

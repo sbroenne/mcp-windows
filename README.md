@@ -47,24 +47,7 @@ Install the Windows MCP extension from the [VS Code Marketplace](https://marketp
 
 The extension automatically configures the MCP server and makes it available to GitHub Copilot.
 
-### Option 2: .NET Tool (Recommended for Developers)
-
-Install as a global .NET tool:
-
-```powershell
-# Install
-dotnet tool install --global Sbroenne.WindowsMcp
-
-# Run
-mcp-windows
-
-# Update
-dotnet tool update --global Sbroenne.WindowsMcp
-```
-
-**Requirements:** [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-
-### Option 3: Download from Releases
+### Option 2: Download from Releases
 
 Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases):
 
@@ -78,36 +61,7 @@ Download pre-built binaries from the [GitHub Releases page](https://github.com/s
 
 If you installed via the VS Code extension, the MCP server is automatically configured. No manual setup required.
 
-### .NET Tool Configuration
-
-If you installed via `dotnet tool install`, configure your MCP client:
-
-**VS Code (settings.json):**
-```json
-{
-  "mcp": {
-    "servers": {
-      "windows-mcp": {
-        "type": "stdio",
-        "command": "mcp-windows"
-      }
-    }
-  }
-}
-```
-
-**Claude Desktop / Other Clients:**
-```json
-{
-  "mcpServers": {
-    "windows-mcp": {
-      "command": "mcp-windows"
-    }
-  }
-}
-```
-
-### Binary Configuration (For Downloaded Releases)
+### MCP Configuration (For Downloaded Releases)
 
 If you downloaded from the releases page:
 

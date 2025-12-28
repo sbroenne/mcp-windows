@@ -32,13 +32,9 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageReleaseNotes>See https://github.com/sbroenne/mcp-windows/releases for release notes</PackageReleaseNotes>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-
-    <!-- .NET Tool Configuration -->
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>mcp-windows</ToolCommandName>
-
-    <!-- Package Validation -->
-    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageType>McpServer</PackageType>
+    <!-- Allow prerelease dependency on ModelContextProtocol (currently 0.5.0-preview.1) -->
+    <NoWarn>$(NoWarn);NU5104</NoWarn>
 
     <!-- Production optimization: exclude debug symbols and XML docs from publish -->
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
@@ -48,15 +44,6 @@
     <!-- WinRT/C#/Win projection trimming for smaller output -->
     <CsWinRTEnableLogging>false</CsWinRTEnableLogging>
   </PropertyGroup>
-
-  <!-- Workaround for .NET SDK unconditionally setting PackageType=DotnetTool when PackAsTool=true.
-       This target runs before Pack and appends McpServer to the package type.
-       In .NET 10+, just setting <PackageType>McpServer</PackageType> would work. -->
-  <Target Name="_AddMcpServerPackageType" BeforeTargets="GenerateNuspec;Pack">
-    <PropertyGroup>
-      <PackageType>$(PackageType);McpServer</PackageType>
-    </PropertyGroup>
-  </Target>
 
   <!-- Include README.md in NuGet package -->
   <ItemGroup>

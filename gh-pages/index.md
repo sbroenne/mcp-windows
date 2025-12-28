@@ -111,25 +111,13 @@ Ask your AI assistant to automate Windows tasks using natural language:
 
 The extension automatically configures the MCP server for GitHub Copilot.
 
-### Option 2: .NET Tool
-
-Install as a global .NET tool:
-
-```powershell
-# Install
-dotnet tool install --global Sbroenne.WindowsMcp
-
-# Run
-mcp-windows
-```
-
-Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
-
-### Option 3: Download from Releases
+### Option 2: Download from Releases
 
 Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases).
 
-## MCP Configuration
+Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+
+## MCP Configuration (For Downloaded Releases)
 
 **VS Code (settings.json):**
 ```json
@@ -138,7 +126,8 @@ Download pre-built binaries from the [GitHub Releases page](https://github.com/s
     "servers": {
       "windows-mcp": {
         "type": "stdio",
-        "command": "mcp-windows"
+        "command": "dotnet",
+        "args": ["path/to/Sbroenne.WindowsMcp.dll"]
       }
     }
   }
@@ -150,7 +139,8 @@ Download pre-built binaries from the [GitHub Releases page](https://github.com/s
 {
   "mcpServers": {
     "windows-mcp": {
-      "command": "mcp-windows"
+      "command": "dotnet",
+      "args": ["path/to/Sbroenne.WindowsMcp.dll"]
     }
   }
 }
