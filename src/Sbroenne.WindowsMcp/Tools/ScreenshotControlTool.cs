@@ -87,13 +87,13 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Capture screenshots. Use annotate=true to discover UI elements (returns numbered screenshot + element list). Simple: screenshot_control(app='Notepad') for image, screenshot_control(app='Notepad', annotate=true) for element discovery. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors. Coordinate system: screenshot pixels == mouse coordinates.")]
+    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements + element list. Use annotate=false for plain screenshot. Simple: screenshot_control(app='Notepad') for element discovery. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
         [Description("Application window to capture by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds the window and captures it. Use this instead of windowHandle for simpler workflows.")] string? app = null,
-        [Description("Overlay numbered labels on interactive UI elements and return element list. Use this to discover available elements before clicking/typing. Default: false")] bool annotate = false,
+        [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
         [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
         [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
         [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,

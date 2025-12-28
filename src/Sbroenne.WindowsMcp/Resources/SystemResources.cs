@@ -162,8 +162,8 @@ public sealed class SystemResources
 
             ### 2. If You Don't Know the Element Name → Discover First
             ```
-            screenshot_control(app="My Application", annotate=true)
-            → See screenshot with numbered labels + element list
+            screenshot_control(app="My Application")
+            → See screenshot with numbered labels + element list (default behavior)
             ```
 
             ### 3. For Toggles → Use ensure_state
@@ -187,8 +187,8 @@ public sealed class SystemResources
             | Press hotkey (Ctrl+S) | keyboard_control(app=..., combo) | - |
             | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
             | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
-            | Take screenshot | screenshot_control(app=...) | - |
-            | Find visible elements | screenshot_control(annotate=true) | ui_automation(get_tree) |
+            | Take screenshot | screenshot_control(app=..., annotate=false) | - |
+            | Find visible elements | screenshot_control(app=...) | ui_automation(get_tree) |
 
             ## Key Principles
 

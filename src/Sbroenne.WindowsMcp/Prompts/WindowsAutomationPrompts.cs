@@ -39,7 +39,7 @@ public sealed class WindowsAutomationPrompts
                 $"• Toggle: ui_automation(action='ensure_state', app='{target}', nameContains='...', desiredState='on'/'off')\n" +
                 "\n" +
                 "If you don't know element names:\n" +
-                $"• screenshot_control(app='{target}', annotate=true) — see all interactive elements with numbered labels\n" +
+                $"• screenshot_control(app='{target}') — see all interactive elements with numbered labels (default)\n" +
                 "\n" +
                 "Fallbacks (only if ui_automation fails):\n" +
                 $"• mouse_control(app='{target}', action='click', x=..., y=...) — use clickablePoint from result\n" +
@@ -144,7 +144,7 @@ public sealed class WindowsAutomationPrompts
                 $"Intent: {intent}\n" +
                 "\n" +
                 "Strategy:\n" +
-                $"1) screenshot_control(app='{app}', annotate=true) — see interactable elements with numbered labels.\n" +
+                $"1) screenshot_control(app='{app}') — see interactable elements with numbered labels (default).\n" +
                 "   Tip: Use outputPath='C:/temp/ui.png' and returnImageData=false to reduce response size.\n" +
                 $"2) ui_automation(action='find', app='{app}', nameContains='...', sortByProminence=true).\n" +
                 "3) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
