@@ -65,7 +65,8 @@ public sealed partial class WindowManagementTool
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
-    /// <param name="handle">Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state).</param>
+    /// <param name="app">Application window to target by title (partial match, case-insensitive). Example: app='Notepad'. The server finds the window automatically.</param>
+    /// <param name="handle">Window handle (alternative to app parameter). Required when app is not specified for actions that target a specific window.</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
@@ -82,12 +83,13 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Window control: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, wait_for, move_to_monitor, ensure_visible. Workflow start: find/list → get handle → activate → pass handle to ui_automation/screenshot_control. Handle format: decimal string (digits only). Troubleshoot: if find fails, try list with regex=true. See system://best-practices for workflows.")]
-    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, state, is_foreground), and error details if failed. Save the 'handle' value to use with activate, close, or other window operations.")]
+    [Description("Window control: list, find, activate, get_foreground, minimize, maximize, restore, close, move, resize, wait_for, move_to_monitor, ensure_visible. Use 'app' parameter to target windows by title without needing a handle first. Example: activate(app='Notepad'). See system://best-practices for workflows.")]
+    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, state, is_foreground), and error details if failed. Save the 'handle' value to use with other tools.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible")] string action,
-        [Description("Window handle (required for activate, minimize, maximize, restore, close, move, resize, set_bounds, move_to_monitor, get_state, wait_for_state)")] string? handle = null,
+        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Notepad' or app='Visual Studio'. The server finds the window automatically. Use this instead of handle for simpler workflows.")] string? app = null,
+        [Description("Window handle (alternative to app parameter). Required when app is not specified for actions that target a specific window.")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
         [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
@@ -133,6 +135,31 @@ public sealed partial class WindowManagementTool
                 return result;
             }
 
+            // Resolve 'app' parameter to handle for actions that need a window target
+            string? resolvedHandle = handle;
+            if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(handle))
+            {
+                // Actions that need a window target
+                var needsHandle = windowAction.Value is
+                    WindowAction.Activate or WindowAction.Minimize or WindowAction.Maximize or
+                    WindowAction.Restore or WindowAction.Close or WindowAction.Move or
+                    WindowAction.Resize or WindowAction.SetBounds or WindowAction.MoveToMonitor or
+                    WindowAction.GetState or WindowAction.WaitForState or WindowAction.MoveAndActivate or
+                    WindowAction.EnsureVisible;
+
+                if (needsHandle)
+                {
+                    var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
+                    if (!findResult.Success || findResult.Window is null)
+                    {
+                        return WindowManagementResult.CreateFailure(
+                            WindowManagementErrorCode.WindowNotFound,
+                            $"Window matching '{app}' not found. Use list action to see available windows.");
+                    }
+                    resolvedHandle = findResult.Window.Handle;
+                }
+            }
+
             WindowManagementResult operationResult;
 
             switch (windowAction.Value)
@@ -146,7 +173,7 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Activate:
-                    operationResult = await HandleActivateAsync(handle, cancellationToken);
+                    operationResult = await HandleActivateAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.GetForeground:
@@ -154,31 +181,31 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Minimize:
-                    operationResult = await HandleMinimizeAsync(handle, cancellationToken);
+                    operationResult = await HandleMinimizeAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.Maximize:
-                    operationResult = await HandleMaximizeAsync(handle, cancellationToken);
+                    operationResult = await HandleMaximizeAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.Restore:
-                    operationResult = await HandleRestoreAsync(handle, cancellationToken);
+                    operationResult = await HandleRestoreAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.Close:
-                    operationResult = await HandleCloseAsync(handle, cancellationToken);
+                    operationResult = await HandleCloseAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.Move:
-                    operationResult = await HandleMoveAsync(handle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAsync(resolvedHandle, x, y, cancellationToken);
                     break;
 
                 case WindowAction.Resize:
-                    operationResult = await HandleResizeAsync(handle, width, height, cancellationToken);
+                    operationResult = await HandleResizeAsync(resolvedHandle, width, height, cancellationToken);
                     break;
 
                 case WindowAction.SetBounds:
-                    operationResult = await HandleSetBoundsAsync(handle, x, y, width, height, cancellationToken);
+                    operationResult = await HandleSetBoundsAsync(resolvedHandle, x, y, width, height, cancellationToken);
                     break;
 
                 case WindowAction.WaitFor:
@@ -186,23 +213,23 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.MoveToMonitor:
-                    operationResult = await HandleMoveToMonitorAsync(handle, target, monitorIndex, cancellationToken);
+                    operationResult = await HandleMoveToMonitorAsync(resolvedHandle, target, monitorIndex, cancellationToken);
                     break;
 
                 case WindowAction.GetState:
-                    operationResult = await HandleGetStateAsync(handle, cancellationToken);
+                    operationResult = await HandleGetStateAsync(resolvedHandle, cancellationToken);
                     break;
 
                 case WindowAction.WaitForState:
-                    operationResult = await HandleWaitForStateAsync(handle, state, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForStateAsync(resolvedHandle, state, timeoutMs, cancellationToken);
                     break;
 
                 case WindowAction.MoveAndActivate:
-                    operationResult = await HandleMoveAndActivateAsync(handle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAndActivateAsync(resolvedHandle, x, y, cancellationToken);
                     break;
 
                 case WindowAction.EnsureVisible:
-                    operationResult = await HandleEnsureVisibleAsync(handle, cancellationToken);
+                    operationResult = await HandleEnsureVisibleAsync(resolvedHandle, cancellationToken);
                     break;
 
                 default:
