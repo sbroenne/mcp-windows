@@ -101,3 +101,4 @@ tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/screenshots/
 
 # Runtime screenshots generated during test execution (not committed)
 **/bin/**/screenshots/
+nupkg/

@@ -19,6 +19,7 @@
     <Description>MCP Server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <InvariantGlobalization>true</InvariantGlobalization>
 
     <!-- Version properties - updated by release workflow -->
     <Version>1.0.0</Version>
@@ -29,6 +30,9 @@
     <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
     <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <PublishDocumentationFile Condition="'$(Configuration)' == 'Release'">false</PublishDocumentationFile>
+
+    <!-- Optimize single-file size when publishing as self-contained -->
+    <EnableCompressionInSingleFile Condition="'$(Configuration)' == 'Release'">true</EnableCompressionInSingleFile>
 
     <!-- WinRT/C#/Win projection trimming for smaller output -->
     <CsWinRTEnableLogging>false</CsWinRTEnableLogging>
@@ -41,9 +45,6 @@
     <PackageReference Include="Interop.UIAutomationClient" />
   </ItemGroup>
 
-  <!-- UI Automation framework references -->
-  <ItemGroup>
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
-  </ItemGroup>
+  <!-- Windows Forms is enabled via UseWindowsForms; no WPF dependency needed -->
 
 </Project>

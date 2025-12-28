@@ -14,6 +14,10 @@ jobs:
     permissions:
       contents: write
 
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+
     steps:
     - uses: actions/checkout@v4
 
@@ -45,20 +49,38 @@ jobs:
     - name: Restore Dependencies
       run: dotnet restore
 
-    - name: Publish (Portable)
-      run: dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -o publish --no-self-contained
+    - name: Publish (Self-contained single-file)
+      run: |
+        $rid = "${{ matrix.rid }}"
+        dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj `
+          -c Release `
+          -r $rid `
+          -o "publish/$rid" `
+          -p:SelfContained=true `
+          -p:PublishSingleFile=true `
+          -p:EnableCompressionInSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:PublishReadyToRun=false
+      shell: pwsh
 
     - name: Create Release Archive
       run: |
         $version = "${{ env.VERSION }}"
+        $rid = "${{ matrix.rid }}"
 
-        Compress-Archive -Path "publish/*" -DestinationPath "windows-mcp-server-$version.zip"
+        $publishDir = "publish/$rid"
+        if (!(Test-Path $publishDir)) {
+          Write-Error "Publish directory not found: $publishDir"
+        }
 
-        Write-Output "Created release archive"
+        $zipName = "windows-mcp-server-$version-$rid.zip"
+        Compress-Archive -Path "$publishDir/*" -DestinationPath $zipName
+
+        Write-Output "Created release archive: $zipName"
         Get-ChildItem *.zip | Format-Table Name, Length
       shell: pwsh
 
-    - name: Create GitHub Release
+    - name: Assemble Release Notes
       run: |
         $tagName = "${{ github.ref_name }}"
         $version = "${{ env.VERSION }}"
@@ -66,13 +88,16 @@ jobs:
         $notes = @"
         ## Windows MCP Server $tagName
 
-        MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.
+        MCP server for Windows automation — UI automation, mouse, keyboard, window management, and screenshots.
 
-        ### Download
+        ### Downloads (no .NET runtime required)
 
-        | File | Description |
-        |------|-------------|
-        | windows-mcp-server-$version.zip | Requires [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) |
+        | File | Architecture |
+        |------|--------------|
+        | windows-mcp-server-$version-win-x64.zip | x64 |
+        | windows-mcp-server-$version-win-arm64.zip | ARM64 |
+
+        Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe. Pick the RID that matches your machine (x64 for most PCs, ARM64 for Surface/ARM dev kits).
 
         ### Available Tools
 
@@ -84,11 +109,11 @@ jobs:
         | window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |
         | screenshot_control | Capture screens, monitors, windows, or regions |
 
-        ### Installation
+        ### Usage
 
-        1. Install [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-        2. Extract the zip to a folder
-        3. Run with ``dotnet Sbroenne.WindowsMcp.dll`` or add to your MCP client config
+        1. Download the zip for your architecture
+        2. Extract the zip (contains Sbroenne.WindowsMcp.exe)
+        3. Run Sbroenne.WindowsMcp.exe or add to your MCP client config
 
         ### MCP Client Configuration
 
@@ -96,20 +121,27 @@ jobs:
         {
           "mcpServers": {
             "windows-mcp": {
-              "command": "dotnet",
-              "args": ["path/to/Sbroenne.WindowsMcp.dll"]
+              "command": "path/to/Sbroenne.WindowsMcp.exe"
             }
           }
         }
         ```
 
         See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-        "@
+        @"
 
         $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
+      shell: pwsh
+
+    - name: Create GitHub Release
+      run: |
+        $tagName = "${{ github.ref_name }}"
+        $version = "${{ env.VERSION }}"
+
+        $assets = Get-ChildItem "windows-mcp-server-$version-*.zip" | Select-Object -ExpandProperty FullName
 
         gh release create "$tagName" `
-          "windows-mcp-server-$version.zip" `
+          $assets `
           --title "Windows MCP Server $tagName" `
           --notes-file release_notes.md
 

@@ -48,10 +48,12 @@ The extension automatically configures the MCP server and makes it available to 
 
 ### Option 2: Download from Releases
 
-Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases):
+Download pre-built, self-contained executables from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases) — no .NET runtime required:
 
-1. Download the latest `mcp-windows-v*.zip`
-2. Extract to your preferred location
+1. Pick your architecture zip:
+  - `windows-mcp-server-<version>-win-x64.zip` (most PCs)
+  - `windows-mcp-server-<version>-win-arm64.zip` (Surface Pro X, ARM dev kits)
+2. Extract to your preferred location (contains `Sbroenne.WindowsMcp.exe`)
 3. Add to your MCP client configuration (see [MCP Configuration](#mcp-configuration))
 
 ## Usage
@@ -68,15 +70,12 @@ If you downloaded from the releases page, add to your MCP client configuration:
 {
   "servers": {
     "windows": {
-      "command": "dotnet",
-      "args": ["path/to/extracted/Sbroenne.WindowsMcp.dll"],
+      "command": "path/to/extracted/Sbroenne.WindowsMcp.exe",
       "env": {}
     }
   }
 }
 ```
-
-> **Note:** Releases are framework-dependent and require [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) to be installed.
 
 ## Tools
 
