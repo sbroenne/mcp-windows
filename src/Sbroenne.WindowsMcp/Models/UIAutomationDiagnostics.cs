@@ -135,4 +135,17 @@ public sealed record ElementQuery
     /// Useful for disambiguation when multiple elements match - larger elements are typically more prominent/important.
     /// </summary>
     public bool SortByProminence { get; init; }
+
+    /// <summary>
+    /// Filter to elements within a specific screen region.
+    /// Format: "x,y,width,height" in screen coordinates.
+    /// Only elements whose bounding box intersects or is contained within this region will be returned.
+    /// </summary>
+    public string? InRegion { get; init; }
+
+    /// <summary>
+    /// Find elements spatially near a reference element.
+    /// The element ID of the reference element. Results will be sorted by distance from this element's center.
+    /// </summary>
+    public string? NearElement { get; init; }
 }

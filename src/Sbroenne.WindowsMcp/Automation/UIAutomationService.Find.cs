@@ -50,11 +50,44 @@ public sealed partial class UIAutomationService
 
                 var condition = BuildCondition(query);
 
+                // Parse inRegion if specified
+                BoundingRect? regionFilter = null;
+                if (!string.IsNullOrEmpty(query.InRegion))
+                {
+                    regionFilter = ParseRegion(query.InRegion);
+                    if (regionFilter == null)
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "find",
+                            UIAutomationErrorType.InvalidParameter,
+                            $"Invalid inRegion format: '{query.InRegion}'. Expected 'x,y,width,height' (e.g., '100,200,300,400').",
+                            CreateDiagnostics(stopwatch, query));
+                    }
+                }
+
+                // Resolve nearElement reference point if specified
+                BoundingRect? referencePoint = null;
+                if (!string.IsNullOrEmpty(query.NearElement))
+                {
+                    var refElement = ElementIdGenerator.ResolveToAutomationElement(query.NearElement);
+                    if (refElement == null)
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "find",
+                            UIAutomationErrorType.ElementNotFound,
+                            $"Reference element for nearElement not found or stale: {query.NearElement}",
+                            CreateDiagnostics(stopwatch, query));
+                    }
+                    var refRect = refElement.CurrentBoundingRectangle;
+                    referencePoint = BoundingRect.FromCoordinates(refRect.left, refRect.top, refRect.right - refRect.left, refRect.bottom - refRect.top);
+                }
+
                 // Determine if we can use fast FindAll
                 var hasAdvancedCriteria = !string.IsNullOrEmpty(query.NameContains) ||
                                          !string.IsNullOrEmpty(query.NamePattern) ||
                                          query.ExactDepth.HasValue ||
-                                         !string.IsNullOrEmpty(query.ClassName);
+                                         !string.IsNullOrEmpty(query.ClassName) ||
+                                         regionFilter != null;
 
                 var elementInfos = new List<UIElementInfo>();
                 var elementsScanned = 0;
@@ -88,8 +121,26 @@ public sealed partial class UIAutomationService
                         recoverySuggestion);
                 }
 
+                // Filter by region if specified (post-processing for FindAll path)
+                if (regionFilter != null && elementInfos.Count > 0)
+                {
+                    elementInfos.RemoveAll(e => !IntersectsRegion(e.BoundingRect, regionFilter));
+                }
+
+                // Sort by proximity to reference element if nearElement specified
+                if (referencePoint != null && elementInfos.Count > 1)
+                {
+                    var refCenterX = referencePoint.CenterX;
+                    var refCenterY = referencePoint.CenterY;
+                    elementInfos.Sort((a, b) =>
+                    {
+                        var distA = DistanceSquared(a.BoundingRect.CenterX, a.BoundingRect.CenterY, refCenterX, refCenterY);
+                        var distB = DistanceSquared(b.BoundingRect.CenterX, b.BoundingRect.CenterY, refCenterX, refCenterY);
+                        return distA.CompareTo(distB); // Ascending order (closest first)
+                    });
+                }
                 // Sort by prominence (bounding box area) if requested - larger elements first
-                if (query.SortByProminence && elementInfos.Count > 1)
+                else if (query.SortByProminence && elementInfos.Count > 1)
                 {
                     elementInfos.Sort((a, b) =>
                     {
@@ -410,5 +461,54 @@ public sealed partial class UIAutomationService
         }
 
         return string.Join(" ", suggestions);
+    }
+
+    /// <summary>
+    /// Parses a region string in format "x,y,width,height".
+    /// </summary>
+    private static BoundingRect? ParseRegion(string regionString)
+    {
+        var parts = regionString.Split(',');
+        if (parts.Length != 4)
+        {
+            return null;
+        }
+
+        if (!int.TryParse(parts[0].Trim(), out var x) ||
+            !int.TryParse(parts[1].Trim(), out var y) ||
+            !int.TryParse(parts[2].Trim(), out var width) ||
+            !int.TryParse(parts[3].Trim(), out var height))
+        {
+            return null;
+        }
+
+        if (width <= 0 || height <= 0)
+        {
+            return null;
+        }
+
+        return new BoundingRect { X = x, Y = y, Width = width, Height = height };
+    }
+
+    /// <summary>
+    /// Checks if an element's bounding rect intersects with the specified region.
+    /// </summary>
+    private static bool IntersectsRegion(BoundingRect elementRect, BoundingRect region)
+    {
+        // Check if rectangles overlap
+        return elementRect.X < region.X + region.Width &&
+               elementRect.X + elementRect.Width > region.X &&
+               elementRect.Y < region.Y + region.Height &&
+               elementRect.Y + elementRect.Height > region.Y;
+    }
+
+    /// <summary>
+    /// Calculates squared distance between two points (avoids sqrt for sorting).
+    /// </summary>
+    private static long DistanceSquared(int x1, int y1, int x2, int y2)
+    {
+        long dx = x1 - x2;
+        long dy = y1 - y2;
+        return dx * dx + dy * dy;
     }
 }
