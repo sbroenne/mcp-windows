@@ -297,9 +297,13 @@ public sealed partial class UIAutomationService
             // Get monitor-relative rect and clickable point
             var (monitorRelativeRect, monitorIndex) = coordinateConverter.ToMonitorRelative(boundingRect);
 
+            // Use cached element ID generation - much faster than full ElementIdGenerator
+            // Just use RuntimeId since it's already cached and uniquely identifies the element
+            var elementId = GenerateFastElementId(element, rootElement);
+
             var info = new UIElementInfo
             {
-                ElementId = ElementIdGenerator.GenerateId(element, rootElement),
+                ElementId = elementId,
                 Name = element.GetCachedName(),
                 AutomationId = element.GetCachedAutomationId(),
                 ControlType = element.GetCachedControlTypeName(),
@@ -322,6 +326,57 @@ public sealed partial class UIAutomationService
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Generates a fast element ID using only cached properties.
+    /// This avoids the expensive tree path calculation of ElementIdGenerator.
+    /// Format: "window:{hwnd}|runtime:{id}"
+    /// </summary>
+    private static string GenerateFastElementId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        try
+        {
+            // Get cached window handle (fast - no COM call)
+            var windowHandle = element.GetCachedNativeWindowHandle();
+
+            // If no handle on element, use root's handle
+            if (windowHandle == 0)
+            {
+                try
+                {
+                    windowHandle = rootElement.GetCachedNativeWindowHandle();
+                }
+                catch
+                {
+                    // Fall back to current property if not in cache
+                    windowHandle = rootElement.GetNativeWindowHandle();
+                }
+            }
+
+            // Get runtime ID - try cached first
+            int[]? runtimeId = null;
+            try
+            {
+                runtimeId = (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId);
+            }
+            catch
+            {
+                // Fall back to current if not cached
+                runtimeId = element.GetRuntimeId();
+            }
+
+            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
+                ? string.Join(".", runtimeId)
+                : "0";
+
+            // Simplified format - no tree path (expensive to calculate)
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached";
+        }
+        catch
+        {
+            return "window:0|runtime:0|path:error";
         }
     }
 

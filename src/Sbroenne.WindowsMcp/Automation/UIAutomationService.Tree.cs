@@ -57,26 +57,10 @@ public sealed partial class UIAutomationService
                     ? strategy.RecommendedMaxDepth
                     : Math.Min(maxDepth, 20);
 
-                // Create cache request for batch property retrieval (reduces COM calls)
-                var cacheRequest = Uia.CreateTreeCacheRequest(includeChildren: false);
-
-                // Get root element with cached properties for initial traversal
-                var cachedRoot = rootElement.FindFirstBuildCache(
-                    UIA.TreeScope.TreeScope_Element,
-                    Uia.TrueCondition,
-                    cacheRequest) ?? rootElement;
-
+                // Use single-call bulk fetch: get ALL elements in one COM call, then reconstruct tree
+                // This is dramatically faster than per-level FindAllBuildCache calls
                 UIElementInfo? tree;
-                if (strategy.UsePostHocFiltering && controlTypeSet != null)
-                {
-                    // For Electron/Chromium: traverse full tree without filter, then apply filter post-hoc
-                    tree = BuildElementTreeWithCachingPostHoc(cachedRoot, rootElement, effectiveMaxDepth, 0, controlTypeSet, cacheRequest, ref elementsScanned);
-                }
-                else
-                {
-                    // For WinForms/WPF/Win32: use inline filtering for better performance
-                    tree = BuildElementTreeWithCaching(cachedRoot, rootElement, effectiveMaxDepth, 0, controlTypeSet, cacheRequest, ref elementsScanned);
-                }
+                tree = BuildTreeWithBulkFetch(rootElement, effectiveMaxDepth, controlTypeSet, strategy.UsePostHocFiltering, ref elementsScanned);
 
                 var wasTruncated = elementsScanned > MaxElementsToScan;
 
@@ -304,313 +288,161 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
-    /// Builds element tree using IUIAutomationCacheRequest for batch property retrieval.
-    /// This significantly reduces cross-process COM calls by fetching all properties in bulk.
+    /// Builds element tree using a SINGLE FindFirstBuildCache call with TreeScope_Subtree.
+    /// This caches the ENTIRE subtree including children relationships in one COM call.
+    /// We then traverse using GetCachedChildren() which reads from cache (no COM calls).
     /// </summary>
-    private UIElementInfo? BuildElementTreeWithCaching(
+    private UIElementInfo? BuildTreeWithBulkFetch(
+        UIA.IUIAutomationElement rootElement,
+        int maxDepth,
+        HashSet<string>? controlTypeFilter,
+        bool usePostHocFiltering,
+        ref int elementsScanned)
+    {
+        try
+        {
+            // Create cache request with TreeScope_Subtree to cache entire tree including children
+            var cacheRequest = Uia.CreateCacheRequest();
+
+            // Add all properties needed for UIElementInfo conversion
+            cacheRequest.AddProperty(UIA3PropertyIds.Name);
+            cacheRequest.AddProperty(UIA3PropertyIds.AutomationId);
+            cacheRequest.AddProperty(UIA3PropertyIds.ControlType);
+            cacheRequest.AddProperty(UIA3PropertyIds.BoundingRectangle);
+            cacheRequest.AddProperty(UIA3PropertyIds.IsEnabled);
+            cacheRequest.AddProperty(UIA3PropertyIds.IsOffscreen);
+            cacheRequest.AddProperty(UIA3PropertyIds.FrameworkId);
+            cacheRequest.AddProperty(UIA3PropertyIds.ClassName);
+            cacheRequest.AddProperty(UIA3PropertyIds.NativeWindowHandle);
+            cacheRequest.AddProperty(UIA3PropertyIds.RuntimeId);
+
+            // CRITICAL: Set TreeScope to Subtree so GetCachedChildren works on ALL descendants
+            // TreeScope_Subtree = Element + Descendants - caches full tree structure
+            cacheRequest.TreeScope = UIA.TreeScope.TreeScope_Subtree;
+
+            // ONE COM call to fetch entire tree with all properties and children cached
+            var cachedRoot = rootElement.FindFirstBuildCache(
+                UIA.TreeScope.TreeScope_Element,
+                Uia.TrueCondition,
+                cacheRequest);
+
+            if (cachedRoot == null)
+            {
+                return null;
+            }
+
+            // Now traverse using GetCachedChildren() - NO additional COM calls!
+            return BuildTreeFromCachedElement(
+                cachedRoot,
+                rootElement,
+                maxDepth,
+                0,
+                controlTypeFilter,
+                usePostHocFiltering,
+                ref elementsScanned);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Recursively builds tree from cached element using GetCachedChildren().
+    /// This makes NO COM calls since all data is already cached.
+    /// </summary>
+    private UIElementInfo? BuildTreeFromCachedElement(
         UIA.IUIAutomationElement element,
         UIA.IUIAutomationElement rootElement,
         int maxDepth,
         int currentDepth,
         HashSet<string>? controlTypeFilter,
-        UIA.IUIAutomationCacheRequest cacheRequest,
+        bool usePostHocFiltering,
         ref int elementsScanned)
     {
-        try
-        {
-            elementsScanned++;
+        elementsScanned++;
 
-            if (elementsScanned > MaxElementsToScan)
-            {
-                return null;
-            }
-
-            // Use cached control type for filtering
-            var controlTypeName = element.GetCachedControlTypeName().ToLowerInvariant();
-            var includeElement = controlTypeFilter == null || controlTypeFilter.Contains(controlTypeName);
-
-            // Use cached properties for element conversion (skips pattern detection)
-            var elementInfo = includeElement
-                ? ConvertToElementInfoFromCache(element, rootElement, _coordinateConverter, null, skipPatterns: true)
-                : null;
-
-            if (currentDepth < maxDepth && elementsScanned <= MaxElementsToScan)
-            {
-                // Use FindAllBuildCache to get children with all properties pre-cached in one COM call
-                var children = element.FindAllBuildCache(
-                    UIA.TreeScope.TreeScope_Children,
-                    Uia.TrueCondition,
-                    cacheRequest);
-
-                var childInfos = new List<UIElementInfo>();
-
-                if (children != null)
-                {
-                    for (var i = 0; i < children.Length && elementsScanned <= MaxElementsToScan; i++)
-                    {
-                        var child = children.GetElement(i);
-                        if (child == null)
-                        {
-                            continue;
-                        }
-
-                        var childInfo = BuildElementTreeWithCaching(
-                            child, rootElement, maxDepth, currentDepth + 1,
-                            controlTypeFilter, cacheRequest, ref elementsScanned);
-                        if (childInfo != null)
-                        {
-                            childInfos.Add(childInfo);
-                        }
-                    }
-                }
-
-                if (elementInfo != null && childInfos.Count > 0)
-                {
-                    elementInfo = elementInfo with { Children = [.. childInfos] };
-                }
-                else if (elementInfo == null && childInfos.Count > 0)
-                {
-                    return childInfos[0];
-                }
-            }
-
-            return elementInfo;
-        }
-        catch
+        if (elementsScanned > MaxElementsToScan || currentDepth > maxDepth)
         {
             return null;
         }
-    }
 
-    /// <summary>
-    /// Builds element tree using post-hoc filtering with caching for Electron/Chromium apps.
-    /// Combines the benefits of caching (fewer COM calls) with post-hoc filtering
-    /// (doesn't prune branches containing matching elements).
-    /// </summary>
-    private UIElementInfo? BuildElementTreeWithCachingPostHoc(
-        UIA.IUIAutomationElement element,
-        UIA.IUIAutomationElement rootElement,
-        int maxDepth,
-        int currentDepth,
-        HashSet<string> controlTypeFilter,
-        UIA.IUIAutomationCacheRequest cacheRequest,
-        ref int elementsScanned)
-    {
-        try
+        var controlTypeName = element.GetCachedControlTypeName().ToLowerInvariant();
+        var matchesFilter = controlTypeFilter == null || controlTypeFilter.Contains(controlTypeName);
+
+        // Get children from cache (should be NO COM call if cached correctly)
+        var childInfos = new List<UIElementInfo>();
+        if (currentDepth < maxDepth)
         {
-            elementsScanned++;
+            // Try to get cached children first - this is the fast path
+            UIA.IUIAutomationElementArray? cachedChildren = null;
+            try
+            {
+                cachedChildren = element.GetCachedChildren();
+            }
+            catch
+            {
+                // Children not cached - this shouldn't happen with TreeScope_Subtree
+                // Fall through with null
+            }
 
-            if (elementsScanned > MaxElementsToScan)
+            if (cachedChildren != null && cachedChildren.Length > 0)
+            {
+                for (var i = 0; i < cachedChildren.Length && elementsScanned <= MaxElementsToScan; i++)
+                {
+                    var child = cachedChildren.GetElement(i);
+                    if (child == null)
+                    {
+                        continue;
+                    }
+
+                    var childInfo = BuildTreeFromCachedElement(
+                        child, rootElement, maxDepth, currentDepth + 1,
+                        controlTypeFilter, usePostHocFiltering, ref elementsScanned);
+
+                    if (childInfo != null)
+                    {
+                        childInfos.Add(childInfo);
+                    }
+                }
+            }
+        }
+
+        // Post-hoc filtering (Electron): include if matches OR has matching descendants
+        if (usePostHocFiltering && controlTypeFilter != null)
+        {
+            if (!matchesFilter && childInfos.Count == 0)
             {
                 return null;
             }
 
-            // Use cached control type for filtering
-            var controlTypeName = element.GetCachedControlTypeName().ToLowerInvariant();
-            var matchesFilter = controlTypeFilter.Contains(controlTypeName);
             var elementInfo = ConvertToElementInfoFromCache(element, rootElement, _coordinateConverter, null, skipPatterns: true);
-
-            // Collect children regardless of current element's match status
-            var childInfos = new List<UIElementInfo>();
-            if (currentDepth < maxDepth && elementsScanned <= MaxElementsToScan)
+            if (elementInfo == null)
             {
-                var children = element.FindAllBuildCache(
-                    UIA.TreeScope.TreeScope_Children,
-                    Uia.TrueCondition,
-                    cacheRequest);
-
-                if (children != null)
-                {
-                    for (var i = 0; i < children.Length && elementsScanned <= MaxElementsToScan; i++)
-                    {
-                        var child = children.GetElement(i);
-                        if (child == null)
-                        {
-                            continue;
-                        }
-
-                        var childInfo = BuildElementTreeWithCachingPostHoc(
-                            child, rootElement, maxDepth, currentDepth + 1,
-                            controlTypeFilter, cacheRequest, ref elementsScanned);
-                        if (childInfo != null)
-                        {
-                            childInfos.Add(childInfo);
-                        }
-                    }
-                }
+                return childInfos.Count == 1 ? childInfos[0] : null;
             }
 
-            // Same decision logic as non-cached version
-            if (matchesFilter)
-            {
-                if (childInfos.Count > 0 && elementInfo != null)
-                {
-                    return elementInfo with { Children = [.. childInfos] };
-                }
-                return elementInfo;
-            }
-            else if (childInfos.Count > 0)
-            {
-                if (childInfos.Count == 1)
-                {
-                    return childInfos[0];
-                }
-                if (elementInfo != null)
-                {
-                    return elementInfo with { Children = [.. childInfos] };
-                }
-                return childInfos[0];
-            }
-
-            return null;
+            return childInfos.Count > 0 ? elementInfo with { Children = [.. childInfos] } : elementInfo;
         }
-        catch
+
+        // Inline filtering: only include if matches
+        if (!matchesFilter)
+        {
+            return childInfos.Count switch
+            {
+                0 => null,
+                1 => childInfos[0],
+                _ => childInfos[0]
+            };
+        }
+
+        var info = ConvertToElementInfoFromCache(element, rootElement, _coordinateConverter, null, skipPatterns: true);
+        if (info == null)
         {
             return null;
         }
-    }
 
-    private UIElementInfo? BuildElementTree(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxDepth, int currentDepth, HashSet<string>? controlTypeFilter, ref int elementsScanned)
-    {
-        try
-        {
-            elementsScanned++;
-
-            if (elementsScanned > MaxElementsToScan)
-            {
-                return null;
-            }
-
-            var controlTypeName = element.GetControlTypeName().ToLowerInvariant();
-            var includeElement = controlTypeFilter == null || controlTypeFilter.Contains(controlTypeName);
-
-            var elementInfo = includeElement ? ConvertToElementInfo(element, rootElement, _coordinateConverter, null) : null;
-
-            if (currentDepth < maxDepth && elementsScanned <= MaxElementsToScan)
-            {
-                var children = element.FindAll(UIA.TreeScope.TreeScope_Children, Uia.TrueCondition);
-                var childInfos = new List<UIElementInfo>();
-
-                if (children != null)
-                {
-                    for (var i = 0; i < children.Length && elementsScanned <= MaxElementsToScan; i++)
-                    {
-                        var child = children.GetElement(i);
-                        if (child == null)
-                        {
-                            continue;
-                        }
-
-                        var childInfo = BuildElementTree(child, rootElement, maxDepth, currentDepth + 1, controlTypeFilter, ref elementsScanned);
-                        if (childInfo != null)
-                        {
-                            childInfos.Add(childInfo);
-                        }
-                    }
-                }
-
-                if (elementInfo != null && childInfos.Count > 0)
-                {
-                    elementInfo = elementInfo with { Children = [.. childInfos] };
-                }
-                else if (elementInfo == null && childInfos.Count > 0)
-                {
-                    return childInfos[0];
-                }
-            }
-
-            return elementInfo;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Builds element tree using post-hoc filtering strategy for Electron/Chromium apps.
-    /// Traverses the full tree without filtering, then applies filter while preserving hierarchy.
-    /// This prevents pruning branches that contain matching elements deep in the tree.
-    /// </summary>
-    private UIElementInfo? BuildElementTreeWithPostHocFiltering(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxDepth, int currentDepth, HashSet<string> controlTypeFilter, ref int elementsScanned)
-    {
-        try
-        {
-            elementsScanned++;
-
-            if (elementsScanned > MaxElementsToScan)
-            {
-                return null;
-            }
-
-            // Always convert element (we'll filter in the result composition)
-            var controlTypeName = element.GetControlTypeName().ToLowerInvariant();
-            var matchesFilter = controlTypeFilter.Contains(controlTypeName);
-            var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
-
-            // Collect children regardless of current element's match status
-            var childInfos = new List<UIElementInfo>();
-            if (currentDepth < maxDepth && elementsScanned <= MaxElementsToScan)
-            {
-                var children = element.FindAll(UIA.TreeScope.TreeScope_Children, Uia.TrueCondition);
-
-                if (children != null)
-                {
-                    for (var i = 0; i < children.Length && elementsScanned <= MaxElementsToScan; i++)
-                    {
-                        var child = children.GetElement(i);
-                        if (child == null)
-                        {
-                            continue;
-                        }
-
-                        var childInfo = BuildElementTreeWithPostHocFiltering(child, rootElement, maxDepth, currentDepth + 1, controlTypeFilter, ref elementsScanned);
-                        if (childInfo != null)
-                        {
-                            childInfos.Add(childInfo);
-                        }
-                    }
-                }
-            }
-
-            // Decision logic:
-            // 1. If this element matches filter, include it with all filtered children
-            // 2. If this element doesn't match but has children that matched, return a placeholder
-            //    that contains those children (to preserve hierarchy)
-            // 3. If nothing matches, return null
-
-            if (matchesFilter)
-            {
-                // Include this element with filtered children
-                if (childInfos.Count > 0 && elementInfo != null)
-                {
-                    return elementInfo with { Children = [.. childInfos] };
-                }
-                return elementInfo;
-            }
-            else if (childInfos.Count > 0)
-            {
-                // Don't match but have matching descendants - return first child or aggregate
-                if (childInfos.Count == 1)
-                {
-                    return childInfos[0];
-                }
-
-                // Multiple children matched - include this element as a container
-                // but mark it as non-matching by not including its own info
-                if (elementInfo != null)
-                {
-                    return elementInfo with { Children = [.. childInfos] };
-                }
-                return childInfos[0];
-            }
-
-            return null;
-        }
-        catch
-        {
-            return null;
-        }
+        return childInfos.Count > 0 ? info with { Children = [.. childInfos] } : info;
     }
 
     private static HashSet<string>? ParseControlTypeFilter(string? filter)
