@@ -116,50 +116,65 @@ jobs:
         tagName="${{ github.ref_name }}"
         version="${{ env.VERSION }}"
 
-        cat > release_notes.md << EOF
-        ## Windows MCP Server ${tagName}
+        cat > release_notes.md << 'EOF'
+## Windows MCP Server
 
-        MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.
+**Let AI agents control Windows applications.** Click buttons, type text, toggle settings — all by name, not coordinates.
 
-        ### Downloads (no .NET runtime required)
+Uses the **Windows UI Automation API** to find UI elements reliably, regardless of DPI, theme, resolution, or window position.
 
-        | File | Architecture |
-        |------|--------------|
-        | windows-mcp-server-${version}-win-x64.zip | x64 |
-        | windows-mcp-server-${version}-win-arm64.zip | ARM64 |
+### Why UI Automation First?
 
-        Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe. Pick the RID that matches your machine (x64 for most PCs, ARM64 for Surface/ARM dev kits).
+Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
 
-        ### Available Tools
+Windows MCP Server queries the UI directly — it finds buttons by name, not pixels.
 
-        | Tool | Description |
-        |------|-------------|
-        | ui_automation | Find UI elements, interact with controls, OCR text recognition |
-        | mouse_control | Click, double-click, right-click, move, drag, scroll, get_position |
-        | keyboard_control | Type text, press keys, combinations, sequences |
-        | window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |
-        | screenshot_control | Capture screens, monitors, windows, or regions |
+| | Screenshot-Based | Windows MCP Server |
+|---|---|---|
+| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
+| **DPI/theme changes** | Breaks | **Works** |
+| **Speed** | ~2-5 seconds | **~50 milliseconds** |
+| **Tokens per action** | ~1500 (image) | **~50 (text)** |
 
-        ### Usage
+### Downloads (no .NET runtime required)
+EOF
+        cat >> release_notes.md << EOF
 
-        1. Download the zip for your architecture
-        2. Extract the zip (contains Sbroenne.WindowsMcp.exe)
-        3. Run Sbroenne.WindowsMcp.exe or add to your MCP client config
+| File | Architecture |
+|------|--------------|
+| windows-mcp-server-${version}-win-x64.zip | x64 (most PCs) |
+| windows-mcp-server-${version}-win-arm64.zip | ARM64 (Surface Pro X, ARM dev kits) |
 
-        ### MCP Client Configuration
+Each zip contains a single, self-contained \`Sbroenne.WindowsMcp.exe\`.
 
-        \`\`\`json
-        {
-          "mcpServers": {
-            "windows-mcp": {
-              "command": "path/to/Sbroenne.WindowsMcp.exe"
-            }
-          }
-        }
-        \`\`\`
+### Tools
 
-        See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-        EOF
+| Tool | Description |
+|------|-------------|
+| \`ui_automation\` | **Primary tool** — find elements by name, click, type, toggle, ensure_state |
+| \`screenshot_control\` | Annotated screenshots with element overlays for discovery |
+| \`mouse_control\` | Fallback mouse input for games/custom UIs |
+| \`keyboard_control\` | Type text, press keys, hotkey sequences |
+| \`window_management\` | Find, activate, move, resize windows |
+
+### Usage
+
+1. Download the zip for your architecture
+2. Extract (contains \`Sbroenne.WindowsMcp.exe\`)
+3. Add to your MCP client config:
+
+\`\`\`json
+{
+  "servers": {
+    "windows": {
+      "command": "path/to/Sbroenne.WindowsMcp.exe"
+    }
+  }
+}
+\`\`\`
+
+See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
+EOF
 
     - name: Create GitHub Release
       run: |
