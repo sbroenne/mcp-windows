@@ -50,7 +50,7 @@ Most automation tools take a screenshot, send it to a vision model, and guess wh
 
 Windows MCP Server queries the UI directly using the **Windows UI Automation API** — the same technology screen readers use. It finds buttons by name, not pixels.
 
-<div class="comparison-table">
+<div class="comparison-table" markdown="1">
 
 | | Screenshot-Based | Windows MCP Server |
 |---|---|---|
@@ -169,7 +169,7 @@ Pre-built binaries on [GitHub Releases](https://github.com/sbroenne/mcp-windows/
 
 📖 **[Feature Reference](/features/)** — All tools and actions
 
- **[Changelog](/changelog/)** — Release history
+📋 **[Changelog](/changelog/)** — Release history
 
 🤝 **[Contributing](/contributing/)** — How to help
 
