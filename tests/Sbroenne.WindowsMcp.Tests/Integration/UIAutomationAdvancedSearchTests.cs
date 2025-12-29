@@ -314,7 +314,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
     #region GetFocusedElement Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task GetFocusedElement_ReturnsCurrentlyFocusedElement()
     {
         // Focus on the text box first
@@ -328,6 +328,11 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Focus the element
         var focusResult = await _automationService.FocusElementAsync(textboxResult.Elements![0].ElementId);
+
+        // Skip if elevation prevents focus (common in CI environments)
+        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
+            "Focus requires same elevation level - skipping in CI environment");
+
         Assert.True(focusResult.Success, "Failed to focus element");
 
         // Longer delay for focus to take effect (can be slow in CI)

@@ -434,7 +434,7 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
     #region Focus Tests
 
-    [Fact]
+    [SkippableFact]
     public async Task Focus_TextBox_SetsFocus()
     {
         // Find the text box first
@@ -457,6 +457,10 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Act - try to focus using the element ID
         var focusResult = await _automationService.FocusElementAsync(textBoxId);
+
+        // Skip if elevation prevents focus (common in CI environments)
+        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
+            "Focus requires same elevation level - skipping in CI environment");
 
         // Assert
         Assert.True(focusResult.Success, $"Focus failed: {focusResult.ErrorMessage}. ElementId was: {textBoxId}");
