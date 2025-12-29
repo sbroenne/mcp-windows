@@ -116,65 +116,39 @@ jobs:
         tagName="${{ github.ref_name }}"
         version="${{ env.VERSION }}"
 
-        cat > release_notes.md << 'EOF'
-## Windows MCP Server
-
-**Let AI agents control Windows applications.** Click buttons, type text, toggle settings — all by name, not coordinates.
-
-Uses the **Windows UI Automation API** to find UI elements reliably, regardless of DPI, theme, resolution, or window position.
-
-### Why UI Automation First?
-
-Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
-
-Windows MCP Server queries the UI directly — it finds buttons by name, not pixels.
-
-| | Screenshot-Based | Windows MCP Server |
-|---|---|---|
-| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
-| **DPI/theme changes** | Breaks | **Works** |
-| **Speed** | ~2-5 seconds | **~50 milliseconds** |
-| **Tokens per action** | ~1500 (image) | **~50 (text)** |
-
-### Downloads (no .NET runtime required)
-EOF
-        cat >> release_notes.md << EOF
-
-| File | Architecture |
-|------|--------------|
-| windows-mcp-server-${version}-win-x64.zip | x64 (most PCs) |
-| windows-mcp-server-${version}-win-arm64.zip | ARM64 (Surface Pro X, ARM dev kits) |
-
-Each zip contains a single, self-contained \`Sbroenne.WindowsMcp.exe\`.
-
-### Tools
-
-| Tool | Description |
-|------|-------------|
-| \`ui_automation\` | **Primary tool** — find elements by name, click, type, toggle, ensure_state |
-| \`screenshot_control\` | Annotated screenshots with element overlays for discovery |
-| \`mouse_control\` | Fallback mouse input for games/custom UIs |
-| \`keyboard_control\` | Type text, press keys, hotkey sequences |
-| \`window_management\` | Find, activate, move, resize windows |
-
-### Usage
-
-1. Download the zip for your architecture
-2. Extract (contains \`Sbroenne.WindowsMcp.exe\`)
-3. Add to your MCP client config:
-
-\`\`\`json
-{
-  "servers": {
-    "windows": {
-      "command": "path/to/Sbroenne.WindowsMcp.exe"
-    }
-  }
-}
-\`\`\`
-
-See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-EOF
+        # Write release notes to file (avoiding YAML-conflicting characters)
+        echo "## Windows MCP Server" > release_notes.md
+        echo "" >> release_notes.md
+        echo "Let AI agents control Windows applications. Click buttons, type text, toggle settings - all by name, not coordinates." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Uses the Windows UI Automation API to find UI elements reliably, regardless of DPI, theme, resolution, or window position." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Downloads (no .NET runtime required)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "| File | Architecture |" >> release_notes.md
+        echo "|------|--------------|" >> release_notes.md
+        echo "| windows-mcp-server-${version}-win-x64.zip | x64 (most PCs) |" >> release_notes.md
+        echo "| windows-mcp-server-${version}-win-arm64.zip | ARM64 (Surface Pro X, ARM dev kits) |" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Tools" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "| Tool | Description |" >> release_notes.md
+        echo "|------|-------------|" >> release_notes.md
+        echo "| ui_automation | Primary tool - find elements by name, click, type, toggle, ensure_state |" >> release_notes.md
+        echo "| screenshot_control | Annotated screenshots with element overlays for discovery |" >> release_notes.md
+        echo "| mouse_control | Fallback mouse input for games/custom UIs |" >> release_notes.md
+        echo "| keyboard_control | Type text, press keys, hotkey sequences |" >> release_notes.md
+        echo "| window_management | Find, activate, move, resize windows |" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Usage" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "1. Download the zip for your architecture" >> release_notes.md
+        echo "2. Extract (contains Sbroenne.WindowsMcp.exe)" >> release_notes.md
+        echo "3. Add to your MCP client config" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation." >> release_notes.md
 
     - name: Create GitHub Release
       run: |
