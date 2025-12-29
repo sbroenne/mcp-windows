@@ -6,13 +6,12 @@ using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
-
+using LocalBoundingRect = Sbroenne.WindowsMcp.Models.BoundingRect;
+using LocalOcrLine = Sbroenne.WindowsMcp.Models.OcrLine;
 // Alias our models to avoid conflicts with Windows.Media.Ocr types
 using LocalOcrResult = Sbroenne.WindowsMcp.Models.OcrResult;
-using LocalOcrLine = Sbroenne.WindowsMcp.Models.OcrLine;
-using LocalOcrWord = Sbroenne.WindowsMcp.Models.OcrWord;
 using LocalOcrStatus = Sbroenne.WindowsMcp.Models.OcrStatus;
-using LocalBoundingRect = Sbroenne.WindowsMcp.Models.BoundingRect;
+using LocalOcrWord = Sbroenne.WindowsMcp.Models.OcrWord;
 
 namespace Sbroenne.WindowsMcp.Capture;
 

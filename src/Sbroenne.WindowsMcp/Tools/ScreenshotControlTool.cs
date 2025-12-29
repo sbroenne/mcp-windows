@@ -3,9 +3,11 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -15,7 +17,9 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class ScreenshotControlTool
 {
-    private readonly Capture.IScreenshotService _screenshotService;
+    private readonly IScreenshotService _screenshotService;
+    private readonly IAnnotatedScreenshotService _annotatedScreenshotService;
+    private readonly IWindowService _windowService;
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -27,9 +31,16 @@ public sealed partial class ScreenshotControlTool
     /// Initializes a new instance of the <see cref="ScreenshotControlTool"/> class.
     /// </summary>
     /// <param name="screenshotService">The screenshot capture service.</param>
-    public ScreenshotControlTool(Capture.IScreenshotService screenshotService)
+    /// <param name="annotatedScreenshotService">The annotated screenshot service for element discovery.</param>
+    /// <param name="windowService">The window service for finding windows by title.</param>
+    public ScreenshotControlTool(
+        IScreenshotService screenshotService,
+        IAnnotatedScreenshotService annotatedScreenshotService,
+        IWindowService windowService)
     {
         _screenshotService = screenshotService;
+        _annotatedScreenshotService = annotatedScreenshotService;
+        _windowService = windowService;
     }
 
     /// <summary>
@@ -42,6 +53,12 @@ public sealed partial class ScreenshotControlTool
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
     /// Default: JPEG format at quality 85, at logical resolution (matching mouse coordinate space).
     ///
+    /// **ANNOTATION MODE** (annotate=true):
+    /// - Returns screenshot with numbered labels on interactive UI elements
+    /// - Includes element list with index, name, controlType, and elementId
+    /// - Use this to discover what elements are available before clicking/typing
+    /// - Elements can be used directly with ui_automation actions
+    ///
     /// Monitor targeting:
     /// - 'primary_screen': Captures the main display (with taskbar). Most common choice.
     /// - 'secondary_screen': Captures the other monitor. Only works with exactly 2 monitors.
@@ -53,6 +70,8 @@ public sealed partial class ScreenshotControlTool
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'.</param>
+    /// <param name="app">Application window to capture by title (partial match). Automatically finds the window and sets target='window'.</param>
+    /// <param name="annotate">Overlay numbered labels on interactive elements and return element list. Use this when you need to discover UI elements before interacting.</param>
     /// <param name="target">Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index for 3+ monitors), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.</param>
     /// <param name="monitorIndex">Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.</param>
     /// <param name="windowHandle">Window handle (HWND) as a decimal string for 'window' target. Get from window_management tool output and pass it through verbatim.</param>
@@ -68,11 +87,13 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Capture screenshots: primary_screen, secondary_screen, monitor (by index), window (by handle), region, all_monitors. Coordinate system: screenshot pixels == mouse coordinates (no conversion needed). Prefer ui_automation for reading UI text; use screenshot_control for visual verification. JPEG default (LLM-optimized); use PNG for lossless. See system://best-practices for workflows.")]
-    [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, monitor list, and error details if failed.")]
+    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements + element list. Use annotate=false for plain screenshot. Simple: screenshot_control(app='Notepad') for element discovery. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors.")]
+    [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
+        [Description("Application window to capture by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds the window and captures it. Use this instead of windowHandle for simpler workflows.")] string? app = null,
+        [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
         [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
         [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
         [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,
@@ -100,6 +121,30 @@ public sealed partial class ScreenshotControlTool
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
                 $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'");
+        }
+
+        // Resolve 'app' parameter to windowHandle if specified
+        if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
+        {
+            var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
+            if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
+            {
+                // Try listing all windows to provide helpful suggestions
+                var listResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
+                var suggestion = availableWindows.Length > 0
+                    ? $"Available windows: {string.Join(", ", availableWindows)}"
+                    : "No windows found. Ensure the application is running.";
+
+                return ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.WindowNotFound,
+                    $"No window found matching app='{app}'. {suggestion}");
+            }
+
+            // Use the first matching window and set target to window
+            var resolvedWindow = findResult.Windows![0];
+            windowHandle = resolvedWindow.Handle;
+            target = "window";
         }
 
         // Parse target
@@ -162,6 +207,12 @@ public sealed partial class ScreenshotControlTool
             }
 
             region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
+        }
+
+        // Handle annotated screenshot mode
+        if (annotate && screenshotAction == ScreenshotAction.Capture)
+        {
+            return await CaptureAnnotatedAsync(windowHandle, parsedImageFormat, parsedQuality, parsedOutputMode, outputPath, cancellationToken);
         }
 
         // Build request with all parameters
@@ -258,5 +309,79 @@ public sealed partial class ScreenshotControlTool
             "file" => OutputMode.File,
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Captures an annotated screenshot with numbered element labels.
+    /// </summary>
+    private async Task<ScreenshotControlResult> CaptureAnnotatedAsync(
+        string? windowHandle,
+        Models.ImageFormat? imageFormat,
+        int quality,
+        OutputMode? outputMode,
+        string? outputPath,
+        CancellationToken cancellationToken)
+    {
+        var format = imageFormat ?? ScreenshotConfiguration.DefaultImageFormat;
+        var result = await _annotatedScreenshotService.CaptureAsync(
+            windowHandle,
+            controlTypeFilter: null,
+            maxElements: 50,
+            searchDepth: 15,
+            format,
+            quality,
+            interactiveOnly: true,
+            cancellationToken);
+
+        if (!result.Success)
+        {
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.CaptureError,
+                result.ErrorMessage ?? "Failed to capture annotated screenshot");
+        }
+
+        // Save to file if outputPath or outputMode is file
+        string? savedFilePath = null;
+        var shouldSaveToFile = outputMode == OutputMode.File || !string.IsNullOrEmpty(outputPath);
+
+        if (shouldSaveToFile && !string.IsNullOrEmpty(result.ImageData))
+        {
+            try
+            {
+                var imageBytes = Convert.FromBase64String(result.ImageData);
+                var filePath = outputPath ?? Path.Combine(Path.GetTempPath(), $"annotated_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
+
+                // If outputPath is a directory, generate filename
+                if (Directory.Exists(outputPath))
+                {
+                    filePath = Path.Combine(outputPath, $"annotated_{DateTime.Now:yyyyMMdd_HHmmss}.jpg");
+                }
+
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
+                savedFilePath = filePath;
+            }
+            catch (Exception ex)
+            {
+                return ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.CaptureError,
+                    $"Failed to save annotated image to '{outputPath}': {ex.Message}");
+            }
+        }
+
+        // Return inline or file result
+        var returnInline = outputMode != OutputMode.File && savedFilePath == null;
+        return ScreenshotControlResult.AnnotatedSuccess(
+            returnInline ? result.ImageData : null,
+            result.Width ?? 0,
+            result.Height ?? 0,
+            result.ImageFormat ?? "jpeg",
+            result.Elements ?? [],
+            savedFilePath);
     }
 }

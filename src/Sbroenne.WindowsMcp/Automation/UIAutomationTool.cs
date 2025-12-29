@@ -67,6 +67,7 @@ public sealed partial class UIAutomationTool
     /// </summary>
     /// <param name="action">The action to perform.</param>
     /// <param name="windowHandle">Window handle to target. For interactive actions, the window is automatically activated before the action. Get from window_management tool.</param>
+    /// <param name="app">Application window to target by title (partial match). The server automatically finds and activates the window.</param>
     /// <param name="name">Element name to search for.</param>
     /// <param name="nameContains">Substring to search for in element names (partial match).</param>
     /// <param name="namePattern">Regex pattern to match element names.</param>
@@ -86,21 +87,21 @@ public sealed partial class UIAutomationTool
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.</param>
     /// <param name="desiredState">Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.</param>
     /// <param name="sortByProminence">Sort results by element prominence (bounding box area, largest first). Useful for disambiguation.</param>
-    /// <param name="interactiveOnly">For capture_annotated: filter to only interactive control types (default: true).</param>
-    /// <param name="outputPath">For capture_annotated: save image to file instead of returning base64.</param>
-    /// <param name="returnImageData">For capture_annotated: include base64 image in response (default: true). Set false with outputPath to reduce response size.</param>
     /// <param name="inRegion">Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates.</param>
     /// <param name="nearElement">Find elements near a reference element. Pass the elementId of the reference. Results sorted by distance.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element, capture_annotated. Fast tree traversal (~60-130ms). Framework auto-detection (WinForms/WPF/Electron). Use capture_annotated for discovery, then click/type by elementId. Prefer over mouse_control for UI interaction. See system://best-practices for workflows.")]
+    [Description("UI element interaction via Windows UIA. Use click/type/ensure_state directly with app+nameContains - no find step needed. Example: click(app='Notepad', nameContains='Save'). Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element. For element discovery, use screenshot_control(annotate=true) instead. Prefer over mouse_control. See system://best-practices.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, capture_annotated")]
+        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
         UIAutomationAction action,
 
         [Description("Window handle to target as a decimal string (copy verbatim from window_management output). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
         string? windowHandle = null,
+
+        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds and activates the window. Use this instead of windowHandle for simpler workflows.")]
+        string? app = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
         string? name = null,
@@ -159,15 +160,6 @@ public sealed partial class UIAutomationTool
         [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
         bool sortByProminence = false,
 
-        [Description("For capture_annotated: filter to only interactive control types (Button, Edit, CheckBox, etc.). Default: true.")]
-        bool interactiveOnly = true,
-
-        [Description("For capture_annotated: save image to this file path instead of returning base64. Supports .png and .jpg extensions.")]
-        string? outputPath = null,
-
-        [Description("For capture_annotated: whether to include base64 image data in response. Set to false when using outputPath to reduce response size. Default: true.")]
-        bool returnImageData = true,
-
         [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
         string? inRegion = null,
 
@@ -181,6 +173,68 @@ public sealed partial class UIAutomationTool
         // Clamp maxDepth to reasonable limits
         maxDepth = Math.Clamp(maxDepth, 0, 20);
         timeoutMs = Math.Clamp(timeoutMs, 0, 60000);
+
+        // Resolve 'app' parameter to windowHandle if specified
+        Models.WindowInfo? resolvedWindow = null;
+        if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
+        {
+            var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
+            if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
+            {
+                // Try listing all windows to provide helpful suggestions
+                var listResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
+                var suggestion = availableWindows.Length > 0
+                    ? $"Available windows: {string.Join(", ", availableWindows)}"
+                    : "No windows found. Ensure the application is running.";
+
+                return UIAutomationResult.CreateFailure(
+                    GetActionName(action),
+                    UIAutomationErrorType.WindowNotFound,
+                    $"No window found matching app='{app}'.",
+                    null,
+                    suggestion);
+            }
+
+            // If multiple windows match, use the first one (most recently active)
+            resolvedWindow = findResult.Windows![0];
+            windowHandle = resolvedWindow.Handle;
+
+            // Activate the window
+            var activateResult = await _windowService.ActivateWindowAsync(nint.Parse(windowHandle), cancellationToken);
+            if (!activateResult.Success)
+            {
+                LogWindowActivationFailed(_logger, resolvedWindow.Title, activateResult.Error);
+            }
+        }
+
+        // AUTO-RECOVERY: If user is searching for controlType='Window' without a window context,
+        // they're trying to find an application window - auto-convert to app parameter
+        if (action == UIAutomationAction.Find &&
+            string.Equals(controlType, "Window", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrWhiteSpace(windowHandle) &&
+            string.IsNullOrWhiteSpace(app))
+        {
+            // Extract the window search term from name/nameContains
+            var windowSearchTerm = name ?? nameContains ?? namePattern;
+            if (!string.IsNullOrWhiteSpace(windowSearchTerm))
+            {
+                // Recursively call with app parameter instead
+                return await ExecuteAsync(
+                    action,
+                    windowHandle: null,
+                    app: windowSearchTerm,
+                    name: null, // Clear name since we're using it for app
+                    nameContains: null,
+                    namePattern: null,
+                    controlType: null, // Clear controlType since we handled it
+                    automationId, className, elementId, parentElementId,
+                    maxDepth, exactDepth, foundIndex, includeChildren, timeoutMs,
+                    text, clearFirst, value, language, desiredState, sortByProminence,
+                    inRegion, nearElement,
+                    cancellationToken);
+            }
+        }
 
         // Validate/parse window handle once (decimal string only)
         nint? parsedWindowHandle = null;
@@ -219,16 +273,16 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
-                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, desiredState, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, timeoutMs, cancellationToken),
                 UIAutomationAction.Click => await HandleClickAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
                 UIAutomationAction.Type => await HandleTypeAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, text, clearFirst, cancellationToken),
                 UIAutomationAction.Select => await HandleSelectAsync(elementId, windowHandle, name, controlType, automationId, value, cancellationToken),
-                UIAutomationAction.Toggle => await HandleToggleAsync(elementId, cancellationToken),
-                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, desiredState, cancellationToken),
+                UIAutomationAction.Toggle => await HandleToggleAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
+                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, cancellationToken),
                 UIAutomationAction.Invoke => await HandleInvokeAsync(elementId, value, cancellationToken),
                 UIAutomationAction.Focus => await HandleFocusAsync(elementId, cancellationToken),
                 UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
-                UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, includeChildren, cancellationToken),
+                UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, includeChildren, cancellationToken),
                 UIAutomationAction.Highlight => await HandleHighlightAsync(elementId, cancellationToken),
                 UIAutomationAction.HideHighlight => await _automationService.HideHighlightAsync(cancellationToken),
                 UIAutomationAction.Ocr => await HandleOcrAsync(windowHandle, language, cancellationToken),
@@ -237,14 +291,21 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
-                UIAutomationAction.CaptureAnnotated => await HandleCaptureAnnotatedAsync(windowHandle, controlType, maxDepth, interactiveOnly, outputPath, returnImageData, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
-            // Attach target window info for actions that interact with the UI
-            if (result.Success && IsInteractiveAction(action))
+            // Attach target window info - use resolved window if available, otherwise get foreground
+            if (result.Success)
             {
-                result = await AttachTargetWindowInfoAsync(result, cancellationToken);
+                if (resolvedWindow != null)
+                {
+                    // We resolved via 'app' parameter - attach that window info
+                    result = result with { TargetWindow = TargetWindowInfo.FromWindowInfo(resolvedWindow) };
+                }
+                else if (IsInteractiveAction(action))
+                {
+                    result = await AttachTargetWindowInfoAsync(result, cancellationToken);
+                }
             }
 
             return result;
@@ -298,7 +359,6 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
-            UIAutomationAction.CaptureAnnotated => "capture_annotated",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -461,15 +521,33 @@ public sealed partial class UIAutomationTool
     /// Waits for an element to reach a desired state (e.g., enabled, not offscreen, specific toggle state).
     /// </summary>
     private async Task<UIAutomationResult> HandleWaitForStateAsync(
-        string? elementId, string? desiredState, int timeoutMs, CancellationToken cancellationToken)
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, string? desiredState,
+        int timeoutMs, CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure(
-                "wait_for_state",
-                UIAutomationErrorType.InvalidParameter,
-                "elementId is required for WaitForState action",
-                null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("wait_for_state", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -556,21 +634,67 @@ public sealed partial class UIAutomationTool
         return await _automationService.FindAndSelectAsync(query, value, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleToggleAsync(string? elementId, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleToggleAsync(
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.InvalidParameter, "Element ID is required for toggle action", null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleEnsureStateAsync(string? elementId, string? desiredState, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleEnsureStateAsync(
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, string? desiredState,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
         if (string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.InvalidParameter, "Element ID is required for ensure_state action", null);
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -686,8 +810,35 @@ public sealed partial class UIAutomationTool
     }
 
     private async Task<UIAutomationResult> HandleGetTextAsync(
-        string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken)
+        string? elementId, string? windowHandle, string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex, bool includeChildren,
+        CancellationToken cancellationToken)
     {
+        // If no elementId, try to find the element first
+        if (string.IsNullOrEmpty(elementId))
+        {
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
+            }
+
+            elementId = findResult.Elements[0].ElementId;
+        }
+
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
     }
 
@@ -877,87 +1028,6 @@ public sealed partial class UIAutomationTool
         return await _automationService.GetAncestorsAsync(elementId, depthLimit, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleCaptureAnnotatedAsync(
-        string? windowHandle, string? controlTypeFilter, int maxDepth, bool interactiveOnly, string? outputPath, bool returnImageData, CancellationToken cancellationToken)
-    {
-        // Use maxDepth for capture_annotated, with sensible defaults:
-        // - If maxDepth is default (5), use 15 for Electron compatibility
-        // - Otherwise use the caller's value, clamped to valid range
-        var searchDepth = maxDepth == 5 ? 15 : Math.Clamp(maxDepth, 1, 20);
-
-        if (!string.IsNullOrWhiteSpace(windowHandle))
-        {
-            if (!WindowHandleParser.TryParse(windowHandle, out var parsed) || parsed == nint.Zero)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "capture_annotated",
-                    UIAutomationErrorType.InvalidParameter,
-                    $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
-                    null);
-            }
-        }
-
-        var result = await _annotatedScreenshotService.CaptureAsync(
-            windowHandle,
-            controlTypeFilter,
-            maxElements: 50,
-            searchDepth: searchDepth,
-            Models.ImageFormat.Jpeg,
-            quality: 85,
-            interactiveOnly: interactiveOnly,
-            cancellationToken);
-
-        if (!result.Success)
-        {
-            return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
-                result.ErrorMessage ?? "Failed to capture annotated screenshot", null);
-        }
-
-        // Save to file if outputPath is specified
-        string? savedFilePath = null;
-        if (!string.IsNullOrEmpty(outputPath))
-        {
-            try
-            {
-                var imageBytes = Convert.FromBase64String(result.ImageData!);
-                var directory = Path.GetDirectoryName(outputPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                await File.WriteAllBytesAsync(outputPath, imageBytes, cancellationToken);
-                savedFilePath = outputPath;
-            }
-            catch (Exception ex)
-            {
-                return UIAutomationResult.CreateFailure("capture_annotated", UIAutomationErrorType.InternalError,
-                    $"Failed to save image to '{outputPath}': {ex.Message}", null);
-            }
-        }
-
-        // Build usage hint based on options
-        var usageHint = $"Screenshot with {result.ElementCount} numbered elements. Reference elements by their index number (1-{result.ElementCount}). " +
-                        "Each element has an elementId you can use for subsequent operations like click, type, toggle.";
-        if (savedFilePath != null)
-        {
-            usageHint = $"Image saved to '{savedFilePath}'. " + usageHint;
-        }
-
-        // Return success with annotated screenshot data
-        return new UIAutomationResult
-        {
-            Success = true,
-            Action = "capture_annotated",
-            AnnotatedImageData = returnImageData ? result.ImageData : null,
-            AnnotatedImageFormat = result.ImageFormat,
-            AnnotatedImageWidth = result.Width,
-            AnnotatedImageHeight = result.Height,
-            AnnotatedElements = result.Elements,
-            ElementCount = result.ElementCount,
-            UsageHint = usageHint
-        };
-    }
-
     #endregion
 
     #region LoggerMessage Methods
@@ -970,6 +1040,9 @@ public sealed partial class UIAutomationTool
 
     [LoggerMessage(Level = LogLevel.Debug, Message = "Auto-activating target window with handle: {WindowHandle}")]
     private static partial void LogWindowActivation(ILogger logger, nint windowHandle);
+
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to activate window '{WindowTitle}': {Error}")]
+    private static partial void LogWindowActivationFailed(ILogger logger, string windowTitle, string? error);
 
     #endregion
 }
@@ -1066,9 +1139,5 @@ public enum UIAutomationAction
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
     [Description("Get all ancestor elements of an element up to the window root")]
-    GetAncestors,
-
-    /// <summary>Capture annotated screenshot with numbered labels on interactive elements.</summary>
-    [Description("Capture annotated screenshot with numbered labels on interactive elements. Returns image + element mapping.")]
-    CaptureAnnotated
+    GetAncestors
 }

@@ -7,85 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`app` parameter** - All tools now accept an `app` parameter for simplified window targeting
+  - Click buttons, type text, and take screenshots without separate window activation
+  - Example: `ui_automation(action='click', app='Notepad', name='Save')`
+- **Direct search in actions** - `click`, `type`, `toggle`, `ensure_state`, `get_text`, `wait_for_state` now search directly
+  - No need to call `find` first — just specify what you want to interact with
+- **Annotated screenshots by default** - `screenshot_control` now includes element overlays automatically
+  - Element names, types, and coordinates embedded in the image
+
+### Changed
+- **Consolidated tools** - Removed redundant actions (`combo`, `click_element`, `capture_annotated`)
+  - Use `keyboard_control(action='press', key='c', modifiers='ctrl')` instead of `combo`
+  - Use `ui_automation(action='click')` instead of `click_element`
+  - Use `screenshot_control` (annotate=true is now default) instead of `capture_annotated`
+- **Simplified workflow** - Most tasks now require fewer tool calls
+  - Old: `window_management(action='activate')` → `ui_automation(action='find')` → `ui_automation(action='click')`
+  - New: `ui_automation(action='click', app='Notepad', name='Save')`
+
+## [1.1.4] - 2025-12-28
+
+### Changed
+- Ship self-contained exe releases (x64/arm64) — no .NET runtime required
+
+## [1.1.3] - 2025-12-27
+
+### Changed
+- Optimized MCP tool descriptions for LLM token efficiency
+
+## [1.1.2] - 2025-12-27
+
+### Added
+- Phase 3-4 LLM usability improvements
+- Enhanced error messages and guidance
+
+## [1.1.1] - 2025-12-26
+
+### Added
+- Phase 0-2 integration tests for LLM-driven improvements
+- Improved test coverage for UI automation scenarios
+
+## [1.1.0] - 2025-12-25
+
 ### Changed
 - **UIA3 Migration** - Migrated UI Automation from UIA2 (managed wrapper) to UIA3 (COM API)
   - ~40% performance improvement for element discovery and tree traversal
   - Better compatibility with modern Windows applications
   - Improved stability and reduced memory usage
-  - Direct COM interop eliminates managed wrapper overhead
 
 ### Added
+- CI workflow for automated testing on pull requests
 - Comprehensive UI Automation test infrastructure
-  - WinForms test harness with TabControl, ListView, TreeView, DataGridView, and common form controls
+  - WinForms test harness with TabControl, ListView, TreeView, DataGridView
   - Electron test harness for Chromium-based application testing
-  - 45+ integration tests covering find, click, type, toggle, tree navigation, and advanced search
-
-## [1.0.9] - 2025-12-25
-
-### Changed
-- Add CI workflow for automated testing on pull requests
-- Fix release workflow for improved reliability
-
-## [1.0.8] - 2025-12-24
-
-### Added
-- **UI Automation tool with OCR support** - 15 actions for pattern-based interaction: find elements, click buttons, toggle checkboxes, type text, read values, and more
-- OCR fallback for text extraction when accessibility APIs don't expose text
-- `activateFirst` parameter for multi-window workflow support
-- `target` parameter for screenshot tool to specify capture target
-
-### Changed
-- Simplified monitor dimensions handling
-
-## [1.0.7] - 2025-12-12
-
-### Changed
-- **Breaking change**: Mouse coordinate-based operations now require `monitorIndex` parameter for explicit monitor targeting
-- Improves reliability in multi-monitor setups
-
-## [1.0.6] - 2025-12-12
-
-### Fixed
-- Minor release workflow improvements
-
-## [1.0.5] - 2025-12-11
-
-### Fixed
-- Disable screenshot scaling by default for accurate mouse positioning
-- Screenshots now return actual pixel dimensions matching coordinate systems
-
-## [1.0.4] - 2025-12-10
-
-### Added
-- Test harness infrastructure to prevent primary monitor interference during testing
-
-## [1.0.3] - 2025-12-10
-
-### Added
-- LLM-optimized screenshot defaults: JPEG format, auto-scaling, file output
-- GitHub Pages documentation site
-- Description attributes for all tool parameters
-
-### Changed
-- Migrated to official MCP SDK with code quality enhancements
-
-## [1.0.1] - 2025-12-09
-
-### Added
-- Monitor-aware operations for easier multi-monitor handling
-
-### Fixed
-- Release workflow environment variable handling
-
-## [1.0.0] - 2025-12-09
-
-### Added
-- Initial release
-- Mouse control: click, double-click, right-click, middle-click, move, drag, scroll
-- Keyboard control: type text, press keys, key combinations, sequences
-- Window management: list, find, activate, minimize, maximize, restore, move, resize
-- Screenshot capture: primary screen, specific monitor, window, region, with optional cursor
-- Multi-monitor and DPI awareness
-- Modifier key support (Ctrl, Shift, Alt, Win)
-- Zero-configuration VS Code extension with automatic MCP server registration
-- Automatic .NET 8 runtime acquisition via ms-dotnettools.vscode-dotnet-runtime
+  - 45+ integration tests covering find, click, type, toggle, tree navigation

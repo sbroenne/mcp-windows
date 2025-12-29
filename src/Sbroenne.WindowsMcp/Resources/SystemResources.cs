@@ -132,89 +132,101 @@ public sealed class SystemResources
     /// </summary>
     /// <returns>Markdown document with best practices.</returns>
     [McpServerResource(UriTemplate = "system://best-practices", Name = "best-practices", Title = "Windows Automation Best Practices", MimeType = "text/markdown")]
-    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications to avoid common pitfalls like sending input to wrong windows.")]
+    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications.")]
     public static string GetBestPractices()
     {
         return """
             # Windows Automation Best Practices
 
-            ## Critical: Always Verify Target Window
+            ## The Simple Workflow: Just Use `app` Parameter
 
-            Every keyboard, mouse, and UI automation response includes a `target_window` object showing which window received the input:
-            ```json
-            {
-              "success": true,
-              "target_window": {
-                "handle": "123456",
-                "title": "My Application",
-                "process_name": "myapp",
-                "process_id": 1234
-              }
-            }
+            All tools accept an `app` parameter that automatically finds and activates windows by title (partial match):
+
+            ```
+            ui_automation(action="click", app="Visual Studio Code", nameContains="Save")
+            keyboard_control(action="press", app="Notepad", key="s", modifiers="ctrl")
+            mouse_control(action="click", app="Settings", x=100, y=200)
+            screenshot_control(app="Chrome")
             ```
 
-            **ALWAYS check `target_window.title` or `target_window.process_name` matches your intended target.**
+            **That's it.** No need to manually find handles or activate windows.
 
-            ## Recommended Workflow for UI Automation
+            ## Recommended Workflow
 
-            ### 1. Find the Target Window
+            ### 1. Just Click It (Direct Interaction)
             ```
-            window_management(action="find", title="My Application")
-            → Save the handle from the response
+            ui_automation(action="click", app="Notepad", nameContains="Save")
+            ui_automation(action="type", app="Notepad", controlType="Edit", text="Hello")
             ```
+            **No find step needed!** Click and type actions search for the element directly.
 
-            ### 2. Activate the Window
+            ### 2. If You Don't Know the Element Name → Discover First
             ```
-            window_management(action="activate", handle="<saved_handle>")
-            ```
-
-            ### 3. Verify Activation
-            ```
-            window_management(action="get_foreground")
-            → Confirm the returned window matches your target
+            screenshot_control(app="My Application")
+            → See screenshot with numbered labels + element list (default behavior)
             ```
 
-            ### 4. Perform Input Operations
-            Use keyboard_control, mouse_control, or ui_automation.
-            Check `target_window` in each response to verify input went to the correct window.
-
-            ### 5. Verify Results with Screenshot
+            ### 3. For Toggles → Use ensure_state
             ```
-            screenshot_control(target="primary_screen")
-            → Visually confirm the expected UI state
+            ui_automation(action="ensure_state", app="Settings", nameContains="Dark Mode", desiredState="on")
+            ```
+            Atomic operation - checks state and toggles only if needed.
+
+            ### 4. Verify Results
+            ```
+            ui_automation(action="wait_for_disappear", app="My Application", nameContains="Save") // wait for dialog to close
+            screenshot_control(app="My Application") // visual check
             ```
 
-            ## Common Pitfalls
+            ## When to Use Each Tool
 
-            1. **Window focus changed**: Another application stole focus between operations
-               - Solution: Re-activate the target window before each critical operation
+            | Goal | Primary Tool | Fallback |
+            |------|-------------|----------|
+            | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(app=...) |
+            | Type in text field | ui_automation(type) | keyboard_control(app=...) |
+            | Press hotkey (Ctrl+S) | keyboard_control(app=..., action='press', key='s', modifiers='ctrl') | - |
+            | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
+            | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
+            | Take screenshot | screenshot_control(app=..., annotate=false) | - |
+            | Find visible elements | screenshot_control(app=...) | ui_automation(get_tree) |
 
-            2. **Dialog appeared**: A modal dialog blocked the expected UI
-               - Solution: Use ui_automation(action="find") to check for dialogs
+            ## Key Principles
 
-            3. **Wrong window received input**: Multiple windows with similar titles
-               - Solution: Use process_name or handle to identify windows uniquely
+            1. **Just click/type directly** - no find step needed: `click(app='...', nameContains='...')`
+            2. **Use screenshot_control(annotate=true) only when you don't know element names**
+            3. **Use app parameter everywhere** - simpler than managing handles
+            4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(app='...', nameContains='...', desiredState='on')`
+            5. **Use wait_for_disappear for dialogs** - block until dialog closes
 
-            4. **UI element not found**: Element hasn't loaded yet
-               - Solution: Use ui_automation(action="wait_for", timeoutMs=5000) before interacting
+            ## When to Use `find` (Optional)
 
-            5. **Coordinates outside bounds**: Click/move coordinates outside visible area
-               - Solution: Use screenshot_control(action="list_monitors") to understand display layout
+            All actions support direct search, so `find` is rarely needed. Use it when:
 
-            ## Tool Integration Quick Reference
+            - **Getting clickable_point** for mouse fallback: `find` returns coordinates
+            - **Multiple matches** - see all matching elements, pick the right one
+            - **Element inspection** - check patterns, children, properties
 
-            | Task | Tool | Action |
-            |------|------|--------|
-            | Find a window | window_management | find, list |
-            | Activate a window | window_management | activate |
-            | Check active window | window_management | get_foreground |
-            | Find UI element | ui_automation | find, wait_for |
-            | Type text | keyboard_control | type |
-            | Press key combo | keyboard_control | combo |
-            | Click coordinates | mouse_control | click |
-            | Click UI element | ui_automation | click, invoke |
-            | Verify UI state | screenshot_control | capture |
-            | Read text | ui_automation | get_text, ocr |
+            ## Fallback Strategy
+
+            If ui_automation click/type doesn't work (custom controls, games, etc.):
+
+            ```
+            ui_automation(action="find", app="App", nameContains="Button")
+            → Get clickable_point: { x: 450, y: 300 }
+            mouse_control(app="App", action="click", x=450, y=300)
+            keyboard_control(app="App", action="type", text="...")
+            ```
+
+            ## Advanced: Window Handles
+
+            For complex scenarios with multiple similar windows, use window_management:
+            ```
+            window_management(action="find", title="Untitled - Notepad")
+            → Get specific handle
+            ui_automation(action="find", windowHandle="<handle>", ...)
+            ```
+
+            But for most cases, just use `app` parameter.
             """;
     }
 
@@ -235,10 +247,10 @@ public sealed class SystemResources
 
             | Error Code | Recovery Action |
             |------------|-----------------|
-            | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or call `capture_annotated` first to discover available elements. |
+            | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or use `screenshot_control(annotate=true)` first to discover available elements. |
             | `element_stale` | Element was removed from UI. Re-run `find` to get fresh elementId. |
             | `pattern_not_supported` | Element doesn't support this action. Check `supportedPatterns` in element info. Use `invoke` for buttons, `toggle` for checkboxes. |
-            | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `capture_annotated`. |
+            | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `screenshot_control(annotate=true)`. |
             | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
 
             ## Mouse/Keyboard Errors
@@ -270,7 +282,7 @@ public sealed class SystemResources
 
             ### Element Not Found → Discovery Workflow
             ```
-            1. capture_annotated → see all interactive elements
+            1. screenshot_control(annotate=true) → see all interactive elements
             2. find with broader criteria (nameContains, controlType only)
             3. get_tree → see element hierarchy for parent scoping
             ```
@@ -345,7 +357,7 @@ public sealed class SystemResources
               ],
               "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
             }
-            // capture_annotated returns elements + image:
+            // screenshot_control(annotate=true) returns elements + image:
             {
               "success": true,
               "annotated_elements": [
@@ -416,7 +428,7 @@ public sealed class SystemResources
             {
               "success": false,
               "error_code": "element_not_found",
-              "error": "Element matching criteria not found. Try capture_annotated to discover elements.",
+              "error": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
               "target_window": { "handle": "12345678", "title": "...", "process_name": "..." }
             }
             ```

@@ -1,8 +1,8 @@
 ---
 layout: default
-title: "AI-Powered Windows Automation for Computer Use, QA & RPA"
-description: "Enable AI assistants like GitHub Copilot and Claude to control Windows with UI Automation, mouse, keyboard, window management, and screenshots."
-keywords: "Windows automation, MCP server, AI Windows, UI automation, mouse control, keyboard control, window management, screenshot capture, OCR, computer use, GitHub Copilot Windows, Claude Windows, RPA, QA automation"
+title: "Windows MCP Server — Windows Automation for AI Agents"
+description: "Let AI agents control Windows applications. Click buttons, type text, toggle settings — all by name, not coordinates. Works with GitHub Copilot, Claude, and any MCP client."
+keywords: "Windows MCP Server, Windows automation, MCP server, AI Windows automation, UI automation, computer use, GitHub Copilot Windows, Claude Windows, semantic automation, Windows accessibility API, agentic automation"
 canonical_url: "https://windowsmcpserver.dev/"
 ---
 
@@ -11,7 +11,7 @@ canonical_url: "https://windowsmcpserver.dev/"
     <div class="hero-content">
       <img src="{{ '/assets/images/icon.png' | relative_url }}" alt="Windows MCP Server Icon" class="hero-icon">
       <h1 class="hero-title">Windows MCP Server</h1>
-      <p class="hero-subtitle">High-performance MCP server for AI-powered Windows automation. UI Automation, mouse, keyboard, window management, and screenshots.</p>
+      <p class="hero-subtitle">Let AI agents control Windows applications.</p>
     </div>
   </div>
 </div>
@@ -27,110 +27,164 @@ canonical_url: "https://windowsmcpserver.dev/"
 </div>
 
 <div class="container content-section" markdown="1">
-## 🤔 What is This?
 
-**Windows MCP Server** bridges the gap between LLMs and Windows, enabling AI assistants to perform UI automation, application control, testing, and RPA tasks.
+## What Can It Do?
 
-> Built with .NET 10 and native Windows APIs for maximum performance and reliability.
+Ask your AI assistant to control any Windows application:
 
-<p><a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp" class="button-link">Install from VS Code Marketplace</a></p>
+- "Click the Save button in Notepad"
+- "Toggle Dark Mode on in Settings"
+- "Type my email in the login field"
+- "Move this window to my second monitor"
+- "Read the text from that dialog box"
 
-## ✨ Key Features
+Works with **GitHub Copilot**, **Claude Desktop**, and any MCP-compatible AI assistant.
+
+<p><a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp" class="button-link">Install from VS Code Marketplace →</a></p>
+
+---
+
+## Why It Works
+
+Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
+
+Windows MCP Server queries the UI directly using the **Windows UI Automation API** — the same technology screen readers use. It finds buttons by name, not pixels.
+
+<div class="comparison-table" markdown="1">
+
+| | Screenshot-Based | Windows MCP Server |
+|---|---|---|
+| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
+| **DPI/theme changes** | Breaks | **Works** |
+| **Window moved** | Breaks | **Works** |
+| **State awareness** | None | **Full** (checked, enabled, focused) |
+| **Speed** | ~2-5 seconds | **~50 milliseconds** |
+| **Tokens per action** | ~1500 (image) | **~50 (text)** |
+
+</div>
+
+---
+
+## When You Need Screenshots
+
+For games, canvas apps, and custom controls that don't expose accessibility data, Windows MCP includes full screenshot + mouse + keyboard support.
+
+But even then, screenshots aren't just pixels — they include structured element data (names, types, clickable coordinates) so the LLM can often skip vision parsing.
+
+Plus **local OCR** for text extraction — no image upload, ~100ms.
+
+---
+
+## Key Features
 
 <div class="features-grid">
 <div class="feature-card">
-<h3>🖥️ True Multi-Monitor Support</h3>
-<p>Full awareness of multiple displays with per-monitor DPI scaling. Easy targeting with <code>primary_screen</code> or <code>secondary_screen</code>. Most Windows MCP servers don't handle this correctly.</p>
+<h3>🧠 Semantic UI Access</h3>
+<p>Find elements by name, type, or ID — not coordinates. Works regardless of DPI, theme, resolution, or window position.</p>
 </div>
 
 <div class="feature-card">
-<h3>🔍 UI Automation with UIA3</h3>
-<p>Direct COM interop for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and <code>capture_annotated</code> for LLM-friendly numbered screenshots.</p>
+<h3>✅ It Just Works</h3>
+<p>Same automation works on any Windows machine. No retraining when UI looks different. No coordinate adjustments.</p>
 </div>
 
 <div class="feature-card">
-<h3>🖱️ Mouse & ⌨️ Keyboard</h3>
-<p>Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.</p>
+<h3>💻 Electron App Support</h3>
+<p>Built-in support for VS Code, Teams, Slack, and other Electron apps. Navigates Chromium's accessibility tree automatically.</p>
 </div>
 
 <div class="feature-card">
-<h3>🪟 Window Management</h3>
-<p>Find, activate, move, resize, and control windows. Move windows between monitors. Handles UWP apps and virtual desktops.</p>
+<h3>🎯 Focused</h3>
+<p>Does one thing well: Windows UI control. No duplicate terminal, file, or process tools — your LLM already has those.</p>
 </div>
 
 <div class="feature-card">
-<h3>📸 LLM-Optimized Screenshots</h3>
-<p>JPEG format with auto-scaling to vision model limits. Capture screens, windows, regions, or all monitors.</p>
+<h3>📸 Smart Screenshots</h3>
+<p>Screenshots include structured element data (names, types, coordinates) — not just pixels. The LLM can use the metadata instead of parsing the image.</p>
+</div>
+
+<div class="feature-card">
+<h3>🔄 Full Fallback</h3>
+<p>Screenshot + mouse + keyboard for games and custom controls. Plus local OCR for text extraction without sending images.</p>
+</div>
+
+<div class="feature-card">
+<h3>⚡ Atomic Operations</h3>
+<p>"Turn on Dark Mode" checks the current state first and only toggles if needed. One call, no race conditions.</p>
+</div>
+
+<div class="feature-card">
+<h3>🖥️ Multi-Monitor</h3>
+<p>Full awareness of multiple displays with per-monitor DPI scaling. Target windows by name automatically.</p>
 </div>
 
 <div class="feature-card">
 <h3>🔒 Security-Aware</h3>
-<p>Gracefully handles elevated windows (UIPI), UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.</p>
+<p>Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.</p>
 </div>
 </div>
 
 <p><a href="/features/">See complete feature reference →</a></p>
 
-## What Can You Do With It?
+---
 
-Ask your AI assistant to automate Windows tasks using natural language:
+## How It Works
 
-<div class="example-section">
-<h4>🔍 UI Automation</h4>
-<p><strong>You:</strong> "Find the Save button in Notepad and click it"</p>
-<p>AI uses UI Automation to find the button by name and clicks it without needing coordinates.</p>
-</div>
+**Most apps (90%)** — Your AI asks for a button by name. Windows MCP finds it through the accessibility tree and clicks it. No screenshot needed.
 
-<div class="example-section">
-<h4>🖱️ Mouse Automation</h4>
-<p><strong>You:</strong> "Click on the Start button"</p>
-<p>AI takes a screenshot, identifies the Start button coordinates, and performs the click.</p>
-</div>
+**Discovery** — Don't know what's clickable? Ask for an annotated screenshot. You'll get numbered elements with names and coordinates.
 
-<div class="example-section">
-<h4>⌨️ Keyboard Input</h4>
-<p><strong>You:</strong> "Press Win+R, type 'notepad', and press Enter"</p>
-<p>AI executes the key combination, types the text, and opens Notepad.</p>
-</div>
+**Toggles** — "Turn on Dark Mode" checks the current state first. Only toggles if needed.
 
-<div class="example-section">
-<h4>🪟 Window Management</h4>
-<p><strong>You:</strong> "Move this window to the secondary monitor"</p>
-<p>AI finds the window and moves it to the other screen.</p>
-</div>
+**Games & Canvas Apps** — Full mouse and keyboard control when accessibility APIs aren't available.
+
+---
 
 ## Installation
 
-### Option 1: VS Code Extension (Recommended)
+### VS Code Extension (Recommended)
 
-1. Open VS Code
-2. Go to Extensions (Ctrl+Shift+X)
-3. Search for "Windows MCP"
-4. Click Install
+1. Open VS Code → Extensions (Ctrl+Shift+X)
+2. Search "Windows MCP"
+3. Install
 
-The extension automatically configures the MCP server for GitHub Copilot.
+Automatically configures for GitHub Copilot. No manual setup.
 
-### Option 2: Download from Releases
+### Direct Download
 
-Download pre-built binaries from the [GitHub Releases page](https://github.com/sbroenne/mcp-windows/releases).
+Pre-built binaries on [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases). Works with any MCP client (Claude Desktop, etc).
+
+---
+
+## Who Uses This
+
+- **AI Agent Developers** building autonomous Windows automation
+- **QA Engineers** automating UI testing with natural language
+- **RPA Developers** creating robust, maintainable automation
+- **Power Users** who want AI to control their desktop
+
+---
 
 ## Documentation
 
-📖 **[Complete Feature Reference](/features/)** — All tools, actions, and configuration
+📖 **[Feature Reference](/features/)** — All tools and actions
 
-📋 **[Changelog](/changelog/)** — Release notes and version history
+📋 **[Changelog](/changelog/)** — Release history
 
-🤝 **[Contributing Guide](/contributing/)** — How to contribute
+🤝 **[Contributing](/contributing/)** — How to help
+
+---
 
 ## ⚠️ Caution
 
-This MCP server interacts directly with your Windows operating system to perform actions. Use with caution and avoid deploying in environments where such risks cannot be tolerated.
+This MCP server controls your Windows desktop. Use responsibly.
+
+---
 
 ## Related Projects
 
 - [Excel MCP Server](https://excelmcpserver.dev) — AI-powered Excel automation
-- [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) — AI-powered OBS Studio automation
-- [HeyGen MCP Server](https://github.com/sbroenne/heygen-mcp) — HeyGen AI video generation
+- [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) — AI-powered streaming control
 
 </div>
 

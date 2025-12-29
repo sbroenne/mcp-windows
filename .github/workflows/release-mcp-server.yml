@@ -9,10 +9,8 @@ on:
       - 'mcp-v*'
 
 jobs:
-  release-mcp-server:
+  build:
     runs-on: windows-latest
-    permissions:
-      contents: write
 
     strategy:
       matrix:
@@ -80,72 +78,86 @@ jobs:
         Get-ChildItem *.zip | Format-Table Name, Length
       shell: pwsh
 
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.rid }}
+        path: windows-mcp-server-*.zip
+        retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Extract Version
+      run: |
+        tagName="${{ github.ref_name }}"
+        version="${tagName#mcp-v}"
+        echo "Version: $version"
+        echo "VERSION=$version" >> $GITHUB_ENV
+
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        pattern: release-*
+        merge-multiple: true
+
+    - name: List Artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        ls -la artifacts/
+
     - name: Assemble Release Notes
       run: |
-        $tagName = "${{ github.ref_name }}"
-        $version = "${{ env.VERSION }}"
+        tagName="${{ github.ref_name }}"
+        version="${{ env.VERSION }}"
 
-        $notes = @"
-        ## Windows MCP Server $tagName
-
-        MCP server for Windows automation — UI automation, mouse, keyboard, window management, and screenshots.
-
-        ### Downloads (no .NET runtime required)
-
-        | File | Architecture |
-        |------|--------------|
-        | windows-mcp-server-$version-win-x64.zip | x64 |
-        | windows-mcp-server-$version-win-arm64.zip | ARM64 |
-
-        Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe. Pick the RID that matches your machine (x64 for most PCs, ARM64 for Surface/ARM dev kits).
-
-        ### Available Tools
-
-        | Tool | Description |
-        |------|-------------|
-        | ui_automation | Find UI elements, interact with controls, OCR text recognition |
-        | mouse_control | Click, double-click, right-click, move, drag, scroll, get_position |
-        | keyboard_control | Type text, press keys, combinations, sequences |
-        | window_management | List, find, activate, minimize, maximize, move, resize, move_to_monitor |
-        | screenshot_control | Capture screens, monitors, windows, or regions |
-
-        ### Usage
-
-        1. Download the zip for your architecture
-        2. Extract the zip (contains Sbroenne.WindowsMcp.exe)
-        3. Run Sbroenne.WindowsMcp.exe or add to your MCP client config
-
-        ### MCP Client Configuration
-
-        ```json
-        {
-          "mcpServers": {
-            "windows-mcp": {
-              "command": "path/to/Sbroenne.WindowsMcp.exe"
-            }
-          }
-        }
-        ```
-
-        See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-        @"
-
-        $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
-      shell: pwsh
+        # Write release notes to file (avoiding YAML-conflicting characters)
+        echo "## Windows MCP Server" > release_notes.md
+        echo "" >> release_notes.md
+        echo "Let AI agents control Windows applications. Click buttons, type text, toggle settings - all by name, not coordinates." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Uses the Windows UI Automation API to find UI elements reliably, regardless of DPI, theme, resolution, or window position." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Downloads (no .NET runtime required)" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "| File | Architecture |" >> release_notes.md
+        echo "|------|--------------|" >> release_notes.md
+        echo "| windows-mcp-server-${version}-win-x64.zip | x64 (most PCs) |" >> release_notes.md
+        echo "| windows-mcp-server-${version}-win-arm64.zip | ARM64 (Surface Pro X, ARM dev kits) |" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe." >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Tools" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "| Tool | Description |" >> release_notes.md
+        echo "|------|-------------|" >> release_notes.md
+        echo "| ui_automation | Primary tool - find elements by name, click, type, toggle, ensure_state |" >> release_notes.md
+        echo "| screenshot_control | Annotated screenshots with element overlays for discovery |" >> release_notes.md
+        echo "| mouse_control | Fallback mouse input for games/custom UIs |" >> release_notes.md
+        echo "| keyboard_control | Type text, press keys, hotkey sequences |" >> release_notes.md
+        echo "| window_management | Find, activate, move, resize windows |" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "### Usage" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "1. Download the zip for your architecture" >> release_notes.md
+        echo "2. Extract (contains Sbroenne.WindowsMcp.exe)" >> release_notes.md
+        echo "3. Add to your MCP client config" >> release_notes.md
+        echo "" >> release_notes.md
+        echo "See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation." >> release_notes.md
 
     - name: Create GitHub Release
       run: |
-        $tagName = "${{ github.ref_name }}"
-        $version = "${{ env.VERSION }}"
-
-        $assets = Get-ChildItem "windows-mcp-server-$version-*.zip" | Select-Object -ExpandProperty FullName
-
-        gh release create "$tagName" `
-          $assets `
-          --title "Windows MCP Server $tagName" `
+        tagName="${{ github.ref_name }}"
+        gh release create "$tagName" \
+          artifacts/*.zip \
+          --repo ${{ github.repository }} \
+          --title "Windows MCP Server $tagName" \
           --notes-file release_notes.md
-
-        Write-Output "Released Windows MCP Server $version"
+        echo "Released Windows MCP Server ${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: pwsh

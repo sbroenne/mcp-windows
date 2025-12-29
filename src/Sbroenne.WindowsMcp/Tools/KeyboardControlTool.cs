@@ -28,6 +28,7 @@ public sealed partial class KeyboardControlTool : IDisposable
 
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly IWindowEnumerator _windowEnumerator;
+    private readonly IWindowService _windowService;
     private readonly IElevationDetector _elevationDetector;
     private readonly ISecureDesktopDetector _secureDesktopDetector;
     private readonly KeyboardOperationLogger _logger;
@@ -39,6 +40,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// </summary>
     /// <param name="keyboardInputService">The keyboard input service.</param>
     /// <param name="windowEnumerator">The window enumerator for getting target window info.</param>
+    /// <param name="windowService">The window service for finding and activating windows.</param>
     /// <param name="elevationDetector">The elevation detector.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="logger">The operation logger.</param>
@@ -46,6 +48,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     public KeyboardControlTool(
         IKeyboardInputService keyboardInputService,
         IWindowEnumerator windowEnumerator,
+        IWindowService windowService,
         IElevationDetector elevationDetector,
         ISecureDesktopDetector secureDesktopDetector,
         KeyboardOperationLogger logger,
@@ -53,6 +56,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     {
         _keyboardInputService = keyboardInputService ?? throw new ArgumentNullException(nameof(keyboardInputService));
         _windowEnumerator = windowEnumerator ?? throw new ArgumentNullException(nameof(windowEnumerator));
+        _windowService = windowService ?? throw new ArgumentNullException(nameof(windowService));
         _elevationDetector = elevationDetector ?? throw new ArgumentNullException(nameof(elevationDetector));
         _secureDesktopDetector = secureDesktopDetector ?? throw new ArgumentNullException(nameof(secureDesktopDetector));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -64,6 +68,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// </summary>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
+    /// <param name="app">Application window to target by title (partial match). The server automatically finds and activates the window.</param>
     /// <param name="text">Text to type (required for type action).</param>
     /// <param name="key">Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot.</param>
     /// <param name="modifiers">Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions).</param>
@@ -76,14 +81,15 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, wait_for_idle. Prefer ui_automation(action='type') for text entry; use keyboard_control for hotkeys (Ctrl+S), navigation (Tab/arrows), or when UIA fails. Safety: set expectedWindowTitle/expectedProcessName to prevent wrong-window input. See system://best-practices for workflows.")]
+    [Description("Keyboard input: type, press (with optional modifiers for hotkeys), key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle. For hotkeys like Ctrl+S: press(key='s', modifiers='ctrl'). Prefer ui_automation(action='type') for text entry. Use 'app' parameter to auto-activate target window.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle")] string action,
+        [Description("The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle")] string action,
+        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds and activates the window before the keyboard action.")] string? app = null,
         [Description("Text to type (required for type action)")] string? text = null,
-        [Description("Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
-        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions)")] string? modifiers = null,
+        [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
+        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string? modifiers = null,
         [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
         [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
         [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
@@ -110,6 +116,31 @@ public sealed partial class KeyboardControlTool : IDisposable
 
         try
         {
+            // Resolve 'app' parameter to find and activate the target window
+            if (!string.IsNullOrWhiteSpace(app))
+            {
+                var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
+                if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
+                {
+                    // Try listing all windows to provide helpful suggestions
+                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: linkedToken);
+                    var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
+                    var suggestion = availableWindows.Length > 0
+                        ? $"Available windows: {string.Join(", ", availableWindows)}"
+                        : "No windows found. Ensure the application is running.";
+
+                    var result = KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        $"No window found matching app='{app}'. {suggestion}");
+                    _logger.LogOperationFailure(correlationId, action ?? "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    return result;
+                }
+
+                // Activate the window before performing keyboard action
+                var resolvedWindow = findResult.Windows![0];
+                await _windowService.ActivateWindowAsync(nint.Parse(resolvedWindow.Handle), linkedToken);
+            }
+
             // Pre-flight check: verify target window if expected values are specified
             if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
             {
@@ -159,10 +190,6 @@ public sealed partial class KeyboardControlTool : IDisposable
 
                 case KeyboardAction.KeyUp:
                     operationResult = await HandleKeyUpAsync(key, linkedToken);
-                    break;
-
-                case KeyboardAction.Combo:
-                    operationResult = await HandleComboAsync(key, modifiers, linkedToken);
                     break;
 
                 case KeyboardAction.Sequence:
@@ -348,36 +375,6 @@ public sealed partial class KeyboardControlTool : IDisposable
         return await _keyboardInputService.KeyUpAsync(key, cancellationToken);
     }
 
-    private async Task<KeyboardControlResult> HandleComboAsync(string? key, string? modifiers, CancellationToken cancellationToken)
-    {
-        // Validate required parameter
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            return KeyboardControlResult.CreateFailure(
-                KeyboardControlErrorCode.MissingRequiredParameter,
-                "The 'key' parameter is required for combo action");
-        }
-
-        // Check for secure desktop
-        if (_secureDesktopDetector.IsSecureDesktopActive())
-        {
-            return KeyboardControlResult.CreateFailure(
-                KeyboardControlErrorCode.SecureDesktopActive,
-                "Cannot send keyboard input when secure desktop (UAC prompt, lock screen) is active");
-        }
-
-        // Check for elevated foreground window
-        if (IsForegroundWindowElevated())
-        {
-            return KeyboardControlResult.CreateFailure(
-                KeyboardControlErrorCode.ElevatedProcessTarget,
-                "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
-        }
-
-        var modifierKey = ParseModifiers(modifiers);
-        return await _keyboardInputService.PressKeyAsync(key, modifierKey, 1, cancellationToken);
-    }
-
     private async Task<KeyboardControlResult> HandleSequenceAsync(string? sequenceJson, int? interKeyDelayMs, CancellationToken cancellationToken)
     {
         // Validate required parameter
@@ -443,7 +440,6 @@ public sealed partial class KeyboardControlTool : IDisposable
             "press" => KeyboardAction.Press,
             "key_down" or "keydown" => KeyboardAction.KeyDown,
             "key_up" or "keyup" => KeyboardAction.KeyUp,
-            "combo" => KeyboardAction.Combo,
             "sequence" => KeyboardAction.Sequence,
             "release_all" or "releaseall" => KeyboardAction.ReleaseAll,
             "get_keyboard_layout" or "getkeyboardlayout" or "layout" => KeyboardAction.GetKeyboardLayout,

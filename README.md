@@ -1,37 +1,100 @@
-# 🪟 Windows MCP
+# 🪟 Windows MCP Server
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
 
-**Windows MCP** is a high-performance MCP server for AI-powered Windows automation. It bridges the gap between LLMs and Windows, enabling agents to perform UI automation, application control, testing, and RPA tasks.
+**Let AI agents control Windows applications.** Click buttons, type text, toggle settings — all by name, not coordinates.
 
-> Built with .NET 10 and native Windows APIs for maximum performance and reliability.
+Uses the **Windows UI Automation API** to find UI elements reliably, regardless of DPI, theme, resolution, or window position.
+
+## How It's Different
+
+There are other Windows MCP servers. Here's why this one exists:
+
+| | Windows MCP Server | Other Windows MCP Servers |
+|---|---|---|
+| **Primary approach** | UI Automation API | Screenshot + vision model |
+| **Response time** | ~50ms | ~700ms–2.5s |
+| **Scope** | Windows UI only | Often includes shell, file, browser tools |
+| **Telemetry** | None | Varies |
+
+### Why UI Automation First?
+
+Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
+
+Windows MCP Server queries the UI directly — it finds buttons by name, not pixels.
+
+| | Screenshot-Based | Windows MCP Server |
+|---|---|---|
+| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
+| **DPI/theme changes** | Breaks | **Works** |
+| **Window moved** | Breaks | **Works** |
+| **State awareness** | None | **Full** (checked, enabled, focused) |
+| **Speed** | ~2-5 seconds | **~50 milliseconds** |
+| **Tokens per action** | ~1500 (image) | **~50 (text)** |
+
+When you do need screenshots (games, canvas apps, custom controls), we support that too — plus **local OCR** that extracts text without vision model tokens.
+
+```
+# No screenshot needed — direct semantic access
+ui_automation(action='click', app='Notepad', nameContains='Save') → success ✓
+
+# When you need it — screenshot fallback
+screenshot_control(app='Game') → mouse_control(x=450, y=300)
+
+# Local OCR — ~100ms, no image upload, ~50 tokens for result
+ui_automation(action='ocr', app='CustomApp') → structured text data
+```
 
 ## ✨ Key Features
 
-- **🖥️ True Multi-Monitor Support**  
-  Full awareness of multiple displays with per-monitor DPI scaling. Use `target='primary_screen'` or `'secondary_screen'` for easy targeting. Most Windows MCP servers don't handle this correctly.
+- **🧠 Semantic UI Automation**  
+  Find elements by name, type, or ID — not coordinates. Works regardless of DPI, theme, resolution, or window position.
 
-- **🔍 UI Automation with UIA3**  
-  Direct COM interop to Windows UI Automation for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and `capture_annotated` for LLM-friendly numbered screenshots.
+- **✅ It Just Works**  
+  Same automation works on any Windows machine. No retraining when UI looks different. No coordinate adjustments.
 
-- **🖱️ Mouse & ⌨️ Keyboard Control**  
-  Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.
+- **💻 Electron App Support**  
+  Built-in support for VS Code, Teams, Slack, and other Electron apps. Navigates Chromium's accessibility tree automatically.
 
-- **🪟 Window Management**  
-  Find, activate, move, resize, and control windows. Move windows between monitors. Handles UWP apps and virtual desktops.
+- **🎯 Focused**  
+  Does one thing well: Windows UI control. No duplicate terminal, file, or process tools — your LLM already has those.
 
-- **📸 LLM-Optimized Screenshots**  
-  JPEG format with auto-scaling to vision model limits. Capture screens, windows, regions, or all monitors.
+- **📸 Smart Screenshots**  
+  Screenshots include structured element data (names, types, coordinates) — not just pixels. The LLM can use the metadata instead of parsing the image.
+
+- **🔄 Full Fallback**  
+  Screenshot + mouse + keyboard for games and custom controls. Plus local OCR for text extraction without sending images.
+
+- **⚡ Atomic Operations**  
+  `ensure_state(desiredState='on')` checks current state and toggles only if needed — one call, no race conditions.
+
+- **🖥️ Multi-Monitor**  
+  Full awareness of multiple displays with per-monitor DPI scaling. Use `app='My App'` to target windows automatically.
 
 - **🔒 Security-Aware**  
-  Gracefully handles elevated windows (UIPI), UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
-
-- **⚡ High Performance**  
-  Native Windows API calls via P/Invoke. Synchronous I/O on dedicated thread pool prevents LLM blocking.
+  Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
 For detailed feature documentation, see [FEATURES.md](FEATURES.md).
+
+## The Workflow
+
+```
+# 1. Just click it directly (no screenshot needed)
+ui_automation(action='click', app='Notepad', nameContains='Save')
+
+# 2. If you don't know element names → discover with annotated screenshot
+screenshot_control(app='Notepad')  # Returns numbered elements + image
+
+# 3. For toggles → atomic state management
+ui_automation(action='ensure_state', app='Settings', nameContains='Dark Mode', desiredState='on')
+
+# 4. Fallback for games/custom UIs → full mouse + keyboard support
+screenshot_control(app='Game')  # Get element coordinates
+mouse_control(app='Game', action='click', x=450, y=300)
+keyboard_control(app='Game', action='type', text='player1')
+```
 
 ## Installation
 
@@ -81,11 +144,11 @@ If you downloaded from the releases page, add to your MCP client configuration:
 
 | Tool | Description | Key Actions |
 |------|-------------|-------------|
-| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, ensure_state, capture_annotated |
-| `mouse_control` | Mouse input simulation | click, move, drag, scroll, get_position |
-| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence, wait_for_idle |
-| `window_management` | Window control | find, activate, move, resize, get_state, wait_for_state |
-| `screenshot_control` | Screenshot capture | capture (screen/window/region), list_monitors |
+| `ui_automation` | **Primary tool** — semantic UI interaction | find, click, type, toggle, ensure_state, get_tree |
+| `screenshot_control` | Annotated screenshots for discovery | capture with element overlays (default) |
+| `mouse_control` | Fallback mouse input | click, move, drag, scroll |
+| `keyboard_control` | Keyboard input & hotkeys | type, press, key sequences |
+| `window_management` | Window control | find, activate, move, resize |
 
 For complete action reference, see [FEATURES.md](FEATURES.md).
 

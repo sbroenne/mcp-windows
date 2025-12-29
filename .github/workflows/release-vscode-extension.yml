@@ -72,14 +72,16 @@ jobs:
           Write-Output "package.json version is already $version, skipping npm version"
         }
 
-        # Update CHANGELOG.md - replace the first version number and date
+        # Update CHANGELOG.md - replace [Unreleased] with new version
         $date = Get-Date -Format 'yyyy-MM-dd'
         $changelogPath = 'CHANGELOG.md'
         if (Test-Path $changelogPath) {
           $changelogContent = Get-Content $changelogPath -Raw
-          $changelogContent = $changelogContent -replace '(?m)^## \[\d+\.\d+\.\d+\] - \d{4}-\d{2}-\d{2}', "## [$version] - $date"
+          # Replace [Unreleased] with the new version and add a fresh [Unreleased] section
+          $newUnreleased = "## [Unreleased]`n`n## [$version] - $date"
+          $changelogContent = $changelogContent -replace '## \[Unreleased\]', $newUnreleased
           Set-Content $changelogPath $changelogContent
-          Write-Output "Updated CHANGELOG.md with version $version and date $date"
+          Write-Output "Updated CHANGELOG.md: [Unreleased] -> [$version] - $date"
         }
 
         Write-Output "Updated extension version to $version"

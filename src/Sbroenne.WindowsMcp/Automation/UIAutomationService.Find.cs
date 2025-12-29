@@ -116,17 +116,33 @@ public sealed partial class UIAutomationService
                 LogSearchPerformance(_logger, "find", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
 
                 string? windowTitle = rootElement.GetName();
-                var detectedFramework = DetectFramework(rootElement);
+
+                // AUTO-RECOVERY: If exact name match failed, automatically try partial match
+                if (elementInfos.Count == 0 && !string.IsNullOrEmpty(query.Name) && string.IsNullOrEmpty(query.NameContains))
+                {
+                    // Reset and retry with nameContains instead of exact name
+                    var relaxedQuery = query with { Name = null, NameContains = query.Name };
+                    var relaxedCondition = BuildCondition(relaxedQuery);
+
+                    elementInfos.Clear();
+                    elementsScanned = 0;
+                    matchCount = 0;
+
+                    FindElementsWithTreeWalker(rootElement, rootElement, relaxedCondition, relaxedQuery, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+
+                    if (elementInfos.Count > 0)
+                    {
+                        LogSearchPerformance(_logger, "find (auto-relaxed to partial match)", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
+                    }
+                }
 
                 if (elementInfos.Count == 0)
                 {
-                    var recoverySuggestion = BuildRecoverySuggestion(query, elementsScanned, detectedFramework);
                     return UIAutomationResult.CreateFailure(
                         "find",
                         UIAutomationErrorType.ElementNotFound,
                         BuildNotFoundMessage(query),
-                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle),
-                        recoverySuggestion);
+                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
                 }
 
                 // Filter by region if specified (post-processing for FindAll path)
@@ -414,61 +430,6 @@ public sealed partial class UIAutomationService
         }
 
         return $"No element found matching: {string.Join(", ", criteria)}";
-    }
-
-    /// <summary>
-    /// Builds a context-aware suggestion for when find fails.
-    /// </summary>
-    private static string BuildRecoverySuggestion(ElementQuery query, int elementsScanned, string? detectedFramework)
-    {
-        var suggestions = new List<string>();
-
-        // Framework-specific suggestions
-        if (detectedFramework == "Chromium/Electron")
-        {
-            suggestions.Add("This is a Chromium/Electron app (VS Code, Teams, Slack, etc.).");
-
-            if (!string.IsNullOrEmpty(query.Name))
-            {
-                suggestions.Add($"Try nameContains='{query.Name}' instead of exact name match - Electron apps use ARIA labels which may differ.");
-            }
-
-            suggestions.Add("Use get_tree(maxDepth=3) to discover actual element names and automationIds.");
-            suggestions.Add("For Electron apps, automationId is often more reliable than name.");
-        }
-        else
-        {
-            if (!string.IsNullOrEmpty(query.Name) && string.IsNullOrEmpty(query.NameContains))
-            {
-                suggestions.Add($"Try nameContains='{query.Name}' for partial matching.");
-            }
-        }
-
-        // General suggestions based on what was searched
-        if (elementsScanned == 0)
-        {
-            suggestions.Add("No elements were scanned - check if the window handle is valid and the window is visible.");
-        }
-        else if (elementsScanned < 10)
-        {
-            suggestions.Add($"Only {elementsScanned} elements scanned - the window may be minimized or the element may be in a collapsed section.");
-        }
-        else
-        {
-            suggestions.Add($"Scanned {elementsScanned} elements. Use get_tree to explore the hierarchy and find the correct element name/type.");
-        }
-
-        if (query.ExactDepth.HasValue)
-        {
-            suggestions.Add($"You specified exactDepth={query.ExactDepth.Value}. Try removing this constraint to search all depths.");
-        }
-
-        if (query.FoundIndex > 1)
-        {
-            suggestions.Add($"You requested foundIndex={query.FoundIndex} but there may be fewer matches. Try foundIndex=1 first.");
-        }
-
-        return string.Join(" ", suggestions);
     }
 
     /// <summary>
