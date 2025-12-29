@@ -9,10 +9,8 @@ on:
       - 'mcp-v*'
 
 jobs:
-  release-mcp-server:
+  build:
     runs-on: windows-latest
-    permissions:
-      contents: write
 
     strategy:
       matrix:
@@ -80,22 +78,55 @@ jobs:
         Get-ChildItem *.zip | Format-Table Name, Length
       shell: pwsh
 
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-${{ matrix.rid }}
+        path: windows-mcp-server-*.zip
+        retention-days: 1
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Extract Version
+      run: |
+        tagName="${{ github.ref_name }}"
+        version="${tagName#mcp-v}"
+        echo "Version: $version"
+        echo "VERSION=$version" >> $GITHUB_ENV
+
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        pattern: release-*
+        merge-multiple: true
+
+    - name: List Artifacts
+      run: |
+        echo "Downloaded artifacts:"
+        ls -la artifacts/
+
     - name: Assemble Release Notes
       run: |
-        $tagName = "${{ github.ref_name }}"
-        $version = "${{ env.VERSION }}"
+        tagName="${{ github.ref_name }}"
+        version="${{ env.VERSION }}"
 
-        $notes = @"
-        ## Windows MCP Server $tagName
+        cat > release_notes.md << EOF
+        ## Windows MCP Server ${tagName}
 
-        MCP server for Windows automation — UI automation, mouse, keyboard, window management, and screenshots.
+        MCP server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots.
 
         ### Downloads (no .NET runtime required)
 
         | File | Architecture |
         |------|--------------|
-        | windows-mcp-server-$version-win-x64.zip | x64 |
-        | windows-mcp-server-$version-win-arm64.zip | ARM64 |
+        | windows-mcp-server-${version}-win-x64.zip | x64 |
+        | windows-mcp-server-${version}-win-arm64.zip | ARM64 |
 
         Each zip contains a single, self-contained Sbroenne.WindowsMcp.exe. Pick the RID that matches your machine (x64 for most PCs, ARM64 for Surface/ARM dev kits).
 
@@ -117,7 +148,7 @@ jobs:
 
         ### MCP Client Configuration
 
-        ```json
+        \`\`\`json
         {
           "mcpServers": {
             "windows-mcp": {
@@ -125,27 +156,19 @@ jobs:
             }
           }
         }
-        ```
+        \`\`\`
 
         See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-        @"
-
-        $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
-      shell: pwsh
+        EOF
 
     - name: Create GitHub Release
       run: |
-        $tagName = "${{ github.ref_name }}"
-        $version = "${{ env.VERSION }}"
-
-        $assets = Get-ChildItem "windows-mcp-server-$version-*.zip" | Select-Object -ExpandProperty FullName
-
-        gh release create "$tagName" `
-          $assets `
-          --title "Windows MCP Server $tagName" `
+        tagName="${{ github.ref_name }}"
+        gh release create "$tagName" \
+          artifacts/*.zip \
+          --repo ${{ github.repository }} \
+          --title "Windows MCP Server $tagName" \
           --notes-file release_notes.md
-
-        Write-Output "Released Windows MCP Server $version"
+        echo "Released Windows MCP Server ${{ env.VERSION }}"
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      shell: pwsh
