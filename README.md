@@ -4,46 +4,77 @@
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
 
-**The smarter way to automate Windows with AI.** Unlike screenshot-and-click tools, Windows MCP uses the **Windows UI Automation API** to give LLMs semantic understanding of your applications — not just pixels.
+**Let AI agents control Windows applications.** Click buttons, type text, toggle settings — all by name, not coordinates.
 
-> 🚀 **Why this matters**: When you ask an AI to "click Save", it finds the actual Save button through the accessibility tree, not by guessing coordinates from a screenshot. This works at any DPI, any resolution, any theme, and across window resizes.
+Uses the **Windows UI Automation API** to find UI elements reliably, regardless of DPI, theme, resolution, or window position.
 
-## 🎯 Semantic Automation vs. Vision-Only
+## How It's Different
 
-| Approach | How it works | Reliability |
-|----------|--------------|-------------|
-| **Vision-only** (other tools) | Screenshot → Parse pixels → Guess coordinates → Click | Breaks with DPI changes, themes, window moves |
-| **Windows MCP** | Query accessibility tree → Find "Save" button → Click it | Works regardless of visual appearance |
+There are other Windows MCP servers. Here's why this one exists:
 
-**Result**: Fewer tokens, faster execution, more reliable automation.
+| | Windows MCP Server | Other Windows MCP Servers |
+|---|---|---|
+| **Primary approach** | UI Automation API | Screenshot + vision model |
+| **Response time** | ~50ms | ~700ms–2.5s |
+| **Scope** | Windows UI only | Often includes shell, file, browser tools |
+| **Telemetry** | None | Varies |
+
+### Why UI Automation First?
+
+Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
+
+Windows MCP Server queries the UI directly — it finds buttons by name, not pixels.
+
+| | Screenshot-Based | Windows MCP Server |
+|---|---|---|
+| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
+| **DPI/theme changes** | Breaks | **Works** |
+| **Window moved** | Breaks | **Works** |
+| **State awareness** | None | **Full** (checked, enabled, focused) |
+| **Speed** | ~2-5 seconds | **~50 milliseconds** |
+| **Tokens per action** | ~1500 (image) | **~50 (text)** |
+
+When you do need screenshots (games, canvas apps, custom controls), we support that too — plus **local OCR** that extracts text without vision model tokens.
 
 ```
-# Vision-only approach: ~1500 tokens per screenshot, coordinate guessing
-screenshot() → "I see a button at roughly (450, 300)" → click(450, 300) → hope it worked
-
-# Windows MCP approach: ~50 tokens, deterministic
+# No screenshot needed — direct semantic access
 ui_automation(action='click', app='Notepad', nameContains='Save') → success ✓
+
+# When you need it — screenshot fallback
+screenshot_control(app='Game') → mouse_control(x=450, y=300)
+
+# Local OCR — ~100ms, no image upload, ~50 tokens for result
+ui_automation(action='ocr', app='CustomApp') → structured text data
 ```
 
 ## ✨ Key Features
 
 - **🧠 Semantic UI Automation**  
-  Direct access to Windows UI Automation (UIA3). Find elements by name, type, or ID — not coordinates. Works with WPF, WinForms, UWP, and Electron apps (VS Code, Teams, Slack).
+  Find elements by name, type, or ID — not coordinates. Works regardless of DPI, theme, resolution, or window position.
 
-- **🔄 Smart Fallback Strategy**  
-  UI Automation handles ~90% of apps. For custom controls or games, fall back to annotated screenshots with numbered elements, then mouse/keyboard.
+- **✅ It Just Works**  
+  Same automation works on any Windows machine. No retraining when UI looks different. No coordinate adjustments.
+
+- **💻 Electron App Support**  
+  Built-in support for VS Code, Teams, Slack, and other Electron apps. Navigates Chromium's accessibility tree automatically.
+
+- **🎯 Focused**  
+  Does one thing well: Windows UI control. No duplicate terminal, file, or process tools — your LLM already has those.
+
+- **📸 Smart Screenshots**  
+  Screenshots include structured element data (names, types, coordinates) — not just pixels. The LLM can use the metadata instead of parsing the image.
+
+- **🔄 Full Fallback**  
+  Screenshot + mouse + keyboard for games and custom controls. Plus local OCR for text extraction without sending images.
 
 - **⚡ Atomic Operations**  
-  `ensure_state(desiredState='on')` checks current state and toggles only if needed — one call, no race conditions. No more find → check → toggle → verify roundtrips.
+  `ensure_state(desiredState='on')` checks current state and toggles only if needed — one call, no race conditions.
 
-- **📸 LLM-Optimized Screenshots**  
-  When you need visual context, screenshots come with annotated element overlays and structured element data. JPEG format, auto-scaled to vision model limits.
-
-- **🖥️ True Multi-Monitor Support**  
-  Full awareness of multiple displays with per-monitor DPI scaling. Use `app='My Application'` to target windows automatically.
+- **🖥️ Multi-Monitor**  
+  Full awareness of multiple displays with per-monitor DPI scaling. Use `app='My App'` to target windows automatically.
 
 - **🔒 Security-Aware**  
-  Gracefully handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
+  Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
 For detailed feature documentation, see [FEATURES.md](FEATURES.md).
 
@@ -59,8 +90,10 @@ screenshot_control(app='Notepad')  # Returns numbered elements + image
 # 3. For toggles → atomic state management
 ui_automation(action='ensure_state', app='Settings', nameContains='Dark Mode', desiredState='on')
 
-# 4. Fallback for custom controls → use coordinates from discovery
+# 4. Fallback for games/custom UIs → full mouse + keyboard support
+screenshot_control(app='Game')  # Get element coordinates
 mouse_control(app='Game', action='click', x=450, y=300)
+keyboard_control(app='Game', action='type', text='player1')
 ```
 
 ## Installation
@@ -116,13 +149,6 @@ If you downloaded from the releases page, add to your MCP client configuration:
 | `mouse_control` | Fallback mouse input | click, move, drag, scroll |
 | `keyboard_control` | Keyboard input & hotkeys | type, press, key sequences |
 | `window_management` | Window control | find, activate, move, resize |
-
-### Why UI Automation First?
-
-1. **Token efficiency** — Structured JSON vs. image processing (~50 tokens vs. ~1500)
-2. **Reliability** — Works at any DPI, theme, or resolution
-3. **State awareness** — Know if a button is enabled, a checkbox is checked
-4. **Speed** — Direct API calls, no vision model latency
 
 For complete action reference, see [FEATURES.md](FEATURES.md).
 

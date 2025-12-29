@@ -1,74 +1,100 @@
-# 🪟 Windows MCP - VS Code Extension
+# 🪟 Windows MCP Server for VS Code
 
-High-performance MCP server for AI-powered Windows automation. Enables GitHub Copilot and other AI assistants to control Windows through UI Automation, mouse, keyboard, window management, and screenshots.
+**Let GitHub Copilot control Windows applications.** Click buttons, type text, toggle settings — all by name, not coordinates.
 
-> Built with .NET 10 and native Windows APIs for maximum performance and reliability.
+## What Can Copilot Do?
 
-## ✨ Key Features
+Once installed, just ask:
 
-- **🖥️ True Multi-Monitor Support**  
-  Full awareness of multiple displays with per-monitor DPI scaling. Use `target='primary_screen'` or `'secondary_screen'` for easy targeting. Most Windows MCP servers don't handle this correctly.
+- "Click the Save button in Notepad"
+- "Toggle Dark Mode on in Settings"
+- "Type my email in the login field"
+- "Move this window to my second monitor"
+- "Read the text from that dialog box"
 
-- **🔍 UI Automation with UIA3**  
-  Direct COM interop for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and `capture_annotated` for LLM-friendly numbered screenshots.
+---
 
-- **🖱️ Mouse & ⌨️ Keyboard Control**  
-  Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.
+## Why It Works
 
-- **🪟 Window Management**  
-  Find, activate, move, resize, and control windows. Move windows between monitors. Handles UWP apps and virtual desktops.
+Most automation tools take a screenshot, send it to a vision model, and guess where to click. That breaks when the window moves, the theme changes, or the DPI is different.
 
-- **📸 LLM-Optimized Screenshots**  
-  JPEG format with auto-scaling to vision model limits. Capture screens, windows, regions, or all monitors.
+Windows MCP Server queries the UI directly using the **Windows Accessibility API** — the same technology screen readers use. It finds buttons by name, not pixels.
 
-- **🔒 Security-Aware**  
-  Gracefully handles elevated windows (UIPI), UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
+| | Screenshot-Based | Windows MCP Server |
+|---|---|---|
+| **Finds elements by** | Parsing pixels | **Name, type, or ID** |
+| **DPI/theme changes** | Breaks | **Works** |
+| **Window moved** | Breaks | **Works** |
+| **State awareness** | None | **Full** (checked, enabled, focused) |
+| **Speed** | ~2-5 seconds | **~50 milliseconds** |
 
-## Tools
+---
 
-| Tool | Description | Key Actions |
-|------|-------------|-------------|
-| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, ensure_state, capture_annotated |
-| `mouse_control` | Mouse input simulation | click, move, drag, scroll, get_position |
-| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence, wait_for_idle |
-| `window_management` | Window control | find, activate, move, resize, get_state, wait_for_state |
-| `screenshot_control` | Screenshot capture | capture (screen/window/region), list_monitors |
+## When You Need Screenshots
+
+For games, canvas apps, and custom controls that don't expose accessibility data, Windows MCP includes full screenshot + mouse + keyboard support.
+
+But even then, screenshots aren't just pixels — they include structured element data (names, types, clickable coordinates) so Copilot can often skip vision parsing.
+
+Plus **local OCR** for text extraction — no image upload, ~100ms.
+
+---
+
+## Key Features
+
+- **🧠 Semantic UI Access** — Find elements by name, not coordinates. Works regardless of DPI, theme, or window position.
+
+- **✅ It Just Works** — Same automation works on any Windows machine. No retraining when UI looks different.
+
+- **💻 Electron App Support** — Built-in support for VS Code, Teams, Slack, and other Chromium apps.
+
+- **🎯 Focused** — Does one thing well: Windows UI control. No duplicate terminal or file tools — Copilot already has those.
+
+- **📸 Smart Screenshots** — Screenshots include element names and coordinates, not just pixels.
+
+- **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls. Plus local OCR.
+
+- **⚡ Atomic Operations** — "Turn on Dark Mode" checks the current state first and only toggles if needed.
+
+- **🖥️ Multi-Monitor** — Full awareness of multiple displays with per-monitor DPI scaling.
+
+- **🔒 Security-Aware** — Handles elevated windows, UAC prompts, and secure desktop.
+
+---
+
+## How It Works
+
+**Most apps (90%)** — Copilot asks for a button by name. Windows MCP finds it through the accessibility tree and clicks it. No screenshot needed.
+
+**Discovery** — Don't know what's clickable? Ask for an annotated screenshot. You'll get numbered elements with names and coordinates.
+
+**Toggles** — "Turn on Dark Mode" checks the current state first. Only toggles if needed.
+
+**Games & Canvas Apps** — Full mouse and keyboard control when accessibility APIs aren't available.
+
+---
 
 ## Requirements
 
 - **Windows 10/11**
-- **.NET 10.0 Runtime** (automatically installed via the .NET Install Tool extension)
+- **.NET 10.0 Runtime** (installed automatically)
 
 ## Installation
 
 1. Install this extension from the VS Code Marketplace
-2. The .NET Install Tool extension will be installed as a dependency
-3. The Windows MCP server is bundled and ready to use
+2. The .NET runtime installs automatically if needed
+3. Start using natural language with Copilot
 
-## Usage
-
-Once installed, the Windows MCP server is automatically available to AI assistants like GitHub Copilot. Use natural language to:
-
-- "Find the Save button and click it"
-- "Take an annotated screenshot of this window"
-- "Move this window to the secondary monitor"
-- "Type 'Hello, World!' and press Enter"
-- "Press Ctrl+S to save"
+---
 
 ## ⚠️ Caution
 
-This MCP server interacts directly with your Windows operating system to perform actions. Use with caution and avoid deploying in environments where such risks cannot be tolerated.
+This extension allows Copilot to control your Windows desktop. Use responsibly.
 
-## Platform Support
-
-This extension is **Windows-only** as it uses native Windows APIs for automation.
-
-## License
-
-MIT
+---
 
 ## Links
 
-- [GitHub Repository](https://github.com/sbroenne/mcp-windows)
 - [Full Documentation](https://windowsmcpserver.dev)
+- [GitHub Repository](https://github.com/sbroenne/mcp-windows)
 - [Report Issues](https://github.com/sbroenne/mcp-windows/issues)
