@@ -1,37 +1,67 @@
-# 🪟 Windows MCP
+# 🪟 Windows MCP Server
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
 
-**Windows MCP** is a high-performance MCP server for AI-powered Windows automation. It bridges the gap between LLMs and Windows, enabling agents to perform UI automation, application control, testing, and RPA tasks.
+**The smarter way to automate Windows with AI.** Unlike screenshot-and-click tools, Windows MCP uses the **Windows UI Automation API** to give LLMs semantic understanding of your applications — not just pixels.
 
-> Built with .NET 10 and native Windows APIs for maximum performance and reliability.
+> 🚀 **Why this matters**: When you ask an AI to "click Save", it finds the actual Save button through the accessibility tree, not by guessing coordinates from a screenshot. This works at any DPI, any resolution, any theme, and across window resizes.
+
+## 🎯 Semantic Automation vs. Vision-Only
+
+| Approach | How it works | Reliability |
+|----------|--------------|-------------|
+| **Vision-only** (other tools) | Screenshot → Parse pixels → Guess coordinates → Click | Breaks with DPI changes, themes, window moves |
+| **Windows MCP** | Query accessibility tree → Find "Save" button → Click it | Works regardless of visual appearance |
+
+**Result**: Fewer tokens, faster execution, more reliable automation.
+
+```
+# Vision-only approach: ~1500 tokens per screenshot, coordinate guessing
+screenshot() → "I see a button at roughly (450, 300)" → click(450, 300) → hope it worked
+
+# Windows MCP approach: ~50 tokens, deterministic
+ui_automation(action='click', app='Notepad', nameContains='Save') → success ✓
+```
 
 ## ✨ Key Features
 
-- **🖥️ True Multi-Monitor Support**  
-  Full awareness of multiple displays with per-monitor DPI scaling. Use `target='primary_screen'` or `'secondary_screen'` for easy targeting. Most Windows MCP servers don't handle this correctly.
+- **🧠 Semantic UI Automation**  
+  Direct access to Windows UI Automation (UIA3). Find elements by name, type, or ID — not coordinates. Works with WPF, WinForms, UWP, and Electron apps (VS Code, Teams, Slack).
 
-- **🔍 UI Automation with UIA3**  
-  Direct COM interop to Windows UI Automation for ~40% faster performance. 23 actions including find, click, type, toggle, ensure_state, and `capture_annotated` for LLM-friendly numbered screenshots.
+- **🔄 Smart Fallback Strategy**  
+  UI Automation handles ~90% of apps. For custom controls or games, fall back to annotated screenshots with numbered elements, then mouse/keyboard.
 
-- **🖱️ Mouse & ⌨️ Keyboard Control**  
-  Full input simulation with Unicode support, key combinations, and modifier keys. Layout-independent typing works with any language.
-
-- **🪟 Window Management**  
-  Find, activate, move, resize, and control windows. Move windows between monitors. Handles UWP apps and virtual desktops.
+- **⚡ Atomic Operations**  
+  `ensure_state(desiredState='on')` checks current state and toggles only if needed — one call, no race conditions. No more find → check → toggle → verify roundtrips.
 
 - **📸 LLM-Optimized Screenshots**  
-  JPEG format with auto-scaling to vision model limits. Capture screens, windows, regions, or all monitors.
+  When you need visual context, screenshots come with annotated element overlays and structured element data. JPEG format, auto-scaled to vision model limits.
+
+- **🖥️ True Multi-Monitor Support**  
+  Full awareness of multiple displays with per-monitor DPI scaling. Use `app='My Application'` to target windows automatically.
 
 - **🔒 Security-Aware**  
-  Gracefully handles elevated windows (UIPI), UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
-
-- **⚡ High Performance**  
-  Native Windows API calls via P/Invoke. Synchronous I/O on dedicated thread pool prevents LLM blocking.
+  Gracefully handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
 For detailed feature documentation, see [FEATURES.md](FEATURES.md).
+
+## The Workflow
+
+```
+# 1. Just click it directly (no screenshot needed)
+ui_automation(action='click', app='Notepad', nameContains='Save')
+
+# 2. If you don't know element names → discover with annotated screenshot
+screenshot_control(app='Notepad')  # Returns numbered elements + image
+
+# 3. For toggles → atomic state management
+ui_automation(action='ensure_state', app='Settings', nameContains='Dark Mode', desiredState='on')
+
+# 4. Fallback for custom controls → use coordinates from discovery
+mouse_control(app='Game', action='click', x=450, y=300)
+```
 
 ## Installation
 
@@ -81,11 +111,18 @@ If you downloaded from the releases page, add to your MCP client configuration:
 
 | Tool | Description | Key Actions |
 |------|-------------|-------------|
-| `ui_automation` | UI Automation with UIA3 + OCR | find, click, type, toggle, ensure_state, capture_annotated |
-| `mouse_control` | Mouse input simulation | click, move, drag, scroll, get_position |
-| `keyboard_control` | Keyboard input simulation | type, press, combo, sequence, wait_for_idle |
-| `window_management` | Window control | find, activate, move, resize, get_state, wait_for_state |
-| `screenshot_control` | Screenshot capture | capture (screen/window/region), list_monitors |
+| `ui_automation` | **Primary tool** — semantic UI interaction | find, click, type, toggle, ensure_state, get_tree |
+| `screenshot_control` | Annotated screenshots for discovery | capture with element overlays (default) |
+| `mouse_control` | Fallback mouse input | click, move, drag, scroll |
+| `keyboard_control` | Keyboard input & hotkeys | type, press, key sequences |
+| `window_management` | Window control | find, activate, move, resize |
+
+### Why UI Automation First?
+
+1. **Token efficiency** — Structured JSON vs. image processing (~50 tokens vs. ~1500)
+2. **Reliability** — Works at any DPI, theme, or resolution
+3. **State awareness** — Know if a button is enabled, a checkbox is checked
+4. **Speed** — Direct API calls, no vision model latency
 
 For complete action reference, see [FEATURES.md](FEATURES.md).
 

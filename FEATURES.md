@@ -2,21 +2,36 @@
 
 Comprehensive documentation of all Windows MCP tools, actions, and configuration options.
 
+## 🎯 The Approach: Semantic First, Fallback When Needed
+
+Windows MCP uses the **Windows UI Automation API** as the primary interaction method. This gives AI agents semantic understanding of applications — finding elements by name, type, and state rather than parsing screenshots.
+
+**When to use each tool:**
+
+| Scenario | Tool | Why |
+|----------|------|-----|
+| Click a button by name | `ui_automation` | Semantic, works at any DPI/theme |
+| Toggle a setting | `ui_automation` | Atomic state management |
+| Discover UI elements | `screenshot_control` | Annotated screenshots with element data |
+| Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
+| Custom controls / games | `mouse_control` | Coordinate-based fallback |
+| Find/move windows | `window_management` | Window lifecycle control |
+
 ## Tools Overview
 
 | Tool | Description |
 |------|-------------|
-| `ui_automation` | UI Automation with UIA3 COM API and OCR |
-| `mouse_control` | Mouse input simulation |
-| `keyboard_control` | Keyboard input simulation |
+| `ui_automation` | **Primary** — Semantic UI interaction via UIA3 |
+| `screenshot_control` | Annotated screenshots for discovery + fallback |
+| `keyboard_control` | Keyboard input and hotkeys |
+| `mouse_control` | Coordinate-based mouse input (fallback) |
 | `window_management` | Window control and management |
-| `screenshot_control` | Screenshot capture |
 
 ---
 
 ## 🔍 UI Automation
 
-Interact with Windows UI elements using the UI Automation API and OCR.
+Interact with Windows UI elements using the UI Automation API and OCR. **This is the primary tool** — use it for all standard Windows applications.
 
 ### Actions
 
@@ -44,7 +59,8 @@ Interact with Windows UI elements using the UI Automation API and OCR.
 | `ocr` | OCR text in screen region | Region parameters |
 | `ocr_element` | OCR on element bounds | `elementId` |
 | `ocr_status` | Check OCR availability | none |
-| `capture_annotated` | Screenshot with numbered labels on interactive elements | `windowHandle`, `controlType` (filter) |
+
+> **Note**: For annotated screenshots with element discovery, use `screenshot_control(app='...')` which returns both an annotated image and structured element data.
 
 ### Capabilities
 
@@ -57,11 +73,10 @@ Interact with Windows UI elements using the UI Automation API and OCR.
 - **Sort by prominence** - Order results by bounding box area (largest first) for disambiguation
 - **Text extraction** - Get text from controls via UI Automation or OCR fallback
 - **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
-- **Multi-window workflows** - Auto-activate target windows before interaction
+- **Multi-window workflows** - Use `app` parameter to auto-activate target windows before interaction
 - **Wrong window detection** - Verify expected window is active before interactive actions
 - **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
 - **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
-- **Annotated screenshots** - Capture numbered screenshots with `interactiveOnly` filter, `outputPath` file saving, and optional base64 via `returnImageData`
 
 ---
 
@@ -104,10 +119,9 @@ Control keyboard input on Windows with Unicode support.
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
 | `type` | Type text using Unicode input | `text` |
-| `press` | Press and release a key | `key` |
+| `press` | Press and release a key (with optional modifiers) | `key`, optional `modifiers` |
 | `key_down` | Hold a key down | `key` |
 | `key_up` | Release a held key | `key` |
-| `combo` | Key + modifiers combination | `key`, `modifiers` |
 | `sequence` | Multiple keys in order | `keys` |
 | `release_all` | Release all held keys | none |
 | `get_keyboard_layout` | Query current layout | none |
@@ -140,7 +154,7 @@ Control keyboard input on Windows with Unicode support.
 
 - **Unicode text typing** (layout-independent) - type any character in any language
 - **Virtual key presses** - Enter, Tab, Escape, F1-F24, navigation keys
-- **Key combinations** - Ctrl+S, Alt+Tab, Ctrl+Shift+P, Win+L
+- **Key combinations** - Use `press` with `modifiers` parameter: `press(key='s', modifiers='ctrl')` for Ctrl+S
 - **Key sequences** - multi-key macros with configurable timing
 - **Hold/release keys** - for Shift-select and other hold operations
 - **Special keys** - Copilot key (Windows 11), media controls, browser keys
@@ -152,27 +166,29 @@ Control keyboard input on Windows with Unicode support.
 
 ## 🪟 Window Management
 
-Control windows on the Windows desktop.
+Control windows on the Windows desktop. All actions support the `app` parameter for easy window targeting.
 
 ### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
 | `list` | List all visible windows | none |
-| `find` | Find windows by title | `title` |
-| `activate` | Bring window to foreground | `handle` |
+| `find` | Find windows by title | `title` or `app` |
+| `activate` | Bring window to foreground | `handle` or `app` |
 | `get_foreground` | Get current foreground window | none |
-| `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` |
-| `minimize` | Minimize window | `handle` |
-| `maximize` | Maximize window | `handle` |
-| `restore` | Restore window from min/max | `handle` |
-| `close` | Close window (sends WM_CLOSE) | `handle` |
-| `move` | Move window to position | `handle`, `x`, `y` |
-| `resize` | Resize window | `handle`, `width`, `height` |
-| `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
+| `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` or `app` |
+| `minimize` | Minimize window | `handle` or `app` |
+| `maximize` | Maximize window | `handle` or `app` |
+| `restore` | Restore window from min/max | `handle` or `app` |
+| `close` | Close window (sends WM_CLOSE) | `handle` or `app` |
+| `move` | Move window to position | `handle` or `app`, `x`, `y` |
+| `resize` | Resize window | `handle` or `app`, `width`, `height` |
+| `set_bounds` | Move and resize atomically | `handle` or `app`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
-| `wait_for_state` | Wait for window to reach a specific state | `handle`, `state`, `timeoutMs` |
-| `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
+| `wait_for_state` | Wait for window to reach a specific state | `handle` or `app`, `state`, `timeoutMs` |
+| `move_to_monitor` | Move window to a specific monitor | `handle` or `app`, `target` or `monitorIndex` |
+| `move_and_activate` | Move to monitor and activate atomically | `handle` or `app`, `target` or `monitorIndex` |
+| `ensure_visible` | Ensure window is visible (restore if minimized, activate) | `handle` or `app` |
 
 ### Capabilities
 
@@ -191,23 +207,24 @@ Control windows on the Windows desktop.
 
 ## 📸 Screenshot Capture
 
-Capture screenshots on Windows with LLM-optimized defaults.
+Capture screenshots on Windows with LLM-optimized defaults. **By default, screenshots include annotated element overlays** with numbered labels and structured element data — perfect for UI discovery.
 
 ### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `capture` | Capture screenshot | `target` |
+| `capture` | Capture screenshot (with element annotations by default) | `target` or `app` |
 | `list_monitors` | List all connected monitors | none |
 
 ### Capture Targets
 
 | Target | Description | Additional Parameters |
 |--------|-------------|----------------------|
+| `app` | **Recommended** — Capture specific app window by name | Partial title match |
 | `primary_screen` | Capture primary monitor (default) | none |
 | `secondary_screen` | Capture secondary monitor (2-monitor setups) | none |
 | `monitor` | Capture specific monitor | `monitorIndex` |
-| `window` | Capture specific window | `windowHandle` |
+| `window` | Capture specific window by handle | `windowHandle` |
 | `region` | Capture rectangular region | `regionX`, `regionY`, `regionWidth`, `regionHeight` |
 | `all_monitors` | Composite of all displays | none |
 
@@ -215,26 +232,60 @@ Capture screenshots on Windows with LLM-optimized defaults.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
+| `app` | string | `null` | **Recommended.** Application name (partial title match). Auto-finds and activates window. |
+| `annotate` | boolean | `true` | Include numbered element overlays and structured element data |
 | `includeCursor` | boolean | `false` | Include mouse cursor in capture |
 | `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
 | `quality` | integer | `85` | Compression quality for JPEG (1-100) |
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
+### Annotated Screenshot Response
+
+When `annotate=true` (default), the response includes both an image and structured element data:
+
+```json
+{
+  "success": true,
+  "annotated_elements": [
+    { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem", "clickable_point": { "x": 50, "y": 30 } },
+    { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem", "clickable_point": { "x": 100, "y": 30 } }
+  ],
+  "element_count": 25,
+  "image_data": "base64...",
+  "image_format": "jpeg"
+}
+```
+
+**Use case**: When you don't know element names, capture an annotated screenshot first. The numbered labels in the image correspond to the structured element data, making it easy to identify what to click.
+
+### Plain Screenshot (No Annotations)
+
+For simple screenshots without element discovery:
+
+```json
+{
+  "action": "capture",
+  "app": "Notepad",
+  "annotate": false
+}
+```
+
 ### Capabilities
 
-- **LLM-Optimized by Default** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
-- **Easy targeting** - use `target='primary_screen'` or `'secondary_screen'`
-- **Capture any monitor** - screenshot any connected display by index
-- **Capture windows** - screenshot a specific window (even if partially obscured)
-- **Capture regions** - screenshot an arbitrary rectangular area
-- **Capture all monitors** - composite screenshot of entire virtual desktop
+- **Annotated by Default** - Screenshots include numbered element overlays and structured data for UI discovery
+- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
+- **Easy targeting** - Use `app='My Application'` to capture any window by partial title
+- **Capture any monitor** - Screenshot any connected display by index
+- **Capture windows** - Screenshot a specific window (even if partially obscured)
+- **Capture regions** - Screenshot an arbitrary rectangular area
+- **Capture all monitors** - Composite screenshot of entire virtual desktop
 - **Format options** - JPEG (default) or PNG with configurable quality (1-100)
-- **Auto-scaling** - defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
-- **Output modes** - inline base64 (default) or file path for zero-overhead file workflows
-- **Cursor inclusion** - optionally include mouse cursor in captures
-- **Multi-monitor aware** - supports extended desktop configurations
-- **DPI aware** - correct pixel dimensions on high-DPI displays
+- **Auto-scaling** - Defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
+- **Output modes** - Inline base64 (default) or file path for zero-overhead file workflows
+- **Cursor inclusion** - Optionally include mouse cursor in captures
+- **Multi-monitor aware** - Supports extended desktop configurations
+- **DPI aware** - Correct pixel dimensions on high-DPI displays
 
 ---
 

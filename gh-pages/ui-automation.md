@@ -1,23 +1,55 @@
 ---
 layout: default
-title: "UI Automation & OCR"
-description: "The core capability of Windows MCP Server. Find UI elements, interact with controls, and extract text using the Windows UI Automation accessibility API and OCR."
-keywords: "Windows UI Automation, accessibility API, OCR, MCP, UI testing, RPA, LLM agents, computer use"
+title: "UI Automation — Semantic Windows Control for AI Agents"
+description: "Why semantic UI automation beats screenshot-and-click. Find elements by name, interact with controls, get state feedback — all without vision model overhead."
+keywords: "Windows UI Automation, accessibility API, MCP, UI testing, RPA, LLM agents, computer use, semantic automation, agentic AI"
 permalink: /ui-automation/
 ---
 
 <div class="hero">
   <div class="container">
     <div class="hero-content">
-      <h1 class="hero-title">UI Automation & OCR</h1>
-      <p class="hero-subtitle">The core capability — interact with Windows applications through accessibility APIs</p>
+      <h1 class="hero-title">UI Automation</h1>
+      <p class="hero-subtitle">Semantic control — interact with applications through meaning, not pixels</p>
     </div>
   </div>
 </div>
 
 <div class="container content-section" markdown="1">
 
-Windows MCP Server provides a unified `ui_automation` tool for discovering, interacting with, and extracting text from Windows applications using the Windows UI Automation API (UIA3) and OCR.
+## Why Semantic Automation?
+
+**The Problem with Screenshot-Based Automation:**
+
+```
+1. Take screenshot (~1500 tokens)
+2. Send to vision model to find "Save button" (~500ms latency)
+3. Get coordinates (x=450, y=300) — but what if DPI changed? Window moved?
+4. Click coordinates — hope it's still there
+5. Take another screenshot to verify
+```
+
+**With Windows MCP's UI Automation:**
+
+```
+ui_automation(action='click', app='Notepad', nameContains='Save')
+→ { "success": true, "element": { "name": "Save", "controlType": "Button" } }
+```
+
+**One call. ~50 tokens. Deterministic result. Works at any DPI, resolution, or theme.**
+
+### The Key Insight
+
+The Windows operating system already knows exactly where every button, checkbox, and text field is. Screen readers use this information. So can AI agents.
+
+Windows MCP Server exposes the **Windows UI Automation API (UIA3)** — the same accessibility technology used by assistive software — through MCP tools. This gives LLMs:
+
+- **Semantic element discovery** — Find "Save" by name, not by parsing pixels
+- **State awareness** — Is this checkbox checked? Is this button enabled?
+- **Pattern-based interaction** — Click buttons, toggle checkboxes, type in fields
+- **Deterministic feedback** — Know exactly what happened, not "it looks like it worked"
+
+---
 
 ## Quick Start: Just Use the `app` Parameter
 
