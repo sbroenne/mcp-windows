@@ -396,11 +396,9 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                 {
                     Index = index,
                     Name = element.Name,
-                    ControlType = element.ControlType,
-                    AutomationId = element.AutomationId,
-                    ElementId = element.ElementId,
-                    ClickablePoint = element.ClickablePoint,
-                    BoundingBox = element.BoundingRect
+                    Type = element.ControlType,
+                    Id = element.ElementId,
+                    Click = [element.ClickablePoint.X, element.ClickablePoint.Y, element.ClickablePoint.MonitorIndex]
                 });
             }
         }

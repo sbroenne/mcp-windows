@@ -43,8 +43,8 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         Assert.True(result.Success, $"Move failed: {result.Error}");
         Assert.NotNull(result.Window);
         Assert.NotNull(result.Window.Bounds);
-        Assert.True(result.Window.Bounds.Width > 0);
-        Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Window.Bounds[2] > 0); // Width
+        Assert.True(result.Window.Bounds[3] > 0); // Height
 
         // Clean up - move back to original position
         await _windowService.MoveWindowAsync(handle, originalBounds.X, originalBounds.Y);
@@ -67,8 +67,8 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         Assert.True(result.Success, $"Resize failed: {result.Error}");
         Assert.NotNull(result.Window);
         Assert.NotNull(result.Window.Bounds);
-        Assert.True(result.Window.Bounds.Width > 0);
-        Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Window.Bounds[2] > 0); // Width
+        Assert.True(result.Window.Bounds[3] > 0); // Height
 
         // Clean up - restore original size
         await _windowService.ResizeWindowAsync(handle, originalBounds.Width, originalBounds.Height);
@@ -96,8 +96,8 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         Assert.True(result.Success, $"SetBounds failed: {result.Error}");
         Assert.NotNull(result.Window);
         Assert.NotNull(result.Window.Bounds);
-        Assert.True(result.Window.Bounds.Width > 0);
-        Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Window.Bounds[2] > 0); // Width
+        Assert.True(result.Window.Bounds[3] > 0); // Height
 
         // Clean up - restore original bounds
         var restoreBounds = new WindowBounds

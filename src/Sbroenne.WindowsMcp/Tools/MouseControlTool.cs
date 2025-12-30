@@ -150,7 +150,7 @@ public sealed partial class MouseControlTool
         try
         {
             // Resolve 'app' parameter to windowHandle if specified
-            Models.WindowInfo? resolvedWindow = null;
+            Models.WindowInfoCompact? resolvedWindow = null;
             if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
             {
                 var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
@@ -531,7 +531,7 @@ public sealed partial class MouseControlTool
                     operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
                 }
 
-                _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.WindowTitle, stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.TargetWindow?.Title, stopwatch.ElapsedMilliseconds);
             }
             else
             {
@@ -999,7 +999,7 @@ public sealed partial class MouseControlTool
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch
@@ -1046,7 +1046,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.WrongTargetWindow,
                         $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent click in wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
@@ -1059,7 +1059,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.WrongTargetWindow,
                         $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent click in wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 

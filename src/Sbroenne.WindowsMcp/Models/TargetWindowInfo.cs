@@ -6,38 +6,62 @@ namespace Sbroenne.WindowsMcp.Models;
 /// Lightweight window information included in operation results to indicate
 /// which window received the input or was the target of an action.
 /// </summary>
+/// <remarks>
+/// Property names are intentionally short to minimize JSON token count:
+/// - h: Handle (HWND as decimal string)
+/// - t: Title
+/// - pn: Process Name
+/// - pid: Process ID
+/// </remarks>
 public sealed record TargetWindowInfo
 {
     /// <summary>
     /// Gets the window handle (HWND) as decimal string for JSON safety.
     /// </summary>
-    [JsonPropertyName("handle")]
+    [JsonPropertyName("h")]
     public required string Handle { get; init; }
 
     /// <summary>
     /// Gets the window title text.
     /// </summary>
-    [JsonPropertyName("title")]
+    [JsonPropertyName("t")]
     public required string Title { get; init; }
 
     /// <summary>
     /// Gets the process name (e.g., "notepad.exe", "chrome.exe").
     /// </summary>
-    [JsonPropertyName("process_name")]
+    [JsonPropertyName("pn")]
     public required string ProcessName { get; init; }
 
     /// <summary>
     /// Gets the process ID.
     /// </summary>
-    [JsonPropertyName("process_id")]
+    [JsonPropertyName("pid")]
     public required int ProcessId { get; init; }
 
     /// <summary>
-    /// Creates a TargetWindowInfo from a WindowInfo.
+    /// Creates a TargetWindowInfo from a WindowInfoCompact.
+    /// </summary>
+    /// <param name="windowInfo">The compact window info.</param>
+    /// <returns>A lightweight TargetWindowInfo.</returns>
+    public static TargetWindowInfo FromWindowInfo(WindowInfoCompact windowInfo)
+    {
+        ArgumentNullException.ThrowIfNull(windowInfo);
+        return new TargetWindowInfo
+        {
+            Handle = windowInfo.Handle,
+            Title = windowInfo.Title,
+            ProcessName = windowInfo.ProcessName,
+            ProcessId = windowInfo.ProcessId
+        };
+    }
+
+    /// <summary>
+    /// Creates a TargetWindowInfo from a full WindowInfo.
     /// </summary>
     /// <param name="windowInfo">The full window info.</param>
     /// <returns>A lightweight TargetWindowInfo.</returns>
-    public static TargetWindowInfo FromWindowInfo(WindowInfo windowInfo)
+    public static TargetWindowInfo FromFullWindowInfo(WindowInfo windowInfo)
     {
         ArgumentNullException.ThrowIfNull(windowInfo);
         return new TargetWindowInfo

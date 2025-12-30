@@ -6,37 +6,38 @@ Wait for Notepad to open and confirm it is visible.
 
 ## [AGENT]
 
-### CHECK FunctionCall
+### ASSERT FunctionCall
 ```json
 {
   "function_name": "keyboard_control"
 }
 ```
 
-### CHECK SemanticCondition
-The response indicates Notepad was launched or opened successfully
+### ASSERT ContainsAny
+notepad, launched, opened, visible, success
 
 ## [USER]
-Find the Notepad window and type "Hello from Windows MCP Server!" in the text area.
+Activate the Notepad window and type "Hello from Windows MCP Server!" into it.
 
 ## [AGENT]
 
-### CHECK FunctionCall
+### ASSERT FunctionCall
 ```json
 {
-  "function_name": "ui_automation"
+  "function_name": "keyboard_control"
 }
 ```
 
-### CHECK SemanticCondition
-The response indicates text was typed successfully
+### ASSERT ContainsAny
+typed, text, hello, success, notepad
 
 ## [USER]
 Take a screenshot of the Notepad window showing the text that was typed.
+Save the screenshot to the "screenshots" subdirectory in the current working directory.
 
 ## [AGENT]
 
-### CHECK FunctionCall
+### ASSERT FunctionCall
 ```json
 {
   "function_name": "screenshot_control"
@@ -48,27 +49,27 @@ Find the Notepad window and report its title and current state (maximized, minim
 
 ## [AGENT]
 
-### CHECK FunctionCall
+### ASSERT FunctionCall
 ```json
 {
   "function_name": "window_management"
 }
 ```
 
-### CHECK SemanticCondition
-The response mentions Notepad
+### ASSERT ContainsAny
+notepad, Notepad
 
 ## [USER]
 Click the X (close) button on the Notepad window to close it. If a save dialog appears, click "Don't Save" to discard changes.
 
 ## [AGENT]
 
-### CHECK FunctionCall
+### ASSERT FunctionCall
 ```json
 {
   "function_name": "ui_automation"
 }
 ```
 
-### CHECK SemanticCondition
-The response indicates the window was closed or the action completed
+### ASSERT ContainsAny
+closed, close, exit, done, discard, click

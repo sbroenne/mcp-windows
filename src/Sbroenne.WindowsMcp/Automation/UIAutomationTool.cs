@@ -94,7 +94,7 @@ public sealed partial class UIAutomationTool
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("UI element interaction via Windows UIA. Use click/type/ensure_state directly with app+nameContains - no find step needed. Example: click(app='Notepad', nameContains='Save'). Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element. For element discovery, use screenshot_control(annotate=true) instead. Prefer over mouse_control. See system://best-practices.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
+        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, get_element_details")]
         UIAutomationAction action,
 
         [Description("Window handle to target as a decimal string (copy verbatim from window_management output). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
@@ -175,7 +175,7 @@ public sealed partial class UIAutomationTool
         timeoutMs = Math.Clamp(timeoutMs, 0, 60000);
 
         // Resolve 'app' parameter to windowHandle if specified
-        Models.WindowInfo? resolvedWindow = null;
+        Models.WindowInfoCompact? resolvedWindow = null;
         if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
         {
             var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
@@ -291,6 +291,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
+                UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -359,6 +360,7 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
+            UIAutomationAction.GetElementDetails => "get_element_details",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -384,7 +386,7 @@ public sealed partial class UIAutomationTool
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch
@@ -541,13 +543,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("wait_for_state", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -655,13 +657,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
@@ -688,13 +690,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -733,7 +735,7 @@ public sealed partial class UIAutomationTool
         if (string.Equals(currentState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
         {
             // Already in desired state - return success without toggling
-            return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+            return UIAutomationResult.CreateSuccessCompact("ensure_state", [elementInfo], null) with
             {
                 UsageHint = $"Element was already in '{normalizedDesiredState}' state. No action taken."
             };
@@ -760,7 +762,7 @@ public sealed partial class UIAutomationTool
 
             if (string.Equals(elementInfo.ToggleState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
             {
-                return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+                return UIAutomationResult.CreateSuccessCompact("ensure_state", [elementInfo], null) with
                 {
                     UsageHint = $"Element toggled to '{normalizedDesiredState}' state (took {attempt + 1} toggle(s))."
                 };
@@ -830,13 +832,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
@@ -1028,6 +1030,30 @@ public sealed partial class UIAutomationTool
         return await _automationService.GetAncestorsAsync(elementId, depthLimit, cancellationToken);
     }
 
+    /// <summary>
+    /// Gets full element details by ID. Returns complete UIElementInfo with bounds, patterns, value, etc.
+    /// Use this after 'find' action when you need detailed information about a specific element.
+    /// </summary>
+    private async Task<UIAutomationResult> HandleGetElementDetailsAsync(
+        string? elementId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return UIAutomationResult.CreateFailure("get_element_details", UIAutomationErrorType.InvalidParameter,
+                "elementId is required for get_element_details action. Use 'find' first to get an element ID from the Items array.", null);
+        }
+
+        // Resolve and return full element info
+        var elementInfo = await _automationService.ResolveElementAsync(elementId, cancellationToken);
+        if (elementInfo == null)
+        {
+            return UIAutomationResult.CreateFailure("get_element_details", UIAutomationErrorType.ElementNotFound,
+                $"Element not found or stale: {elementId}. Use 'find' to get a fresh element ID.", null);
+        }
+
+        return UIAutomationResult.CreateSuccess("get_element_details", elementInfo, null);
+    }
+
     #endregion
 
     #region LoggerMessage Methods
@@ -1139,5 +1165,9 @@ public enum UIAutomationAction
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
     [Description("Get all ancestor elements of an element up to the window root")]
-    GetAncestors
+    GetAncestors,
+
+    /// <summary>Get full element details by ID (bounds, patterns, value, etc.).</summary>
+    [Description("Get full element details by ID. Use after find to get complete info for a specific element.")]
+    GetElementDetails
 }

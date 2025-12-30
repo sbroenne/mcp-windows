@@ -160,7 +160,7 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
         }
         finally
         {
@@ -342,7 +342,7 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
         }
         finally
         {
@@ -444,7 +444,7 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
         }
         finally
         {
@@ -541,7 +541,7 @@ public sealed class MouseInputService : IMouseInputService
         NativeMethods.GetCursorPos(out var finalPos);
         var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
     }
 
     /// <inheritdoc />
@@ -644,7 +644,7 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
         }
         finally
         {
@@ -706,13 +706,12 @@ public sealed class MouseInputService : IMouseInputService
 
         // Get the window title under the cursor before scrolling
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
 
         // If amount is 0, we can just return success without sending any input
         if (amount == 0)
         {
             var zeroPosition = new Coordinates(currentPos.X, currentPos.Y);
-            return Task.FromResult(MouseControlResult.CreateSuccess(zeroPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(zeroPosition, screenBounds));
         }
 
         // Determine the event flag and wheel delta based on direction
@@ -783,7 +782,7 @@ public sealed class MouseInputService : IMouseInputService
         NativeMethods.GetCursorPos(out var finalPos);
         var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
     }
 
     /// <summary>

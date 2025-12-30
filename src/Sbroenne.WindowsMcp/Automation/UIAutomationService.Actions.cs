@@ -20,7 +20,7 @@ public sealed partial class UIAutomationService
         try
         {
             var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure(
                     "click",
@@ -29,8 +29,8 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            var targetElement = findResult.Elements[0];
-            var elementId = targetElement.ElementId;
+            var targetElement = findResult.Items[0];
+            var elementId = targetElement.Id;
 
             return await PerformClickAsync(elementId, query.WindowHandle, stopwatch, cancellationToken);
         }
@@ -92,7 +92,7 @@ public sealed partial class UIAutomationService
             if (element.TryInvoke())
             {
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
             }
 
             // Fall back to clicking at element's clickable point
@@ -101,7 +101,7 @@ public sealed partial class UIAutomationService
             {
                 PerformPhysicalClick(clickablePoint.Value);
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
             }
 
             return UIAutomationResult.CreateFailure(
@@ -121,7 +121,7 @@ public sealed partial class UIAutomationService
         try
         {
             var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure(
                     "type",
@@ -130,8 +130,8 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            var targetElement = findResult.Elements[0];
-            var elementId = targetElement.ElementId;
+            var targetElement = findResult.Items[0];
+            var elementId = targetElement.Id;
 
             return await PerformTypeAsync(elementId, text, clearFirst, query.WindowHandle, stopwatch, cancellationToken);
         }
@@ -203,7 +203,7 @@ public sealed partial class UIAutomationService
                     if (element.TrySetValue(text))
                     {
                         var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                        return (Success: true, Result: UIAutomationResult.CreateSuccess("type", info!, CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
+                        return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                     }
                 }
             }
@@ -212,7 +212,7 @@ public sealed partial class UIAutomationService
                 if (element.TrySetValue(text))
                 {
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return (Success: true, Result: UIAutomationResult.CreateSuccess("type", info!, CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
+                    return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                 }
             }
 
@@ -244,7 +244,7 @@ public sealed partial class UIAutomationService
         return await _staThread.ExecuteAsync(() =>
         {
             var info = ConvertToElementInfo(staResult.Element!, staResult.RootElement!, _coordinateConverter);
-            return UIAutomationResult.CreateSuccess("type", info!, CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch));
         }, cancellationToken);
     }
 
@@ -257,7 +257,7 @@ public sealed partial class UIAutomationService
         try
         {
             var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure(
                     "select",
@@ -266,8 +266,8 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            var targetElement = findResult.Elements[0];
-            var elementId = targetElement.ElementId;
+            var targetElement = findResult.Items[0];
+            var elementId = targetElement.Id;
 
             return await PerformSelectAsync(elementId, value, query.WindowHandle, stopwatch, cancellationToken);
         }
@@ -329,7 +329,7 @@ public sealed partial class UIAutomationService
             if (TrySelectItem(element, value))
             {
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccess("select", info!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("select", [info!], CreateDiagnostics(stopwatch));
             }
 
             // Try ExpandCollapse + find item
@@ -350,7 +350,7 @@ public sealed partial class UIAutomationService
                         if (item.TryInvoke() || TrySelectElement(item))
                         {
                             var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                            return UIAutomationResult.CreateSuccess("select", info!, CreateDiagnostics(stopwatch));
+                            return UIAutomationResult.CreateSuccessCompact("select", [info!], CreateDiagnostics(stopwatch));
                         }
                     }
                 }
@@ -532,7 +532,7 @@ public sealed partial class UIAutomationService
                 if (element.TryInvoke())
                 {
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
                 }
 
                 // Fall back to clicking at element's clickable point
@@ -541,7 +541,7 @@ public sealed partial class UIAutomationService
                 {
                     PerformPhysicalClick(clickablePoint.Value);
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return UIAutomationResult.CreateSuccess("click", info!, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
                 }
 
                 return UIAutomationResult.CreateFailure(
@@ -606,7 +606,7 @@ public sealed partial class UIAutomationService
                 var rootElement = GetRootElementForScroll(element);
                 var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
 
-                return UIAutomationResult.CreateSuccess("highlight", elementInfo!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("highlight", [elementInfo!], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)

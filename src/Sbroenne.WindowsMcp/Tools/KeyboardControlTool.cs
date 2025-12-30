@@ -549,7 +549,7 @@ public sealed partial class KeyboardControlTool : IDisposable
                     var result = KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.WrongTargetWindow,
                         $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
@@ -562,7 +562,7 @@ public sealed partial class KeyboardControlTool : IDisposable
                     var result = KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.WrongTargetWindow,
                         $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
@@ -602,7 +602,7 @@ public sealed partial class KeyboardControlTool : IDisposable
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch

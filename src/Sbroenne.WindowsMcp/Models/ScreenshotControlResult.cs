@@ -6,100 +6,121 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Output model for screenshot operations.
 /// </summary>
+/// <remarks>
+/// Property names are intentionally short to minimize JSON token count:
+/// - ok: Success
+/// - ec: Error code
+/// - msg: Message
+/// - img: Image data (base64)
+/// - w: Width
+/// - h: Height
+/// - ow: Original width
+/// - oh: Original height
+/// - fmt: Format
+/// - sz: File size bytes
+/// - fp: File path
+/// - mon: Monitors list
+/// - avail: Available monitors
+/// - vs: Virtual screen
+/// - cmp: Composite metadata
+/// - ae: Annotated elements
+/// - n: Element count
+/// - hint: Usage hint
+/// </remarks>
 public sealed record ScreenshotControlResult
 {
     /// <summary>
     /// Gets a value indicating whether the operation succeeded.
     /// </summary>
-    [JsonPropertyName("success")]
+    [JsonPropertyName("ok")]
     public required bool Success { get; init; }
 
     /// <summary>
     /// Gets the error classification.
     /// </summary>
-    [JsonPropertyName("error_code")]
+    [JsonPropertyName("ec")]
     public required string ErrorCode { get; init; }
 
     /// <summary>
     /// Gets a human-readable description.
     /// </summary>
-    [JsonPropertyName("message")]
+    [JsonPropertyName("msg")]
     public required string Message { get; init; }
 
     /// <summary>
     /// Gets the base64-encoded image data. Null when OutputMode is File.
     /// </summary>
-    [JsonPropertyName("image_data")]
+    [JsonPropertyName("img")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ImageData { get; init; }
 
     /// <summary>
     /// Gets the output image width in pixels (after scaling if applied). Present on capture success.
     /// </summary>
-    [JsonPropertyName("width")]
+    [JsonPropertyName("w")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Width { get; init; }
 
     /// <summary>
     /// Gets the output image height in pixels (after scaling if applied). Present on capture success.
     /// </summary>
-    [JsonPropertyName("height")]
+    [JsonPropertyName("h")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Height { get; init; }
 
     /// <summary>
     /// Gets the original capture width before scaling. Present on capture success.
     /// </summary>
-    [JsonPropertyName("original_width")]
+    [JsonPropertyName("ow")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? OriginalWidth { get; init; }
 
     /// <summary>
     /// Gets the original capture height before scaling. Present on capture success.
     /// </summary>
-    [JsonPropertyName("original_height")]
+    [JsonPropertyName("oh")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? OriginalHeight { get; init; }
 
     /// <summary>
     /// Gets the image format ("jpeg" or "png"). Present on capture success.
     /// </summary>
-    [JsonPropertyName("format")]
+    [JsonPropertyName("fmt")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Format { get; init; }
 
     /// <summary>
     /// Gets the file size in bytes. Present on capture success.
     /// </summary>
-    [JsonPropertyName("file_size_bytes")]
+    [JsonPropertyName("sz")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public long? FileSizeBytes { get; init; }
 
     /// <summary>
     /// Gets the file path when OutputMode is File. Null for inline mode.
     /// </summary>
-    [JsonPropertyName("file_path")]
+    [JsonPropertyName("fp")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? FilePath { get; init; }
 
     /// <summary>
     /// Gets the list of available monitors. Present on ListMonitors action.
     /// </summary>
-    [JsonPropertyName("monitors")]
+    [JsonPropertyName("mon")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<MonitorInfo>? Monitors { get; init; }
 
     /// <summary>
     /// Gets the list of available monitors as a hint. Present on InvalidMonitorIndex error.
     /// </summary>
-    [JsonPropertyName("available_monitors")]
+    [JsonPropertyName("avail")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<MonitorInfo>? AvailableMonitors { get; init; }
 
     /// <summary>
     /// Gets the virtual screen bounds spanning all monitors. Present on ListMonitors action.
     /// </summary>
-    [JsonPropertyName("virtual_screen")]
+    [JsonPropertyName("vs")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public VirtualScreenInfo? VirtualScreen { get; init; }
 
@@ -107,7 +128,7 @@ public sealed record ScreenshotControlResult
     /// Gets the composite screenshot metadata. Present on all-monitors capture success.
     /// Contains monitor region information for each display in the composite image.
     /// </summary>
-    [JsonPropertyName("composite_metadata")]
+    [JsonPropertyName("cmp")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public CompositeScreenshotMetadata? CompositeMetadata { get; init; }
 
@@ -115,21 +136,21 @@ public sealed record ScreenshotControlResult
     /// Gets the list of annotated UI elements when annotate=true.
     /// Each element has an index matching the numbered label on the screenshot.
     /// </summary>
-    [JsonPropertyName("annotated_elements")]
+    [JsonPropertyName("ae")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<AnnotatedElement>? AnnotatedElements { get; init; }
 
     /// <summary>
     /// Gets the count of annotated elements. Present when annotate=true.
     /// </summary>
-    [JsonPropertyName("element_count")]
+    [JsonPropertyName("n")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ElementCount { get; init; }
 
     /// <summary>
     /// Gets a usage hint for the LLM when annotations are present.
     /// </summary>
-    [JsonPropertyName("usage_hint")]
+    [JsonPropertyName("hint")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? UsageHint { get; init; }
 

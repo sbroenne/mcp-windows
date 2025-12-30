@@ -114,8 +114,9 @@ public class MouseClickTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.Error}");
-        Assert.NotNull(result.WindowTitle);
-        Assert.Contains(MouseTestFixture.TestWindowTitle, result.WindowTitle);
+        Assert.NotNull(result.TargetWindow);
+        Assert.NotNull(result.TargetWindow.Title);
+        Assert.Contains(MouseTestFixture.TestWindowTitle, result.TargetWindow.Title);
     }
 
     [Fact]
@@ -172,6 +173,7 @@ public class MouseClickTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, textBoxCenter.Y - 2, textBoxCenter.Y + 2);
 
         // Verify window title confirms we clicked on the test harness
-        Assert.Contains(MouseTestFixture.TestWindowTitle, result.WindowTitle);
+        Assert.NotNull(result.TargetWindow);
+        Assert.Contains(MouseTestFixture.TestWindowTitle, result.TargetWindow.Title);
     }
 }

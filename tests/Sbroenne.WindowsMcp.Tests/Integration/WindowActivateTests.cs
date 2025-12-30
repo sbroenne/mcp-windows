@@ -1,5 +1,4 @@
 using System.Runtime.Versioning;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
@@ -64,7 +63,7 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
         Assert.True(result.Success, $"Activate failed: {result.Error}");
         Assert.NotNull(result.Window);
         // After activation, window should not be minimized
-        Assert.NotEqual(WindowState.Minimized, result.Window.State);
+        Assert.NotEqual("minimized", result.Window.State);
     }
 
     [Fact]
@@ -83,8 +82,8 @@ public class WindowActivateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result.Window);
         Assert.NotNull(result.Window.Title);
         Assert.NotNull(result.Window.Bounds);
-        Assert.True(result.Window.Bounds.Width > 0);
-        Assert.True(result.Window.Bounds.Height > 0);
+        Assert.True(result.Window.Bounds[2] > 0); // Width
+        Assert.True(result.Window.Bounds[3] > 0); // Height
     }
 
     [Fact]

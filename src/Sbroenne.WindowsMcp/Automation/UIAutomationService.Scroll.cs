@@ -84,7 +84,7 @@ public sealed partial class UIAutomationService
                             CreateDiagnostics(stopwatch));
                     }
 
-                    return UIAutomationResult.CreateSuccess("scroll_into_view", elementInfo, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
                 }
 
                 var scrollResult2 = TryScrollParentToElement(element, stopwatch.ElapsedMilliseconds, timeoutMs);
@@ -100,7 +100,7 @@ public sealed partial class UIAutomationService
                             CreateDiagnostics(stopwatch));
                     }
 
-                    return UIAutomationResult.CreateSuccess("scroll_into_view", elementInfo, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
                 }
 
                 return UIAutomationResult.CreateFailure(

@@ -68,7 +68,7 @@ public sealed partial class UIAutomationService
                 var rootElement = GetRootElementFromElementId(elementId) ?? element;
                 var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
 
-                return UIAutomationResult.CreateSuccess("invoke", elementInfo!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("invoke", [elementInfo!], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)

@@ -161,12 +161,10 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         {
             // Each element should have required properties
             Assert.True(element.Index > 0, "Index should be positive");
-            Assert.False(string.IsNullOrEmpty(element.ControlType), "ControlType should not be empty");
-            Assert.False(string.IsNullOrEmpty(element.ElementId), "ElementId should not be empty");
-            Assert.NotNull(element.ClickablePoint);
-            Assert.NotNull(element.BoundingBox);
-            Assert.True(element.BoundingBox.Width > 0, "BoundingBox width should be positive");
-            Assert.True(element.BoundingBox.Height > 0, "BoundingBox height should be positive");
+            Assert.False(string.IsNullOrEmpty(element.Type), "Type should not be empty");
+            Assert.False(string.IsNullOrEmpty(element.Id), "Id should not be empty");
+            Assert.NotNull(element.Click);
+            Assert.Equal(3, element.Click.Length); // [x, y, monitorIndex]
         }
     }
 
@@ -185,7 +183,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
 
         // Should find at least some buttons
         Assert.True(result.Elements.Length >= 1, $"Expected at least 1 button, found {result.Elements.Length}");
-        Assert.All(result.Elements, e => Assert.Equal("Button", e.ControlType));
+        Assert.All(result.Elements, e => Assert.Equal("Button", e.Type));
 
         // Save for manual verification
         SaveScreenshotForVerification(result, "WinForms_ButtonsOnly");
@@ -204,7 +202,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         // Just verify the operation completes successfully
         if (result.Success && result.Elements != null && result.Elements.Length > 0)
         {
-            Assert.All(result.Elements, e => Assert.Equal("Edit", e.ControlType));
+            Assert.All(result.Elements, e => Assert.Equal("Edit", e.Type));
         }
     }
 
@@ -219,7 +217,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         // Assert
         Assert.True(result.Success, $"Capture failed: {result.ErrorMessage}");
         Assert.NotNull(result.Elements);
-        Assert.All(result.Elements, e => Assert.Equal("Button", e.ControlType));
+        Assert.All(result.Elements, e => Assert.Equal("Button", e.Type));
     }
 
     [Fact]
@@ -294,14 +292,14 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         Assert.NotNull(result.Elements);
         Assert.True(result.Elements.Length > 0);
 
-        // Verify all elements have non-empty ElementIds in the expected format
+        // Verify all elements have non-empty Ids in the expected format
         foreach (var element in result.Elements)
         {
             Assert.False(
-                string.IsNullOrEmpty(element.ElementId),
-                $"Element {element.Index} should have a valid ElementId");
-            Assert.Contains("window:", element.ElementId);
-            Assert.Contains("runtime:", element.ElementId);
+                string.IsNullOrEmpty(element.Id),
+                $"Element {element.Index} should have a valid Id");
+            Assert.Contains("window:", element.Id);
+            Assert.Contains("runtime:", element.Id);
         }
     }
 
@@ -318,10 +316,12 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
 
         foreach (var element in result.Elements)
         {
-            // ClickablePoint coordinates should be reasonable
-            Assert.True(element.ClickablePoint.X >= 0, $"ClickablePoint.X should be non-negative for element {element.Index}");
-            Assert.True(element.ClickablePoint.Y >= 0, $"ClickablePoint.Y should be non-negative for element {element.Index}");
-            Assert.True(element.ClickablePoint.MonitorIndex >= 0, $"MonitorIndex should be non-negative for element {element.Index}");
+            // Click coordinates should be reasonable [x, y, monitorIndex]
+            Assert.NotNull(element.Click);
+            Assert.Equal(3, element.Click.Length);
+            Assert.True(element.Click[0] >= 0, $"Click X should be non-negative for element {element.Index}");
+            Assert.True(element.Click[1] >= 0, $"Click Y should be non-negative for element {element.Index}");
+            Assert.True(element.Click[2] >= 0, $"MonitorIndex should be non-negative for element {element.Index}");
         }
     }
 

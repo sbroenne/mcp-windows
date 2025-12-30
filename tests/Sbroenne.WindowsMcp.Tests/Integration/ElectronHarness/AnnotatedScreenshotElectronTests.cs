@@ -162,12 +162,10 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         {
             // Each element should have required properties
             Assert.True(element.Index > 0, "Index should be positive");
-            Assert.False(string.IsNullOrEmpty(element.ControlType), "ControlType should not be empty");
-            Assert.False(string.IsNullOrEmpty(element.ElementId), "ElementId should not be empty");
-            Assert.NotNull(element.ClickablePoint);
-            Assert.NotNull(element.BoundingBox);
-            Assert.True(element.BoundingBox.Width > 0, "BoundingBox width should be positive");
-            Assert.True(element.BoundingBox.Height > 0, "BoundingBox height should be positive");
+            Assert.False(string.IsNullOrEmpty(element.Type), "Type should not be empty");
+            Assert.False(string.IsNullOrEmpty(element.Id), "Id should not be empty");
+            Assert.NotNull(element.Click);
+            Assert.Equal(3, element.Click.Length); // [x, y, monitorIndex]
         }
     }
 
@@ -265,7 +263,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         // All elements should be buttons
         foreach (var element in result.Elements)
         {
-            Assert.Equal("Button", element.ControlType);
+            Assert.Equal("Button", element.Type);
         }
     }
 
@@ -284,7 +282,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
             // All returned elements should be Edit controls
             foreach (var element in result.Elements)
             {
-                Assert.Equal("Edit", element.ControlType);
+                Assert.Equal("Edit", element.Type);
             }
         }
     }
@@ -306,8 +304,8 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         foreach (var element in result.Elements)
         {
             Assert.True(
-                element.ControlType == "Button" || element.ControlType == "Edit",
-                $"Expected Button or Edit, got {element.ControlType}");
+                element.Type == "Button" || element.Type == "Edit",
+                $"Expected Button or Edit, got {element.Type}");
         }
     }
 
@@ -376,12 +374,14 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         foreach (var element in result.Elements)
         {
-            // ClickablePoint coordinates should be reasonable
-            Assert.True(element.ClickablePoint.X >= 0,
-                $"ClickablePoint.X should be non-negative for element {element.Index}");
-            Assert.True(element.ClickablePoint.Y >= 0,
-                $"ClickablePoint.Y should be non-negative for element {element.Index}");
-            Assert.True(element.ClickablePoint.MonitorIndex >= 0,
+            // Click coordinates should be reasonable [x, y, monitorIndex]
+            Assert.NotNull(element.Click);
+            Assert.Equal(3, element.Click.Length);
+            Assert.True(element.Click[0] >= 0,
+                $"Click X should be non-negative for element {element.Index}");
+            Assert.True(element.Click[1] >= 0,
+                $"Click Y should be non-negative for element {element.Index}");
+            Assert.True(element.Click[2] >= 0,
                 $"MonitorIndex should be non-negative for element {element.Index}");
         }
     }
@@ -398,14 +398,14 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         Assert.NotNull(result.Elements);
         Assert.NotEmpty(result.Elements);
 
-        // Verify all elements have non-empty ElementIds that can be used for subsequent operations
+        // Verify all elements have non-empty Ids that can be used for subsequent operations
         foreach (var element in result.Elements)
         {
             Assert.False(
-                string.IsNullOrEmpty(element.ElementId),
-                $"Element {element.Index} should have a valid ElementId");
-            Assert.Contains("window:", element.ElementId);
-            Assert.Contains("runtime:", element.ElementId);
+                string.IsNullOrEmpty(element.Id),
+                $"Element {element.Index} should have a valid Id");
+            Assert.Contains("window:", element.Id);
+            Assert.Contains("runtime:", element.Id);
         }
     }
 
@@ -424,10 +424,10 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
 
         // Try to use the first element's ID to get text
         var firstElement = captureResult.Elements[0];
-        Assert.NotNull(firstElement.ElementId);
+        Assert.NotNull(firstElement.Id);
 
         var getTextResult = await _automationService.GetTextAsync(
-            elementId: firstElement.ElementId,
+            elementId: firstElement.Id,
             windowHandle: _windowHandleString,
             includeChildren: false);
 
@@ -511,7 +511,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
             e.Name?.Contains("Home", StringComparison.OrdinalIgnoreCase) == true);
 
         Assert.NotNull(homeButton);
-        Assert.Equal("Button", homeButton.ControlType);
+        Assert.Equal("Button", homeButton.Type);
     }
 
     #endregion
@@ -679,14 +679,18 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
             Color.FromArgb(111, 66, 193),   // Purple
         };
 
-        // For each element, check if annotation-like colors appear near the bounding box
+        // For each element, check if annotation-like colors appear near the click position
+        // Since we no longer have BoundingBox in compact format, we sample near the Click coordinates
         var foundAnnotationColors = 0;
         foreach (var element in result.Elements.Take(5))
         {
-            var box = element.BoundingBox;
-            // Sample a few pixels near the top-right corner where labels are drawn
-            var sampleX = Math.Min(box.X + box.Width - 5, bitmap.Width - 1);
-            var sampleY = Math.Max(box.Y - 10, 0);
+            // Click is [x, y, monitorIndex] - sample near the click point
+            var clickX = element.Click[0];
+            var clickY = element.Click[1];
+
+            // Sample a few pixels above and to the right of click point where labels might be
+            var sampleX = Math.Min(clickX + 20, bitmap.Width - 1);
+            var sampleY = Math.Max(clickY - 20, 0);
 
             if (sampleX >= 0 && sampleX < bitmap.Width && sampleY >= 0 && sampleY < bitmap.Height)
             {

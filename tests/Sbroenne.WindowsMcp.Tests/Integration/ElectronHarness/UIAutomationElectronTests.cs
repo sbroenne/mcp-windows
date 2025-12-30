@@ -80,11 +80,11 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"GetTree failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Tree);
+        Assert.NotEmpty(result.Tree!);
 
         // The root should be the window
-        var root = result.Elements[0];
+        var root = result.Tree![0];
         Assert.Contains("Electron", root.Name ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -101,7 +101,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(result.Success);
 
         // Find Document element in the tree
-        var hasDocument = ContainsControlType(result.Elements, "Document");
+        var hasDocument = ContainsControlTypeInTree(result.Tree!, "Document");
         Assert.True(hasDocument, "Electron window should contain a Document element for web content");
     }
 
@@ -122,9 +122,9 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
-        Assert.Equal("Button", result.Elements[0].ControlType);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+        Assert.Equal("Button", result.Items![0].Type);
     }
 
     [Fact]
@@ -140,9 +140,9 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
-        Assert.Equal("Edit", result.Elements[0].ControlType);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+        Assert.Equal("Edit", result.Items![0].Type);
     }
 
     [Fact]
@@ -158,9 +158,9 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
-        Assert.Equal("ComboBox", result.Elements[0].ControlType);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+        Assert.Equal("ComboBox", result.Items![0].Type);
     }
 
     [Fact]
@@ -175,8 +175,8 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert - navigation landmark should be found
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
     }
 
     [Fact]
@@ -190,9 +190,9 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
+        Assert.NotNull(result.Items);
         // We have at least 3 buttons: Primary, Secondary, Submit
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 buttons, found {result.Elements.Length}");
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 buttons, found {result.Items!.Length}");
     }
 
     #endregion
@@ -200,7 +200,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     #region Element Properties Tests
 
     [Fact]
-    public async Task Find_Element_HasClickablePoint()
+    public async Task Find_Element_HasClickCoordinates()
     {
         var result = await _automationService.FindElementsAsync(new ElementQuery
         {
@@ -211,30 +211,12 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success);
-        Assert.NotNull(result.Elements);
-        var button = result.Elements[0];
-        Assert.NotNull(button.ClickablePoint);
-        Assert.True(button.ClickablePoint.X > 0, "ClickablePoint.X should be positive");
-        Assert.True(button.ClickablePoint.Y > 0, "ClickablePoint.Y should be positive");
-    }
-
-    [Fact]
-    public async Task Find_Element_HasBoundingRect()
-    {
-        var result = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Navigate Home",
-            ControlType = "Button",
-        });
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.NotNull(result.Elements);
-        var button = result.Elements[0];
-        Assert.NotNull(button.BoundingRect);
-        Assert.True(button.BoundingRect.Width > 0, "BoundingRect.Width should be positive");
-        Assert.True(button.BoundingRect.Height > 0, "BoundingRect.Height should be positive");
+        Assert.NotNull(result.Items);
+        var button = result.Items![0];
+        Assert.NotNull(button.Click);
+        Assert.Equal(3, button.Click.Length); // [x, y, monitorIndex]
+        Assert.True(button.Click[0] > 0, "Click X should be positive");
+        Assert.True(button.Click[1] > 0, "Click Y should be positive");
     }
 
     [Fact]
@@ -249,10 +231,10 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success);
-        Assert.NotNull(result.Elements);
-        var button = result.Elements[0];
-        Assert.NotNull(button.ClickablePoint);
-        Assert.True(button.ClickablePoint.MonitorIndex >= 0, "MonitorIndex should be non-negative");
+        Assert.NotNull(result.Items);
+        var button = result.Items![0];
+        Assert.NotNull(button.Click);
+        Assert.True(button.Click[2] >= 0, "MonitorIndex should be non-negative");
     }
 
     #endregion
@@ -308,8 +290,8 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
 
         Assert.True(findResult.Success);
-        Assert.NotNull(findResult.Elements);
-        var inputId = findResult.Elements[0].ElementId;
+        Assert.NotNull(findResult.Items);
+        var inputId = findResult.Items![0].Id;
         Assert.NotNull(inputId);
 
         var getTextResult = await _automationService.GetTextAsync(
@@ -337,8 +319,8 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
 
         Assert.True(findResult.Success);
-        Assert.NotNull(findResult.Elements);
-        var buttonId = findResult.Elements[0].ElementId;
+        Assert.NotNull(findResult.Items);
+        var buttonId = findResult.Items![0].Id;
         Assert.NotNull(buttonId);
 
         // Act - Invoke the button
@@ -373,13 +355,13 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
 
         // Skip if element not found (CI environment timing issues)
-        if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+        if (!findResult.Success || findResult.Items == null || findResult.Items!.Length == 0)
         {
             // Element not available in this run - skip gracefully
             return;
         }
 
-        var inputId = findResult.Elements[0].ElementId;
+        var inputId = findResult.Items![0].Id;
         Assert.NotNull(inputId);
 
         // Act
@@ -408,8 +390,8 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
 
         Assert.True(groupResult.Success);
-        Assert.NotNull(groupResult.Elements);
-        var groupId = groupResult.Elements[0].ElementId;
+        Assert.NotNull(groupResult.Items);
+        var groupId = groupResult.Items![0].Id;
         Assert.NotNull(groupId);
 
         // Now search for buttons within that group only
@@ -422,9 +404,9 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(buttonResult.Success);
-        Assert.NotNull(buttonResult.Elements);
+        Assert.NotNull(buttonResult.Items);
         // Should find the 4 navigation buttons (Home, Forms, Data, Settings)
-        Assert.True(buttonResult.Elements.Length >= 4, $"Expected at least 4 buttons in navigation, found {buttonResult.Elements.Length}");
+        Assert.True(buttonResult.Items!.Length >= 4, $"Expected at least 4 buttons in navigation, found {buttonResult.Items!.Length}");
     }
 
     #endregion
@@ -449,8 +431,8 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"WaitFor failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
         Assert.True(stopwatch.ElapsedMilliseconds < 2000, "WaitFor should return quickly for existing elements");
     }
 
@@ -683,7 +665,7 @@ public sealed class UIAutomationElectronTests : IDisposable
             ControlType = "Button",
         });
 
-        if (allButtons.Success && allButtons.Elements?.Length >= 2)
+        if (allButtons.Success && allButtons.Items?.Length >= 2)
         {
             // Find buttons starting from 2nd specifically
             // FoundIndex=2 returns up to 2 elements starting from the 2nd match
@@ -695,10 +677,10 @@ public sealed class UIAutomationElectronTests : IDisposable
             });
 
             Assert.True(secondResult.Success);
-            Assert.NotNull(secondResult.Elements);
-            Assert.True(secondResult.Elements.Length >= 1, "Should find at least one button starting from 2nd");
+            Assert.NotNull(secondResult.Items);
+            Assert.True(secondResult.Items!.Length >= 1, "Should find at least one button starting from 2nd");
             // The first result should be the 2nd button (not the first)
-            Assert.NotEqual(allButtons.Elements[0].ElementId, secondResult.Elements[0].ElementId);
+            Assert.NotEqual(allButtons.Items![0].Id, secondResult.Items![0].Id);
         }
     }
 
@@ -716,15 +698,15 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
 
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should find at least one element with 'Input' in name");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should find at least one element with 'Input' in name");
     }
 
     #endregion
 
     #region Helper Methods
 
-    private static bool ContainsControlType(UIElementInfo[]? elements, string controlType)
+    private static bool ContainsControlType(UIElementCompact[]? elements, string controlType)
     {
         if (elements == null)
         {
@@ -733,12 +715,30 @@ public sealed class UIAutomationElectronTests : IDisposable
 
         foreach (var element in elements)
         {
-            if (string.Equals(element.ControlType, controlType, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(element.Type, controlType, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsControlTypeInTree(UIElementCompactTree[]? elements, string controlType)
+    {
+        if (elements == null)
+        {
+            return false;
+        }
+
+        foreach (var element in elements)
+        {
+            if (string.Equals(element.Type, controlType, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            if (ContainsControlType(element.Children, controlType))
+            if (ContainsControlTypeInTree(element.Children, controlType))
             {
                 return true;
             }
