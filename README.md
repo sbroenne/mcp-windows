@@ -76,6 +76,9 @@ ui_automation(action='ocr', app='CustomApp') → structured text data
 - **🔒 Security-Aware**  
   Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
+- **🪙 Token Optimized**  
+  JSON responses use short property names to minimize token usage. Reduces LLM costs and improves response times.
+
 For detailed feature documentation, see [FEATURES.md](FEATURES.md).
 
 ## The Workflow
@@ -148,7 +151,7 @@ If you downloaded from the releases page, add to your MCP client configuration:
 | `screenshot_control` | Annotated screenshots for discovery | capture with element overlays (default) |
 | `mouse_control` | Fallback mouse input | click, move, drag, scroll |
 | `keyboard_control` | Keyboard input & hotkeys | type, press, key sequences |
-| `window_management` | Window control | find, activate, move, resize |
+| `window_management` | Window control & app launching | launch, find, activate, move, resize |
 
 For complete action reference, see [FEATURES.md](FEATURES.md).
 

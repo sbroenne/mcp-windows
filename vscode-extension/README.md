@@ -60,6 +60,8 @@ Plus **local OCR** for text extraction — no image upload, ~100ms.
 
 - **🔒 Security-Aware** — Handles elevated windows, UAC prompts, and secure desktop.
 
+- **🪙 Token Optimized** — JSON responses use short property names to minimize token usage. Reduces costs and improves response times.
+
 ---
 
 ## How It Works
