@@ -16,8 +16,7 @@ There are other Windows MCP servers. Here's why this one exists:
 |---|---|---|
 | **Primary approach** | UI Automation API | Screenshot + vision model |
 | **Response time** | ~50ms | ~700ms–2.5s |
-| **Scope** | Windows UI only | Often includes shell, file, browser tools |
-| **Telemetry** | None | Varies |
+| **Token efficiency** | Optimized (60% reduction) | Standard |
 
 ### Why UI Automation First?
 
