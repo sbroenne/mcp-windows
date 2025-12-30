@@ -12,10 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Launch applications directly from the MCP server
   - Automatic window detection after launch
   - Returns window handle for subsequent operations
-- **skUnit LLM integration tests** - New test project for end-to-end testing with AI
-  - Uses [skUnit](https://github.com/mehrandvd/skunit) for semantic testing
-  - Markdown-based test scenarios with assertions
-- **Build script** - `build-standalone.ps1` for local single-file builds
 
 ### Changed
 - **Optimized JSON output for token efficiency** - Reduced token usage in tool responses
