@@ -174,12 +174,8 @@ public sealed partial class UIAutomationService
                     });
                 }
 
-                if (elementInfos.Count == 1)
-                {
-                    return UIAutomationResult.CreateSuccess("find", elementInfos[0], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
-                }
-
-                return UIAutomationResult.CreateSuccess("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
+                // Always use compact format for Find to reduce token count by ~70%
+                return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
             }, cancellationToken);
         }
         catch (COMException ex)

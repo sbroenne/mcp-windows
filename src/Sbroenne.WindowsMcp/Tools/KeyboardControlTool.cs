@@ -9,6 +9,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Serialization;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -19,13 +20,6 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class KeyboardControlTool : IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly IWindowEnumerator _windowEnumerator;
     private readonly IWindowService _windowService;
@@ -81,7 +75,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input: type, press (with optional modifiers for hotkeys), key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle. For hotkeys like Ctrl+S: press(key='s', modifiers='ctrl'). Prefer ui_automation(action='type') for text entry. Use 'app' parameter to auto-activate target window.")]
+    [Description("Keyboard input to the CURRENTLY FOCUSED window/element. Best for: hotkeys (Win+R, Ctrl+S, Alt+Tab), special keys (Enter, Escape, Tab, arrows), typing into dialogs you just opened (e.g., Run dialog after Win+R). For typing text into a SPECIFIC UI element (e.g., Notepad's document area), use ui_automation(action='type', app='...') instead. Actions: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -254,7 +248,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             _logger.LogOperationException(correlationId, action ?? "null", ex);
@@ -405,7 +399,7 @@ public sealed partial class KeyboardControlTool : IDisposable
         IReadOnlyList<KeySequenceItem> sequence;
         try
         {
-            sequence = JsonSerializer.Deserialize<List<KeySequenceItem>>(sequenceJson, JsonOptions) ?? [];
+            sequence = JsonSerializer.Deserialize<List<KeySequenceItem>>(sequenceJson, McpJsonOptions.Default) ?? [];
         }
         catch (JsonException ex)
         {
@@ -549,7 +543,7 @@ public sealed partial class KeyboardControlTool : IDisposable
                     var result = KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.WrongTargetWindow,
                         $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
@@ -562,14 +556,14 @@ public sealed partial class KeyboardControlTool : IDisposable
                     var result = KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.WrongTargetWindow,
                         $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
             // Window matches expectations
             return KeyboardControlResult.CreateSuccess();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.WrongTargetWindow,
@@ -602,7 +596,7 @@ public sealed partial class KeyboardControlTool : IDisposable
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch

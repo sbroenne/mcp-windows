@@ -89,8 +89,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - should return all buttons (at least Submit, Cancel, Disabled)
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 buttons, got {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 buttons, got {result.Items!.Length}");
     }
 
     [Fact]
@@ -104,10 +104,10 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         });
 
         Assert.True(allButtonsResult.Success, "Failed to find all buttons");
-        Assert.True(allButtonsResult.Elements?.Length >= 2, "Need at least 2 buttons for this test");
+        Assert.True(allButtonsResult.Items?.Length >= 2, "Need at least 2 buttons for this test");
 
-        var firstButton = allButtonsResult.Elements![0];
-        var secondButton = allButtonsResult.Elements![1];
+        var firstButton = allButtonsResult.Items![0];
+        var secondButton = allButtonsResult.Items![1];
 
         // Act - Now get buttons starting from the 2nd one
         // With FoundIndex=2, maxResults is set to 2, so we get up to 2 elements starting from 2nd
@@ -120,12 +120,12 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - Should include 2nd button but not the first
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should find at least one button");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should find at least one button");
 
         // First result should be the 2nd button (not the first)
-        Assert.NotEqual(firstButton.ElementId, result.Elements[0].ElementId);
-        Assert.Equal(secondButton.ElementId, result.Elements[0].ElementId);
+        Assert.NotEqual(firstButton.Id, result.Items![0].Id);
+        Assert.Equal(secondButton.Id, result.Items![0].Id);
     }
 
     [Fact]
@@ -142,9 +142,9 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - with exactly 3 checkboxes, starting from 3rd gives us just the 3rd one
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should find at least one checkbox");
-        Assert.Equal("CheckBox", result.Elements[0].ControlType);
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should find at least one checkbox");
+        Assert.Equal("CheckBox", result.Items![0].Type);
     }
 
     [Fact]
@@ -181,9 +181,9 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should find at least Submit button");
-        Assert.Contains(result.Elements, e => e.Name?.Contains("Submit", StringComparison.OrdinalIgnoreCase) == true);
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should find at least Submit button");
+        Assert.Contains(result.Items!, e => e.Name?.Contains("Submit", StringComparison.OrdinalIgnoreCase) == true);
     }
 
     [Fact]
@@ -199,8 +199,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1);
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1);
     }
 
     [Fact]
@@ -235,8 +235,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 2, "Should find Submit and Cancel");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 2, "Should find Submit and Cancel");
     }
 
     [Fact]
@@ -252,8 +252,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - Submit ends with "mit"
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.Contains(result.Elements, e => e.Name?.Contains("Submit") == true);
+        Assert.NotNull(result.Items);
+        Assert.Contains(result.Items!, e => e.Name?.Contains("Submit") == true);
     }
 
     [Fact]
@@ -288,10 +288,10 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - Should find the window itself
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
+        Assert.NotNull(result.Items);
         // Root should be a Window or Pane type
-        Assert.Contains(result.Elements, e =>
-            e.ControlType == "Window" || e.ControlType == "Pane");
+        Assert.Contains(result.Items!, e =>
+            e.Type == "Window" || e.Type == "Pane");
     }
 
     [Fact]
@@ -306,8 +306,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should have at least one immediate child");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should have at least one immediate child");
     }
 
     #endregion
@@ -327,7 +327,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         Assert.True(textboxResult.Success, "Failed to find textbox");
 
         // Focus the element
-        var focusResult = await _automationService.FocusElementAsync(textboxResult.Elements![0].ElementId);
+        var focusResult = await _automationService.FocusElementAsync(textboxResult.Items![0].Id);
 
         // Skip if elevation prevents focus (common in CI environments)
         Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
@@ -344,8 +344,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         // Assert - just verify that we can get a focused element
         // The actual focused element may vary depending on system state
         Assert.True(result.Success, $"GetFocusedElement failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should return at least one focused element");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should return at least one focused element");
     }
 
     #endregion
@@ -363,19 +363,19 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         });
 
         Assert.True(checkboxResult.Success, "Failed to find checkbox");
-        var checkbox = checkboxResult.Elements![0];
+        var checkbox = checkboxResult.Items![0];
 
         // Get ancestors
-        var result = await _automationService.GetAncestorsAsync(checkbox.ElementId, null);
+        var result = await _automationService.GetAncestorsAsync(checkbox.Id, null);
 
         // Assert
         Assert.True(result.Success, $"GetAncestors failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 2, "Should have at least parent and window");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 2, "Should have at least parent and window");
 
         // The ancestors should include the window
-        Assert.Contains(result.Elements, e =>
-            e.ControlType == "Window" || e.ControlType == "Pane");
+        Assert.Contains(result.Items!, e =>
+            e.Type == "Window" || e.Type == "Pane");
     }
 
     [Fact]
@@ -455,9 +455,9 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - Should only find Submit
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.Single(result.Elements);
-        Assert.Contains("Submit", result.Elements[0].Name ?? string.Empty);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items!);
+        Assert.Contains("Submit", result.Items![0].Name ?? string.Empty);
     }
 
     [Fact]
@@ -470,7 +470,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
             ControlType = "CheckBox",
         });
 
-        Assert.True(allCheckboxes.Success && allCheckboxes.Elements?.Length >= 2,
+        Assert.True(allCheckboxes.Success && allCheckboxes.Items?.Length >= 2,
             "Need at least 2 checkboxes for this test");
 
         // Now use FoundIndex=2 with CheckBox type
@@ -483,9 +483,9 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
         // Assert - Should start from 2nd checkbox
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Should find at least one checkbox");
-        Assert.NotEqual(allCheckboxes.Elements![0].ElementId, result.Elements[0].ElementId);
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Should find at least one checkbox");
+        Assert.NotEqual(allCheckboxes.Items![0].Id, result.Items![0].Id);
     }
 
     #endregion

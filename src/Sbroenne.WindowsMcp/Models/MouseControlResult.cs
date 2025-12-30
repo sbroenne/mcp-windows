@@ -6,34 +6,46 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// The response payload for the mouse_control MCP tool.
 /// </summary>
+/// <remarks>
+/// Property names are intentionally short to minimize JSON token count:
+/// - ok: Success
+/// - pos: Final position [x, y]
+/// - tw: Target window info
+/// - mi: Monitor index
+/// - mw: Monitor width
+/// - mh: Monitor height
+/// - err: Error message
+/// - ec: Error code
+/// - ed: Error details
+/// - fix: Recovery suggestion
+/// </remarks>
 public sealed record MouseControlResult
 {
     /// <summary>
     /// Gets a value indicating whether the operation completed successfully.
     /// </summary>
     [Required]
-    [JsonPropertyName("success")]
+    [JsonPropertyName("ok")]
     public required bool Success { get; init; }
 
     /// <summary>
-    /// Gets the final cursor position after the operation.
+    /// Gets the final cursor position after the operation. Internal use only.
     /// </summary>
-    [Required]
-    [JsonPropertyName("final_position")]
-    public required FinalPosition FinalPosition { get; init; }
+    [JsonIgnore]
+    public FinalPosition FinalPosition { get; init; } = new(0, 0);
 
     /// <summary>
-    /// Gets the title of the window under the cursor (if available).
+    /// Gets the final cursor position as [x, y] array for JSON serialization.
     /// </summary>
-    [JsonPropertyName("window_title")]
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? WindowTitle { get; init; }
+    [Required]
+    [JsonPropertyName("pos")]
+    public int[] Position => [FinalPosition.X, FinalPosition.Y];
 
     /// <summary>
     /// Gets detailed information about the window that received the mouse input.
     /// This helps LLM agents verify that clicks/input went to the correct window.
     /// </summary>
-    [JsonPropertyName("target_window")]
+    [JsonPropertyName("tw")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TargetWindowInfo? TargetWindow { get; init; }
 
@@ -41,7 +53,7 @@ public sealed record MouseControlResult
     /// Gets the monitor index where the operation occurred (0-based).
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("monitor_index")]
+    [JsonPropertyName("mi")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorIndex { get; init; }
 
@@ -49,7 +61,7 @@ public sealed record MouseControlResult
     /// Gets the width of the monitor where the operation occurred.
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("monitor_width")]
+    [JsonPropertyName("mw")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorWidth { get; init; }
 
@@ -57,14 +69,14 @@ public sealed record MouseControlResult
     /// Gets the height of the monitor where the operation occurred.
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("monitor_height")]
+    [JsonPropertyName("mh")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorHeight { get; init; }
 
     /// <summary>
     /// Gets the error message if the operation failed.
     /// </summary>
-    [JsonPropertyName("error")]
+    [JsonPropertyName("err")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Error { get; init; }
 
@@ -77,14 +89,14 @@ public sealed record MouseControlResult
     /// <summary>
     /// Gets the error code string for JSON serialization.
     /// </summary>
-    [JsonPropertyName("error_code")]
+    [JsonPropertyName("ec")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorCodeString => ErrorCode == MouseControlErrorCode.Success ? null : ConvertErrorCodeToString(ErrorCode);
 
     /// <summary>
     /// Gets additional context for errors (e.g., valid_bounds for out-of-bounds errors).
     /// </summary>
-    [JsonPropertyName("error_details")]
+    [JsonPropertyName("ed")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object>? ErrorDetails { get; init; }
 
@@ -92,7 +104,7 @@ public sealed record MouseControlResult
     /// Gets the suggested recovery action for LLM agents when the operation fails.
     /// Provides actionable guidance on what to try next.
     /// </summary>
-    [JsonPropertyName("recovery_suggestion")]
+    [JsonPropertyName("fix")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RecoverySuggestion { get; init; }
 
@@ -113,7 +125,6 @@ public sealed record MouseControlResult
     /// </summary>
     /// <param name="coordinates">The final cursor coordinates.</param>
     /// <param name="screenBounds">The current screen bounds.</param>
-    /// <param name="windowTitle">Optional window title under the cursor.</param>
     /// <param name="monitorIndex">Optional monitor index where the operation occurred.</param>
     /// <param name="monitorWidth">Optional width of the monitor where the operation occurred.</param>
     /// <param name="monitorHeight">Optional height of the monitor where the operation occurred.</param>
@@ -121,7 +132,6 @@ public sealed record MouseControlResult
     public static MouseControlResult CreateSuccess(
         Coordinates coordinates,
         ScreenBounds? screenBounds = null,
-        string? windowTitle = null,
         int? monitorIndex = null,
         int? monitorWidth = null,
         int? monitorHeight = null)
@@ -130,7 +140,6 @@ public sealed record MouseControlResult
         {
             Success = true,
             FinalPosition = new FinalPosition(coordinates.X, coordinates.Y),
-            WindowTitle = windowTitle,
             MonitorIndex = monitorIndex,
             MonitorWidth = monitorWidth,
             MonitorHeight = monitorHeight,
@@ -236,6 +245,4 @@ public sealed record MouseControlResult
 /// </summary>
 /// <param name="X">The x-coordinate.</param>
 /// <param name="Y">The y-coordinate.</param>
-public sealed record FinalPosition(
-    [property: JsonPropertyName("x")] int X,
-    [property: JsonPropertyName("y")] int Y);
+public sealed record FinalPosition(int X, int Y);

@@ -92,9 +92,9 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. Use click/type/ensure_state directly with app+nameContains - no find step needed. Example: click(app='Notepad', nameContains='Save'). Actions: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, ocr, ocr_element. For element discovery, use screenshot_control(annotate=true) instead. Prefer over mouse_control. See system://best-practices.")]
+    [Description("UI element interaction via Windows UIA. PRIMARY TOOL for clicking buttons and typing text. Examples: click(app='Notepad', nameContains='Close') clicks the Close button; type(app='Notepad', text='Hello') types into the document. Works with title bar buttons (Close, Minimize, Maximize), dialogs, and all standard UI controls. Use directly with app+nameContains - no find step needed. Actions: click, type, invoke, toggle, ensure_state, select, find, get_tree, wait_for, wait_for_disappear, get_text, focus, scroll_into_view, highlight, ocr. ALWAYS prefer over mouse_control for clicking UI elements.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors")]
+        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, get_element_details")]
         UIAutomationAction action,
 
         [Description("Window handle to target as a decimal string (copy verbatim from window_management output). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
@@ -175,7 +175,7 @@ public sealed partial class UIAutomationTool
         timeoutMs = Math.Clamp(timeoutMs, 0, 60000);
 
         // Resolve 'app' parameter to windowHandle if specified
-        Models.WindowInfo? resolvedWindow = null;
+        Models.WindowInfoCompact? resolvedWindow = null;
         if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
         {
             var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
@@ -280,7 +280,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.Toggle => await HandleToggleAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
                 UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, cancellationToken),
                 UIAutomationAction.Invoke => await HandleInvokeAsync(elementId, value, cancellationToken),
-                UIAutomationAction.Focus => await HandleFocusAsync(elementId, cancellationToken),
+                UIAutomationAction.Focus => await HandleFocusAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
                 UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
                 UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, includeChildren, cancellationToken),
                 UIAutomationAction.Highlight => await HandleHighlightAsync(elementId, cancellationToken),
@@ -291,6 +291,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
+                UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -314,7 +315,7 @@ public sealed partial class UIAutomationTool
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogActionError(_logger, action, ex);
             return UIAutomationResult.CreateFailure(
@@ -359,6 +360,7 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetElementAtCursor => "get_element_at_cursor",
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
+            UIAutomationAction.GetElementDetails => "get_element_details",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -384,7 +386,7 @@ public sealed partial class UIAutomationTool
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch
@@ -424,7 +426,7 @@ public sealed partial class UIAutomationTool
 
             return UIAutomationResult.CreateSuccess(actionName, Array.Empty<UIElementInfo>(), null);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return UIAutomationResult.CreateFailure(
                 actionName,
@@ -474,6 +476,24 @@ public sealed partial class UIAutomationTool
         string? controlType, string? automationId, string? className, int? exactDepth, int foundIndex,
         int timeoutMs, CancellationToken cancellationToken)
     {
+        // Validate that at least one search criterion is provided
+        var hasSearchCriteria = !string.IsNullOrEmpty(name) ||
+                                !string.IsNullOrEmpty(nameContains) ||
+                                !string.IsNullOrEmpty(namePattern) ||
+                                !string.IsNullOrEmpty(controlType) ||
+                                !string.IsNullOrEmpty(automationId) ||
+                                !string.IsNullOrEmpty(className);
+
+        if (!hasSearchCriteria)
+        {
+            return UIAutomationResult.CreateFailure(
+                "wait_for",
+                UIAutomationErrorType.InvalidParameter,
+                "wait_for requires at least one search criterion. Provide name, nameContains, controlType, or automationId to identify the element to wait for.",
+                null,
+                "Example: wait_for(app='Notepad', nameContains='Don\\'t Save', controlType='Button')");
+        }
+
         var query = new ElementQuery
         {
             WindowHandle = windowHandle,
@@ -541,13 +561,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("wait_for_state", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -655,13 +675,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("toggle", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Toggle, null, cancellationToken);
@@ -688,13 +708,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("ensure_state", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         if (string.IsNullOrEmpty(desiredState))
@@ -733,7 +753,7 @@ public sealed partial class UIAutomationTool
         if (string.Equals(currentState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
         {
             // Already in desired state - return success without toggling
-            return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+            return UIAutomationResult.CreateSuccessCompact("ensure_state", [elementInfo], null) with
             {
                 UsageHint = $"Element was already in '{normalizedDesiredState}' state. No action taken."
             };
@@ -760,7 +780,7 @@ public sealed partial class UIAutomationTool
 
             if (string.Equals(elementInfo.ToggleState, normalizedDesiredState, StringComparison.OrdinalIgnoreCase))
             {
-                return UIAutomationResult.CreateSuccess("ensure_state", elementInfo, null) with
+                return UIAutomationResult.CreateSuccessCompact("ensure_state", [elementInfo], null) with
                 {
                     UsageHint = $"Element toggled to '{normalizedDesiredState}' state (took {attempt + 1} toggle(s))."
                 };
@@ -780,14 +800,89 @@ public sealed partial class UIAutomationTool
         return await _automationService.InvokePatternAsync(elementId, PatternTypes.Invoke, value, cancellationToken);
     }
 
-    private async Task<UIAutomationResult> HandleFocusAsync(string? elementId, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> HandleFocusAsync(
+        string? elementId,
+        string? windowHandle,
+        string? name, string? nameContains, string? namePattern,
+        string? controlType, string? automationId, string? className, int foundIndex,
+        CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(elementId))
+        // If elementId is provided, focus that element directly
+        if (!string.IsNullOrEmpty(elementId))
         {
-            return UIAutomationResult.CreateFailure("focus", UIAutomationErrorType.InvalidParameter, "Element ID is required for focus action", null);
+            return await _automationService.FocusElementAsync(elementId, cancellationToken);
         }
 
-        return await _automationService.FocusElementAsync(elementId, cancellationToken);
+        // If no elementId but we have a windowHandle, focus the window itself
+        // This is a common use case - focusing a window before typing
+        if (!string.IsNullOrWhiteSpace(windowHandle))
+        {
+            if (WindowHandleParser.TryParse(windowHandle, out var parsed) && parsed != nint.Zero)
+            {
+                // Activate the window using window service
+                var activateResult = await _windowService.ActivateWindowAsync(parsed, cancellationToken);
+                if (activateResult.Success)
+                {
+                    return UIAutomationResult.CreateSuccess("focus", Array.Empty<UIElementInfo>(), null) with
+                    {
+                        UsageHint = "Window focused successfully. You can now use keyboard_control to type into it."
+                    };
+                }
+                else
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "focus",
+                        UIAutomationErrorType.WindowNotFound,
+                        $"Failed to focus window: {activateResult.Error}",
+                        null,
+                        "Verify the window handle is valid using window_management(action='list')");
+                }
+            }
+        }
+
+        // If we have search criteria, find the element first and then focus it
+        var hasSearchCriteria = !string.IsNullOrEmpty(name) ||
+                                !string.IsNullOrEmpty(nameContains) ||
+                                !string.IsNullOrEmpty(namePattern) ||
+                                !string.IsNullOrEmpty(controlType) ||
+                                !string.IsNullOrEmpty(automationId) ||
+                                !string.IsNullOrEmpty(className);
+
+        if (hasSearchCriteria)
+        {
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = foundIndex
+            };
+
+            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "focus",
+                    UIAutomationErrorType.ElementNotFound,
+                    "Element not found. Provide elementId, windowHandle, or search criteria (name, controlType, automationId).",
+                    null,
+                    "To focus a window, use: focus(app='Notepad') or focus(windowHandle='12345'). To focus an element, use: focus(app='Notepad', controlType='Edit')");
+            }
+
+            return await _automationService.FocusElementAsync(findResult.Items[0].Id, cancellationToken);
+        }
+
+        // No elementId, no windowHandle, no search criteria
+        return UIAutomationResult.CreateFailure(
+            "focus",
+            UIAutomationErrorType.InvalidParameter,
+            "Focus action requires a target. Provide one of: elementId, windowHandle (or use 'app' parameter), or search criteria (name, controlType, automationId).",
+            null,
+            "To focus a window: focus(app='Notepad'). To focus an element: focus(app='Notepad', controlType='Edit', nameContains='Text')");
     }
 
     private async Task<UIAutomationResult> HandleScrollIntoViewAsync(
@@ -830,13 +925,13 @@ public sealed partial class UIAutomationTool
             };
 
             var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Elements == null || findResult.Elements.Length == 0)
+            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId or search criteria (name, nameContains, controlType, automationId).", null);
             }
 
-            elementId = findResult.Elements[0].ElementId;
+            elementId = findResult.Items[0].Id;
         }
 
         return await _automationService.GetTextAsync(elementId, windowHandle, includeChildren, cancellationToken);
@@ -911,7 +1006,7 @@ public sealed partial class UIAutomationTool
 
             return UIAutomationResult.CreateSuccessWithText("ocr", resultText, null);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return UIAutomationResult.CreateFailure("ocr", UIAutomationErrorType.InternalError, $"OCR failed: {ex.Message}", null);
         }
@@ -966,7 +1061,7 @@ public sealed partial class UIAutomationTool
 
             return UIAutomationResult.CreateSuccessWithText("ocr_element", resultText, null);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return UIAutomationResult.CreateFailure("ocr_element", UIAutomationErrorType.InternalError, $"OCR failed: {ex.Message}", null);
         }
@@ -1026,6 +1121,30 @@ public sealed partial class UIAutomationTool
         // Use maxDepth as the ancestor depth limit (null for unlimited)
         int? depthLimit = maxDepth > 0 && maxDepth < 20 ? maxDepth : null;
         return await _automationService.GetAncestorsAsync(elementId, depthLimit, cancellationToken);
+    }
+
+    /// <summary>
+    /// Gets full element details by ID. Returns complete UIElementInfo with bounds, patterns, value, etc.
+    /// Use this after 'find' action when you need detailed information about a specific element.
+    /// </summary>
+    private async Task<UIAutomationResult> HandleGetElementDetailsAsync(
+        string? elementId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(elementId))
+        {
+            return UIAutomationResult.CreateFailure("get_element_details", UIAutomationErrorType.InvalidParameter,
+                "elementId is required for get_element_details action. Use 'find' first to get an element ID from the Items array.", null);
+        }
+
+        // Resolve and return full element info
+        var elementInfo = await _automationService.ResolveElementAsync(elementId, cancellationToken);
+        if (elementInfo == null)
+        {
+            return UIAutomationResult.CreateFailure("get_element_details", UIAutomationErrorType.ElementNotFound,
+                $"Element not found or stale: {elementId}. Use 'find' to get a fresh element ID.", null);
+        }
+
+        return UIAutomationResult.CreateSuccess("get_element_details", elementInfo, null);
     }
 
     #endregion
@@ -1139,5 +1258,9 @@ public enum UIAutomationAction
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
     [Description("Get all ancestor elements of an element up to the window root")]
-    GetAncestors
+    GetAncestors,
+
+    /// <summary>Get full element details by ID (bounds, patterns, value, etc.).</summary>
+    [Description("Get full element details by ID. Use after find to get complete info for a specific element.")]
+    GetElementDetails
 }

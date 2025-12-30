@@ -122,6 +122,11 @@ Plus **local OCR** for text extraction — no image upload, ~100ms.
 <h3>🔒 Security-Aware</h3>
 <p>Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.</p>
 </div>
+
+<div class="feature-card">
+<h3>🪙 Token Optimized</h3>
+<p>JSON responses use short property names to minimize token usage. Reduces LLM costs and improves response times.</p>
+</div>
 </div>
 
 <p><a href="/features/">See complete feature reference →</a></p>

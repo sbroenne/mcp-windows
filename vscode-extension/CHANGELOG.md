@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Window launch action** - `window_management(action='launch', programPath='notepad.exe')`
+  - Launch applications directly from the MCP server
+  - Automatic window detection after launch
+  - Returns window handle for subsequent operations
+
+### Changed
+- **Optimized JSON output for token efficiency** - Reduced token usage in tool responses
+  - Short property names (e.g., `s` instead of `success`, `h` instead of `handle`)
+  - Centralized JsonSerializerOptions for consistent formatting
+  - Significantly reduces token consumption when LLMs process responses
 - **`app` parameter** - All tools now accept an `app` parameter for simplified window targeting
   - Click buttons, type text, and take screenshots without separate window activation
   - Example: `ui_automation(action='click', app='Notepad', name='Save')`

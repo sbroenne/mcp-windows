@@ -1,6 +1,4 @@
 using System.ComponentModel;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
@@ -20,12 +18,6 @@ public sealed partial class ScreenshotControlTool
     private readonly IScreenshotService _screenshotService;
     private readonly IAnnotatedScreenshotService _annotatedScreenshotService;
     private readonly IWindowService _windowService;
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        WriteIndented = false
-    };
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ScreenshotControlTool"/> class.
@@ -366,7 +358,7 @@ public sealed partial class ScreenshotControlTool
                 await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
                 savedFilePath = filePath;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.CaptureError,

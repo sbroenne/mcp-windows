@@ -27,7 +27,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task MinimizeWindow_MinimizesWindow()
+    public async Task MinimizeWindow_MinimizesWindowAsync()
     {
         // Arrange - Use the test harness window
         nint handle = _fixture.TestWindowHandle;
@@ -39,7 +39,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"Minimize failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Minimized, result.Window.State);
+        Assert.Equal("minimized", result.Window.State);
 
         // Clean up - restore the window for other tests
         await _windowService.RestoreWindowAsync(handle);
@@ -47,7 +47,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task MaximizeWindow_MaximizesWindow()
+    public async Task MaximizeWindow_MaximizesWindowAsync()
     {
         // Arrange - Use the test harness window
         nint handle = _fixture.TestWindowHandle;
@@ -59,7 +59,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"Maximize failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Maximized, result.Window.State);
+        Assert.Equal("maximized", result.Window.State);
 
         // Clean up - restore the window for other tests
         await _windowService.RestoreWindowAsync(handle);
@@ -83,7 +83,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"Restore failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Normal, result.Window.State);
+        Assert.Equal("normal", result.Window.State);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"Restore failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Normal, result.Window.State);
+        Assert.Equal("normal", result.Window.State);
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"GetState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Normal, result.Window.State);
+        Assert.Equal("normal", result.Window.State);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"GetState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Minimized, result.Window.State);
+        Assert.Equal("minimized", result.Window.State);
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
@@ -279,7 +279,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"GetState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Maximized, result.Window.State);
+        Assert.Equal("maximized", result.Window.State);
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
@@ -334,7 +334,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"WaitForState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Normal, result.Window.State);
+        Assert.Equal("normal", result.Window.State);
     }
 
     [Fact]
@@ -360,7 +360,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"WaitForState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Minimized, result.Window.State);
+        Assert.Equal("minimized", result.Window.State);
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
@@ -390,7 +390,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result);
         Assert.True(result.Success, $"WaitForState failed: {result.Error}");
         Assert.NotNull(result.Window);
-        Assert.Equal(WindowState.Maximized, result.Window.State);
+        Assert.Equal("maximized", result.Window.State);
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);

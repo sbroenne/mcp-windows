@@ -6,6 +6,10 @@ Comprehensive documentation of all Windows MCP tools, actions, and configuration
 
 Windows MCP uses the **Windows UI Automation API** as the primary interaction method. This gives AI agents semantic understanding of applications — finding elements by name, type, and state rather than parsing screenshots.
 
+### Token Optimization
+
+All tool responses use **short property names** (e.g., `s` instead of `success`, `h` instead of `handle`) to minimize token usage. This reduces LLM costs and improves response times when processing tool results.
+
 **When to use each tool:**
 
 | Scenario | Tool | Why |
@@ -172,6 +176,7 @@ Control windows on the Windows desktop. All actions support the `app` parameter 
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
+| `launch` | Launch an application | `programPath` |
 | `list` | List all visible windows | none |
 | `find` | Find windows by title | `title` or `app` |
 | `activate` | Bring window to foreground | `handle` or `app` |
@@ -192,6 +197,7 @@ Control windows on the Windows desktop. All actions support the `app` parameter 
 
 ### Capabilities
 
+- **Launch applications** - Start programs by name or path with automatic window detection
 - List all visible top-level windows with titles, handles, process info, and bounds
 - Locate windows by title (substring or regex matching)
 - Bring windows to foreground with focus

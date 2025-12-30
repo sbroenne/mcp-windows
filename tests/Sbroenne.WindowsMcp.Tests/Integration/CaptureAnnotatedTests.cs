@@ -126,8 +126,8 @@ public sealed class CaptureAnnotatedTests : IDisposable
         foreach (var element in result.Elements)
         {
             Assert.True(
-                interactiveTypes.Any(t => element.ControlType?.Contains(t, StringComparison.OrdinalIgnoreCase) == true),
-                $"Element '{element.Name}' has non-interactive type '{element.ControlType}'");
+                interactiveTypes.Any(t => element.Type?.Contains(t, StringComparison.OrdinalIgnoreCase) == true),
+                $"Element '{element.Name}' has non-interactive type '{element.Type}'");
         }
     }
 
@@ -149,7 +149,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
 
         // With interactiveOnly=false, we should see a mix including Text, Pane, Group, etc.
         // This is a softer assertion since exact elements depend on the form
-        var elementTypes = result.Elements.Select(e => e.ControlType).Distinct().ToList();
+        var elementTypes = result.Elements.Select(e => e.Type).Distinct().ToList();
         Assert.True(elementTypes.Count >= 1, "Expected at least one element type");
     }
 
@@ -169,7 +169,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
         Assert.NotNull(result.Elements);
 
         // Static Text elements should not be included
-        Assert.DoesNotContain(result.Elements, e => e.ControlType == "Text");
+        Assert.DoesNotContain(result.Elements, e => e.Type == "Text");
     }
 
     #endregion
@@ -288,11 +288,11 @@ public sealed class CaptureAnnotatedTests : IDisposable
         Assert.NotNull(result.Elements);
         Assert.True(result.Elements.Length > 0, "Expected at least some elements");
 
-        // All elements should have elementId for subsequent operations
+        // All elements should have Id for subsequent operations
         foreach (var element in result.Elements)
         {
-            Assert.NotNull(element.ElementId);
-            Assert.True(element.ElementId.Length > 0, $"ElementId should not be empty for '{element.Name}'");
+            Assert.NotNull(element.Id);
+            Assert.True(element.Id.Length > 0, $"Id should not be empty for '{element.Name}'");
         }
     }
 
@@ -346,7 +346,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
         // Assert
         Assert.True(result.Elements?.Length > 0, "Expected at least one button");
         Assert.All(result.Elements!, e =>
-            Assert.Contains("Button", e.ControlType, StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("Button", e.Type, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -367,7 +367,7 @@ public sealed class CaptureAnnotatedTests : IDisposable
 
         // All returned elements should be checkboxes
         Assert.All(result.Elements, e =>
-            Assert.Contains("CheckBox", e.ControlType!, StringComparison.OrdinalIgnoreCase));
+            Assert.Contains("CheckBox", e.Type!, StringComparison.OrdinalIgnoreCase));
     }
 
     #endregion

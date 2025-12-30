@@ -139,7 +139,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                 screenshotResult.Height ?? 0,
                 annotatedElements);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogCaptureError(ex, ex.Message);
             return AnnotatedScreenshotResult.CreateFailure($"Failed to capture annotated screenshot: {ex.Message}");
@@ -396,11 +396,9 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                 {
                     Index = index,
                     Name = element.Name,
-                    ControlType = element.ControlType,
-                    AutomationId = element.AutomationId,
-                    ElementId = element.ElementId,
-                    ClickablePoint = element.ClickablePoint,
-                    BoundingBox = element.BoundingRect
+                    Type = element.ControlType,
+                    Id = element.ElementId,
+                    Click = [element.ClickablePoint.X, element.ClickablePoint.Y, element.ClickablePoint.MonitorIndex]
                 });
             }
         }

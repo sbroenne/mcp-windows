@@ -4,6 +4,7 @@ using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Serialization;
 
 namespace Sbroenne.WindowsMcp.Resources;
 
@@ -13,12 +14,6 @@ namespace Sbroenne.WindowsMcp.Resources;
 [McpServerResourceType]
 public sealed class SystemResources
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true
-    };
-
     private readonly IMonitorService _monitorService;
 
     /// <summary>
@@ -39,7 +34,7 @@ public sealed class SystemResources
     public string GetMonitors()
     {
         var monitors = _monitorService.GetMonitors();
-        return JsonSerializer.Serialize(monitors, JsonOptions);
+        return JsonSerializer.Serialize(monitors, McpJsonOptions.Default);
     }
 
     /// <summary>
@@ -61,7 +56,7 @@ public sealed class SystemResources
         {
             // Return a default/unknown layout if we can't detect it
             var unknownLayout = KeyboardLayoutInfo.Create("unknown", "Unknown", "00000000", 0);
-            return JsonSerializer.Serialize(unknownLayout, JsonOptions);
+            return JsonSerializer.Serialize(unknownLayout, McpJsonOptions.Default);
         }
 
         // The low word of the layout handle is the language identifier (LANGID)
@@ -86,7 +81,7 @@ public sealed class SystemResources
         var displayName = GetLayoutDisplayName(langId);
 
         var layoutInfo = KeyboardLayoutInfo.Create(languageTag, displayName, layoutId, langId & 0x3FF);
-        return JsonSerializer.Serialize(layoutInfo, JsonOptions);
+        return JsonSerializer.Serialize(layoutInfo, McpJsonOptions.Default);
     }
 
     /// <summary>
@@ -308,132 +303,143 @@ public sealed class SystemResources
             # Result Schema Reference
 
             JSON examples showing key fields in tool responses. Use for planning multi-step workflows.
+            Note: Property names use short abbreviations to minimize token usage.
 
             ## window_management
 
             ```json
-            // find/list returns windows array:
+            // find/list returns windows array (ws):
             {
-              "success": true,
-              "windows": [
+              "ok": true,
+              "ws": [
                 {
-                  "handle": "12345678",
-                  "title": "Visual Studio Code",
-                  "process_name": "Code",
-                  "process_id": 1234,
-                  "state": "normal",
-                  "is_foreground": true,
-                  "bounds": { "x": 0, "y": 0, "width": 1920, "height": 1080 }
+                  "h": "12345678",
+                  "t": "Visual Studio Code",
+                  "pn": "Code",
+                  "pid": 1234,
+                  "s": "normal",
+                  "fg": true,
+                  "b": [0, 0, 1920, 1080]
                 }
-              ]
+              ],
+              "n": 1
             }
-            // activate/single window returns window object:
+            // activate/single window returns window object (w):
             {
-              "success": true,
-              "window": { "handle": "12345678", "title": "...", "state": "normal" }
+              "ok": true,
+              "w": { "h": "12345678", "t": "...", "s": "normal" }
             }
             ```
 
-            **Key field:** `handle` - pass verbatim to other tools as `windowHandle`.
+            **Key fields:** `h` (handle) - pass verbatim to other tools as `windowHandle`. `ok` = success.
+            **Abbreviations:** h=handle, t=title, pn=process_name, pid=process_id, s=state, fg=foreground, b=bounds[x,y,w,h], n=count
 
             ## ui_automation
 
             ```json
-            // find returns elements array:
+            // find returns elements array (ae):
             {
-              "success": true,
-              "elements": [
+              "ok": true,
+              "ae": [
                 {
-                  "element_id": "path:fast:12345678:1.2.3",
-                  "name": "Save",
-                  "control_type": "Button",
-                  "automation_id": "SaveButton",
-                  "clickable_point": { "x": 450, "y": 300 },
-                  "bounding_rect": { "x": 400, "y": 280, "width": 100, "height": 40 },
-                  "is_enabled": true,
-                  "supported_patterns": ["Invoke"],
-                  "framework_type": "WPF"
+                  "id": "path:fast:12345678:1.2.3",
+                  "n": "Save",
+                  "t": "Button",
+                  "aid": "SaveButton",
+                  "cp": [450, 300],
+                  "br": [400, 280, 100, 40],
+                  "en": true,
+                  "pat": ["Invoke"],
+                  "fw": "WPF"
                 }
               ],
-              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" },
+              "n": 1
             }
-            // screenshot_control(annotate=true) returns elements + image:
+            // screenshot_control(annotate=true) returns annotated elements + image:
             {
-              "success": true,
-              "annotated_elements": [
-                { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem" },
-                { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem" }
+              "ok": true,
+              "ae": [
+                { "i": 1, "id": "...", "n": "File", "t": "MenuItem" },
+                { "i": 2, "id": "...", "n": "Edit", "t": "MenuItem" }
               ],
-              "element_count": 25,
-              "annotated_image_data": "base64...",
-              "annotated_image_format": "jpeg"
+              "n": 25,
+              "img": "base64...",
+              "fmt": "jpeg"
             }
             ```
 
             **Key fields:**
-            - `element_id` - pass to click/type/toggle actions
-            - `clickable_point` - fallback coords for mouse_control
-            - `framework_type` - "Electron", "WPF", "WinForms" (affects search strategy)
+            - `id` (element_id) - pass to click/type/toggle actions
+            - `cp` (clickable_point) - fallback coords for mouse_control
+            - `fw` (framework_type) - "Electron", "WPF", "WinForms" (affects search strategy)
+
+            **Abbreviations:** id=element_id, n=name/count, t=type, cp=clickable_point, br=bounding_rect, en=enabled, pat=patterns, fw=framework, tw=target_window
 
             ## mouse_control
 
             ```json
             {
-              "success": true,
-              "final_position": { "x": 450, "y": 300 },
-              "monitor_index": 0,
-              "monitor_width": 1920,
-              "monitor_height": 1080,
-              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+              "ok": true,
+              "pos": [450, 300],
+              "mi": 0,
+              "mw": 1920,
+              "mh": 1080,
+              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
             }
             ```
 
-            **Key field:** `target_window` - verify clicks went to correct window.
+            **Key field:** `tw` (target_window) - verify clicks went to correct window.
+            **Abbreviations:** ok=success, pos=position[x,y], mi=monitor_index, mw=monitor_width, mh=monitor_height, tw=target_window
 
             ## keyboard_control
 
             ```json
             {
-              "success": true,
-              "characters_typed": 15,
-              "target_window": { "handle": "12345678", "title": "My App", "process_name": "myapp" }
+              "ok": true,
+              "cnt": 15,
+              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
             }
             ```
 
-            **Key field:** `target_window` - verify input went to correct window.
+            **Key field:** `tw` (target_window) - verify input went to correct window.
+            **Abbreviations:** ok=success, cnt=characters_typed, tw=target_window
 
             ## screenshot_control
 
             ```json
             // capture:
             {
-              "success": true,
-              "image_data": "base64...",
-              "width": 1920,
-              "height": 1080,
-              "format": "jpeg"
+              "ok": true,
+              "img": "base64...",
+              "w": 1920,
+              "h": 1080,
+              "fmt": "jpeg"
             }
             // list_monitors:
             {
-              "success": true,
-              "monitors": [
-                { "index": 0, "is_primary": true, "width": 1920, "height": 1080, "x": 0, "y": 0 }
+              "ok": true,
+              "mon": [
+                { "i": 0, "p": true, "w": 1920, "h": 1080, "x": 0, "y": 0 }
               ]
             }
             ```
+
+            **Abbreviations:** ok=success, img=image_data, w=width, h=height, fmt=format, mon=monitors, i=index, p=is_primary
 
             ## Error Response (all tools)
 
             ```json
             {
-              "success": false,
-              "error_code": "element_not_found",
-              "error": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
-              "target_window": { "handle": "12345678", "title": "...", "process_name": "..." }
+              "ok": false,
+              "ec": "element_not_found",
+              "err": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
+              "fix": "Use screenshot_control(annotate=true) to discover available elements.",
+              "tw": { "h": "12345678", "t": "...", "pn": "..." }
             }
             ```
 
-            **Key field:** `error_code` - look up in system://error-recovery for recovery actions.
+            **Key fields:** `ec` (error_code) - look up in system://error-recovery for recovery actions. `fix` = recovery suggestion.
             """;
     }
 }

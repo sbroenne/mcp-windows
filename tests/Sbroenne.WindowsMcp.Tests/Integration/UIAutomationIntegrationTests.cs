@@ -83,10 +83,10 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.Single(result.Elements);
-        Assert.Equal("Button", result.Elements[0].ControlType);
-        Assert.Contains("Submit", result.Elements[0].Name ?? string.Empty);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
+        Assert.Equal("Button", result.Items![0].Type);
+        Assert.Contains("Submit", result.Items![0].Name ?? string.Empty);
     }
 
     [Fact]
@@ -102,9 +102,9 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.Single(result.Elements);
-        Assert.Contains("Cancel", result.Elements[0].Name ?? string.Empty);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
+        Assert.Contains("Cancel", result.Items![0].Name ?? string.Empty);
     }
 
     [Fact]
@@ -119,9 +119,9 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, "Expected at least 1 edit control");
-        Assert.Equal("Edit", result.Elements[0].ControlType);
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, "Expected at least 1 edit control");
+        Assert.Equal("Edit", result.Items![0].Type);
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 2, "Expected at least 2 buttons");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 2, "Expected at least 2 buttons");
     }
 
     [Fact]
@@ -153,10 +153,10 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         });
 
         Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
-        Assert.NotNull(findResult.Elements);
-        Assert.True(findResult.Elements.Length > 0, "Expected at least one Edit control");
+        Assert.NotNull(findResult.Items);
+        Assert.True(findResult.Items!.Length > 0, "Expected at least one Edit control");
 
-        var elementId = findResult.Elements[0].ElementId;
+        var elementId = findResult.Items![0].Id;
         Assert.NotNull(elementId);
 
         // Parse the element ID to understand its structure
@@ -206,12 +206,12 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"GetTree failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Tree);
+        Assert.NotEmpty(result.Tree!);
 
         // The first element should be the window
-        var windowElement = result.Elements[0];
-        Assert.Equal("Window", windowElement.ControlType);
+        var windowElement = result.Tree![0];
+        Assert.Equal("Window", windowElement.Type);
         Assert.Contains("Test Harness", windowElement.Name ?? string.Empty);
     }
 
@@ -227,11 +227,11 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"GetTree failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Tree);
+        Assert.NotEmpty(result.Tree!);
 
         // With depth 1, we should get the window but children won't have grandchildren
-        var windowElement = result.Elements[0];
+        var windowElement = result.Tree![0];
         if (windowElement.Children != null)
         {
             foreach (var child in windowElement.Children)
@@ -247,9 +247,9 @@ public sealed class UIAutomationIntegrationTests : IDisposable
     #region Element Properties Tests
 
     [Fact]
-    public async Task Find_Element_HasClickablePoint()
+    public async Task Find_Element_HasClickCoordinates()
     {
-        // Act - Find the Submit button which should have a clickable point
+        // Act - Find the Submit button which should have click coordinates
         var result = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
@@ -259,31 +259,13 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        var button = result.Elements[0];
-        Assert.NotNull(button.ClickablePoint);
-        Assert.True(button.ClickablePoint.X > 0);
-        Assert.True(button.ClickablePoint.Y > 0);
-    }
-
-    [Fact]
-    public async Task Find_Element_HasBoundingRect()
-    {
-        // Act - Find the Submit button which should have a bounding rect
-        var result = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Submit",
-            ControlType = "Button",
-        });
-
-        // Assert
-        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        var button = result.Elements[0];
-        Assert.NotNull(button.BoundingRect);
-        Assert.True(button.BoundingRect.Width > 0);
-        Assert.True(button.BoundingRect.Height > 0);
+        Assert.NotNull(result.Items);
+        var button = result.Items![0];
+        Assert.NotNull(button.Click);
+        Assert.Equal(3, button.Click.Length); // [x, y, monitorIndex]
+        Assert.True(button.Click[0] > 0, "Click X should be positive");
+        Assert.True(button.Click[1] > 0, "Click Y should be positive");
+        Assert.True(button.Click[2] >= 0, "MonitorIndex should be non-negative");
     }
 
     #endregion
@@ -341,6 +323,35 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         Assert.Equal(testText, actualText);
     }
 
+    [Fact]
+    public async Task FindAndType_WithNoSelector_TypesIntoFirstTextControl()
+    {
+        // Arrange
+        var testText = "Fallback typing works";
+
+        // Act - Rely on default Document/Edit fallback when no selector is provided
+        var typeResult = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+            },
+            text: testText,
+            clearFirst: true);
+
+        // Assert
+        Assert.True(typeResult.Success, $"FindAndType failed: {typeResult.ErrorMessage}");
+        Assert.NotNull(typeResult.Items);
+        var typedElementId = typeResult.Items![0].Id;
+
+        var getTextResult = await _automationService.GetTextAsync(
+            elementId: typedElementId,
+            windowHandle: _windowHandle,
+            includeChildren: false);
+
+        Assert.True(getTextResult.Success, $"GetText failed: {getTextResult.ErrorMessage}");
+        Assert.Equal(testText, getTextResult.Text);
+    }
+
     #endregion
 
     #region GetText Tests
@@ -372,8 +383,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         });
 
         Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
-        Assert.NotNull(findResult.Elements);
-        var textBoxId = findResult.Elements[0].ElementId;
+        Assert.NotNull(findResult.Items);
+        var textBoxId = findResult.Items![0].Id;
 
         // Act
         var getTextResult = await _automationService.GetTextAsync(
@@ -407,8 +418,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"WaitFor failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
         Assert.True(stopwatch.ElapsedMilliseconds < 1000, "WaitFor should return quickly for existing elements");
     }
 
@@ -445,9 +456,9 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         });
 
         Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
-        Assert.NotNull(findResult.Elements);
-        Assert.True(findResult.Elements.Length > 0, "Expected to find at least one Edit control");
-        var textBoxId = findResult.Elements[0].ElementId;
+        Assert.NotNull(findResult.Items);
+        Assert.True(findResult.Items!.Length > 0, "Expected to find at least one Edit control");
+        var textBoxId = findResult.Items![0].Id;
         Assert.NotNull(textBoxId);
 
         // Debug: log the element ID format
@@ -527,11 +538,11 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 tab items, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 tab items, found {result.Items!.Length}");
 
         // Verify we can find specific tabs by name
-        var tabNames = result.Elements.Select(e => e.Name).ToList();
+        var tabNames = result.Items!.Select(e => e.Name).ToList();
         Assert.Contains("Form Controls", tabNames);
     }
 
@@ -548,10 +559,10 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert - verify the tab exists and is findable
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.Single(result.Elements);
-        Assert.Equal("Tree View", result.Elements[0].Name);
-        Assert.NotNull(result.Elements[0].ClickablePoint);
+        Assert.NotNull(result.Items);
+        Assert.Single(result.Items);
+        Assert.Equal("Tree View", result.Items![0].Name);
+        Assert.NotNull(result.Items![0].Click);
     }
 
     [Fact]
@@ -575,7 +586,7 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         });
 
         // If no List control, try finding ListItems instead which is more reliable
-        if (!result.Success || result.Elements?.Length == 0)
+        if (!result.Success || result.Items?.Length == 0)
         {
             result = await _automationService.FindElementsAsync(new ElementQuery
             {
@@ -586,8 +597,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert - we should find either the List control or ListItems
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, $"Expected at least 1 list or list item, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, $"Expected at least 1 list or list item, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -611,8 +622,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 checkboxes, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 checkboxes, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -636,11 +647,11 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 radio buttons, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 radio buttons, found {result.Items!.Length}");
 
         // Verify we can find specific radio buttons
-        var radioNames = result.Elements.Select(e => e.Name).ToList();
+        var radioNames = result.Items!.Select(e => e.Name).ToList();
         Assert.Contains("Small", radioNames);
         Assert.Contains("Medium", radioNames);
         Assert.Contains("Large", radioNames);
@@ -667,8 +678,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, $"Expected at least 1 combo box, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, $"Expected at least 1 combo box, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -692,10 +703,10 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
+        Assert.NotNull(result.Items);
 
         // We should find multiple groups including nested ones
-        var groupNames = result.Elements.Select(e => e.Name).ToList();
+        var groupNames = result.Items!.Select(e => e.Name).ToList();
         Assert.Contains("Options", groupNames);
         // Size Selection group contains nested Priority group
         Assert.Contains(groupNames, name => name?.Contains("Size") ?? false);
@@ -715,15 +726,15 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"GetTree failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.NotEmpty(result.Elements);
+        Assert.NotNull(result.Tree);
+        Assert.NotEmpty(result.Tree!);
 
         // The root should be the window
-        var windowElement = result.Elements[0];
-        Assert.Equal("Window", windowElement.ControlType);
+        var windowElement = result.Tree![0];
+        Assert.Equal("Window", windowElement.Type);
 
         // Count total elements to verify we're getting deep hierarchy
-        static int CountElements(UIElementInfo element)
+        static int CountElements(UIElementCompactTree element)
         {
             int count = 1;
             if (element.Children != null)
@@ -785,8 +796,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, $"Expected at least 1 DataGrid control, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, $"Expected at least 1 DataGrid control, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -810,8 +821,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, $"Expected at least 1 slider, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, $"Expected at least 1 slider, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -835,8 +846,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 1, $"Expected at least 1 progress bar, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 1, $"Expected at least 1 progress bar, found {result.Items!.Length}");
     }
 
     [Fact]
@@ -851,19 +862,19 @@ public sealed class UIAutomationIntegrationTests : IDisposable
 
         // Assert - verify we find multiple tabs
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
-        Assert.NotNull(result.Elements);
-        Assert.True(result.Elements.Length >= 3, $"Expected at least 3 tabs, found {result.Elements.Length}");
+        Assert.NotNull(result.Items);
+        Assert.True(result.Items!.Length >= 3, $"Expected at least 3 tabs, found {result.Items!.Length}");
 
-        // All tab items should have clickable points
-        foreach (var tab in result.Elements)
+        // All tab items should have clickable points (Click array)
+        foreach (var tab in result.Items!)
         {
-            Assert.NotNull(tab.ClickablePoint);
-            Assert.True(tab.ClickablePoint.X > 0);
-            Assert.True(tab.ClickablePoint.Y > 0);
+            Assert.NotNull(tab.Click);
+            Assert.True(tab.Click[0] > 0, "Click X should be positive");
+            Assert.True(tab.Click[1] > 0, "Click Y should be positive");
         }
 
         // Verify we can identify at least one known tab
-        var tabNames = result.Elements.Select(e => e.Name).ToList();
+        var tabNames = result.Items!.Select(e => e.Name).ToList();
         Assert.Contains("Form Controls", tabNames);
     }
 

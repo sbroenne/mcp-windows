@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
@@ -96,9 +97,9 @@ public sealed class MouseInputService : IMouseInputService
         // Get the current screen bounds if not already retrieved
         screenBounds ??= CoordinateNormalizer.GetVirtualScreenBounds();
 
-        // Get the window title under the cursor before clicking
+        // Get the target window info under the cursor before clicking
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Press modifier keys if specified (only those not already pressed by user)
         IReadOnlyList<int> pressedModifiers = [];
@@ -160,7 +161,8 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+            return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
         }
         finally
         {
@@ -210,6 +212,53 @@ public sealed class MouseInputService : IMouseInputService
         return new string(titleBuffer, 0, length);
     }
 
+    /// <summary>
+    /// Gets target window information at the specified screen coordinates.
+    /// </summary>
+    /// <param name="x">The x-coordinate.</param>
+    /// <param name="y">The y-coordinate.</param>
+    /// <returns>The target window info, or null if no window found.</returns>
+    internal static TargetWindowInfo? GetTargetWindowInfoAtPoint(int x, int y)
+    {
+        var point = new POINT(x, y);
+        var hwnd = NativeMethods.WindowFromPoint(point);
+
+        if (hwnd == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        // Get the top-level window (root ancestor) to avoid returning child window info
+        // like "Chrome Legacy Window" for Electron apps (VS Code, Teams, Slack, etc.)
+        var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeConstants.GA_ROOT);
+        if (rootHwnd != IntPtr.Zero)
+        {
+            hwnd = rootHwnd;
+        }
+
+        // Get window title
+        const int maxTitleLength = 256;
+        var titleBuffer = new char[maxTitleLength];
+        var length = NativeMethods.GetWindowText(hwnd, titleBuffer, maxTitleLength);
+        var title = length > 0 ? new string(titleBuffer, 0, length) : string.Empty;
+
+        // Get process info
+        _ = NativeMethods.GetWindowThreadProcessId(hwnd, out var processId);
+        var processName = string.Empty;
+
+        try
+        {
+            using var process = Process.GetProcessById((int)processId);
+            processName = process.ProcessName;
+        }
+        catch
+        {
+            // Process may have exited or we don't have access
+        }
+
+        return TargetWindowInfo.Create(hwnd, title, processName, (int)processId);
+    }
+
     /// <inheritdoc />
     public Task<MouseControlResult> DoubleClickAsync(int? x, int? y, ModifierKey modifiers = ModifierKey.None, CancellationToken cancellationToken = default)
     {
@@ -240,9 +289,9 @@ public sealed class MouseInputService : IMouseInputService
         // Get the current screen bounds if not already retrieved
         screenBounds ??= CoordinateNormalizer.GetVirtualScreenBounds();
 
-        // Get the window title under the cursor before clicking
+        // Get the target window info under the cursor before clicking
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Press modifier keys before the double-click
         var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
@@ -342,7 +391,8 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+            return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
         }
         finally
         {
@@ -381,9 +431,9 @@ public sealed class MouseInputService : IMouseInputService
         // Get the current screen bounds if not already retrieved
         screenBounds ??= CoordinateNormalizer.GetVirtualScreenBounds();
 
-        // Get the window title under the cursor before clicking
+        // Get the target window info under the cursor before clicking
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Press modifier keys before the click
         var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
@@ -444,7 +494,8 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+            return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
         }
         finally
         {
@@ -483,9 +534,9 @@ public sealed class MouseInputService : IMouseInputService
         // Get the current screen bounds if not already retrieved
         screenBounds ??= CoordinateNormalizer.GetVirtualScreenBounds();
 
-        // Get the window title under the cursor before clicking
+        // Get the target window info under the cursor before clicking
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Build the INPUT structures for middle mouse down and middle mouse up
         var inputs = new INPUT[]
@@ -541,7 +592,8 @@ public sealed class MouseInputService : IMouseInputService
         NativeMethods.GetCursorPos(out var finalPos);
         var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+        var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+        return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
     }
 
     /// <inheritdoc />
@@ -576,8 +628,8 @@ public sealed class MouseInputService : IMouseInputService
             return Task.FromResult(moveToStartResult);
         }
 
-        // Get the window title at the start position
-        var windowTitle = GetWindowTitleAtPoint(startX, startY);
+        // Get the target window info at the start position
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(startX, startY);
 
         // Determine which button down/up flags to use
         uint buttonDownFlag;
@@ -644,7 +696,8 @@ public sealed class MouseInputService : IMouseInputService
             NativeMethods.GetCursorPos(out var finalPos);
             var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-            return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+            var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+            return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
         }
         finally
         {
@@ -706,13 +759,12 @@ public sealed class MouseInputService : IMouseInputService
 
         // Get the window title under the cursor before scrolling
         NativeMethods.GetCursorPos(out var currentPos);
-        var windowTitle = GetWindowTitleAtPoint(currentPos.X, currentPos.Y);
 
         // If amount is 0, we can just return success without sending any input
         if (amount == 0)
         {
             var zeroPosition = new Coordinates(currentPos.X, currentPos.Y);
-            return Task.FromResult(MouseControlResult.CreateSuccess(zeroPosition, screenBounds, windowTitle));
+            return Task.FromResult(MouseControlResult.CreateSuccess(zeroPosition, screenBounds));
         }
 
         // Determine the event flag and wheel delta based on direction
@@ -783,7 +835,7 @@ public sealed class MouseInputService : IMouseInputService
         NativeMethods.GetCursorPos(out var finalPos);
         var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
 
-        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds, windowTitle));
+        return Task.FromResult(MouseControlResult.CreateSuccess(finalPosition, screenBounds));
     }
 
     /// <summary>

@@ -68,7 +68,7 @@ public sealed class WindowService : IWindowService
 
             return WindowManagementResult.CreateListSuccess(windows);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger?.LogWindowOperation("list", success: false, errorMessage: ex.Message);
             return WindowManagementResult.CreateFailure(
@@ -98,7 +98,7 @@ public sealed class WindowService : IWindowService
                 WindowManagementErrorCode.InvalidRegexPattern,
                 $"Invalid regex pattern: {ex.Message}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger?.LogWindowOperation("find", success: false, errorMessage: ex.Message);
             return WindowManagementResult.CreateFailure(
@@ -661,5 +661,13 @@ public sealed class WindowService : IWindowService
         return WindowManagementResult.CreateFailure(
             WindowManagementErrorCode.Timeout,
             $"Timeout after {timeout}ms waiting for window to reach state '{targetState}'. Current state: '{currentState}'");
+    }
+
+    /// <inheritdoc/>
+    public Task<Models.WindowInfo?> GetWindowInfoAsync(
+        nint handle,
+        CancellationToken cancellationToken = default)
+    {
+        return _enumerator.GetWindowInfoAsync(handle, cancellationToken);
     }
 }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Test Execution Order:
+  1. Unit tests (via TestCollectionOrderer in Sbroenne.WindowsMcp.Tests)
+  2. Integration tests (via TestCollectionOrderer in Sbroenne.WindowsMcp.Tests)
+  3. skUnit/LLM tests (Sbroenne.WindowsMcp.LLM.Tests - runs last due to MaxCpuCount=1)
+  
+  This file is auto-discovered by dotnet test when named .runsettings in solution root.
+  Simply run: dotnet test
+-->
+<RunSettings>
+  <RunConfiguration>
+    <!-- Run only 1 test assembly at a time to ensure sequential execution -->
+    <!-- This ensures Sbroenne.WindowsMcp.Tests completes before Sbroenne.WindowsMcp.LLM.Tests -->
+    <MaxCpuCount>1</MaxCpuCount>
+  </RunConfiguration>
+</RunSettings>

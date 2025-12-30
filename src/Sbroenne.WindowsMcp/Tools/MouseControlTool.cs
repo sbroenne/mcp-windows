@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Automation;
@@ -20,13 +19,6 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class MouseControlTool
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
 
     private readonly IMouseInputService _mouseInputService;
@@ -109,7 +101,7 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Mouse input: move, click, double_click, right_click, middle_click, drag, scroll, get_position. Use ui_automation(action='click') for UI elements instead. mouse_control is for: 1) raw coordinate clicks, 2) custom-drawn controls, 3) games. Use 'app' parameter to auto-activate target window.")]
+    [Description("Low-level mouse input for raw coordinate clicks. DO NOT use for clicking buttons - use ui_automation(action='click') instead. mouse_control is ONLY for: 1) raw coordinate clicks when you have exact x,y, 2) custom-drawn controls without UIA support, 3) games. Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
@@ -150,7 +142,7 @@ public sealed partial class MouseControlTool
         try
         {
             // Resolve 'app' parameter to windowHandle if specified
-            Models.WindowInfo? resolvedWindow = null;
+            Models.WindowInfoCompact? resolvedWindow = null;
             if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
             {
                 var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
@@ -531,7 +523,7 @@ public sealed partial class MouseControlTool
                     operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
                 }
 
-                _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.WindowTitle, stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.TargetWindow?.Title, stopwatch.ElapsedMilliseconds);
             }
             else
             {
@@ -559,7 +551,7 @@ public sealed partial class MouseControlTool
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             _logger.LogOperationException(correlationId, action ?? "null", ex);
@@ -999,7 +991,7 @@ public sealed partial class MouseControlTool
 
             return result with
             {
-                TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo)
+                TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo)
             };
         }
         catch
@@ -1046,7 +1038,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.WrongTargetWindow,
                         $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent click in wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
@@ -1059,14 +1051,14 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.WrongTargetWindow,
                         $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent click in wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromWindowInfo(windowInfo) };
+                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
                 }
             }
 
             // Window matches expectations
             return MouseControlResult.CreateSuccess(new Coordinates(0, 0));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.WrongTargetWindow,

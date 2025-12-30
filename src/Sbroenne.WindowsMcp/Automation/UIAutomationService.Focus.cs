@@ -48,7 +48,7 @@ public sealed partial class UIAutomationService
                 var rootElement = GetRootElementFromElementId(elementId) ?? element;
                 var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
 
-                return UIAutomationResult.CreateSuccess("focus", elementInfo!, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("focus", [elementInfo!], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)
@@ -107,7 +107,7 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
-                return UIAutomationResult.CreateSuccess("get_focused_element", elementInfo, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("get_focused_element", [elementInfo], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)
@@ -163,7 +163,7 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
-                return UIAutomationResult.CreateSuccess("get_element_at_cursor", elementInfo, CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("get_element_at_cursor", [elementInfo], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)
@@ -237,7 +237,7 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
-                return UIAutomationResult.CreateSuccess("get_ancestors", [.. ancestors], CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessCompact("get_ancestors", [.. ancestors], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)

@@ -71,7 +71,7 @@ public sealed class VisualDiffService : IVisualDiffService
         {
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             return Task.FromResult(new VisualDiffResult

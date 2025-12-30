@@ -84,7 +84,7 @@ public sealed partial class UIAutomationService
                             CreateDiagnostics(stopwatch));
                     }
 
-                    return UIAutomationResult.CreateSuccess("scroll_into_view", elementInfo, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
                 }
 
                 var scrollResult2 = TryScrollParentToElement(element, stopwatch.ElapsedMilliseconds, timeoutMs);
@@ -100,7 +100,7 @@ public sealed partial class UIAutomationService
                             CreateDiagnostics(stopwatch));
                     }
 
-                    return UIAutomationResult.CreateSuccess("scroll_into_view", elementInfo, CreateDiagnostics(stopwatch));
+                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
                 }
 
                 return UIAutomationResult.CreateFailure(
@@ -148,7 +148,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "ScrollItemPattern"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"ScrollItemPattern failed: {ex.Message}");
         }
@@ -232,7 +232,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "ParentScroll"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"Parent scroll failed: {ex.Message}");
         }

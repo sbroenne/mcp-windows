@@ -83,7 +83,7 @@ public sealed partial class UIAutomationService
                         CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
                 }
 
-                return UIAutomationResult.CreateSuccess("get_tree", [tree], CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
+                return UIAutomationResult.CreateSuccessCompactTree("get_tree", [tree], CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
             }, cancellationToken);
         }
         catch (COMException ex)
@@ -162,7 +162,7 @@ public sealed partial class UIAutomationService
             cancellationToken.ThrowIfCancellationRequested();
 
             var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-            if (!result.Success || (result.Elements?.Length ?? 0) == 0)
+            if (!result.Success || (result.Items?.Length ?? 0) == 0)
             {
                 // Element no longer found - success!
                 stopwatch.Stop();

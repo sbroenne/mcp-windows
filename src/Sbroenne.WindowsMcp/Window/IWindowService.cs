@@ -180,4 +180,14 @@ public interface IWindowService
         WindowState targetState,
         int? timeoutMs = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets information about a specific window by handle.
+    /// </summary>
+    /// <param name="handle">The window handle.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Window information, or null if the window doesn't exist.</returns>
+    Task<Models.WindowInfo?> GetWindowInfoAsync(
+        nint handle,
+        CancellationToken cancellationToken = default);
 }

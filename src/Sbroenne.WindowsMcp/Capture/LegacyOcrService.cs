@@ -64,7 +64,7 @@ public sealed partial class LegacyOcrService : IOcrService
                 LogOcrEngineNotAvailable(_logger);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             LogOcrInitializationError(_logger, ex);
             _isAvailable = false;
@@ -156,7 +156,7 @@ public sealed partial class LegacyOcrService : IOcrService
                 languageUsed,
                 stopwatch.ElapsedMilliseconds);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             LogOcrError(_logger, ex);
@@ -188,10 +188,12 @@ public sealed partial class LegacyOcrService : IOcrService
             var requestedLang = new Windows.Globalization.Language(language);
             return OcrEngine.TryCreateFromLanguage(requestedLang);
         }
-        catch
+#pragma warning disable CA1031 // Do not catch general exception types - intentional fallback for invalid language codes
+        catch (Exception)
         {
             return _defaultEngine;
         }
+#pragma warning restore CA1031
     }
 
     private static async Task<SoftwareBitmap?> ConvertToSoftwareBitmapAsync(Bitmap bitmap, CancellationToken cancellationToken)
@@ -221,6 +223,10 @@ public sealed partial class LegacyOcrService : IOcrService
             }
 
             return softwareBitmap;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception)
         {

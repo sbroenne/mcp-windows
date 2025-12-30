@@ -5,12 +5,22 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Result of a window management operation.
 /// </summary>
+/// <remarks>
+/// Property names are intentionally short to minimize JSON token count:
+/// - ok: Success
+/// - ec: Error code
+/// - err: Error message
+/// - w: Window (single)
+/// - ws: Windows (list)
+/// - n: Count
+/// - msg: Message
+/// </remarks>
 public sealed record WindowManagementResult
 {
     /// <summary>
     /// Gets a value indicating whether the operation succeeded.
     /// </summary>
-    [JsonPropertyName("success")]
+    [JsonPropertyName("ok")]
     public required bool Success { get; init; }
 
     /// <summary>
@@ -22,7 +32,7 @@ public sealed record WindowManagementResult
     /// <summary>
     /// Gets the error code string for JSON serialization.
     /// </summary>
-    [JsonPropertyName("error_code")]
+    [JsonPropertyName("ec")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorCodeString => ErrorCode == WindowManagementErrorCode.None
         ? null
@@ -31,35 +41,37 @@ public sealed record WindowManagementResult
     /// <summary>
     /// Gets the error message if operation failed.
     /// </summary>
-    [JsonPropertyName("error")]
+    [JsonPropertyName("err")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Error { get; init; }
 
     /// <summary>
     /// Gets the single window info (for find, activate, get_foreground, etc.).
+    /// Uses compact format for reduced token count.
     /// </summary>
-    [JsonPropertyName("window")]
+    [JsonPropertyName("w")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public WindowInfo? Window { get; init; }
+    public WindowInfoCompact? Window { get; init; }
 
     /// <summary>
     /// Gets the list of windows (for list action).
+    /// Uses compact format for reduced token count.
     /// </summary>
-    [JsonPropertyName("windows")]
+    [JsonPropertyName("ws")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public IReadOnlyList<WindowInfo>? Windows { get; init; }
+    public IReadOnlyList<WindowInfoCompact>? Windows { get; init; }
 
     /// <summary>
     /// Gets the number of windows found/affected.
     /// </summary>
-    [JsonPropertyName("count")]
+    [JsonPropertyName("n")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Count { get; init; }
 
     /// <summary>
     /// Gets an informational message for successful results.
     /// </summary>
-    [JsonPropertyName("message")]
+    [JsonPropertyName("msg")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
 
@@ -69,6 +81,23 @@ public sealed record WindowManagementResult
     /// <param name="windows">The list of windows.</param>
     /// <returns>A successful result with the window list.</returns>
     public static WindowManagementResult CreateListSuccess(IReadOnlyList<WindowInfo> windows)
+    {
+        ArgumentNullException.ThrowIfNull(windows);
+
+        return new WindowManagementResult
+        {
+            Success = true,
+            Windows = windows.Select(WindowInfoCompact.FromFull).ToList(),
+            Count = windows.Count
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful result for a list operation (compact version).
+    /// </summary>
+    /// <param name="windows">The list of compact windows.</param>
+    /// <returns>A successful result with the window list.</returns>
+    public static WindowManagementResult CreateListSuccess(IReadOnlyList<WindowInfoCompact> windows)
     {
         ArgumentNullException.ThrowIfNull(windows);
 
@@ -87,6 +116,22 @@ public sealed record WindowManagementResult
     /// <param name="message">Optional success message.</param>
     /// <returns>A successful result with the window info.</returns>
     public static WindowManagementResult CreateWindowSuccess(WindowInfo window, string? message = null)
+    {
+        return new WindowManagementResult
+        {
+            Success = true,
+            Window = WindowInfoCompact.FromFull(window),
+            Message = message
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful result for a single window operation (compact version).
+    /// </summary>
+    /// <param name="window">The compact window info.</param>
+    /// <param name="message">Optional success message.</param>
+    /// <returns>A successful result with the window info.</returns>
+    public static WindowManagementResult CreateWindowSuccess(WindowInfoCompact window, string? message = null)
     {
         return new WindowManagementResult
         {
@@ -136,7 +181,7 @@ public sealed record WindowManagementResult
         return new WindowManagementResult
         {
             Success = true,
-            Windows = Array.Empty<WindowInfo>(),
+            Windows = [],
             Count = 0,
             Message = $"No windows found matching '{searchTerm}'"
         };

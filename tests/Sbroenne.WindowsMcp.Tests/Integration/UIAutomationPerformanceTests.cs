@@ -232,12 +232,12 @@ public sealed class UIAutomationPerformanceTests : IDisposable
                 Parameters = "ControlType=Button",
                 DurationMs = sw.ElapsedMilliseconds,
                 ElementsScanned = result.Diagnostics?.ElementsScanned ?? 0,
-                ElementsFound = result.Elements?.Length ?? 0,
+                ElementsFound = result.Items?.Length ?? 0,
                 Success = result.Success,
             });
 
             Assert.True(result.Success);
-            Console.WriteLine($"[PERF] WinForms Find(Button): {sw.ElapsedMilliseconds}ms, found {result.Elements?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
+            Console.WriteLine($"[PERF] WinForms Find(Button): {sw.ElapsedMilliseconds}ms, found {result.Items?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
         }
 
         [Fact]
@@ -258,12 +258,12 @@ public sealed class UIAutomationPerformanceTests : IDisposable
                 Parameters = "Name=Submit,ControlType=Button",
                 DurationMs = sw.ElapsedMilliseconds,
                 ElementsScanned = result.Diagnostics?.ElementsScanned ?? 0,
-                ElementsFound = result.Elements?.Length ?? 0,
+                ElementsFound = result.Items?.Length ?? 0,
                 Success = result.Success,
             });
 
             Assert.True(result.Success);
-            Console.WriteLine($"[PERF] WinForms Find(Submit): {sw.ElapsedMilliseconds}ms, found {result.Elements?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
+            Console.WriteLine($"[PERF] WinForms Find(Submit): {sw.ElapsedMilliseconds}ms, found {result.Items?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
         }
 
         [Fact]
@@ -453,12 +453,12 @@ public sealed class UIAutomationPerformanceTests : IDisposable
                 Parameters = "ControlType=Button",
                 DurationMs = sw.ElapsedMilliseconds,
                 ElementsScanned = result.Diagnostics?.ElementsScanned ?? 0,
-                ElementsFound = result.Elements?.Length ?? 0,
+                ElementsFound = result.Items?.Length ?? 0,
                 Success = result.Success,
             });
 
             Assert.True(result.Success);
-            Console.WriteLine($"[PERF] Electron Find(Button): {sw.ElapsedMilliseconds}ms, found {result.Elements?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
+            Console.WriteLine($"[PERF] Electron Find(Button): {sw.ElapsedMilliseconds}ms, found {result.Items?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
         }
 
         [Fact]
@@ -479,12 +479,12 @@ public sealed class UIAutomationPerformanceTests : IDisposable
                 Parameters = "Name=Navigate Home,ControlType=Button",
                 DurationMs = sw.ElapsedMilliseconds,
                 ElementsScanned = result.Diagnostics?.ElementsScanned ?? 0,
-                ElementsFound = result.Elements?.Length ?? 0,
+                ElementsFound = result.Items?.Length ?? 0,
                 Success = result.Success,
             });
 
             Assert.True(result.Success);
-            Console.WriteLine($"[PERF] Electron Find(Navigate Home): {sw.ElapsedMilliseconds}ms, found {result.Elements?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
+            Console.WriteLine($"[PERF] Electron Find(Navigate Home): {sw.ElapsedMilliseconds}ms, found {result.Items?.Length}, scanned {result.Diagnostics?.ElementsScanned}");
         }
 
         [Fact]

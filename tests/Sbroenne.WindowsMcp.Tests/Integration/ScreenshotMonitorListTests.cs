@@ -150,12 +150,13 @@ public sealed class ScreenshotMonitorListTests
         // Act
         var json = System.Text.Json.JsonSerializer.Serialize(monitor);
 
-        // Assert
-        Assert.Contains("\"index\"", json);
-        Assert.Contains("\"device_name\"", json);
-        Assert.Contains("\"width\"", json);
-        Assert.Contains("\"height\"", json);
-        Assert.Contains("\"is_primary\"", json);
+        // Assert - property names are abbreviated to minimize token count
+        // i=index, dn=display_number, dev=device_name, w=width, h=height, p=is_primary
+        Assert.Contains("\"i\":", json);
+        Assert.Contains("\"dev\":", json);
+        Assert.Contains("\"w\":", json);
+        Assert.Contains("\"h\":", json);
+        Assert.Contains("\"p\":", json);
     }
 
     [Fact]
@@ -270,7 +271,7 @@ public sealed class ScreenshotMonitorListTests
         // Act
         var json = System.Text.Json.JsonSerializer.Serialize(monitor);
 
-        // Assert
-        Assert.Contains("\"display_number\"", json);
+        // Assert - dn = display_number (abbreviated for token efficiency)
+        Assert.Contains("\"dn\":", json);
     }
 }

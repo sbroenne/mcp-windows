@@ -3,7 +3,6 @@ using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -111,10 +110,11 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
             // Bounds should have valid dimensions (can be negative for multi-monitor)
             // Width and Height should be non-negative for visible windows
             // Note: Minimized windows may have 0 bounds
-            if (window.State != WindowState.Minimized)
+            // Bounds is [x, y, width, height] array
+            if (window.State != "minimized")
             {
-                Assert.True(window.Bounds.Width >= 0, $"Window '{window.Title}' has negative width");
-                Assert.True(window.Bounds.Height >= 0, $"Window '{window.Title}' has negative height");
+                Assert.True(window.Bounds[2] >= 0, $"Window '{window.Title}' has negative width");
+                Assert.True(window.Bounds[3] >= 0, $"Window '{window.Title}' has negative height");
             }
         }
     }
@@ -136,10 +136,10 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
         foreach (var window in result.Windows)
         {
             Assert.True(
-                window.State == WindowState.Normal ||
-                window.State == WindowState.Minimized ||
-                window.State == WindowState.Maximized ||
-                window.State == WindowState.Hidden,
+                window.State == "normal" ||
+                window.State == "minimized" ||
+                window.State == "maximized" ||
+                window.State == "hidden",
                 $"Window '{window.Title}' has unexpected state: {window.State}");
         }
     }
@@ -180,13 +180,8 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
 
         // Windows on the current desktop should report OnCurrentDesktop = true
         // Note: This is informational - we can't guarantee all are on current desktop
-        // but we verify the field is populated
-        foreach (var window in result.Windows)
-        {
-            // The field should be set (default to true for visible windows on current desktop)
-            // Just verify the field exists and is accessible
-            _ = window.OnCurrentDesktop;
-        }
+        // Note: WindowInfoCompact doesn't include OnCurrentDesktop field
+        // The compact format focuses on essential display properties only
     }
 
     [Fact]
@@ -223,25 +218,8 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
         }
     }
 
-    [Fact]
-    public async Task ListWindows_IncludesRespondingStatus()
-    {
-        // Act
-        var result = await _windowService.ListWindowsAsync();
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.NotNull(result.Windows);
-
-        // Most normal windows should be responding
-        // Check that the IsResponding field is accessible and most are true
-        int respondingCount = result.Windows.Count(w => w.IsResponding);
-        int totalCount = result.Windows.Count;
-
-        // At least half should be responding (healthy system)
-        Assert.True(respondingCount >= totalCount / 2,
-            $"Too few responding windows: {respondingCount}/{totalCount}");
-    }
+    // Note: IsResponding is not included in WindowInfoCompact (compact format focuses on essential display properties).
+    // The ListWindows_IncludesRespondingStatus test has been removed as this field is no longer available.
 }
 
 /// <summary>
