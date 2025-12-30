@@ -139,7 +139,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                 screenshotResult.Height ?? 0,
                 annotatedElements);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogCaptureError(ex, ex.Message);
             return AnnotatedScreenshotResult.CreateFailure($"Failed to capture annotated screenshot: {ex.Message}");

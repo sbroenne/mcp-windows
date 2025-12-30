@@ -248,7 +248,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             _logger.LogOperationException(correlationId, action ?? "null", ex);
@@ -563,7 +563,7 @@ public sealed partial class KeyboardControlTool : IDisposable
             // Window matches expectations
             return KeyboardControlResult.CreateSuccess();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.WrongTargetWindow,

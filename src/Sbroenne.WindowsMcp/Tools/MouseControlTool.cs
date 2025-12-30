@@ -551,7 +551,7 @@ public sealed partial class MouseControlTool
             _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             _logger.LogOperationException(correlationId, action ?? "null", ex);
@@ -1058,7 +1058,7 @@ public sealed partial class MouseControlTool
             // Window matches expectations
             return MouseControlResult.CreateSuccess(new Coordinates(0, 0));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.WrongTargetWindow,

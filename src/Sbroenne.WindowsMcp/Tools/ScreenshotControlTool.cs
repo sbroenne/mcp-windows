@@ -358,7 +358,7 @@ public sealed partial class ScreenshotControlTool
                 await File.WriteAllBytesAsync(filePath, imageBytes, cancellationToken);
                 savedFilePath = filePath;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.CaptureError,

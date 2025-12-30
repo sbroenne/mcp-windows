@@ -697,7 +697,7 @@ public sealed partial class UIAutomationService
 
                 return Task.FromResult(UIAutomationResult.CreateSuccess("hide_highlight", CreateDiagnostics(stopwatch)));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 return Task.FromResult(UIAutomationResult.CreateFailure(
                     "hide_highlight",

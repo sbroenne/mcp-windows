@@ -114,7 +114,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "Invoke"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"Invoke failed: {ex.Message}");
         }
@@ -135,7 +135,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "Toggle"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"Toggle failed: {ex.Message}");
         }
@@ -166,7 +166,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "ExpandCollapse"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"ExpandCollapse failed: {ex.Message}");
         }
@@ -192,7 +192,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "SetValue"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"SetValue failed: {ex.Message}");
         }
@@ -225,7 +225,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "SetRangeValue"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"SetRangeValue failed: {ex.Message}");
         }
@@ -266,7 +266,7 @@ public sealed partial class UIAutomationService
         {
             return (false, COMExceptionHelper.GetErrorMessage(ex, "Scroll"));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return (false, $"Scroll failed: {ex.Message}");
         }

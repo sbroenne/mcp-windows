@@ -174,7 +174,7 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Find:
-                    operationResult = await HandleFindAsync(title, regex, cancellationToken);
+                    operationResult = await HandleFindAsync(title, app, regex, cancellationToken);
                     break;
 
                 case WindowAction.Activate:
@@ -214,7 +214,7 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.WaitFor:
-                    operationResult = await HandleWaitForAsync(title, regex, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForAsync(title, app, regex, timeoutMs, cancellationToken);
                     break;
 
                 case WindowAction.MoveToMonitor:
@@ -264,7 +264,7 @@ public sealed partial class WindowManagementTool
             _logger?.LogWindowOperation(action ?? "null", success: false, errorMessage: errorResult.Error);
             return errorResult;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
             _logger?.LogError(action ?? "null", ex);
@@ -323,11 +323,14 @@ public sealed partial class WindowManagementTool
                 var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
 
                 // Wait for the process to have a main window
+                // Some apps (like Notepad) may not immediately set MainWindowHandle
+                // We also try to find any window belonging to this process
                 while (!process.HasExited && DateTime.UtcNow < deadline)
                 {
                     await Task.Delay(100, cancellationToken);
                     process.Refresh();
 
+                    // First try MainWindowHandle (works for most apps)
                     if (process.MainWindowHandle != IntPtr.Zero)
                     {
                         // Found the main window, return its info
@@ -336,6 +339,23 @@ public sealed partial class WindowManagementTool
                         {
                             return WindowManagementResult.CreateWindowSuccess(
                                 windowInfo,
+                                $"Launched '{programPath}' successfully");
+                        }
+                    }
+
+                    // Fallback: Search for any visible window owned by this process
+                    // This helps with apps that don't set MainWindowHandle immediately
+                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                    if (listResult.Success && listResult.Windows != null)
+                    {
+                        var processWindow = listResult.Windows.FirstOrDefault(w =>
+                            string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase) ||
+                            w.ProcessId == process.Id);
+
+                        if (processWindow != null)
+                        {
+                            return WindowManagementResult.CreateWindowSuccess(
+                                processWindow,
                                 $"Launched '{programPath}' successfully");
                         }
                     }
@@ -348,7 +368,24 @@ public sealed partial class WindowManagementTool
                         $"Process '{programPath}' exited unexpectedly with code {process.ExitCode}");
                 }
 
-                // Timeout waiting for window
+                // Timeout waiting for window - but process is running
+                // Make one final attempt to find any window
+                var finalListResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                if (finalListResult.Success && finalListResult.Windows != null)
+                {
+                    var processWindow = finalListResult.Windows.FirstOrDefault(w =>
+                        string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase) ||
+                        w.ProcessId == process.Id);
+
+                    if (processWindow != null)
+                    {
+                        return WindowManagementResult.CreateWindowSuccess(
+                            processWindow,
+                            $"Launched '{programPath}' successfully");
+                    }
+                }
+
+                // Truly couldn't find the window
                 return WindowManagementResult.CreateSuccess(
                     $"Launched '{programPath}' (PID: {process.Id}), but window did not appear within timeout. Use list or wait_for to find the window.");
             }
@@ -369,7 +406,7 @@ public sealed partial class WindowManagementTool
                 WindowManagementErrorCode.AccessDenied,
                 $"Access denied when trying to launch '{programPath}'. Check permissions.");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SystemError,
@@ -401,17 +438,20 @@ public sealed partial class WindowManagementTool
 
     private async Task<WindowManagementResult> HandleFindAsync(
         string? title,
+        string? app,
         bool useRegex,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(title))
+        // Accept either 'title' or 'app' parameter for finding windows
+        var searchTerm = title ?? app;
+        if (string.IsNullOrEmpty(searchTerm))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "Title is required for find action");
+                "Either 'title' or 'app' is required for find action. Example: find(app='Notepad') or find(title='Notepad')");
         }
 
-        return await _windowService.FindWindowAsync(title, useRegex, cancellationToken);
+        return await _windowService.FindWindowAsync(searchTerm, useRegex, cancellationToken);
     }
 
     private async Task<WindowManagementResult> HandleActivateAsync(
@@ -570,18 +610,21 @@ public sealed partial class WindowManagementTool
 
     private async Task<WindowManagementResult> HandleWaitForAsync(
         string? title,
+        string? app,
         bool useRegex,
         int? timeoutMs,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(title))
+        // Accept either 'title' or 'app' parameter for waiting
+        var searchTerm = title ?? app;
+        if (string.IsNullOrEmpty(searchTerm))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "Title is required for wait_for action");
+                "Either 'title' or 'app' is required for wait_for action. Example: wait_for(app='Notepad') or wait_for(title='Notepad')");
         }
 
-        return await _windowService.WaitForWindowAsync(title, useRegex, timeoutMs, cancellationToken);
+        return await _windowService.WaitForWindowAsync(searchTerm, useRegex, timeoutMs, cancellationToken);
     }
 
     private async Task<WindowManagementResult> HandleMoveToMonitorAsync(

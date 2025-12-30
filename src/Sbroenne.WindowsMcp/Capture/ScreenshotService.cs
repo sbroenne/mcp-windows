@@ -92,7 +92,7 @@ public sealed class ScreenshotService : IScreenshotService
                 ScreenshotErrorCode.Timeout,
                 "Screenshot operation was cancelled");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogOperationError("CaptureError", ex.Message);
             return ScreenshotControlResult.Error(
@@ -352,7 +352,7 @@ public sealed class ScreenshotService : IScreenshotService
             // Handle output mode
             return BuildCaptureResult(processed, request, $"Captured window: {processed.Width}x{processed.Height} {processed.Format}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogOperationError("PrintWindowException", ex.Message);
             return ScreenshotControlResult.Error(
