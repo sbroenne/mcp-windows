@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
@@ -20,13 +19,6 @@ namespace Sbroenne.WindowsMcp.Tools;
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowManagementTool
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private readonly IWindowService _windowService;
     private readonly IMonitorService _monitorService;
     private readonly WindowOperationLogger? _logger;

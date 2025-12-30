@@ -4,6 +4,7 @@ using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Serialization;
 
 namespace Sbroenne.WindowsMcp.Resources;
 
@@ -13,12 +14,6 @@ namespace Sbroenne.WindowsMcp.Resources;
 [McpServerResourceType]
 public sealed class SystemResources
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = true
-    };
-
     private readonly IMonitorService _monitorService;
 
     /// <summary>
@@ -39,7 +34,7 @@ public sealed class SystemResources
     public string GetMonitors()
     {
         var monitors = _monitorService.GetMonitors();
-        return JsonSerializer.Serialize(monitors, JsonOptions);
+        return JsonSerializer.Serialize(monitors, McpJsonOptions.Default);
     }
 
     /// <summary>
@@ -61,7 +56,7 @@ public sealed class SystemResources
         {
             // Return a default/unknown layout if we can't detect it
             var unknownLayout = KeyboardLayoutInfo.Create("unknown", "Unknown", "00000000", 0);
-            return JsonSerializer.Serialize(unknownLayout, JsonOptions);
+            return JsonSerializer.Serialize(unknownLayout, McpJsonOptions.Default);
         }
 
         // The low word of the layout handle is the language identifier (LANGID)
@@ -86,7 +81,7 @@ public sealed class SystemResources
         var displayName = GetLayoutDisplayName(langId);
 
         var layoutInfo = KeyboardLayoutInfo.Create(languageTag, displayName, layoutId, langId & 0x3FF);
-        return JsonSerializer.Serialize(layoutInfo, JsonOptions);
+        return JsonSerializer.Serialize(layoutInfo, McpJsonOptions.Default);
     }
 
     /// <summary>

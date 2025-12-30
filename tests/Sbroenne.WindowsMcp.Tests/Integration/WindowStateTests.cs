@@ -27,7 +27,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task MinimizeWindow_MinimizesWindow()
+    public async Task MinimizeWindow_MinimizesWindowAsync()
     {
         // Arrange - Use the test harness window
         nint handle = _fixture.TestWindowHandle;
@@ -47,7 +47,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task MaximizeWindow_MaximizesWindow()
+    public async Task MaximizeWindow_MaximizesWindowAsync()
     {
         // Arrange - Use the test harness window
         nint handle = _fixture.TestWindowHandle;

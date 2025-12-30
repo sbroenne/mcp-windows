@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Diagnostics;
-using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Automation;
@@ -20,13 +19,6 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class MouseControlTool
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
 
     private readonly IMouseInputService _mouseInputService;

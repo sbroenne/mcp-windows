@@ -9,6 +9,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Serialization;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -19,13 +20,6 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class KeyboardControlTool : IDisposable
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-        WriteIndented = false,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-    };
-
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly IWindowEnumerator _windowEnumerator;
     private readonly IWindowService _windowService;
@@ -405,7 +399,7 @@ public sealed partial class KeyboardControlTool : IDisposable
         IReadOnlyList<KeySequenceItem> sequence;
         try
         {
-            sequence = JsonSerializer.Deserialize<List<KeySequenceItem>>(sequenceJson, JsonOptions) ?? [];
+            sequence = JsonSerializer.Deserialize<List<KeySequenceItem>>(sequenceJson, McpJsonOptions.Default) ?? [];
         }
         catch (JsonException ex)
         {
