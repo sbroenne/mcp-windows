@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **skUnit LLM integration tests** - New test project for end-to-end testing with AI
+  - Uses [skUnit](https://github.com/mehrandvd/skunit) for semantic testing
+  - Markdown-based test scenarios with assertions
+  - Notepad automation workflow as example test case
+- **Window launch action** - `window_management(action='launch', programPath='notepad.exe')`
+  - Launch applications directly from the MCP server
+  - Automatic window detection after launch
+  - Returns window handle for subsequent operations
 - **`app` parameter** - All tools now accept an `app` parameter for simplified window targeting
   - Click buttons, type text, and take screenshots without separate window activation
   - Example: `ui_automation(action='click', app='Notepad', name='Save')`

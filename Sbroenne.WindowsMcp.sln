@@ -11,7 +11,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sbroenne.WindowsMcp.Tests", "tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj", "{34BB6D19-F0C2-4DDE-A249-F2259CEA8447}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sbroenne.WindowsMcp.LLM.Tests", "tests\Sbroenne.WindowsMcp.McpTests\Sbroenne.WindowsMcp.LLM.Tests.csproj", "{04205E9F-C5F7-4DA4-BC8B-842EE66244B8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sbroenne.WindowsMcp.LLM.Tests", "tests\Sbroenne.WindowsMcp.LLM.Tests\Sbroenne.WindowsMcp.LLM.Tests.csproj", "{04205E9F-C5F7-4DA4-BC8B-842EE66244B8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
