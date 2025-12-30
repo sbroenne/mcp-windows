@@ -7,12 +7,12 @@ using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using skUnit;
 
-namespace Sbroenne.WindowsMcp.McpTests;
+namespace Sbroenne.WindowsMcp.LLM.Tests;
 
 /// <summary>
 /// Base class for Windows MCP server tests. Shares the MCP server across tests.
 /// </summary>
-public abstract class WindowsMcpTestBase : IAsyncLifetime
+public abstract class TestBase : IAsyncLifetime
 {
     private static McpClient? _mcp;
     private static IChatClient? _systemUnderTestClient;
@@ -22,7 +22,7 @@ public abstract class WindowsMcpTestBase : IAsyncLifetime
 
     protected ITestOutputHelper Output { get; }
 
-    protected WindowsMcpTestBase(ITestOutputHelper output)
+    protected TestBase(ITestOutputHelper output)
     {
         ArgumentNullException.ThrowIfNull(output);
         Output = output;

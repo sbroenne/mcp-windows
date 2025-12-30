@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using SharpToken;
 using Sbroenne.WindowsMcp.Models;
+using SharpToken;
 using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;

@@ -174,6 +174,7 @@ public sealed class MouseScrollTests : IDisposable
     public async Task ScrollAsync_ZeroAmount_Succeeds()
     {
         // Arrange - scroll 0 clicks (effectively no scroll)
+        _fixture.Reset(); // Ensure clean state
         var (x, y) = _fixture.GetTestWindowCenter();
         _fixture.EnsureTestWindowForeground();
 

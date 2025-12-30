@@ -32,7 +32,7 @@ public sealed record MouseControlResult
     /// Gets the final cursor position after the operation. Internal use only.
     /// </summary>
     [JsonIgnore]
-    public required FinalPosition FinalPosition { get; init; }
+    public FinalPosition FinalPosition { get; init; } = new(0, 0);
 
     /// <summary>
     /// Gets the final cursor position as [x, y] array for JSON serialization.

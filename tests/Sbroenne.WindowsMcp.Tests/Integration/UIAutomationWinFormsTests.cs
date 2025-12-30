@@ -616,10 +616,11 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.True(findResult.Items!.Length > 0);
 
         // Verify list items have names and click coordinates
-        var alphaItem = findResult.Items!.FirstOrDefault(e => e.Name?.Contains("Alpha") == true);
-        Assert.NotNull(alphaItem);
-        Assert.NotNull(alphaItem!.Click);
-        Assert.Equal(3, alphaItem.Click!.Length);
+        // Note: In WinForms ListView, the Name property is the first column text (ID: "1", "2", "3", etc.)
+        var item1 = findResult.Items!.FirstOrDefault(e => e.Name == "1");
+        Assert.NotNull(item1);
+        Assert.NotNull(item1!.Click);
+        Assert.Equal(3, item1.Click!.Length);
     }
 
     [Fact]
@@ -635,7 +636,8 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.True(clickResult.Success, $"Tab click failed: {clickResult.ErrorMessage}");
         await Task.Delay(300);
 
-        // Find and click on "Project Beta" item
+        // Find and click on item "2" (which is "Project Beta")
+        // Note: In WinForms ListView, the Name property is the first column text (ID: "1", "2", "3", etc.)
         var findResult = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
@@ -644,15 +646,15 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.True(findResult.Success);
         Assert.NotNull(findResult.Items);
 
-        var betaItem = findResult.Items!.FirstOrDefault(e => e.Name?.Contains("Beta") == true);
-        if (betaItem != null)
+        var item2 = findResult.Items!.FirstOrDefault(e => e.Name == "2");
+        if (item2 != null)
         {
             // Click the item to select it
             var selectResult = await _automationService.FindAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 ControlType = "ListItem",
-                Name = betaItem.Name,
+                Name = item2.Name,
             });
             Assert.True(selectResult.Success, $"Select click failed: {selectResult.ErrorMessage}");
             await Task.Delay(100);

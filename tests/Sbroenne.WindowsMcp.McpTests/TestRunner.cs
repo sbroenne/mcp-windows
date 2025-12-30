@@ -3,12 +3,12 @@
 
 using skUnit.Scenarios;
 
-namespace Sbroenne.WindowsMcp.McpTests;
+namespace Sbroenne.WindowsMcp.LLM.Tests;
 
 /// <summary>
 /// Integration tests for Windows MCP server using skUnit.
 /// </summary>
-public class WindowsMcpTests(ITestOutputHelper output) : WindowsMcpTestBase(output)
+public class TestRunner(ITestOutputHelper output) : TestBase(output)
 {
     [Fact]
     public async Task NotepadWorkflow_EndToEndAsync()

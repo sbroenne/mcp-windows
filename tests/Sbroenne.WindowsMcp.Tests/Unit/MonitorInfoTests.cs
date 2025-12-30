@@ -73,17 +73,21 @@ public sealed class MonitorInfoTests
         var json = System.Text.Json.JsonSerializer.Serialize(monitor);
 
         // Assert - physical dimensions are hidden (JsonIgnore), only logical dimensions exposed
-        Assert.Contains("\"index\":0", json);
-        Assert.Contains("\"display_number\":1", json);
-        Assert.Contains("\"device_name\":", json);
-        Assert.Contains("\"width\":1920", json);
-        Assert.Contains("\"height\":1080", json);
+        // Property names are abbreviated to minimize token count:
+        // i=index, dn=display_number, dev=device_name, w=width, h=height, x=x, y=y, p=is_primary
+        Assert.Contains("\"i\":0", json);
+        Assert.Contains("\"dn\":1", json);
+        Assert.Contains("\"dev\":", json);
+        Assert.Contains("\"w\":1920", json);
+        Assert.Contains("\"h\":1080", json);
         Assert.Contains("\"x\":0", json);
         Assert.Contains("\"y\":0", json);
-        Assert.Contains("\"is_primary\":true", json);
+        Assert.Contains("\"p\":true", json);
         // Physical dimensions should NOT be in JSON (hidden from LLMs)
         Assert.DoesNotContain("physical_width", json);
         Assert.DoesNotContain("physical_height", json);
+        Assert.DoesNotContain("PhysicalWidth", json);
+        Assert.DoesNotContain("PhysicalHeight", json);
     }
 
     [Fact]

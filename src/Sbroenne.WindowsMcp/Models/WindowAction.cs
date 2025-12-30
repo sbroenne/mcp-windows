@@ -54,5 +54,8 @@ public enum WindowAction
     MoveAndActivate,
 
     /// <summary>Ensure window is visible (restore if minimized, activate).</summary>
-    EnsureVisible
+    EnsureVisible,
+
+    /// <summary>Launch an application and optionally wait for its window.</summary>
+    Launch
 }

@@ -120,20 +120,34 @@ public sealed partial class UIAutomationService
 
         try
         {
-            var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
+            var searchQueries = BuildTypeSearchQueries(query);
+            UIAutomationResult? lastResult = null;
+
+            foreach (var searchQuery in searchQueries)
             {
-                return UIAutomationResult.CreateFailure(
-                    "type",
-                    UIAutomationErrorType.ElementNotFound,
-                    findResult.ErrorMessage ?? "Element not found.",
-                    CreateDiagnostics(stopwatch));
+                var findResult = await FindElementsAsync(searchQuery, cancellationToken);
+                lastResult = findResult;
+
+                if (findResult.Success && findResult.Items is { Length: > 0 })
+                {
+                    var targetElement = findResult.Items[0];
+                    var elementId = targetElement.Id;
+
+                    return await PerformTypeAsync(elementId, text, clearFirst, searchQuery.WindowHandle, stopwatch, cancellationToken);
+                }
             }
 
-            var targetElement = findResult.Items[0];
-            var elementId = targetElement.Id;
+            var errorMessage = lastResult?.ErrorMessage ?? "Element not found.";
+            if (searchQueries.Count > 1 && string.IsNullOrEmpty(lastResult?.ErrorMessage))
+            {
+                errorMessage = "Element not found. Tried default Document/Edit controls. Provide elementId or search criteria (name, controlType, automationId).";
+            }
 
-            return await PerformTypeAsync(elementId, text, clearFirst, query.WindowHandle, stopwatch, cancellationToken);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                lastResult?.ErrorType ?? UIAutomationErrorType.ElementNotFound,
+                errorMessage,
+                CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
         {
@@ -153,6 +167,29 @@ public sealed partial class UIAutomationService
                 $"Type failed: {ex.Message}",
                 CreateDiagnostics(stopwatch));
         }
+    }
+
+    private static List<ElementQuery> BuildTypeSearchQueries(ElementQuery baseQuery)
+    {
+        var queries = new List<ElementQuery>();
+
+        var hasSelector = !string.IsNullOrEmpty(baseQuery.Name) ||
+                          !string.IsNullOrEmpty(baseQuery.NameContains) ||
+                          !string.IsNullOrEmpty(baseQuery.NamePattern) ||
+                          !string.IsNullOrEmpty(baseQuery.AutomationId) ||
+                          !string.IsNullOrEmpty(baseQuery.ClassName) ||
+                          !string.IsNullOrEmpty(baseQuery.ControlType);
+
+        // For plain "type" without selectors, prefer typical text controls first.
+        if (!hasSelector)
+        {
+            queries.Add(baseQuery with { ControlType = "Document" });
+            queries.Add(baseQuery with { ControlType = "Edit" });
+        }
+
+        queries.Add(baseQuery);
+
+        return queries;
     }
 
     private async Task<UIAutomationResult> PerformTypeAsync(string elementId, string text, bool clearFirst, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)

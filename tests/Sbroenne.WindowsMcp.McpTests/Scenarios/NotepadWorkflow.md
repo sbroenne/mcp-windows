@@ -1,7 +1,8 @@
 # SCENARIO Notepad Automation Workflow
 
+
 ## [USER]
-Launch Notepad by pressing Win+R to open the Run dialog, then type "notepad" and press Enter.
+Launch Notepad.
 Wait for Notepad to open and confirm it is visible.
 
 ## [AGENT]
@@ -9,7 +10,7 @@ Wait for Notepad to open and confirm it is visible.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "keyboard_control"
+  "function_name": "window_management"
 }
 ```
 
@@ -17,14 +18,14 @@ Wait for Notepad to open and confirm it is visible.
 notepad, launched, opened, visible, success
 
 ## [USER]
-Activate the Notepad window and type "Hello from Windows MCP Server!" into it.
+Type "Hello from Windows MCP Server!" into the Notepad window.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "keyboard_control"
+  "function_name": "ui_automation"
 }
 ```
 
@@ -33,7 +34,6 @@ typed, text, hello, success, notepad
 
 ## [USER]
 Take a screenshot of the Notepad window showing the text that was typed.
-Save the screenshot to the "screenshots" subdirectory in the current working directory.
 
 ## [AGENT]
 
@@ -60,7 +60,7 @@ Find the Notepad window and report its title and current state (maximized, minim
 notepad, Notepad
 
 ## [USER]
-Click the X (close) button on the Notepad window to close it. If a save dialog appears, click "Don't Save" to discard changes.
+Click the Close button on the Notepad window to close it. If a save dialog appears, click "Don't Save" to discard changes.
 
 ## [AGENT]
 

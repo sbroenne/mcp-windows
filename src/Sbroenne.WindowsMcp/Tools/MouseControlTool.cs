@@ -101,7 +101,7 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Mouse input: move, click, double_click, right_click, middle_click, drag, scroll, get_position. Use ui_automation(action='click') for UI elements instead. mouse_control is for: 1) raw coordinate clicks, 2) custom-drawn controls, 3) games. Use 'app' parameter to auto-activate target window.")]
+    [Description("Low-level mouse input for raw coordinate clicks. DO NOT use for clicking buttons - use ui_automation(action='click') instead. mouse_control is ONLY for: 1) raw coordinate clicks when you have exact x,y, 2) custom-drawn controls without UIA support, 3) games. Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,

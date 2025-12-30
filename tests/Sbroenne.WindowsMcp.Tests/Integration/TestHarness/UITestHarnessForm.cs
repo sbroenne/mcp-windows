@@ -86,10 +86,10 @@ public sealed class UITestHarnessForm : Form
     public int ProgressValue => _progressBar.Value;
 
     /// <summary>
-    /// Gets the selected list view item.
+    /// Gets the selected list view item (returns the project name from the second column).
     /// </summary>
     public string? SelectedListItem =>
-        _listView.SelectedItems.Count > 0 ? _listView.SelectedItems[0].Text : null;
+        _listView.SelectedItems.Count > 0 ? _listView.SelectedItems[0].SubItems[1].Text : null;
 
     /// <summary>
     /// Gets the selected tree view node.

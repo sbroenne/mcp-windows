@@ -323,6 +323,35 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         Assert.Equal(testText, actualText);
     }
 
+    [Fact]
+    public async Task FindAndType_WithNoSelector_TypesIntoFirstTextControl()
+    {
+        // Arrange
+        var testText = "Fallback typing works";
+
+        // Act - Rely on default Document/Edit fallback when no selector is provided
+        var typeResult = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+            },
+            text: testText,
+            clearFirst: true);
+
+        // Assert
+        Assert.True(typeResult.Success, $"FindAndType failed: {typeResult.ErrorMessage}");
+        Assert.NotNull(typeResult.Items);
+        var typedElementId = typeResult.Items![0].Id;
+
+        var getTextResult = await _automationService.GetTextAsync(
+            elementId: typedElementId,
+            windowHandle: _windowHandle,
+            includeChildren: false);
+
+        Assert.True(getTextResult.Success, $"GetText failed: {getTextResult.ErrorMessage}");
+        Assert.Equal(testText, getTextResult.Text);
+    }
+
     #endregion
 
     #region GetText Tests

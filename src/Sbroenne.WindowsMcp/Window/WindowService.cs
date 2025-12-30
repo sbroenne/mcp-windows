@@ -662,4 +662,12 @@ public sealed class WindowService : IWindowService
             WindowManagementErrorCode.Timeout,
             $"Timeout after {timeout}ms waiting for window to reach state '{targetState}'. Current state: '{currentState}'");
     }
+
+    /// <inheritdoc/>
+    public Task<Models.WindowInfo?> GetWindowInfoAsync(
+        nint handle,
+        CancellationToken cancellationToken = default)
+    {
+        return _enumerator.GetWindowInfoAsync(handle, cancellationToken);
+    }
 }
