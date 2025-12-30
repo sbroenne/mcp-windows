@@ -341,16 +341,20 @@ public sealed partial class WindowManagementTool
                                 windowInfo,
                                 $"Launched '{programPath}' successfully");
                         }
+
+                        // MainWindowHandle is set but window info is null (window may still be initializing)
+                        // Give it a bit more time before falling back to list search
+                        await Task.Delay(50, cancellationToken);
                     }
 
                     // Fallback: Search for any visible window owned by this process
-                    // This helps with apps that don't set MainWindowHandle immediately
-                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                    // Use includeAllDesktops: true to catch windows that might be briefly cloaked during initialization
+                    var listResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
                     if (listResult.Success && listResult.Windows != null)
                     {
                         var processWindow = listResult.Windows.FirstOrDefault(w =>
-                            string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase) ||
-                            w.ProcessId == process.Id);
+                            w.ProcessId == process.Id ||
+                            string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
 
                         if (processWindow != null)
                         {
@@ -370,12 +374,12 @@ public sealed partial class WindowManagementTool
 
                 // Timeout waiting for window - but process is running
                 // Make one final attempt to find any window
-                var finalListResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
+                var finalListResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
                 if (finalListResult.Success && finalListResult.Windows != null)
                 {
                     var processWindow = finalListResult.Windows.FirstOrDefault(w =>
-                        string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase) ||
-                        w.ProcessId == process.Id);
+                        w.ProcessId == process.Id ||
+                        string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
 
                     if (processWindow != null)
                     {
