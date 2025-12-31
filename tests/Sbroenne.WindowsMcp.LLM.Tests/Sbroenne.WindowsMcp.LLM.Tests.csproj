@@ -26,14 +26,8 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="OpenAI" />
-    <!-- Use local skUnit with bug fix for success rate check -->
-    <!-- <PackageReference Include="skUnit" /> -->
+    <PackageReference Include="skUnit" />
     <PackageReference Include="xunit" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Reference local skUnit build with fix for success rate calculation bug -->
-    <ProjectReference Include="..\..\..\skunit\src\skUnit\skUnit.csproj" />
     <PackageReference Include="xunit.runner.visualstudio" />
   </ItemGroup>
 
