@@ -47,6 +47,24 @@ C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 
 <!-- MANUAL ADDITIONS START -->
 
+## Development Rules
+
+### Always Test Before Committing
+**CRITICAL**: Never commit code changes without running tests first.
+
+```powershell
+# Run unit tests (fast, excludes integration tests)
+dotnet test tests/Sbroenne.WindowsMcp.Tests --no-build --filter "Category!=Integration"
+
+# Run all tests including integration
+dotnet test tests/Sbroenne.WindowsMcp.Tests --no-build
+```
+
+Only commit after tests pass. This applies to:
+- Code changes
+- Test file changes  
+- Documentation that references code behavior
+
 ## Feature: 008-all-monitors-screenshot (Implemented)
 
 **Purpose**: Capture entire virtual screen spanning all monitors in a single screenshot for LLM-based integration test verification.
