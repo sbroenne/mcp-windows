@@ -91,18 +91,18 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. Use window_management(action='find') first to get a handle, then use click/type directly. Examples: click(windowHandle='123456', nameContains='Close') clicks the Close button. Works with title bar buttons (Close, Minimize, Maximize), dialogs, and all standard UI controls. Actions: click, type, invoke, toggle, ensure_state, select, find, get_tree, wait_for, wait_for_disappear, get_text, focus, scroll_into_view, highlight, ocr. ALWAYS prefer over mouse_control for clicking UI elements.")]
+    [Description("UI element interaction via Windows UIA. WORKFLOW: 1) Call window_management(action='find') to get windowHandle, 2) Use that handle with ui_automation actions. windowHandle is REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). Example: click(windowHandle='123456', nameContains='Close'). Works with title bar buttons, dialogs, and all standard UI controls. DIALOG BUTTONS: nameContains='save' finds 'Save'/'Don't save', nameContains='cancel' finds 'Cancel'. Actions NOT requiring windowHandle: invoke/highlight/get_ancestors/get_element_details (use elementId instead), get_element_at_cursor, get_focused_element, ocr_status. ALWAYS prefer over mouse_control.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, get_element_details")]
         UIAutomationAction action,
 
-        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). For interactive actions (click, type, select, toggle, ensure_state, invoke, focus), the window is automatically activated before the action. If not specified, uses the current foreground window.")]
+        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
         string? windowHandle = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
         string? name = null,
 
-        [Description("Substring to search for in element names (partial match, case-insensitive). Use instead of 'name' when you only know part of the element's name.")]
+        [Description("Substring to search for in element names (partial match, case-insensitive). PREFERRED for dialog buttons - e.g., nameContains=\"Don't save\" finds the discard button in Windows save dialogs. Use instead of 'name' when you only know part of the element's name.")]
         string? nameContains = null,
 
         [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
@@ -186,7 +186,17 @@ public sealed partial class UIAutomationTool
             parsedWindowHandle = parsed;
         }
 
-        // Auto-activate target window for interactive actions when windowHandle is specified
+        // REQUIRE windowHandle for actions that need a window scope (Constitution Principle VI: tools must be dumb actuators)
+        if (RequiresWindowHandle(action) && !parsedWindowHandle.HasValue)
+        {
+            return UIAutomationResult.CreateFailure(
+                GetActionName(action),
+                UIAutomationErrorType.InvalidParameter,
+                $"windowHandle is required for {GetActionName(action)} action. Use window_management(action='find') or window_management(action='list') to get a handle first.",
+                null);
+        }
+
+        // Auto-activate target window for interactive actions
         if (parsedWindowHandle.HasValue && IsInteractiveAction(action))
         {
             var activateResult = await ActivateTargetWindowAsync(parsedWindowHandle.Value, GetActionName(action), cancellationToken);
@@ -253,13 +263,26 @@ public sealed partial class UIAutomationTool
     }
 
     /// <summary>
-    /// Determines if an action is interactive (affects the target window).
+    /// Determines if an action is interactive (affects the target window and should trigger auto-activation).
     /// </summary>
     private static bool IsInteractiveAction(UIAutomationAction action) =>
         action is UIAutomationAction.Click or UIAutomationAction.Type
             or UIAutomationAction.Select or UIAutomationAction.Toggle
-            or UIAutomationAction.EnsureState or UIAutomationAction.Invoke
-            or UIAutomationAction.Focus;
+            or UIAutomationAction.EnsureState or UIAutomationAction.Focus;
+
+    /// <summary>
+    /// Determines if an action requires an explicit windowHandle.
+    /// Constitution Principle VI: Tools must be dumb actuators - no implicit window resolution.
+    /// This includes interactive actions AND search/query actions that need a window scope.
+    /// </summary>
+    private static bool RequiresWindowHandle(UIAutomationAction action) =>
+        action is UIAutomationAction.Click or UIAutomationAction.Type
+            or UIAutomationAction.Select or UIAutomationAction.Toggle
+            or UIAutomationAction.EnsureState or UIAutomationAction.Focus
+            or UIAutomationAction.Find or UIAutomationAction.GetTree
+            or UIAutomationAction.WaitFor or UIAutomationAction.WaitForDisappear
+            or UIAutomationAction.WaitForState or UIAutomationAction.GetText
+            or UIAutomationAction.ScrollIntoView or UIAutomationAction.Ocr;
 
     private static string GetActionName(UIAutomationAction action) =>
         action switch

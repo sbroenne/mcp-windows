@@ -5,127 +5,94 @@ LLMs should use find/list to get window handles, then use explicit handles for a
 This pattern follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
 
 ## [USER]
-Open Notepad for me.
+Launch Notepad for me.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "launch", "Launch"]
+  }
 }
 ```
-
-### ASSERT SemanticCondition
-The Notepad application was successfully launched and a window handle was returned
 
 ### ASSERT ContainsAll
-Notepad, handle
+Notepad
 
 ## [USER]
-I need to find that Notepad window so I can work with it.
+Now find that Notepad window to get its handle.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "find", "Find", "list", "List"]
+  }
 }
 ```
-
-### ASSERT SemanticCondition
-Successfully found the Notepad window and received a numeric window handle
-
-### ASSERT ContainsAll
-found, handle
-
-## [USER]
-What state is the Notepad window in right now?
-
-## [AGENT]
-
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management"
-}
-```
-
-### ASSERT SemanticCondition
-Successfully retrieved the window state using the handle
 
 ### ASSERT ContainsAny
-Normal, Minimized, Maximized, normal, minimized, maximized
+found, Found, Notepad, handle
 
 ## [USER]
-Minimize that Notepad window.
+Use the minimize action with the handle to minimize the Notepad window.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "minimize", "Minimize"],
+    "handle": ["NotEmpty"]
+  }
 }
 ```
 
-### ASSERT SemanticCondition
-The Notepad window was successfully minimized
-
-### ASSERT ContainsAll
-minimized
+### ASSERT ContainsAny
+minimized, Minimized
 
 ## [USER]
-Now bring it back up.
+Use the restore action with the handle to restore the Notepad window.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "restore", "Restore"],
+    "handle": ["NotEmpty"]
+  }
 }
 ```
 
-### ASSERT SemanticCondition
-The Notepad window was successfully restored
-
-### ASSERT ContainsAll
-restored
+### ASSERT ContainsAny
+restored, Restored
 
 ## [USER]
-Make sure Notepad is in the foreground.
+Use the close action with the handle to close the Notepad window.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "close", "Close"],
+    "handle": ["NotEmpty"]
+  }
 }
 ```
 
-### ASSERT SemanticCondition
-The Notepad window was activated and brought to foreground
-
-### ASSERT ContainsAll
-activated
-
-## [USER]
-Close Notepad, I'm done with it.
-
-## [AGENT]
-
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management"
-}
-```
-
-### ASSERT SemanticCondition
-The Notepad window was successfully closed
-
-### ASSERT ContainsAll
-closed
+### ASSERT ContainsAny
+closed, Closed

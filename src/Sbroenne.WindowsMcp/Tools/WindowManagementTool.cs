@@ -79,8 +79,8 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Window control and application launching. To START/OPEN/RUN an application use: launch(programPath='notepad.exe'). DO NOT use wait_for to start apps - it only waits for windows already being launched. Other actions: list, find, activate, minimize, maximize, restore, close, move, resize, move_to_monitor, ensure_visible.")]
-    [return: Description("The result includes success status, window list or single window info (handle, title, process_name, state, is_foreground), and error details if failed. Save the 'handle' value to use with other tools.")]
+    [Description("Window control and application launching. launch(programPath) starts a NEW instance and returns handle - only call ONCE per app, do NOT call again if already open. After launch, the window is focused and ready for keyboard_control. Use activate(handle) to refocus an existing window. CLOSE: sends close request but if app has unsaved changes a dialog appears - use ui_automation to click 'Don't Save' or 'Save' to dismiss it. Actions: launch, list, find, activate, close, minimize, maximize, restore, move, resize.")]
+    [return: Description("The result includes window info (handle, title, process_name, state). SAVE the 'handle' to use with ui_automation, screenshot_control, and close.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The window action to perform: launch (start an application), list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible")] string action,
@@ -315,7 +315,7 @@ public sealed partial class WindowManagementTool
                         {
                             return WindowManagementResult.CreateWindowSuccess(
                                 windowInfo,
-                                $"Launched '{programPath}' successfully");
+                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
                         }
 
                         // MainWindowHandle is set but window info is null (window may still be initializing)
@@ -336,7 +336,7 @@ public sealed partial class WindowManagementTool
                         {
                             return WindowManagementResult.CreateWindowSuccess(
                                 processWindow,
-                                $"Launched '{programPath}' successfully");
+                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
                         }
                     }
                 }
@@ -361,7 +361,7 @@ public sealed partial class WindowManagementTool
                     {
                         return WindowManagementResult.CreateWindowSuccess(
                             processWindow,
-                            $"Launched '{programPath}' successfully");
+                            $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
                     }
                 }
 

@@ -36,7 +36,7 @@ public abstract class TestBase : IAsyncLifetime
             ?? throw new InvalidOperationException("Set AZURE_OPENAI_API_KEY environment variable.");
 
         var azureClient = new AzureOpenAIClient(new Uri(endpoint), new ApiKeyCredential(apiKey));
-        var assertionClient = azureClient.GetChatClient("gpt-4o-mini").AsIChatClient();
+        var assertionClient = azureClient.GetChatClient("gpt-5-mini").AsIChatClient();
 
         ScenarioRunner = new ChatScenarioRunner(assertionClient, Output.WriteLine);
 
@@ -51,7 +51,7 @@ public abstract class TestBase : IAsyncLifetime
             })).ConfigureAwait(false);
 
             var tools = await _mcp.ListToolsAsync().ConfigureAwait(false);
-            var baseChatClient = azureClient.GetChatClient("gpt-4o-mini").AsIChatClient();
+            var baseChatClient = azureClient.GetChatClient("gpt-5-mini").AsIChatClient();
 
             _systemUnderTestClient = new ChatClientBuilder(baseChatClient)
                 .ConfigureOptions(options => options.Tools = [.. tools])

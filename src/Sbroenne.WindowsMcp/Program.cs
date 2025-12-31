@@ -67,7 +67,15 @@ builder.Services
             Name = "sbroenne.windows-mcp",
             Version = "1.0.0",
         };
-        options.ServerInstructions = "MCP server for Windows automation including mouse, keyboard, window management, and screenshot capture. Use the mouse_control tool to move the cursor, click, drag, and scroll. Use the keyboard_control tool to type text, press keys, and perform keyboard shortcuts. Use the window_management tool to list, find, activate, and control windows. Use the screenshot_control tool to capture screenshots of screens, monitors, windows, or regions.";
+        options.ServerInstructions =
+            "WORKFLOW: 1) window_management(find/launch) → get handle, " +
+            "2) Use that handle for ALL subsequent operations on that window. " +
+            "CRITICAL: NEVER launch an app you've already launched - reuse the handle from the previous launch. " +
+            "After launch, the window is focused and ready - proceed directly to keyboard/mouse/ui_automation. " +
+            "Use ui_automation for element interactions (click, type, toggle). " +
+            "Use keyboard_control for hotkeys (Ctrl+S, etc.) and raw text input. " +
+            "Use mouse_control only as fallback when ui_automation fails. " +
+            "CLOSE workflow: window_management(close) may trigger 'Save?' dialog - use ui_automation to dismiss it.";
     })
     .WithStdioServerTransport()
     .WithTools<MouseControlTool>()

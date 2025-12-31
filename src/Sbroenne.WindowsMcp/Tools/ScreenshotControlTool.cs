@@ -78,7 +78,7 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements + element list. Use annotate=false for plain screenshot. For window capture, first use window_management(action='find') to get the handle. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors.")]
+    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements. WINDOW CAPTURE: First call window_management(action='find') to get handle, then screenshot_control(target='window', windowHandle='123456'). Targets: primary_screen (default), secondary_screen, monitor, window (requires windowHandle), region, all_monitors. Use annotate=false for plain screenshot.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
