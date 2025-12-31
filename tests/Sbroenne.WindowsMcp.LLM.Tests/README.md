@@ -90,7 +90,7 @@ The tests follow the skUnit MCP Server testing pattern from [Demo.TddMcp](https:
 ## Adding New Scenarios
 
 1. Create a new `.md` file in `Scenarios/`
-2. Follow the skUnit scenario format with `[USER]` prompts and `[AGENT]` + `CHECK` assertions
+2. Follow the skUnit scenario format with `[USER]` prompts and `[AGENT]` + `ASSERT` assertions
 3. Add a test method that loads and runs the scenario:
 
 ```csharp
@@ -101,6 +101,98 @@ public async Task MyNewScenario_WorksAsync()
     await ScenarioRunner.RunAsync(scenarios, SystemUnderTestClient);
 }
 ```
+
+## Writing Good Test Scenarios
+
+### User Prompts: Use Natural Language
+
+**❌ BAD - Leading the witness (tells LLM exactly what to do):**
+```markdown
+## [USER]
+Use window_management with action "find" and title "Notepad". 
+Then use the handle parameter to call action "close".
+```
+
+**✅ GOOD - Natural user request (tests if LLM understands the tools):**
+```markdown
+## [USER]
+I need to find that Notepad window so I can work with it.
+```
+
+The test should verify the LLM can figure out the correct approach from tool descriptions alone, not by being told exactly what to do.
+
+### Assertions: Be Strict
+
+**❌ BAD - Too loose (matches almost anything):**
+```markdown
+### ASSERT ContainsAny
+success, done, ok, window, notepad
+```
+
+**✅ GOOD - Specific required keywords:**
+```markdown
+### ASSERT ContainsAll
+found, handle
+```
+
+### FunctionCall Assertions: Verify Parameters
+
+**❌ BAD - Only checks function was called:**
+```markdown
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "window_management"
+}
+```
+
+**✅ GOOD - Verifies correct parameters were passed:**
+```markdown
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "find", "Find"],
+    "handle": ["NotEmpty"]
+  }
+}
+```
+
+### Available Argument Assertions
+
+| Assertion | Description | Example |
+|-----------|-------------|---------|
+| `["IsAnyOf", "a", "b", "c"]` | Value equals one of the options | `"action": ["IsAnyOf", "find", "Find"]` |
+| `["ContainsAny", "a", "b"]` | Value contains any substring | `"title": ["ContainsAny", "Notepad", "notepad"]` |
+| `["ContainsAll", "a", "b"]` | Value contains all substrings | `"path": ["ContainsAll", "notepad", ".exe"]` |
+| `["NotEmpty"]` | Value is not null or empty | `"handle": ["NotEmpty"]` |
+| `["Empty"]` | Value is null or empty | `"optional": ["Empty"]` |
+| `["Equals", "value"]` | Exact match | `"action": ["Equals", "close"]` |
+| `["SemanticCondition", "..."]` | Semantic check using LLM | `"description": ["SemanticCondition", "Mentions a window"]` |
+
+### SemanticCondition: Be Specific
+
+**❌ BAD - Vague condition:**
+```markdown
+### ASSERT SemanticCondition
+The operation was successful
+```
+
+**✅ GOOD - Specific expected behavior:**
+```markdown
+### ASSERT SemanticCondition
+The Notepad window was successfully closed using the explicit window handle
+```
+
+### Testing Handle-Based Workflows
+
+When testing tools that require window handles (Constitution Principle VI: tools are dumb actuators):
+
+1. **First turn**: User asks to find/launch a window
+2. **Assert**: Check that handle is returned (`ContainsAll handle`)
+3. **Subsequent turns**: User refers to "that window" naturally
+4. **Assert**: Check that `windowHandle: ["NotEmpty"]` is passed to tools
 
 ## Troubleshooting
 
