@@ -74,7 +74,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input to the CURRENTLY FOCUSED window/element. Best for: hotkeys (Win+R, Ctrl+S, Alt+Tab), special keys (Enter, Escape, Tab, arrows), typing into dialogs you just opened (e.g., Run dialog after Win+R). For typing text into a SPECIFIC UI element (e.g., Notepad's document area), use ui_automation(action='type', app='...') instead. Actions: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle.")]
+    [Description("Keyboard input to the CURRENTLY FOCUSED window/element. Best for: hotkeys (Win+R, Ctrl+S, Alt+Tab), special keys (Enter, Escape, Tab, arrows), typing into dialogs you just opened (e.g., Run dialog after Win+R). For typing text into a SPECIFIC UI element, use ui_automation(action='type', windowHandle='...') instead. Actions: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,

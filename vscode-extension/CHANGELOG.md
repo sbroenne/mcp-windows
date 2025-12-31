@@ -18,9 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Short property names (e.g., `s` instead of `success`, `h` instead of `handle`)
   - Centralized JsonSerializerOptions for consistent formatting
   - Significantly reduces token consumption when LLMs process responses
-- **`app` parameter** - All tools now accept an `app` parameter for simplified window targeting
-  - Click buttons, type text, and take screenshots without separate window activation
-  - Example: `ui_automation(action='click', app='Notepad', name='Save')`
+- **Handle-based workflow** - All tools now use explicit `windowHandle` for window targeting
+  - LLM calls `window_management(action='find')` to get handles, then decides which to use
+  - Removed implicit `app` parameter that made window selection decisions
+  - Example: `ui_automation(action='click', windowHandle='123456', name='Save')`
 - **Direct search in actions** - `click`, `type`, `toggle`, `ensure_state`, `get_text`, `wait_for_state` now search directly
   - No need to call `find` first — just specify what you want to interact with
 - **Annotated screenshots by default** - `screenshot_control` now includes element overlays automatically
@@ -33,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Use `screenshot_control` (annotate=true is now default) instead of `capture_annotated`
 - **Simplified workflow** - Most tasks now require fewer tool calls
   - Old: `window_management(action='activate')` → `ui_automation(action='find')` → `ui_automation(action='click')`
-  - New: `ui_automation(action='click', app='Notepad', name='Save')`
+  - New: `window_management(action='find')` → `ui_automation(action='click', windowHandle='...', name='Save')`
 
 ## [1.1.4] - 2025-12-28
 

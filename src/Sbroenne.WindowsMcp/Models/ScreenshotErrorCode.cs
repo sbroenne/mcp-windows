@@ -71,7 +71,7 @@ public enum ScreenshotErrorCode
     NoSecondaryScreen = 12,
 
     /// <summary>
-    /// Window specified by app parameter was not found.
+    /// Window specified by handle was not found.
     /// </summary>
     WindowNotFound = 13
 }

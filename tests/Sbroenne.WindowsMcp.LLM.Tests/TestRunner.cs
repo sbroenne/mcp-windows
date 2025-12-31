@@ -18,13 +18,13 @@ public class TestRunner(ITestOutputHelper output) : TestBase(output)
     }
 
     /// <summary>
-    /// Tests app parameter resolution for window management actions.
-    /// Verifies fix for issue #47: close/activate with app parameter returning WindowNotFound.
+    /// Tests handle-based window management workflow.
+    /// Verifies that LLMs use find → get handle → use handle pattern.
     /// </summary>
     [Fact]
-    public async Task AppParameterResolution_Issue47Async()
+    public async Task HandleBasedWindowManagement_Issue47Async()
     {
-        var scenarios = ChatScenario.LoadFromText(await File.ReadAllTextAsync("Scenarios/AppParameterResolution.md"));
+        var scenarios = ChatScenario.LoadFromText(await File.ReadAllTextAsync("Scenarios/HandleBasedWindowManagement.md"));
         await ScenarioRunner.RunAsync(scenarios, SystemUnderTestClient);
     }
 }

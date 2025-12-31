@@ -355,7 +355,7 @@ public sealed record UIAutomationResult
             "Operation timed out. Increase timeoutMs or verify the expected UI state.",
 
         UIAutomationErrorType.WrongTargetWindow =>
-            "Wrong window has focus. Use app='...' to target the correct window.",
+            "Wrong window has focus. Use window_management(action='activate', handle='...') to focus the correct window first.",
 
         UIAutomationErrorType.InvalidParameter =>
             "Invalid parameter value. Check the parameter requirements.",

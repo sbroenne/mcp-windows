@@ -36,14 +36,16 @@ Windows MCP Server queries the UI directly — it finds buttons by name, not pix
 When you do need screenshots (games, canvas apps, custom controls), we support that too — plus **local OCR** that extracts text without vision model tokens.
 
 ```
-# No screenshot needed — direct semantic access
-ui_automation(action='click', app='Notepad', nameContains='Save') → success ✓
+# Find window handle first, then click - works regardless of DPI/theme/position
+window_management(action='find', title='Notepad') → handle='123456'
+ui_automation(action='click', windowHandle='123456', nameContains='Save') → success ✓
 
 # When you need it — screenshot fallback
-screenshot_control(app='Game') → mouse_control(x=450, y=300)
+window_management(action='find', title='Game') → handle
+screenshot_control(windowHandle='...') → mouse_control(x=450, y=300)
 
 # Local OCR — ~100ms, no image upload, ~50 tokens for result
-ui_automation(action='ocr', app='CustomApp') → structured text data
+ui_automation(action='ocr', windowHandle='123456') → structured text data
 ```
 
 ## ✨ Key Features
@@ -70,7 +72,7 @@ ui_automation(action='ocr', app='CustomApp') → structured text data
   `ensure_state(desiredState='on')` checks current state and toggles only if needed — one call, no race conditions.
 
 - **🖥️ Multi-Monitor**  
-  Full awareness of multiple displays with per-monitor DPI scaling. Use `app='My App'` to target windows automatically.
+  Full awareness of multiple displays with per-monitor DPI scaling. Use window_management to find and target windows.
 
 - **🔒 Security-Aware**  
   Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
@@ -83,19 +85,23 @@ For detailed feature documentation, see [FEATURES.md](FEATURES.md).
 ## The Workflow
 
 ```
-# 1. Just click it directly (no screenshot needed)
-ui_automation(action='click', app='Notepad', nameContains='Save')
+# 1. Find the window first
+window_management(action='find', title='Notepad') → handle='123456'
 
-# 2. If you don't know element names → discover with annotated screenshot
-screenshot_control(app='Notepad')  # Returns numbered elements + image
+# 2. Click elements by name using the handle
+ui_automation(action='click', windowHandle='123456', nameContains='Save')
 
-# 3. For toggles → atomic state management
-ui_automation(action='ensure_state', app='Settings', nameContains='Dark Mode', desiredState='on')
+# 3. If you don't know element names → discover with annotated screenshot
+screenshot_control(windowHandle='123456')  # Returns numbered elements + image
 
-# 4. Fallback for games/custom UIs → full mouse + keyboard support
-screenshot_control(app='Game')  # Get element coordinates
-mouse_control(app='Game', action='click', x=450, y=300)
-keyboard_control(app='Game', action='type', text='player1')
+# 4. For toggles → atomic state management
+window_management(action='find', title='Settings') → handle='789'
+ui_automation(action='ensure_state', windowHandle='789', nameContains='Dark Mode', desiredState='on')
+
+# 5. Fallback for games/custom UIs → full mouse + keyboard support
+screenshot_control(windowHandle='...')  # Get element coordinates
+mouse_control(action='click', x=450, y=300)
+keyboard_control(action='type', text='player1')
 ```
 
 ## Installation

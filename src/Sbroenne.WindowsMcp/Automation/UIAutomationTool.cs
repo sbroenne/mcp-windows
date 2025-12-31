@@ -417,7 +417,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationErrorType.InvalidParameter,
                 "wait_for requires at least one search criterion. Provide name, nameContains, controlType, or automationId to identify the element to wait for.",
                 null,
-                "Example: wait_for(app='Notepad', nameContains='Don\\'t Save', controlType='Button')");
+                "Example: wait_for(windowHandle='123456', nameContains='Don\\'t Save', controlType='Button')");
         }
 
         var query = new ElementQuery
@@ -796,7 +796,7 @@ public sealed partial class UIAutomationTool
                     UIAutomationErrorType.ElementNotFound,
                     "Element not found. Provide elementId, windowHandle, or search criteria (name, controlType, automationId).",
                     null,
-                    "To focus a window, use: focus(app='Notepad') or focus(windowHandle='12345'). To focus an element, use: focus(app='Notepad', controlType='Edit')");
+                    "To focus a window, use window_management(action='activate', handle='...'). To focus an element, use: focus(windowHandle='12345', controlType='Edit')");
             }
 
             return await _automationService.FocusElementAsync(findResult.Items[0].Id, cancellationToken);
@@ -808,7 +808,7 @@ public sealed partial class UIAutomationTool
             UIAutomationErrorType.InvalidParameter,
             "Focus action requires a target. Provide one of: elementId, windowHandle (or use 'app' parameter), or search criteria (name, controlType, automationId).",
             null,
-            "To focus a window: focus(app='Notepad'). To focus an element: focus(app='Notepad', controlType='Edit', nameContains='Text')");
+            "To focus a window: use window_management(action='activate', handle='...'). To focus an element: focus(windowHandle='12345', controlType='Edit', nameContains='Text')");
     }
 
     private async Task<UIAutomationResult> HandleScrollIntoViewAsync(

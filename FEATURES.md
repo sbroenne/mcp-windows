@@ -64,7 +64,7 @@ Interact with Windows UI elements using the UI Automation API and OCR. **This is
 | `ocr_element` | OCR on element bounds | `elementId` |
 | `ocr_status` | Check OCR availability | none |
 
-> **Note**: For annotated screenshots with element discovery, use `screenshot_control(app='...')` which returns both an annotated image and structured element data.
+> **Note**: For annotated screenshots with element discovery, use `screenshot_control(windowHandle='...')` which returns both an annotated image and structured element data. Get the handle from `window_management(action='find', title='...')`.
 
 ### Capabilities
 
@@ -77,7 +77,7 @@ Interact with Windows UI elements using the UI Automation API and OCR. **This is
 - **Sort by prominence** - Order results by bounding box area (largest first) for disambiguation
 - **Text extraction** - Get text from controls via UI Automation or OCR fallback
 - **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
-- **Multi-window workflows** - Use `app` parameter to auto-activate target windows before interaction
+- **Multi-window workflows** - Use `windowHandle` parameter to target specific windows (get handle from `window_management`)
 - **Wrong window detection** - Verify expected window is active before interactive actions
 - **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
 - **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
@@ -272,7 +272,7 @@ For simple screenshots without element discovery:
 ```json
 {
   "action": "capture",
-  "app": "Notepad",
+  "windowHandle": "123456",
   "annotate": false
 }
 ```
@@ -281,7 +281,7 @@ For simple screenshots without element discovery:
 
 - **Annotated by Default** - Screenshots include numbered element overlays and structured data for UI discovery
 - **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
-- **Easy targeting** - Use `app='My Application'` to capture any window by partial title
+- **Easy targeting** - Use `window_management(action='find', title='...')` to get a handle, then pass to `screenshot_control`
 - **Capture any monitor** - Screenshot any connected display by index
 - **Capture windows** - Screenshot a specific window (even if partially obscured)
 - **Capture regions** - Screenshot an arbitrary rectangular area
