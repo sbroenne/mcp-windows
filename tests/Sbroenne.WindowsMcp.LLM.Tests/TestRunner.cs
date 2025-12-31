@@ -16,4 +16,15 @@ public class TestRunner(ITestOutputHelper output) : TestBase(output)
         var scenarios = ChatScenario.LoadFromText(await File.ReadAllTextAsync("Scenarios/NotepadWorkflow.md"));
         await ScenarioRunner.RunAsync(scenarios, SystemUnderTestClient);
     }
+
+    /// <summary>
+    /// Tests app parameter resolution for window management actions.
+    /// Verifies fix for issue #47: close/activate with app parameter returning WindowNotFound.
+    /// </summary>
+    [Fact]
+    public async Task AppParameterResolution_Issue47Async()
+    {
+        var scenarios = ChatScenario.LoadFromText(await File.ReadAllTextAsync("Scenarios/AppParameterResolution.md"));
+        await ScenarioRunner.RunAsync(scenarios, SystemUnderTestClient);
+    }
 }

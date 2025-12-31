@@ -338,7 +338,7 @@ internal static partial class NativeMethods
     /// <param name="wParam">Additional message-specific information.</param>
     /// <param name="lParam">Additional message-specific information.</param>
     /// <returns>True if successful, false otherwise.</returns>
-    [LibraryImport("user32.dll", SetLastError = true)]
+    [LibraryImport("user32.dll", EntryPoint = "PostMessageW", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool PostMessage(nint hWnd, uint Msg, nint wParam, nint lParam);
 

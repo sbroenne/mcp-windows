@@ -151,13 +151,14 @@ public sealed partial class WindowManagementTool
                 if (needsHandle)
                 {
                     var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
-                    if (!findResult.Success || findResult.Window is null)
+                    // FindWindowAsync returns a list result - check Windows (plural) not Window (singular)
+                    if (!findResult.Success || findResult.Windows is null || findResult.Windows.Count == 0)
                     {
                         return WindowManagementResult.CreateFailure(
                             WindowManagementErrorCode.WindowNotFound,
                             $"Window matching '{app}' not found. Use list action to see available windows.");
                     }
-                    resolvedHandle = findResult.Window.Handle;
+                    resolvedHandle = findResult.Windows[0].Handle;
                 }
             }
 

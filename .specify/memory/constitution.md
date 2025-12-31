@@ -1,19 +1,19 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.6.1 → 2.6.2
+Version change: 2.6.2 → 2.7.0
 Modified principles:
-  - III. MCP Protocol Compliance & SDK Maximization (corrected [Description] attribute guidance)
+  - VII. Windows API Documentation-First → VII. Microsoft Libraries & Research-First (expanded scope)
 Added sections: None
 Removed sections: None
 Technology Stack changes: None
 Templates requiring updates: ✅ No updates required
 Follow-up TODOs: None
-Rationale: PATCH version bump - corrects SDK feature documentation. The MCP SDK's 
-           XmlToDescriptionGenerator source generator has a limitation: it only adds
-           two using statements to generated files, causing compile errors when tool
-           methods use custom return types. Manual [Description] attributes are required
-           as a workaround until SDK fix is available.
+Rationale: MINOR version bump - materially expanded Principle VII to mandate research of all 
+           Microsoft libraries (Microsoft.Extensions.*, System.*, Windows APIs) before planning
+           implementation. Previously only covered Windows APIs. This ensures standard library
+           solutions are discovered and preferred over custom implementations (e.g., 
+           Microsoft.Extensions.Compliance.Redaction for data redaction instead of custom regex).
 -->
 
 # mcp-windows Constitution
@@ -93,12 +93,37 @@ This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 - **MUST implement**: Window/process enumeration, input simulation, screenshots, clipboard, system state access
 - Tools MUST be "dumb actuators"—return raw data for LLM interpretation
 
-### VII. Windows API Documentation-First (NON-NEGOTIABLE)
+### VII. Microsoft Libraries & Research-First (NON-NEGOTIABLE)
 
-- Every feature MUST begin with Microsoft Docs research before planning
-- Specs and plans MUST cite Microsoft Docs URLs for APIs used
-- MUST NOT build custom solutions when Windows APIs exist
-- Custom code permitted only where Windows APIs are insufficient
+Before planning ANY feature implementation:
+
+1. **Research Phase MUST precede planning**: Every feature MUST begin with research of existing Microsoft/standard .NET libraries
+2. **Prefer standard libraries over custom code**: If a Microsoft-published package solves the problem, it MUST be used
+3. **Document research in specs**: Specs and plans MUST cite Microsoft Docs URLs for libraries and APIs used
+
+**Research Scope** (in order of preference):
+- `Microsoft.Extensions.*` packages (logging, DI, compliance, resilience, etc.)
+- `System.*` BCL APIs
+- Windows-specific APIs (`System.Windows.Automation`, `Windows.Graphics.Capture`, DWM/Shell32)
+- Official Microsoft NuGet packages
+
+**Prohibited**:
+- MUST NOT build custom solutions when Microsoft libraries exist (e.g., use `Microsoft.Extensions.Compliance.Redaction` for data redaction, not custom regex)
+- MUST NOT duplicate functionality already provided by `Microsoft.Extensions.*`
+
+**Custom code permitted only when**:
+- No Microsoft library exists for the requirement
+- The Microsoft library has documented limitations that block the use case
+- Performance requirements cannot be met (must be measured, not assumed)
+
+**Examples of Required Library Usage**:
+| Need | Use This | Not This |
+|------|----------|----------|
+| Data redaction | `Microsoft.Extensions.Compliance.Redaction` | Custom regex patterns |
+| Retry/resilience | `Microsoft.Extensions.Resilience` or Polly | Manual retry loops |
+| Options validation | `Microsoft.Extensions.Options` with `ValidateOnStart()` | Manual validation |
+| Logging | `Microsoft.Extensions.Logging` | Custom logging |
+| DI | `Microsoft.Extensions.DependencyInjection` | Service locator |
 
 ### VIII. Security Best Practices (NON-NEGOTIABLE)
 
@@ -290,4 +315,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.6.2 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-10
+**Version**: 2.7.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-31
