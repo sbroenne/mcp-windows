@@ -84,7 +84,6 @@ public sealed partial class MouseControlTool
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position.</param>
-    /// <param name="app">Application window to target by title (partial match). The server automatically finds and activates the window.</param>
     /// <param name="target">Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.</param>
     /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
     /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>
@@ -106,7 +105,6 @@ public sealed partial class MouseControlTool
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The mouse action: move, click, double_click, right_click, middle_click, drag, scroll, get_position")] string action,
-        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds and activates the window before the mouse action.")] string? app = null,
         [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
         [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
         [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
@@ -141,35 +139,6 @@ public sealed partial class MouseControlTool
 
         try
         {
-            // Resolve 'app' parameter to windowHandle if specified
-            Models.WindowInfoCompact? resolvedWindow = null;
-            if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
-            {
-                var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
-                if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
-                {
-                    // Try listing all windows to provide helpful suggestions
-                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: linkedToken);
-                    var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
-                    var suggestion = availableWindows.Length > 0
-                        ? $"Available windows: {string.Join(", ", availableWindows)}"
-                        : "No windows found. Ensure the application is running.";
-
-                    var result = MouseControlResult.CreateFailure(
-                        MouseControlErrorCode.WrongTargetWindow,
-                        $"No window found matching app='{app}'. {suggestion}");
-                    _logger.LogOperationFailure(correlationId, action ?? "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                    return result;
-                }
-
-                // If multiple windows match, use the first one (most recently active)
-                resolvedWindow = findResult.Windows![0];
-                windowHandle = resolvedWindow.Handle;
-
-                // Activate the window before performing mouse action
-                await _windowService.ActivateWindowAsync(nint.Parse(windowHandle), linkedToken);
-            }
-
             // Pre-flight check: verify target window if expected values are specified
             if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
             {

@@ -1,8 +1,9 @@
-# SCENARIO App Parameter Resolution (Issue #47)
+````markdown
+# SCENARIO Handle-Based Window Management
 
-Tests that the `app` parameter correctly resolves windows for all window management actions.
-This verifies the fix for GitHub issue #47 where close/activate with app returned "WindowNotFound"
-even though list with filter found the window.
+Tests the correct handle-based workflow for window management operations.
+LLMs should use find/list to get window handles, then use explicit handles for all actions.
+This pattern follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
 
 ## [USER]
 Launch Notepad using window_management with action "launch" and path "notepad.exe". Wait for it to open.
@@ -28,7 +29,30 @@ launched, opened, started, success, Notepad
 
 
 ## [USER]
-Now use the `app` parameter (NOT the handle) to get the state of the Notepad window. Use action "get_state" with the app parameter set to "Notepad". Report whether it is normal, minimized, or maximized.
+Now find the Notepad window using action "find" with title "Notepad". You'll need the handle from the result to perform subsequent actions.
+
+## [AGENT]
+
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "find", "Find"],
+    "title": ["ContainsAny", "Notepad", "notepad"]
+  }
+}
+```
+
+### ASSERT SemanticCondition
+Successfully found the Notepad window and received a handle
+
+### ASSERT ContainsAny
+found, handle, Handle, window, success
+
+
+## [USER]
+Use the handle you just got to get the state of that Notepad window. Use action "get_state" with the handle parameter.
 
 ## [AGENT]
 
@@ -38,20 +62,20 @@ Now use the `app` parameter (NOT the handle) to get the state of the Notepad win
   "function_name": "window_management",
   "arguments": {
     "action": ["IsAnyOf", "get_state", "GetState", "get-state"],
-    "app": ["ContainsAny", "Notepad", "notepad"]
+    "handle": ["Regex", "\\d+"]
   }
 }
 ```
 
 ### ASSERT SemanticCondition
-It successfully retrieved the window state without a WindowNotFound error
+Successfully retrieved the window state using the handle
 
 ### ASSERT ContainsAny
 normal, minimized, maximized, Normal, Minimized, Maximized
 
 
 ## [USER]
-Minimize the Notepad window using the `app` parameter (NOT the handle). Use action "minimize" with app set to "Notepad".
+Minimize the Notepad window using the handle. Use action "minimize" with the handle parameter.
 
 ## [AGENT]
 
@@ -61,7 +85,7 @@ Minimize the Notepad window using the `app` parameter (NOT the handle). Use acti
   "function_name": "window_management",
   "arguments": {
     "action": ["IsAnyOf", "minimize", "Minimize"],
-    "app": ["ContainsAny", "Notepad", "notepad"]
+    "handle": ["Regex", "\\d+"]
   }
 }
 ```
@@ -74,7 +98,7 @@ minimized, Minimized, success, Success
 
 
 ## [USER]
-Restore the Notepad window using the `app` parameter (NOT the handle). Use action "restore" with app set to "Notepad".
+Restore the Notepad window using the handle. Use action "restore" with the handle parameter.
 
 ## [AGENT]
 
@@ -84,7 +108,7 @@ Restore the Notepad window using the `app` parameter (NOT the handle). Use actio
   "function_name": "window_management",
   "arguments": {
     "action": ["IsAnyOf", "restore", "Restore"],
-    "app": ["ContainsAny", "Notepad", "notepad"]
+    "handle": ["Regex", "\\d+"]
   }
 }
 ```
@@ -97,7 +121,7 @@ restored, Restored, success, Success, normal
 
 
 ## [USER]
-Activate the Notepad window using the `app` parameter (NOT the handle). Use action "activate" with app set to "Notepad". This specifically tests the fix for issue #47.
+Activate the Notepad window using the handle. Use action "activate" with the handle parameter.
 
 ## [AGENT]
 
@@ -107,20 +131,20 @@ Activate the Notepad window using the `app` parameter (NOT the handle). Use acti
   "function_name": "window_management",
   "arguments": {
     "action": ["IsAnyOf", "activate", "Activate"],
-    "app": ["ContainsAny", "Notepad", "notepad"]
+    "handle": ["Regex", "\\d+"]
   }
 }
 ```
 
 ### ASSERT SemanticCondition
-The window was successfully activated without returning WindowNotFound
+The window was successfully activated
 
 ### ASSERT ContainsAny
 activated, Activated, success, Success, foreground
 
 
 ## [USER]
-Finally, close the Notepad window using the `app` parameter (NOT the handle). Use action "close" with app set to "Notepad". This is the primary test for issue #47.
+Finally, close the Notepad window using the handle. Use action "close" with the handle parameter.
 
 ## [AGENT]
 
@@ -130,14 +154,16 @@ Finally, close the Notepad window using the `app` parameter (NOT the handle). Us
   "function_name": "window_management",
   "arguments": {
     "action": ["IsAnyOf", "close", "Close"],
-    "app": ["ContainsAny", "Notepad", "notepad"]
+    "handle": ["Regex", "\\d+"]
   }
 }
 ```
 
 ### ASSERT SemanticCondition
-The window was successfully closed without returning WindowNotFound
+The window was successfully closed
 
 ### ASSERT ContainsAny
 closed, Closed, success, Success
 
+
+````

@@ -62,7 +62,6 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// </summary>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
-    /// <param name="app">Application window to target by title (partial match). The server automatically finds and activates the window.</param>
     /// <param name="text">Text to type (required for type action).</param>
     /// <param name="key">Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot.</param>
     /// <param name="modifiers">Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions).</param>
@@ -80,7 +79,6 @@ public sealed partial class KeyboardControlTool : IDisposable
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle")] string action,
-        [Description("Application window to target by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds and activates the window before the keyboard action.")] string? app = null,
         [Description("Text to type (required for type action)")] string? text = null,
         [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
         [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string? modifiers = null,
@@ -110,31 +108,6 @@ public sealed partial class KeyboardControlTool : IDisposable
 
         try
         {
-            // Resolve 'app' parameter to find and activate the target window
-            if (!string.IsNullOrWhiteSpace(app))
-            {
-                var findResult = await _windowService.FindWindowAsync(app, useRegex: false, linkedToken);
-                if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
-                {
-                    // Try listing all windows to provide helpful suggestions
-                    var listResult = await _windowService.ListWindowsAsync(cancellationToken: linkedToken);
-                    var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
-                    var suggestion = availableWindows.Length > 0
-                        ? $"Available windows: {string.Join(", ", availableWindows)}"
-                        : "No windows found. Ensure the application is running.";
-
-                    var result = KeyboardControlResult.CreateFailure(
-                        KeyboardControlErrorCode.WrongTargetWindow,
-                        $"No window found matching app='{app}'. {suggestion}");
-                    _logger.LogOperationFailure(correlationId, action ?? "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                    return result;
-                }
-
-                // Activate the window before performing keyboard action
-                var resolvedWindow = findResult.Windows![0];
-                await _windowService.ActivateWindowAsync(nint.Parse(resolvedWindow.Handle), linkedToken);
-            }
-
             // Pre-flight check: verify target window if expected values are specified
             if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
             {

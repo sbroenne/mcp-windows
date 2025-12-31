@@ -14,9 +14,9 @@ using Sbroenne.WindowsMcp.Window;
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
-/// Integration tests for WindowManagementTool close action with app parameter.
+/// Integration tests for WindowManagementTool close action.
 /// Uses a dedicated fixture that creates sacrificial windows for close testing.
-/// Verifies fix for issue #47.
+/// Tests the handle-based workflow (find → use handle → close).
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
@@ -146,53 +146,67 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 #pragma warning restore SYSLIB0050
 
     /// <summary>
-    /// Issue #47: Close action with app parameter should resolve and close window.
+    /// Tests find → close workflow using explicit handle.
+    /// This is the correct pattern: LLM finds window, gets handle, then uses handle for close.
     /// </summary>
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task ExecuteAsync_CloseWithAppParameter_ResolvesAndClosesWindow()
+    public async Task ExecuteAsync_CloseWithHandle_FindThenClose()
     {
         // Arrange
         var context = CreateMockContext();
 
-        // Verify window exists first via list (this always worked)
-        var listResult = await _tool.ExecuteAsync(
+        // Step 1: Find the window (LLM would do this)
+        var findResult = await _tool.ExecuteAsync(
             context,
-            action: "list",
-            filter: SacrificialWindowTitle);
+            action: "find",
+            title: SacrificialWindowTitle);
 
-        Assert.True(listResult.Success, $"List should find sacrificial window. Error: {listResult.Error}");
-        Assert.NotNull(listResult.Windows);
-        Assert.NotEmpty(listResult.Windows);
+        Assert.True(findResult.Success, $"Find should locate sacrificial window. Error: {findResult.Error}");
+        Assert.NotNull(findResult.Windows);
+        Assert.NotEmpty(findResult.Windows);
 
-        // Act - Close using app parameter (this was broken before the fix)
+        var windowHandle = findResult.Windows[0].Handle;
+
+        // Step 2: Close using the handle (LLM would use the handle from step 1)
         var closeResult = await _tool.ExecuteAsync(
             context,
             action: "close",
-            app: SacrificialWindowTitle);
+            handle: windowHandle);
 
-        // Assert - Should succeed, not return WindowNotFound
-        Assert.True(closeResult.Success, $"Close via app should succeed but got: {closeResult.Error}");
+        // Assert
+        Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
         Assert.NotEqual(WindowManagementErrorCode.WindowNotFound, closeResult.ErrorCode);
     }
 
     /// <summary>
-    /// Issue #47: After close with app parameter, window should no longer exist.
+    /// After close with handle, window should no longer exist.
     /// </summary>
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task ExecuteAsync_CloseWithAppParameter_WindowDisappears()
+    public async Task ExecuteAsync_CloseWithHandle_WindowDisappears()
     {
         // Arrange
         var context = CreateMockContext();
 
-        // Close using app parameter
+        // Find and close
+        var findResult = await _tool.ExecuteAsync(
+            context,
+            action: "find",
+            title: SacrificialWindowTitle);
+
+        Assert.True(findResult.Success);
+        Assert.NotNull(findResult.Windows);
+        Assert.NotEmpty(findResult.Windows);
+
+        var windowHandle = findResult.Windows[0].Handle;
+
         var closeResult = await _tool.ExecuteAsync(
             context,
             action: "close",
-            app: SacrificialWindowTitle);
+            handle: windowHandle);
 
-        Assert.True(closeResult.Success, $"Close via app should succeed but got: {closeResult.Error}");
+        Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
 
         // Wait for window to close
         await Task.Delay(500);

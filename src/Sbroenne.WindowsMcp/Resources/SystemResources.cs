@@ -133,64 +133,70 @@ public sealed class SystemResources
         return """
             # Windows Automation Best Practices
 
-            ## The Simple Workflow: Just Use `app` Parameter
+            ## The Standard Workflow: Find Handle First, Then Act
 
-            All tools accept an `app` parameter that automatically finds and activates windows by title (partial match):
+            All window-targeting operations require a window handle. Get it using `window_management`:
 
             ```
-            ui_automation(action="click", app="Visual Studio Code", nameContains="Save")
-            keyboard_control(action="press", app="Notepad", key="s", modifiers="ctrl")
-            mouse_control(action="click", app="Settings", x=100, y=200)
-            screenshot_control(app="Chrome")
+            window_management(action="find", title="Notepad")
+            → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
+
+            ui_automation(action="click", windowHandle="123456", nameContains="Save")
+            screenshot_control(target="window", windowHandle="123456")
             ```
 
-            **That's it.** No need to manually find handles or activate windows.
+            **This gives you full control over which window to target, especially when multiple windows match.**
 
             ## Recommended Workflow
 
-            ### 1. Just Click It (Direct Interaction)
+            ### 1. Find the Window First
             ```
-            ui_automation(action="click", app="Notepad", nameContains="Save")
-            ui_automation(action="type", app="Notepad", controlType="Edit", text="Hello")
+            window_management(action="find", title="Notepad")
+            → Get the handle from the result
             ```
-            **No find step needed!** Click and type actions search for the element directly.
 
-            ### 2. If You Don't Know the Element Name → Discover First
+            ### 2. Interact with Elements
             ```
-            screenshot_control(app="My Application")
+            ui_automation(action="click", windowHandle="<handle>", nameContains="Save")
+            ui_automation(action="type", windowHandle="<handle>", controlType="Edit", text="Hello")
+            ```
+
+            ### 3. If You Don't Know the Element Name → Discover First
+            ```
+            screenshot_control(target="window", windowHandle="<handle>")
             → See screenshot with numbered labels + element list (default behavior)
             ```
 
-            ### 3. For Toggles → Use ensure_state
+            ### 4. For Toggles → Use ensure_state
             ```
-            ui_automation(action="ensure_state", app="Settings", nameContains="Dark Mode", desiredState="on")
+            ui_automation(action="ensure_state", windowHandle="<handle>", nameContains="Dark Mode", desiredState="on")
             ```
             Atomic operation - checks state and toggles only if needed.
 
-            ### 4. Verify Results
+            ### 5. Verify Results
             ```
-            ui_automation(action="wait_for_disappear", app="My Application", nameContains="Save") // wait for dialog to close
-            screenshot_control(app="My Application") // visual check
+            ui_automation(action="wait_for_disappear", windowHandle="<handle>", nameContains="Save") // wait for dialog to close
+            screenshot_control(target="window", windowHandle="<handle>") // visual check
             ```
 
             ## When to Use Each Tool
 
             | Goal | Primary Tool | Fallback |
             |------|-------------|----------|
-            | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(app=...) |
-            | Type in text field | ui_automation(type) | keyboard_control(app=...) |
-            | Press hotkey (Ctrl+S) | keyboard_control(app=..., action='press', key='s', modifiers='ctrl') | - |
-            | Navigate (Tab, arrows) | keyboard_control(app=..., press) | - |
+            | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(windowHandle=...) |
+            | Type in text field | ui_automation(type) | keyboard_control with window activated |
+            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | - |
+            | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
             | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
-            | Take screenshot | screenshot_control(app=..., annotate=false) | - |
-            | Find visible elements | screenshot_control(app=...) | ui_automation(get_tree) |
+            | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
+            | Find visible elements | screenshot_control with annotate=true | ui_automation(get_tree) |
 
             ## Key Principles
 
-            1. **Just click/type directly** - no find step needed: `click(app='...', nameContains='...')`
-            2. **Use screenshot_control(annotate=true) only when you don't know element names**
-            3. **Use app parameter everywhere** - simpler than managing handles
-            4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(app='...', nameContains='...', desiredState='on')`
+            1. **Find handle first** - use `window_management(action='find')` to get window handle
+            2. **Use explicit handles** - you control which window when multiple match
+            3. **Use screenshot_control(annotate=true) when you don't know element names**
+            4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(windowHandle='...', nameContains='...', desiredState='on')`
             5. **Use wait_for_disappear for dialogs** - block until dialog closes
 
             ## When to Use `find` (Optional)
@@ -206,22 +212,15 @@ public sealed class SystemResources
             If ui_automation click/type doesn't work (custom controls, games, etc.):
 
             ```
-            ui_automation(action="find", app="App", nameContains="Button")
+            window_management(action="find", title="MyApp")
+            → Get handle: "123456"
+
+            ui_automation(action="find", windowHandle="123456", nameContains="Button")
             → Get clickable_point: { x: 450, y: 300 }
-            mouse_control(app="App", action="click", x=450, y=300)
-            keyboard_control(app="App", action="type", text="...")
-            ```
 
-            ## Advanced: Window Handles
-
-            For complex scenarios with multiple similar windows, use window_management:
+            window_management(action="activate", handle="123456")
+            mouse_control(action="click", windowHandle="123456", x=450, y=300)
             ```
-            window_management(action="find", title="Untitled - Notepad")
-            → Get specific handle
-            ui_automation(action="find", windowHandle="<handle>", ...)
-            ```
-
-            But for most cases, just use `app` parameter.
             """;
     }
 

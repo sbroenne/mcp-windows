@@ -62,7 +62,6 @@ public sealed partial class ScreenshotControlTool
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'.</param>
-    /// <param name="app">Application window to capture by title (partial match). Automatically finds the window and sets target='window'.</param>
     /// <param name="annotate">Overlay numbered labels on interactive elements and return element list. Use this when you need to discover UI elements before interacting.</param>
     /// <param name="target">Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index for 3+ monitors), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.</param>
     /// <param name="monitorIndex">Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.</param>
@@ -79,12 +78,11 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements + element list. Use annotate=false for plain screenshot. Simple: screenshot_control(app='Notepad') for element discovery. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors.")]
+    [Description("Capture screenshots with UI element discovery. Default: returns annotated screenshot with numbered elements + element list. Use annotate=false for plain screenshot. For window capture, first use window_management(action='find') to get the handle. Targets: primary_screen, secondary_screen, monitor, window, region, all_monitors.")]
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
-        [Description("Application window to capture by title (partial match, case-insensitive). Example: app='Visual Studio Code' or app='Notepad'. The server automatically finds the window and captures it. Use this instead of windowHandle for simpler workflows.")] string? app = null,
         [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
         [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
         [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
@@ -113,30 +111,6 @@ public sealed partial class ScreenshotControlTool
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
                 $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'");
-        }
-
-        // Resolve 'app' parameter to windowHandle if specified
-        if (!string.IsNullOrWhiteSpace(app) && string.IsNullOrWhiteSpace(windowHandle))
-        {
-            var findResult = await _windowService.FindWindowAsync(app, useRegex: false, cancellationToken);
-            if (!findResult.Success || (findResult.Windows?.Count ?? 0) == 0)
-            {
-                // Try listing all windows to provide helpful suggestions
-                var listResult = await _windowService.ListWindowsAsync(cancellationToken: cancellationToken);
-                var availableWindows = listResult.Windows?.Take(10).Select(w => $"'{w.Title}'").ToArray() ?? [];
-                var suggestion = availableWindows.Length > 0
-                    ? $"Available windows: {string.Join(", ", availableWindows)}"
-                    : "No windows found. Ensure the application is running.";
-
-                return ScreenshotControlResult.Error(
-                    ScreenshotErrorCode.WindowNotFound,
-                    $"No window found matching app='{app}'. {suggestion}");
-            }
-
-            // Use the first matching window and set target to window
-            var resolvedWindow = findResult.Windows![0];
-            windowHandle = resolvedWindow.Handle;
-            target = "window";
         }
 
         // Parse target
