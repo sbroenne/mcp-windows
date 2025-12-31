@@ -1,90 +1,123 @@
 # SCENARIO Notepad Automation Workflow
 
+Tests a complete Notepad automation workflow using handle-based window targeting.
+CRITICAL: The "app" parameter was removed. All window targeting MUST use explicit handles.
 
 ## [USER]
-Launch Notepad.
-Wait for Notepad to open and confirm it is visible.
+Open Notepad for me.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "launch", "Launch"]
+  }
+}
+```
+
+### ASSERT SemanticCondition
+Notepad was launched and a window handle was returned
+
+### ASSERT ContainsAll
+Notepad, handle
+
+## [USER]
+Type "Hello from Windows MCP Server!" into that Notepad window.
+
+## [AGENT]
+
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "ui_automation",
+  "arguments": {
+    "action": ["IsAnyOf", "type", "Type"],
+    "windowHandle": ["NotEmpty"]
+  }
+}
+```
+
+### ASSERT SemanticCondition
+Text was typed into the Notepad window using the window handle
+
+### ASSERT ContainsAny
+typed, Hello, text
+
+## [USER]
+Take a screenshot of Notepad showing what I typed.
+
+## [AGENT]
+
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "screenshot_control",
+  "arguments": {
+    "windowHandle": ["NotEmpty"]
+  }
+}
+```
+
+### ASSERT SemanticCondition
+A screenshot was captured of the Notepad window using the window handle
+
+## [USER]
+Is that Notepad window maximized or normal sized?
+
+## [AGENT]
+
+### ASSERT FunctionCall
+```json
+{
+  "function_name": "window_management",
+  "arguments": {
+    "handle": ["NotEmpty"]
+  }
 }
 ```
 
 ### ASSERT ContainsAny
-notepad, launched, opened, visible, success
+normal, minimized, maximized, Normal, Minimized, Maximized
 
 ## [USER]
-In the already open Notepad window, type "Hello from Windows MCP Server!". Do not launch a new Notepad instance.
+Close Notepad. Don't save the file.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "ui_automation"
+  "function_name": ["ContainsAny", "ui_automation", "window_management"]
 }
 ```
+
+### ASSERT SemanticCondition
+Notepad was closed, discarding unsaved changes
 
 ### ASSERT ContainsAny
-typed, text, hello, success, notepad
+closed, close, Close, Don't Save
 
 ## [USER]
-Take a screenshot of the already open Notepad window showing the text that was typed. Do not launch a new Notepad instance.
+Verify Notepad is no longer open.
 
 ## [AGENT]
 
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "screenshot_control"
+  "function_name": "window_management",
+  "arguments": {
+    "action": ["IsAnyOf", "find", "Find", "list", "List"]
+  }
 }
 ```
 
-## [USER]
-Find the already open Notepad window and report its title and current state (maximized, minimized, or normal). Do not launch a new Notepad instance.
-
-## [AGENT]
-
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management"
-}
-```
+### ASSERT SemanticCondition
+The search confirmed that no Notepad windows exist or the window was not found
 
 ### ASSERT ContainsAny
-notepad, Notepad
+no, not found, closed, does not exist, none, 0
 
-## [USER]
-Close the Notepad application by clicking its Close button. Target only the notepad.exe process window, not any other application. If a save dialog appears, click "Don't Save" to discard changes.
-
-## [AGENT]
-
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "ui_automation"
-}
-```
-
-### ASSERT ContainsAny
-closed, close, exit, done, discard, click, notepad
-
-## [USER]
-Verify that the notepad.exe process no longer has any open windows.
-
-## [AGENT]
-
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management"
-}
-```
-
-### ASSERT ContainsAny
-no notepad, not found, no window, closed, does not exist, no longer, none, 0 windows
