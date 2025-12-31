@@ -32,6 +32,11 @@ public sealed class UIAutomationToolTests
         _mockWindowEnumerator = Substitute.For<IWindowEnumerator>();
         _mockWindowService = Substitute.For<IWindowService>();
         _mockLogger = Substitute.For<ILogger<UIAutomationTool>>();
+
+        // Mock window activation to succeed for any handle (needed for interactive actions)
+        _mockWindowService.ActivateWindowAsync(Arg.Any<nint>(), Arg.Any<CancellationToken>())
+            .Returns(WindowManagementResult.CreateSuccess("Window activated"));
+
         _tool = new UIAutomationTool(_mockService, _mockOcrService, _mockScreenshotService, _mockAnnotatedScreenshotService, _mockWindowEnumerator, _mockWindowService, _mockLogger);
     }
 
@@ -97,7 +102,7 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Find, name: "TestButton", controlType: "Button");
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Find, windowHandle: "12345", name: "TestButton", controlType: "Button");
 
         // Assert
         Assert.True(result.Success);
@@ -116,12 +121,12 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.GetTree, maxDepth: 3);
+        var result = await _tool.ExecuteAsync(UIAutomationAction.GetTree, windowHandle: "12345", maxDepth: 3);
 
         // Assert
         Assert.True(result.Success);
         Assert.Equal("get_tree", result.Action);
-        await _mockService.Received(1).GetTreeAsync(null, null, 3, null, Arg.Any<CancellationToken>());
+        await _mockService.Received(1).GetTreeAsync("12345", null, 3, null, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -133,7 +138,7 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.WaitFor, name: "TestButton", timeoutMs: 3000);
+        var result = await _tool.ExecuteAsync(UIAutomationAction.WaitFor, windowHandle: "12345", name: "TestButton", timeoutMs: 3000);
 
         // Assert
         Assert.True(result.Success);
@@ -153,7 +158,7 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, name: "TestButton");
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, windowHandle: "12345", name: "TestButton");
 
         // Assert
         Assert.True(result.Success);
@@ -171,7 +176,7 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, name: "TextBox", text: "Hello World", clearFirst: true);
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, windowHandle: "12345", name: "TextBox", text: "Hello World", clearFirst: true);
 
         // Assert
         await _mockService.Received(1).FindAndTypeAsync(
@@ -190,7 +195,7 @@ public sealed class UIAutomationToolTests
             .Returns(expectedResult);
 
         // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Select, name: "ComboBox", value: "Option 1");
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Select, windowHandle: "12345", name: "ComboBox", value: "Option 1");
 
         // Assert
         await _mockService.Received(1).FindAndSelectAsync(
@@ -211,8 +216,8 @@ public sealed class UIAutomationToolTests
             Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Toggle, elementId: "test-id");
+        // Act - Toggle requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Toggle, windowHandle: "12345", elementId: "test-id");
 
         // Assert - Uses PatternTypes.Toggle = "Toggle"
         await _mockService.Received(1).InvokePatternAsync(
@@ -253,8 +258,8 @@ public sealed class UIAutomationToolTests
         _mockService.FocusElementAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Focus, elementId: "test-id");
+        // Act - Focus requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Focus, windowHandle: "12345", elementId: "test-id");
 
         // Assert
         await _mockService.Received(1).FocusElementAsync("test-id", Arg.Any<CancellationToken>());
@@ -268,8 +273,8 @@ public sealed class UIAutomationToolTests
         _mockService.ScrollIntoViewAsync(Arg.Any<string?>(), Arg.Any<ElementQuery?>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.ScrollIntoView, elementId: "test-id", timeoutMs: 2000);
+        // Act - ScrollIntoView requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.ScrollIntoView, windowHandle: "12345", elementId: "test-id", timeoutMs: 2000);
 
         // Assert
         await _mockService.Received(1).ScrollIntoViewAsync("test-id", null, 2000, Arg.Any<CancellationToken>());
@@ -283,11 +288,11 @@ public sealed class UIAutomationToolTests
         _mockService.GetTextAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.GetText, elementId: "test-id", includeChildren: true);
+        // Act - GetText requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.GetText, windowHandle: "12345", elementId: "test-id", includeChildren: true);
 
         // Assert
-        await _mockService.Received(1).GetTextAsync("test-id", null, true, Arg.Any<CancellationToken>());
+        await _mockService.Received(1).GetTextAsync("test-id", "12345", true, Arg.Any<CancellationToken>());
     }
 
     #endregion
@@ -306,11 +311,11 @@ public sealed class UIAutomationToolTests
         _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(UIAutomationResult.CreateSuccess("get_tree", Array.Empty<UIElementInfo>(), null));
 
-        // Act
-        await _tool.ExecuteAsync(UIAutomationAction.GetTree, maxDepth: inputDepth);
+        // Act - GetTree requires windowHandle per Constitution Principle VI
+        await _tool.ExecuteAsync(UIAutomationAction.GetTree, windowHandle: "12345", maxDepth: inputDepth);
 
         // Assert
-        await _mockService.Received(1).GetTreeAsync(null, null, expectedClampedDepth, null, Arg.Any<CancellationToken>());
+        await _mockService.Received(1).GetTreeAsync("12345", null, expectedClampedDepth, null, Arg.Any<CancellationToken>());
     }
 
     [Theory]
@@ -325,8 +330,8 @@ public sealed class UIAutomationToolTests
         _mockService.WaitForElementAsync(Arg.Any<ElementQuery>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
             .Returns(UIAutomationResult.CreateSuccess("wait_for", CreateTestElementInfo(), null));
 
-        // Act
-        await _tool.ExecuteAsync(UIAutomationAction.WaitFor, name: "Test", timeoutMs: inputTimeout);
+        // Act - WaitFor requires windowHandle per Constitution Principle VI
+        await _tool.ExecuteAsync(UIAutomationAction.WaitFor, windowHandle: "12345", name: "Test", timeoutMs: inputTimeout);
 
         // Assert
         await _mockService.Received(1).WaitForElementAsync(Arg.Any<ElementQuery>(), expectedClampedTimeout, Arg.Any<CancellationToken>());
@@ -442,8 +447,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndClickAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .Returns(errorResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, name: "Save");
+        // Act - Click requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, windowHandle: "12345", name: "Save");
 
         // Assert
         Assert.False(result.Success);
@@ -462,8 +467,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndClickAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .Returns(errorResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, name: "NonExistentButton");
+        // Act - Click requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Click, windowHandle: "12345", name: "NonExistentButton");
 
         // Assert
         Assert.False(result.Success);
@@ -481,8 +486,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndTypeAsync(Arg.Any<ElementQuery>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(errorResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, name: "Label", text: "Hello");
+        // Act - Type requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, windowHandle: "12345", name: "Label", text: "Hello");
 
         // Assert
         Assert.False(result.Success);
@@ -492,8 +497,8 @@ public sealed class UIAutomationToolTests
     [Fact]
     public async Task ExecuteAsync_Type_WithEmptyText_ReturnsInvalidParameterErrorAsync()
     {
-        // Act - Empty text should be rejected by validation
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, name: "TextBox", text: "");
+        // Act - Empty text should be rejected by validation (windowHandle required per Constitution Principle VI)
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Type, windowHandle: "12345", name: "TextBox", text: "");
 
         // Assert
         Assert.False(result.Success);
@@ -513,8 +518,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndSelectAsync(Arg.Any<ElementQuery>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(errorResult);
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Select, name: "Country", value: "Nonexistent");
+        // Act - Select requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Select, windowHandle: "12345", name: "Country", value: "Nonexistent");
 
         // Assert
         Assert.False(result.Success);
@@ -529,10 +534,10 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndClickAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act - test without windowHandle since that triggers auto-activation
-        // The parameter passing is the same regardless of window handle
+        // Act - Click requires windowHandle per Constitution Principle VI
         await _tool.ExecuteAsync(
             UIAutomationAction.Click,
+            windowHandle: "12345",
             name: "Button",
             controlType: "Button",
             automationId: "btn123");
@@ -554,8 +559,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindAndTypeAsync(Arg.Any<ElementQuery>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
-        // Act
-        await _tool.ExecuteAsync(UIAutomationAction.Type, name: "Field", text: "Append", clearFirst: false);
+        // Act - Type requires windowHandle per Constitution Principle VI
+        await _tool.ExecuteAsync(UIAutomationAction.Type, windowHandle: "12345", name: "Field", text: "Append", clearFirst: false);
 
         // Assert
         await _mockService.Received(1).FindAndTypeAsync(
@@ -576,8 +581,8 @@ public sealed class UIAutomationToolTests
         _mockService.FindElementsAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new InvalidOperationException("Test error"));
 
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.Find, name: "Test");
+        // Act - Find requires windowHandle per Constitution Principle VI
+        var result = await _tool.ExecuteAsync(UIAutomationAction.Find, windowHandle: "12345", name: "Test");
 
         // Assert
         Assert.False(result.Success);
@@ -596,9 +601,9 @@ public sealed class UIAutomationToolTests
         _mockService.FindElementsAsync(Arg.Any<ElementQuery>(), Arg.Any<CancellationToken>())
             .ThrowsAsync(new OperationCanceledException());
 
-        // Act & Assert
+        // Act & Assert - Find requires windowHandle per Constitution Principle VI
         await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            _tool.ExecuteAsync(UIAutomationAction.Find, name: "Test", cancellationToken: cts.Token));
+            _tool.ExecuteAsync(UIAutomationAction.Find, windowHandle: "12345", name: "Test", cancellationToken: cts.Token));
     }
 
     #endregion
