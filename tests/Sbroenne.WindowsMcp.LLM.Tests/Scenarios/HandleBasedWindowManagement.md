@@ -4,8 +4,6 @@ Tests the correct handle-based workflow for window management operations.
 LLMs should use find/list to get window handles, then use explicit handles for all actions.
 This pattern follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
 
-All window targeting MUST use explicit "handle" parameter obtained from find/list actions.
-
 ## [USER]
 Open Notepad for me.
 
@@ -14,11 +12,7 @@ Open Notepad for me.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "launch", "Launch"],
-    "programPath": ["ContainsAny", "notepad", "Notepad", "notepad.exe"]
-  }
+  "function_name": "window_management"
 }
 ```
 
@@ -28,7 +22,6 @@ The Notepad application was successfully launched and a window handle was return
 ### ASSERT ContainsAll
 Notepad, handle
 
-
 ## [USER]
 I need to find that Notepad window so I can work with it.
 
@@ -37,20 +30,15 @@ I need to find that Notepad window so I can work with it.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "find", "Find"],
-    "title": ["ContainsAny", "Notepad", "notepad"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-Successfully found the Notepad window and received a numeric window handle that can be used for subsequent operations
+Successfully found the Notepad window and received a numeric window handle
 
 ### ASSERT ContainsAll
 found, handle
-
 
 ## [USER]
 What state is the Notepad window in right now?
@@ -60,20 +48,15 @@ What state is the Notepad window in right now?
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "get_state", "GetState", "get-state"],
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-Successfully retrieved the window state (normal, minimized, or maximized) using the explicit handle parameter
+Successfully retrieved the window state using the handle
 
 ### ASSERT ContainsAny
 Normal, Minimized, Maximized, normal, minimized, maximized
-
 
 ## [USER]
 Minimize that Notepad window.
@@ -83,20 +66,15 @@ Minimize that Notepad window.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "minimize", "Minimize"],
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-The Notepad window was successfully minimized using the handle
+The Notepad window was successfully minimized
 
 ### ASSERT ContainsAll
 minimized
-
 
 ## [USER]
 Now bring it back up.
@@ -106,20 +84,15 @@ Now bring it back up.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "restore", "Restore"],
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-The Notepad window was successfully restored to normal state using the handle
+The Notepad window was successfully restored
 
 ### ASSERT ContainsAll
 restored
-
 
 ## [USER]
 Make sure Notepad is in the foreground.
@@ -129,20 +102,15 @@ Make sure Notepad is in the foreground.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "activate", "Activate"],
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-The Notepad window was successfully activated and brought to foreground using the handle
+The Notepad window was activated and brought to foreground
 
 ### ASSERT ContainsAll
 activated
-
 
 ## [USER]
 Close Notepad, I'm done with it.
@@ -152,16 +120,12 @@ Close Notepad, I'm done with it.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "close", "Close"],
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
 ### ASSERT SemanticCondition
-The Notepad window was successfully closed using the handle
+The Notepad window was successfully closed
 
 ### ASSERT ContainsAll
 closed

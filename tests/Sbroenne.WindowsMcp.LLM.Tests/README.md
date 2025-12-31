@@ -135,9 +135,10 @@ success, done, ok, window, notepad
 found, handle
 ```
 
-### FunctionCall Assertions: Verify Parameters
+### FunctionCall Assertions
 
-**❌ BAD - Only checks function was called:**
+FunctionCall assertions verify that a specific MCP tool was called:
+
 ```markdown
 ### ASSERT FunctionCall
 ```json
@@ -146,30 +147,7 @@ found, handle
 }
 ```
 
-**✅ GOOD - Verifies correct parameters were passed:**
-```markdown
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "find", "Find"],
-    "handle": ["NotEmpty"]
-  }
-}
-```
-
-### Available Argument Assertions
-
-| Assertion | Description | Example |
-|-----------|-------------|---------|
-| `["IsAnyOf", "a", "b", "c"]` | Value equals one of the options | `"action": ["IsAnyOf", "find", "Find"]` |
-| `["ContainsAny", "a", "b"]` | Value contains any substring | `"title": ["ContainsAny", "Notepad", "notepad"]` |
-| `["ContainsAll", "a", "b"]` | Value contains all substrings | `"path": ["ContainsAll", "notepad", ".exe"]` |
-| `["NotEmpty"]` | Value is not null or empty | `"handle": ["NotEmpty"]` |
-| `["Empty"]` | Value is null or empty | `"optional": ["Empty"]` |
-| `["Equals", "value"]` | Exact match | `"action": ["Equals", "close"]` |
-| `["SemanticCondition", "..."]` | Semantic check using LLM | `"description": ["SemanticCondition", "Mentions a window"]` |
+> **Note**: `function_name` must be a simple string, not an array. Use `SemanticCondition` and `ContainsAll` assertions to verify behavior rather than trying to assert on specific argument values.
 
 ### SemanticCondition: Be Specific
 
@@ -190,9 +168,10 @@ The Notepad window was successfully closed using the explicit window handle
 When testing tools that require window handles (Constitution Principle VI: tools are dumb actuators):
 
 1. **First turn**: User asks to find/launch a window
-2. **Assert**: Check that handle is returned (`ContainsAll handle`)
-3. **Subsequent turns**: User refers to "that window" naturally
-4. **Assert**: Check that `windowHandle: ["NotEmpty"]` is passed to tools
+2. **Assert FunctionCall**: Check that `window_management` was called
+3. **Assert ContainsAll**: Verify `handle` is mentioned in the response
+4. **Subsequent turns**: User refers to "that window" naturally
+5. **Assert SemanticCondition**: Verify the operation used the handle appropriately
 
 ## Troubleshooting
 

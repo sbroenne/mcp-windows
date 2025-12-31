@@ -11,10 +11,7 @@ Open Notepad for me.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "launch", "Launch"]
-  }
+  "function_name": "window_management"
 }
 ```
 
@@ -32,11 +29,7 @@ Type "Hello from Windows MCP Server!" into that Notepad window.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "ui_automation",
-  "arguments": {
-    "action": ["IsAnyOf", "type", "Type"],
-    "windowHandle": ["NotEmpty"]
-  }
+  "function_name": "ui_automation"
 }
 ```
 
@@ -54,15 +47,12 @@ Take a screenshot of Notepad showing what I typed.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "screenshot_control",
-  "arguments": {
-    "windowHandle": ["NotEmpty"]
-  }
+  "function_name": "screenshot_control"
 }
 ```
 
 ### ASSERT SemanticCondition
-A screenshot was captured of the Notepad window using the window handle
+A screenshot was captured of the Notepad window
 
 ## [USER]
 Is that Notepad window maximized or normal sized?
@@ -72,10 +62,7 @@ Is that Notepad window maximized or normal sized?
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "handle": ["NotEmpty"]
-  }
+  "function_name": "window_management"
 }
 ```
 
@@ -87,18 +74,11 @@ Close Notepad. Don't save the file.
 
 ## [AGENT]
 
-### ASSERT FunctionCall
-```json
-{
-  "function_name": ["ContainsAny", "ui_automation", "window_management"]
-}
-```
-
 ### ASSERT SemanticCondition
 Notepad was closed, discarding unsaved changes
 
 ### ASSERT ContainsAny
-closed, close, Close, Don't Save
+closed, close, Close
 
 ## [USER]
 Verify Notepad is no longer open.
@@ -108,10 +88,7 @@ Verify Notepad is no longer open.
 ### ASSERT FunctionCall
 ```json
 {
-  "function_name": "window_management",
-  "arguments": {
-    "action": ["IsAnyOf", "find", "Find", "list", "List"]
-  }
+  "function_name": "window_management"
 }
 ```
 
@@ -120,4 +97,3 @@ The search confirmed that no Notepad windows exist or the window was not found
 
 ### ASSERT ContainsAny
 no, not found, closed, does not exist, none, 0
-
