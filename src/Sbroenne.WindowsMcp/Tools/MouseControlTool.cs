@@ -100,25 +100,24 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Low-level mouse input - AVOID for UI elements. USE ui_automation(action='click') instead for buttons/controls. mouse_control is ONLY for: raw coordinate clicks with exact x,y, custom-drawn controls without UIA support, games. When using windowHandle, x/y become window-relative coordinates. Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
-    [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
+    [Description("Low-level mouse input - AVOID for UI elements. USE ui_automation(action='click') instead. Only for: raw coordinate clicks, custom-drawn controls, games.")]
+    [return: Description("Result with cursor position, monitor context, 'target_window' for clicks.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The mouse action: move, click, double_click, right_click, middle_click, drag, scroll, get_position")] string action,
-        [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
-        [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
-        [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
-        [Description("End x-coordinate relative to the monitor. Required for drag action.")] int? endX = null,
-        [Description("End y-coordinate relative to the monitor. Required for drag action.")] int? endY = null,
-        [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
-        [Description("Number of scroll clicks (default: 1)")] int amount = 1,
-        [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
-        [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Monitor index (0-based). Alternative to 'target' for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
-        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent clicking in the wrong application.")] string? expectedWindowTitle = null,
-        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent clicking in the wrong application.")] string? expectedProcessName = null,
-
-        [Description("Window handle (decimal string from window_management). When provided with x/y, coordinates are relative to the window's top-left corner instead of the monitor. Useful for clicking fixed positions within a specific window.")] string? windowHandle = null,
+        [Description("Mouse action")] MouseAction action,
+        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
+        [Description("X relative to monitor")] int? x = null,
+        [Description("Y relative to monitor")] int? y = null,
+        [Description("End X for drag")] int? endX = null,
+        [Description("End Y for drag")] int? endY = null,
+        [Description("Scroll: up, down, left, right")] string? direction = null,
+        [Description("Scroll clicks")] int amount = 1,
+        [Description("Modifiers: ctrl,shift,alt")] string? modifiers = null,
+        [Description("Drag button: left,right,middle")] string? button = null,
+        [Description("Monitor index (0-based)")] int? monitorIndex = null,
+        [Description("Expected window title")] string? expectedWindowTitle = null,
+        [Description("Expected process name")] string? expectedProcessName = null,
+        [Description("Window handle for relative coords")] string? windowHandle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -128,9 +127,9 @@ public sealed partial class MouseControlTool
 
         // Create MCP client logger for observability
         var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("MouseControl");
-        clientLogger?.LogMouseOperationStarted(action ?? "null");
+        clientLogger?.LogMouseOperationStarted(action.ToString());
 
-        _logger.LogOperationStart(correlationId, action ?? "null");
+        _logger.LogOperationStart(correlationId, action.ToString());
 
         // Create a linked token source with the configured timeout
         using var timeoutCts = new CancellationTokenSource(_configuration.TimeoutMs);
@@ -145,29 +144,9 @@ public sealed partial class MouseControlTool
                 var targetCheckResult = await VerifyTargetWindowAsync(expectedWindowTitle, expectedProcessName, linkedToken);
                 if (!targetCheckResult.Success)
                 {
-                    _logger.LogOperationFailure(correlationId, action ?? "null", targetCheckResult.ErrorCode.ToString(), targetCheckResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    _logger.LogOperationFailure(correlationId, action.ToString(), targetCheckResult.ErrorCode.ToString(), targetCheckResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                     return targetCheckResult;
                 }
-            }
-
-            // Validate and parse the action
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                var result = MouseControlResult.CreateFailure(
-                    MouseControlErrorCode.InvalidAction,
-                    "Action parameter is required");
-                _logger.LogOperationFailure(correlationId, "null", result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return result;
-            }
-
-            var mouseAction = ParseAction(action);
-            if (mouseAction == null)
-            {
-                var result = MouseControlResult.CreateFailure(
-                    MouseControlErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: move, click, double_click, right_click, middle_click, drag, scroll, get_position");
-                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                return result;
             }
 
             // NEW VALIDATION: Check if coordinates are provided
@@ -185,7 +164,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Invalid windowHandle: '{windowHandle}'. Expected decimal string from window_management.");
-                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                     return result;
                 }
 
@@ -195,7 +174,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Could not get window position for handle {windowHandle}. The window may no longer exist.");
-                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                     return result;
                 }
 
@@ -232,7 +211,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Invalid target: '{target}'. Valid values are: 'primary_screen', 'secondary_screen'");
-                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                     return result;
                 }
 
@@ -252,7 +231,7 @@ public sealed partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         errorMessage);
-                    _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                    _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                     return result;
                 }
 
@@ -280,7 +259,7 @@ public sealed partial class MouseControlTool
                         { "valid_targets", ValidTargets },
                         { "valid_indices", availableIndices }
                     });
-                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
 
@@ -299,7 +278,7 @@ public sealed partial class MouseControlTool
                         { "valid_indices", availableIndices },
                         { "provided_index", targetMonitorIndex }
                     });
-                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
 
@@ -313,7 +292,7 @@ public sealed partial class MouseControlTool
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.InvalidCoordinates,
                     $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
-                _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
 
@@ -387,7 +366,7 @@ public sealed partial class MouseControlTool
                                 },
                                 { "provided_coordinates", new { x = x.Value, y = y.Value } }
                             });
-                        _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                        _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                         return result;
                     }
                 }
@@ -412,7 +391,7 @@ public sealed partial class MouseControlTool
                                 },
                                 { "provided_coordinates", new { x = endX.Value, y = endY.Value } }
                             });
-                        _logger.LogOperationFailure(correlationId, action, result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                        _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                         return result;
                     }
                 }
@@ -420,7 +399,7 @@ public sealed partial class MouseControlTool
 
             MouseControlResult operationResult;
 
-            switch (mouseAction.Value)
+            switch (action)
             {
                 case MouseAction.Move:
                     operationResult = await HandleMoveAsync(absoluteX, absoluteY, linkedToken);
@@ -487,16 +466,16 @@ public sealed partial class MouseControlTool
                 }
 
                 // Attach target window info for input operations (not get_position)
-                if (mouseAction.Value != MouseAction.GetPosition)
+                if (action != MouseAction.GetPosition)
                 {
                     operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
                 }
 
-                _logger.LogOperationSuccess(correlationId, action, operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.TargetWindow?.Title, stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationSuccess(correlationId, action.ToString(), operationResult.FinalPosition.X, operationResult.FinalPosition.Y, operationResult.TargetWindow?.Title, stopwatch.ElapsedMilliseconds);
             }
             else
             {
-                _logger.LogOperationFailure(correlationId, action, operationResult.ErrorCode.ToString(), operationResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+                _logger.LogOperationFailure(correlationId, action.ToString(), operationResult.ErrorCode.ToString(), operationResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             }
 
             return operationResult;
@@ -507,7 +486,7 @@ public sealed partial class MouseControlTool
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.OperationTimeout,
                 $"Operation timed out after {_configuration.TimeoutMs}ms");
-            _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+            _logger.LogOperationFailure(correlationId, action.ToString(), errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
         catch (OperationCanceledException)
@@ -517,13 +496,13 @@ public sealed partial class MouseControlTool
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.UnexpectedError,
                 "Operation was cancelled");
-            _logger.LogOperationFailure(correlationId, action ?? "null", errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
+            _logger.LogOperationFailure(correlationId, action.ToString(), errorResult.ErrorCode.ToString(), errorResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
             return errorResult;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
-            _logger.LogOperationException(correlationId, action ?? "null", ex);
+            _logger.LogOperationException(correlationId, action.ToString(), ex);
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.UnexpectedError,
                 $"An unexpected error occurred: {ex.Message}");
@@ -844,22 +823,6 @@ public sealed partial class MouseControlTool
         }
 
         return modifiers;
-    }
-
-    private static MouseAction? ParseAction(string action)
-    {
-        return action.ToLowerInvariant() switch
-        {
-            "move" => MouseAction.Move,
-            "click" => MouseAction.Click,
-            "double_click" => MouseAction.DoubleClick,
-            "right_click" => MouseAction.RightClick,
-            "middle_click" => MouseAction.MiddleClick,
-            "drag" => MouseAction.Drag,
-            "scroll" => MouseAction.Scroll,
-            "get_position" => MouseAction.GetPosition,
-            _ => null,
-        };
     }
 
     private static MonitorTarget? ParseTarget(string? target)

@@ -91,75 +91,75 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. WORKFLOW: 1) Call window_management(action='find') to get windowHandle, 2) Use that handle with ui_automation actions. windowHandle is REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). Example: click(windowHandle='123456', nameContains='Close'). Works with title bar buttons, dialogs, and all standard UI controls. DIALOG BUTTONS: nameContains='save' finds 'Save'/'Don't save', nameContains='cancel' finds 'Cancel'. Actions NOT requiring windowHandle: invoke/highlight/get_ancestors/get_element_details (use elementId instead), get_element_at_cursor, get_focused_element, ocr_status. ALWAYS prefer over mouse_control.")]
+    [Description("UI element interaction via Windows UIA. Requires windowHandle from window_management(find/list). ALWAYS prefer over mouse_control.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, get_element_details")]
+        [Description("Action")]
         UIAutomationAction action,
 
-        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
+        [Description("Window handle from window_management")]
         string? windowHandle = null,
 
-        [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
+        [Description("Element name (exact)")]
         string? name = null,
 
-        [Description("Substring to search for in element names (partial match, case-insensitive). PREFERRED for dialog buttons - e.g., nameContains=\"Don't save\" finds the discard button in Windows save dialogs. Use instead of 'name' when you only know part of the element's name.")]
+        [Description("Name substring (partial match)")]
         string? nameContains = null,
 
-        [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
+        [Description("Name regex pattern")]
         string? namePattern = null,
 
-        [Description("Control type filter: Button, Edit, Text, List, ListItem, Tree, TreeItem, Menu, MenuItem, ComboBox, CheckBox, RadioButton, Tab, TabItem, Window, Pane, Document, Hyperlink, Image, ProgressBar, Slider, Spinner, StatusBar, ToolBar, ToolTip, Group, ScrollBar, DataGrid, DataItem, Custom")]
+        [Description("Control type: Button,Edit,Text,List,etc.")]
         string? controlType = null,
 
-        [Description("AutomationId to search for (exact match). More reliable than name for finding elements.")]
+        [Description("AutomationId (exact)")]
         string? automationId = null,
 
-        [Description("Element class name to filter by (e.g., 'Chrome_WidgetWin_1' for Chromium apps, 'Button' for Win32 buttons).")]
+        [Description("Element class name")]
         string? className = null,
 
-        [Description("Element ID from a previous find operation (for element-specific actions like toggle, invoke, focus)")]
+        [Description("Element ID from previous find")]
         string? elementId = null,
 
-        [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
+        [Description("Parent element ID to scope search")]
         string? parentElementId = null,
 
-        [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
+        [Description("Max tree depth (default 5)")]
         int maxDepth = 5,
 
-        [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]
+        [Description("Search only at this depth")]
         int? exactDepth = null,
 
-        [Description("Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd button, foundIndex=3 for the 3rd, etc.")]
+        [Description("Return Nth match (1-based)")]
         int foundIndex = 1,
 
-        [Description("Include child elements in response")]
+        [Description("Include children")]
         bool includeChildren = false,
 
-        [Description("Timeout in milliseconds for wait_for (default: 5000)")]
+        [Description("Timeout ms (default 5000)")]
         int timeoutMs = 5000,
 
-        [Description("Text to type (for type action)")]
+        [Description("Text for type action")]
         string? text = null,
 
-        [Description("Clear existing text before typing (default: false)")]
+        [Description("Clear before typing")]
         bool clearFirst = false,
 
-        [Description("Value for select or invoke actions")]
+        [Description("Value for select/invoke")]
         string? value = null,
 
-        [Description("OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.")]
+        [Description("OCR language (e.g. 'en-US')")]
         string? language = null,
 
-        [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
+        [Description("State: on,off,enabled,disabled,visible")]
         string? desiredState = null,
 
-        [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
+        [Description("Sort by element size")]
         bool sortByProminence = false,
 
-        [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
+        [Description("Filter to region 'x,y,w,h'")]
         string? inRegion = null,
 
-        [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
+        [Description("Find near this elementId")]
         string? nearElement = null,
 
         CancellationToken cancellationToken = default)
@@ -1118,98 +1118,98 @@ public sealed partial class UIAutomationTool
 /// <summary>
 /// UI Automation action types.
 /// </summary>
-[JsonConverter(typeof(UIAutomationActionJsonConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<UIAutomationAction>))]
 public enum UIAutomationAction
 {
     /// <summary>Search for elements matching criteria.</summary>
-    [Description("Search for elements matching criteria")]
+    [JsonStringEnumMemberName("find")]
     Find,
 
     /// <summary>Get UI element hierarchy.</summary>
-    [Description("Get UI element hierarchy")]
+    [JsonStringEnumMemberName("get_tree")]
     GetTree,
 
     /// <summary>Wait for an element to appear.</summary>
-    [Description("Wait for an element to appear")]
+    [JsonStringEnumMemberName("wait_for")]
     WaitFor,
 
     /// <summary>Wait for an element to disappear.</summary>
-    [Description("Wait for an element to disappear (inverse of wait_for)")]
+    [JsonStringEnumMemberName("wait_for_disappear")]
     WaitForDisappear,
 
     /// <summary>Wait for an element to reach a specific state.</summary>
-    [Description("Wait for an element to reach a specific state (toggleState, isEnabled, isOffscreen). Use with desiredState parameter.")]
+    [JsonStringEnumMemberName("wait_for_state")]
     WaitForState,
 
     /// <summary>Click an element.</summary>
-    [Description("Click an element")]
+    [JsonStringEnumMemberName("click")]
     Click,
 
     /// <summary>Type text into an element.</summary>
-    [Description("Type text into an element")]
+    [JsonStringEnumMemberName("type")]
     Type,
 
     /// <summary>Select an item from a list or combo box.</summary>
-    [Description("Select an item from a list or combo box")]
+    [JsonStringEnumMemberName("select")]
     Select,
 
     /// <summary>Toggle a checkbox or toggle button.</summary>
-    [Description("Toggle a checkbox or toggle button")]
+    [JsonStringEnumMemberName("toggle")]
     Toggle,
 
-    /// <summary>Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if needed.</summary>
-    [Description("Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if current state differs from desiredState.")]
+    /// <summary>Ensure a checkbox/toggle is in a specific state (on/off).</summary>
+    [JsonStringEnumMemberName("ensure_state")]
     EnsureState,
 
     /// <summary>Invoke a pattern on an element.</summary>
-    [Description("Invoke a pattern on an element")]
+    [JsonStringEnumMemberName("invoke")]
     Invoke,
 
     /// <summary>Set keyboard focus to an element.</summary>
-    [Description("Set keyboard focus to an element")]
+    [JsonStringEnumMemberName("focus")]
     Focus,
 
     /// <summary>Scroll an element into view.</summary>
-    [Description("Scroll an element into view")]
+    [JsonStringEnumMemberName("scroll_into_view")]
     ScrollIntoView,
 
     /// <summary>Get text content from an element.</summary>
-    [Description("Get text content from an element")]
+    [JsonStringEnumMemberName("get_text")]
     GetText,
 
-    /// <summary>Visually highlight an element for debugging. Persists until HideHighlight is called.</summary>
-    [Description("Visually highlight an element for debugging. Persists until HideHighlight is called.")]
+    /// <summary>Visually highlight an element for debugging.</summary>
+    [JsonStringEnumMemberName("highlight")]
     Highlight,
 
     /// <summary>Hide the current highlight rectangle.</summary>
-    [Description("Hide the current highlight rectangle")]
+    [JsonStringEnumMemberName("hide_highlight")]
     HideHighlight,
 
     /// <summary>Extract text from screen or window using OCR.</summary>
-    [Description("Extract text from screen or window using OCR")]
+    [JsonStringEnumMemberName("ocr")]
     Ocr,
 
     /// <summary>Extract text from a specific element's bounding rectangle using OCR.</summary>
-    [Description("Extract text from a specific element's bounding rectangle using OCR")]
+    [JsonStringEnumMemberName("ocr_element")]
     OcrElement,
 
     /// <summary>Get OCR engine availability and status information.</summary>
-    [Description("Get OCR engine availability and status information")]
+    [JsonStringEnumMemberName("ocr_status")]
     OcrStatus,
 
     /// <summary>Get the UI element at the current cursor position.</summary>
-    [Description("Get the UI element at the current cursor position")]
+    [JsonStringEnumMemberName("get_element_at_cursor")]
     GetElementAtCursor,
 
     /// <summary>Get the currently focused UI element.</summary>
-    [Description("Get the currently focused UI element")]
+    [JsonStringEnumMemberName("get_focused_element")]
     GetFocusedElement,
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
-    [Description("Get all ancestor elements of an element up to the window root")]
+    [JsonStringEnumMemberName("get_ancestors")]
     GetAncestors,
 
     /// <summary>Get full element details by ID (bounds, patterns, value, etc.).</summary>
-    [Description("Get full element details by ID. Use after find to get complete info for a specific element.")]
+    [JsonStringEnumMemberName("get_element_details")]
     GetElementDetails
 }
