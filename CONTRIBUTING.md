@@ -155,6 +155,26 @@ public void Click_WithValidCoordinates_SendsClickInput()
 }
 ```
 
+### LLM Integration Tests
+
+LLM integration tests verify that AI agents can correctly use the MCP tools. These tests use [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) and require:
+- Azure OpenAI API access (set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
+- Windows desktop session (not headless CI)
+
+```powershell
+# Run all LLM tests
+cd tests/Sbroenne.WindowsMcp.LLM.Tests
+.\Run-LLMTests.ps1 -Build
+
+# Run specific scenario
+.\Run-LLMTests.ps1 -Scenario notepad-workflow.yaml
+
+# Run with different model
+.\Run-LLMTests.ps1 -Model gpt-4.1
+```
+
+See [`tests/Sbroenne.WindowsMcp.LLM.Tests/README.md`](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for complete documentation.
+
 ## Code Style
 
 ### C# Standards

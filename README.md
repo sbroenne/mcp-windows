@@ -167,7 +167,7 @@ This MCP server interacts directly with your Windows operating system to perform
 ## Testing
 
 ```bash
-# Run all tests
+# Run all unit/integration tests
 dotnet test
 
 # Run unit tests only
@@ -176,6 +176,17 @@ dotnet test --filter "FullyQualifiedName~Unit"
 # Run integration tests only (requires Windows desktop session)
 dotnet test --filter "FullyQualifiedName~Integration"
 ```
+
+### LLM Integration Tests
+
+LLM tests verify AI agents can correctly use the MCP tools. Uses [agent-benchmark](https://github.com/mykhaliev/agent-benchmark).
+
+```powershell
+cd tests/Sbroenne.WindowsMcp.LLM.Tests
+.\Run-LLMTests.ps1 -Build   # Build server and run all tests
+```
+
+Requires `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` environment variables. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for details.
 
 ## License
 
