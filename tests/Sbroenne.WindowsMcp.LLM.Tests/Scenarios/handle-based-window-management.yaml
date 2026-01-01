@@ -1,0 +1,88 @@
+# Agent-benchmark test: Handle-Based Window Management
+# Tests the correct handle-based workflow for window management operations.
+# LLMs should use find/list to get window handles, then use explicit handles for all actions.
+# This pattern follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
+# Migrated from skUnit: HandleBasedWindowManagement.md
+
+name: "Handle-Based Window Management"
+test_delay: 60s
+
+mcp_servers:
+  - name: windows-mcp
+    command: "{{SERVER_PATH}}"
+
+scenarios:
+  - name: "Window Lifecycle with Explicit Handles"
+    model: "{{MODEL}}"
+    system_prompt: |
+      You are a Windows automation assistant. Use the available MCP tools to help users
+      manage windows and automate tasks. Always use explicit handles from find/list operations.
+      Never use convenience parameters - always get handles first, then use them in subsequent calls.
+    
+    steps:
+      - prompt: "Launch Notepad for me."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"launch"'
+              - tool_call_contains: '"action":"Launch"'
+              - tool_call_contains: '"action": "launch"'
+              - tool_call_contains: '"action": "Launch"'
+          - response_contains: Notepad
+
+      - prompt: "Now find that Notepad window to get its handle."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"find"'
+              - tool_call_contains: '"action":"Find"'
+              - tool_call_contains: '"action":"list"'
+              - tool_call_contains: '"action":"List"'
+              - tool_call_contains: '"action": "find"'
+              - tool_call_contains: '"action": "Find"'
+              - tool_call_contains: '"action": "list"'
+              - tool_call_contains: '"action": "List"'
+          - anyOf:
+              - response_contains: found
+              - response_contains: Found
+              - response_contains: Notepad
+              - response_contains: handle
+
+      - prompt: "Use the minimize action with the handle to minimize the Notepad window."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"minimize"'
+              - tool_call_contains: '"action":"Minimize"'
+              - tool_call_contains: '"action": "minimize"'
+              - tool_call_contains: '"action": "Minimize"'
+          - tool_call_contains: '"handle"'
+          - anyOf:
+              - response_contains: minimized
+              - response_contains: Minimized
+
+      - prompt: "Use the restore action with the handle to restore the Notepad window."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"restore"'
+              - tool_call_contains: '"action":"Restore"'
+              - tool_call_contains: '"action": "restore"'
+              - tool_call_contains: '"action": "Restore"'
+          - tool_call_contains: '"handle"'
+          - anyOf:
+              - response_contains: restored
+              - response_contains: Restored
+
+      - prompt: "Use the close action with the handle to close the Notepad window."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"close"'
+              - tool_call_contains: '"action":"Close"'
+              - tool_call_contains: '"action": "close"'
+              - tool_call_contains: '"action": "Close"'
+          - tool_call_contains: '"handle"'
+          - anyOf:
+              - response_contains: closed
+              - response_contains: Closed

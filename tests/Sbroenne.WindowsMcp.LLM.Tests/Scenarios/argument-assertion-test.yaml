@@ -1,0 +1,43 @@
+# Agent-benchmark test: Argument Assertion Test
+# Tests that function call arguments are correctly passed to MCP tools
+# Migrated from skUnit: ArgumentAssertionTest.md
+
+name: "Argument Assertion Test"
+test_delay: 60s
+
+mcp_servers:
+  - name: windows-mcp
+    command: "{{SERVER_PATH}}"
+
+scenarios:
+  - name: "Launch and Close Notepad with Handle"
+    model: "{{MODEL}}"
+    system_prompt: |
+      You are a Windows automation assistant. Use the available MCP tools to help users
+      manage windows and automate tasks. Always use explicit handles from find/list operations.
+    
+    steps:
+      - prompt: "Launch notepad.exe for me."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"launch"'
+              - tool_call_contains: '"action":"Launch"'
+              - tool_call_contains: '"action": "launch"'
+              - tool_call_contains: '"action": "Launch"'
+          - anyOf:
+              - response_contains: Notepad
+              - response_contains: launched
+
+      - prompt: "Now close Notepad using the handle from the launch."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"close"'
+              - tool_call_contains: '"action":"Close"'
+              - tool_call_contains: '"action": "close"'
+              - tool_call_contains: '"action": "Close"'
+          - tool_call_contains: '"handle"'
+          - anyOf:
+              - response_contains: closed
+              - response_contains: Closed
