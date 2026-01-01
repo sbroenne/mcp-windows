@@ -83,8 +83,8 @@ public sealed partial class ScreenshotControlTool
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The action to perform.")] ScreenshotAction action = ScreenshotAction.Capture,
-        [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
-        [Description("Capture target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
+        [Description("Add numbered labels to UI elements (default: true)")] bool annotate = true,
+        [Description("Target: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', or 'all_monitors'")] string? target = null,
         [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
         [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,
         [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int? regionX = null,
@@ -94,8 +94,8 @@ public sealed partial class ScreenshotControlTool
         [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
         [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
         [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
-        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
-        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
+        [Description("Output mode: 'inline' (base64) or 'file' (saves to disk)")] string? outputMode = null,
+        [Description("Output path for 'file' mode")] string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

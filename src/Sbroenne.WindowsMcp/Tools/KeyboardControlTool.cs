@@ -85,9 +85,9 @@ public sealed partial class KeyboardControlTool : IDisposable
         [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
         [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
         [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
-        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string? expectedWindowTitle = null,
-        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string? expectedProcessName = null,
-        [Description("For 'type' action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text. Default is false.")] bool clearFirst = false,
+        [Description("Expected window title (fails if not matched)")] string? expectedWindowTitle = null,
+        [Description("Expected process name (fails if not matched)")] string? expectedProcessName = null,
+        [Description("Clear field before typing (Ctrl+A then type)")] bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

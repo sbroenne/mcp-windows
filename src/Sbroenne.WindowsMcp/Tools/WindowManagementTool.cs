@@ -84,10 +84,10 @@ public sealed partial class WindowManagementTool
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The window action to perform.")] WindowAction action,
-        [Description("Program to launch (required for launch action). Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'mspaint.exe') or full path (e.g., 'C:\\Windows\\notepad.exe').")] string? programPath = null,
-        [Description("Command-line arguments for the launched program (optional, for launch action).")] string? arguments = null,
-        [Description("Working directory for the launched program (optional, for launch action).")] string? workingDirectory = null,
-        [Description("Wait for the launched application window to appear (default: true for launch action).")] bool waitForWindow = true,
+        [Description("Program to launch (e.g., 'notepad.exe' or full path)")] string? programPath = null,
+        [Description("Command-line arguments for launch")] string? arguments = null,
+        [Description("Working directory for launch")] string? workingDirectory = null,
+        [Description("Wait for window to appear (default: true)")] bool waitForWindow = true,
         [Description("Window handle for actions that target a specific window (e.g., activate, close, minimize). Get the handle from the 'list' or 'find' action.")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
@@ -98,10 +98,10 @@ public sealed partial class WindowManagementTool
         [Description("Width for resize or set_bounds action")] int? width = null,
         [Description("Height for resize or set_bounds action")] int? height = null,
         [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int? timeoutMs = null,
-        [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
-        [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
+        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
+        [Description("Monitor index (0-based, for 3+ monitors)")] int? monitorIndex = null,
         [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
-        [Description("Exclude windows whose title contains this text (for list action). Useful for filtering out dialogs or popups.")] string? excludeTitle = null,
+        [Description("Exclude windows with this title substring")] string? excludeTitle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

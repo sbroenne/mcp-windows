@@ -108,7 +108,7 @@ public sealed partial class UIAutomationTool
         [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
         string? namePattern = null,
 
-        [Description("Control type filter: Button, Edit, Text, List, ListItem, Tree, TreeItem, Menu, MenuItem, ComboBox, CheckBox, RadioButton, Tab, TabItem, Window, Pane, Document, Hyperlink, Image, ProgressBar, Slider, Spinner, StatusBar, ToolBar, ToolTip, Group, ScrollBar, DataGrid, DataItem, Custom")]
+        [Description("Control type filter (e.g., Button, Edit, Text, CheckBox, ComboBox, Menu, MenuItem)")]
         string? controlType = null,
 
         [Description("AutomationId to search for (exact match). More reliable than name for finding elements.")]
@@ -123,13 +123,13 @@ public sealed partial class UIAutomationTool
         [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
         string? parentElementId = null,
 
-        [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
+        [Description("Max tree depth for get_tree (default: 5)")]
         int maxDepth = 5,
 
-        [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]
+        [Description("Search only at this depth (1=immediate children)")]
         int? exactDepth = null,
 
-        [Description("Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd button, foundIndex=3 for the 3rd, etc.")]
+        [Description("Return Nth match (1-based, default: 1)")]
         int foundIndex = 1,
 
         [Description("Include child elements in response")]
@@ -153,13 +153,13 @@ public sealed partial class UIAutomationTool
         [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
         string? desiredState = null,
 
-        [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
+        [Description("Sort by element size (largest first)")]
         bool sortByProminence = false,
 
-        [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
+        [Description("Filter to region (format: 'x,y,width,height')")]
         string? inRegion = null,
 
-        [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
+        [Description("Find elements near this elementId (sorted by distance)")]
         string? nearElement = null,
 
         CancellationToken cancellationToken = default)
