@@ -74,20 +74,20 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input to FOREGROUND window. After window_management(launch), just call keyboard_control directly. For specific UI element, use ui_automation(action='type').")]
-    [return: Description("Result with 'target_window' showing which window received input.")]
+    [Description("Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S), special keys. For typing into a specific UI element by handle, use ui_automation(action='type') instead.")]
+    [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("Keyboard action")] KeyboardAction action,
-        [Description("Text for type")] string? text = null,
-        [Description("Key: enter,tab,escape,f1,a,ctrl,shift,alt,win,copilot")] string? key = null,
-        [Description("Modifiers: ctrl,shift,alt,win")] string? modifiers = null,
-        [Description("Repeat count")] int repeat = 1,
-        [Description("Key sequence JSON")] string? sequence = null,
-        [Description("Inter-key delay ms")] int? interKeyDelayMs = null,
-        [Description("Expected window title")] string? expectedWindowTitle = null,
-        [Description("Expected process name")] string? expectedProcessName = null,
-        [Description("Clear field before typing")] bool clearFirst = false,
+        [Description("The keyboard action to perform.")] KeyboardAction action,
+        [Description("Text to type (required for type action)")] string? text = null,
+        [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
+        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string? modifiers = null,
+        [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
+        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
+        [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
+        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string? expectedWindowTitle = null,
+        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string? expectedProcessName = null,
+        [Description("For 'type' action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text. Default is false.")] bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

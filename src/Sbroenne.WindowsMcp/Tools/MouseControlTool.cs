@@ -100,24 +100,24 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Low-level mouse input - AVOID for UI elements. USE ui_automation(action='click') instead. Only for: raw coordinate clicks, custom-drawn controls, games.")]
-    [return: Description("Result with cursor position, monitor context, 'target_window' for clicks.")]
+    [Description("Low-level mouse input - AVOID for UI elements. USE ui_automation(action='click') instead for buttons/controls. mouse_control is ONLY for: raw coordinate clicks with exact x,y, custom-drawn controls without UIA support, games. When using windowHandle, x/y become window-relative coordinates.")]
+    [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("Mouse action")] MouseAction action,
-        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
-        [Description("X relative to monitor")] int? x = null,
-        [Description("Y relative to monitor")] int? y = null,
-        [Description("End X for drag")] int? endX = null,
-        [Description("End Y for drag")] int? endY = null,
-        [Description("Scroll: up, down, left, right")] string? direction = null,
-        [Description("Scroll clicks")] int amount = 1,
-        [Description("Modifiers: ctrl,shift,alt")] string? modifiers = null,
-        [Description("Drag button: left,right,middle")] string? button = null,
-        [Description("Monitor index (0-based)")] int? monitorIndex = null,
-        [Description("Expected window title")] string? expectedWindowTitle = null,
-        [Description("Expected process name")] string? expectedProcessName = null,
-        [Description("Window handle for relative coords")] string? windowHandle = null,
+        [Description("The mouse action to perform.")] MouseAction action,
+        [Description("Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.")] string? target = null,
+        [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
+        [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
+        [Description("End x-coordinate relative to the monitor. Required for drag action.")] int? endX = null,
+        [Description("End y-coordinate relative to the monitor. Required for drag action.")] int? endY = null,
+        [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
+        [Description("Number of scroll clicks (default: 1)")] int amount = 1,
+        [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
+        [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
+        [Description("Monitor index (0-based). Alternative to 'target' for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices. Not required for coordinate-less actions or get_position.")] int? monitorIndex = null,
+        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent clicking in the wrong application.")] string? expectedWindowTitle = null,
+        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent clicking in the wrong application.")] string? expectedProcessName = null,
+        [Description("Window handle (decimal string from window_management). When provided with x/y, coordinates are relative to the window's top-left corner instead of the monitor. Useful for clicking fixed positions within a specific window.")] string? windowHandle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

@@ -91,75 +91,75 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. Requires windowHandle from window_management(find/list). ALWAYS prefer over mouse_control.")]
+    [Description("UI element interaction via Windows UIA. WORKFLOW: 1) Call window_management(action='find') to get windowHandle, 2) Use that handle with ui_automation actions. windowHandle is REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). Example: click(windowHandle='123456', nameContains='Close'). Works with title bar buttons, dialogs, and all standard UI controls. DIALOG BUTTONS: nameContains='save' finds 'Save'/'Don't save', nameContains='cancel' finds 'Cancel'. Actions NOT requiring windowHandle: invoke/highlight/get_ancestors/get_element_details (use elementId instead), get_element_at_cursor, get_focused_element, ocr_status. ALWAYS prefer over mouse_control.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action")]
+        [Description("The UI automation action to perform.")]
         UIAutomationAction action,
 
-        [Description("Window handle from window_management")]
+        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
         string? windowHandle = null,
 
-        [Description("Element name (exact)")]
+        [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
         string? name = null,
 
-        [Description("Name substring (partial match)")]
+        [Description("Substring to search for in element names (partial match, case-insensitive). PREFERRED for dialog buttons - e.g., nameContains=\"Don't save\" finds the discard button in Windows save dialogs. Use instead of 'name' when you only know part of the element's name.")]
         string? nameContains = null,
 
-        [Description("Name regex pattern")]
+        [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
         string? namePattern = null,
 
-        [Description("Control type: Button,Edit,Text,List,etc.")]
+        [Description("Control type filter: Button, Edit, Text, List, ListItem, Tree, TreeItem, Menu, MenuItem, ComboBox, CheckBox, RadioButton, Tab, TabItem, Window, Pane, Document, Hyperlink, Image, ProgressBar, Slider, Spinner, StatusBar, ToolBar, ToolTip, Group, ScrollBar, DataGrid, DataItem, Custom")]
         string? controlType = null,
 
-        [Description("AutomationId (exact)")]
+        [Description("AutomationId to search for (exact match). More reliable than name for finding elements.")]
         string? automationId = null,
 
-        [Description("Element class name")]
+        [Description("Element class name to filter by (e.g., 'Chrome_WidgetWin_1' for Chromium apps, 'Button' for Win32 buttons).")]
         string? className = null,
 
-        [Description("Element ID from previous find")]
+        [Description("Element ID from a previous find operation (for element-specific actions like toggle, invoke, focus)")]
         string? elementId = null,
 
-        [Description("Parent element ID to scope search")]
+        [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
         string? parentElementId = null,
 
-        [Description("Max tree depth (default 5)")]
+        [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
         int maxDepth = 5,
 
-        [Description("Search only at this depth")]
+        [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]
         int? exactDepth = null,
 
-        [Description("Return Nth match (1-based)")]
+        [Description("Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd button, foundIndex=3 for the 3rd, etc.")]
         int foundIndex = 1,
 
-        [Description("Include children")]
+        [Description("Include child elements in response")]
         bool includeChildren = false,
 
-        [Description("Timeout ms (default 5000)")]
+        [Description("Timeout in milliseconds for wait_for (default: 5000)")]
         int timeoutMs = 5000,
 
-        [Description("Text for type action")]
+        [Description("Text to type (for type action)")]
         string? text = null,
 
-        [Description("Clear before typing")]
+        [Description("Clear existing text before typing (default: false)")]
         bool clearFirst = false,
 
-        [Description("Value for select/invoke")]
+        [Description("Value for select or invoke actions")]
         string? value = null,
 
-        [Description("OCR language (e.g. 'en-US')")]
+        [Description("OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.")]
         string? language = null,
 
-        [Description("State: on,off,enabled,disabled,visible")]
+        [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
         string? desiredState = null,
 
-        [Description("Sort by element size")]
+        [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
         bool sortByProminence = false,
 
-        [Description("Filter to region 'x,y,w,h'")]
+        [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
         string? inRegion = null,
 
-        [Description("Find near this elementId")]
+        [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
         string? nearElement = null,
 
         CancellationToken cancellationToken = default)
