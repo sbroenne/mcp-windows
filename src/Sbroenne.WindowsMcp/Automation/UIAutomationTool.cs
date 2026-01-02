@@ -373,7 +373,7 @@ public sealed partial class UIAutomationTool
             // Small delay to ensure the window is fully activated and ready for input
             await Task.Delay(50, cancellationToken);
 
-            return UIAutomationResult.CreateSuccess(actionName, Array.Empty<UIElementInfo>(), null);
+            return UIAutomationResult.CreateSuccess(actionName, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -772,7 +772,7 @@ public sealed partial class UIAutomationTool
                 var activateResult = await _windowService.ActivateWindowAsync(parsed, cancellationToken);
                 if (activateResult.Success)
                 {
-                    return UIAutomationResult.CreateSuccess("focus", Array.Empty<UIElementInfo>(), null) with
+                    return UIAutomationResult.CreateSuccess("focus", null) with
                     {
                         UsageHint = "Window focused successfully. You can now use keyboard_control to type into it."
                     };

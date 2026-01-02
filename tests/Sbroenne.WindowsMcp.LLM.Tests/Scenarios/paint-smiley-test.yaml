@@ -1,0 +1,134 @@
+# Windows Paint Smiley Test
+#
+# Testing framework: Agent Benchmark
+# https://github.com/mykhaliev/agent-benchmark
+#
+# Test: Draw a yellow smiley face in Paint and save it
+# Success = image file saved to disk
+#
+# IMPORTANT: This test requires a higher Azure OpenAI quota than S0 tier.
+# The multi-step drawing task requires many iterations and can consume
+# 80-120K tokens total. If you see 429 rate limit errors, you need to:
+# 1. Wait a few minutes between test runs
+# 2. Upgrade your Azure OpenAI tier
+# 3. Use a deployment with higher TPM limits
+#
+# Prerequisites:
+# - Windows 10/11 with Paint app
+# - Windows MCP Server
+# - Azure OpenAI with sufficient TPM quota (recommended: S1+ tier)
+# - Environment variables set:
+#   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt4o
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-4o
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-5-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt4o-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt4o
+
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5-chat
+
+settings:
+  verbose: true
+  max_iterations: 25      # More iterations needed for drawing operations
+
+sessions:
+  - name: Paint Smiley Workflow
+    tests:
+      - name: "Draw yellow smiley in Paint"
+        description: "Open Paint, draw a yellow smiley face using shape tools, and save the image"
+        prompt: |
+          1. Launch mspaint.exe (Windows Paint)
+          2. Draw a yellow smiley face using Paint's shape tools
+          3. Save the image to: {{TEST_RESULTS_PATH}}\smiley.png
+          4. Close Paint
+          5. Verify the file exists
+
+          Report "VERIFIED: Smiley saved" when complete.
+        assertions:
+          # OUTCOME: LLM confirmed the file was saved
+          - type: output_regex
+            pattern: "(?i)(saved|created|verified|smiley.*png|file.*exists)"
+
+          # OUTCOME: Smiley mentioned in output
+          - type: output_regex
+            pattern: "(?i)smiley"
+
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "failed"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # REQUIRED: Must use window_management to launch Paint
+          - type: tool_called
+            tool: window_management
+
+          # VERIFY: Paint was launched
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "launch"
+              programPath: "mspaint.exe"
+
+          # REQUIRED: Must use mouse_control for drawing
+          - type: tool_called
+            tool: mouse_control
+
+          # FLEXIBLE: May use keyboard for shortcuts or UI automation for buttons
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_automation
+
+          # VERIFY: Mouse was used for drawing (drag or click operations)
+          - anyOf:
+              - type: tool_param_equals
+                tool: mouse_control
+                params:
+                  action: "drag"
+              - type: tool_param_equals
+                tool: mouse_control
+                params:
+                  action: "click"
+
+          # PERFORMANCE: Complete within 120 seconds (drawing takes time)
+          - type: max_latency_ms
+            value: 120000
+
+          # EFFICIENCY: Stay under token limits
+          - type: max_tokens
+            value: 80000

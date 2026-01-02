@@ -234,7 +234,7 @@ public sealed partial class UIAutomationService
             if (Equals(currentValue, targetValue))
             {
                 stopwatch.Stop();
-                return UIAutomationResult.CreateSuccess(
+                return UIAutomationResult.CreateSuccessCompact(
                     "wait_for_state",
                     [element],
                     new UIAutomationDiagnostics { DurationMs = stopwatch.ElapsedMilliseconds });

@@ -282,16 +282,6 @@ public sealed class ScreenshotService : IScreenshotService
                 $"Window has invalid dimensions: {width}x{height}"));
         }
 
-        // Check size limit
-        long totalPixels = (long)width * height;
-        if (totalPixels > _configuration.MaxPixels)
-        {
-            _logger.LogImageTooLarge(width, height, totalPixels, _configuration.MaxPixels);
-            return Task.FromResult(ScreenshotControlResult.Error(
-                ScreenshotErrorCode.ImageTooLarge,
-                $"Window size ({width}x{height} = {totalPixels:N0} pixels) exceeds maximum allowed ({_configuration.MaxPixels:N0} pixels)"));
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         // Try PrintWindow first (can capture occluded windows)
@@ -398,16 +388,6 @@ public sealed class ScreenshotService : IScreenshotService
         var width = virtualScreen.Width;
         var height = virtualScreen.Height;
 
-        // Check size limit
-        long totalPixels = (long)width * height;
-        if (totalPixels > _configuration.MaxPixels)
-        {
-            _logger.LogImageTooLarge(width, height, totalPixels, _configuration.MaxPixels);
-            return Task.FromResult(ScreenshotControlResult.Error(
-                ScreenshotErrorCode.ImageTooLarge,
-                $"All-monitors capture ({width}x{height} = {totalPixels:N0} pixels) exceeds maximum allowed ({_configuration.MaxPixels:N0} pixels)"));
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         // Create bitmap and capture the entire virtual screen
@@ -511,15 +491,6 @@ public sealed class ScreenshotService : IScreenshotService
         ScreenshotControlRequest request,
         CancellationToken cancellationToken)
     {
-        // Check size limit
-        if (region.TotalPixels > _configuration.MaxPixels)
-        {
-            _logger.LogImageTooLarge(region.Width, region.Height, region.TotalPixels, _configuration.MaxPixels);
-            return Task.FromResult(ScreenshotControlResult.Error(
-                ScreenshotErrorCode.ImageTooLarge,
-                $"Capture area ({region.Width}x{region.Height} = {region.TotalPixels:N0} pixels) exceeds maximum allowed ({_configuration.MaxPixels:N0} pixels)"));
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
 
         // Create bitmap and capture

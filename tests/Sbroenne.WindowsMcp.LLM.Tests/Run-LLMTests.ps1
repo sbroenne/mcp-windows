@@ -137,8 +137,7 @@ if (-not $env:AZURE_OPENAI_ENDPOINT) {
     exit 1
 }
 if (-not $env:AZURE_OPENAI_API_KEY) {
-    Write-Error "AZURE_OPENAI_API_KEY environment variable is not set."
-    exit 1
+    Write-Host "Note: AZURE_OPENAI_API_KEY not set. Using Entra ID authentication." -ForegroundColor DarkGray
 }
 
 # Build MCP server if requested (optional, dotnet run will build anyway)
@@ -240,6 +239,7 @@ foreach ($ScenarioFile in $ScenarioFiles) {
     $Content = Get-Content $ScenarioFile.FullName -Raw
     $Content = $Content -replace '\{\{SERVER_COMMAND\}\}', $ServerCommand
     $Content = $Content -replace '\{\{MODEL\}\}', $Model
+    $Content = $Content -replace '\{\{TEST_RESULTS_PATH\}\}', $ReportsDir
     $Content | Set-Content $TempFile -Encoding UTF8
 
     # Run agent-benchmark

@@ -116,7 +116,7 @@ public sealed class UIAutomationToolTests
     public async Task ExecuteAsync_GetTreeAction_CallsGetTreeAsync()
     {
         // Arrange
-        var expectedResult = UIAutomationResult.CreateSuccess("get_tree", Array.Empty<UIElementInfo>(), null);
+        var expectedResult = UIAutomationResult.CreateSuccessCompact("get_tree", Array.Empty<UIElementInfo>(), null);
         _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(expectedResult);
 
@@ -309,7 +309,7 @@ public sealed class UIAutomationToolTests
     {
         // Arrange
         _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(UIAutomationResult.CreateSuccess("get_tree", Array.Empty<UIElementInfo>(), null));
+            .Returns(UIAutomationResult.CreateSuccessCompact("get_tree", Array.Empty<UIElementInfo>(), null));
 
         // Act - GetTree requires windowHandle per Constitution Principle VI
         await _tool.ExecuteAsync(UIAutomationAction.GetTree, windowHandle: "12345", maxDepth: inputDepth);

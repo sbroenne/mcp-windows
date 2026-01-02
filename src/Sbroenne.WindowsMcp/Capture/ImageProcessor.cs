@@ -4,10 +4,21 @@ using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 namespace Sbroenne.WindowsMcp.Capture;
 
 /// <summary>
-/// Processes captured bitmaps: format encoding.
+/// Processes captured bitmaps: scaling and format encoding.
 /// </summary>
 public sealed class ImageProcessor : IImageProcessor
 {
+    /// <summary>
+    /// Maximum width for output images. Images wider than this will be scaled down.
+    /// 1024px width balances readability with token consumption for LLM vision APIs.
+    /// </summary>
+    private const int MaxWidth = 1024;
+
+    /// <summary>
+    /// Maximum height for output images. Images taller than this will be scaled down.
+    /// </summary>
+    private const int MaxHeight = 768;
+
     /// <inheritdoc />
     public ProcessedImage Process(
         Bitmap source,
@@ -16,24 +27,72 @@ public sealed class ImageProcessor : IImageProcessor
     {
         ArgumentNullException.ThrowIfNull(source);
 
+        var originalWidth = source.Width;
+        var originalHeight = source.Height;
+
+        // Scale down if needed
+        var (scaledBitmap, scaledWidth, scaledHeight) = ScaleIfNeeded(source);
+        var bitmapToEncode = scaledBitmap ?? source;
+
+        try
+        {
+            // Encode to requested format
+            var data = imageFormat switch
+            {
+                Models.ImageFormat.Jpeg => EncodeToJpeg(bitmapToEncode, quality),
+                Models.ImageFormat.Png => EncodeToPng(bitmapToEncode),
+                _ => throw new ArgumentOutOfRangeException(nameof(imageFormat), imageFormat, "Unsupported image format")
+            };
+
+            return new ProcessedImage(
+                data,
+                scaledWidth,
+                scaledHeight,
+                originalWidth,
+                originalHeight,
+                imageFormat.ToString().ToLowerInvariant());
+        }
+        finally
+        {
+            // Dispose the scaled bitmap if we created one
+            scaledBitmap?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Scales the bitmap down if it exceeds the maximum dimensions.
+    /// </summary>
+    /// <returns>Tuple of (scaled bitmap or null if no scaling, final width, final height).</returns>
+    private static (Bitmap? ScaledBitmap, int Width, int Height) ScaleIfNeeded(Bitmap source)
+    {
         var width = source.Width;
         var height = source.Height;
 
-        // Encode to requested format
-        var data = imageFormat switch
+        // Check if scaling is needed
+        if (width <= MaxWidth && height <= MaxHeight)
         {
-            Models.ImageFormat.Jpeg => EncodeToJpeg(source, quality),
-            Models.ImageFormat.Png => EncodeToPng(source),
-            _ => throw new ArgumentOutOfRangeException(nameof(imageFormat), imageFormat, "Unsupported image format")
-        };
+            return (null, width, height);
+        }
 
-        return new ProcessedImage(
-            data,
-            width,
-            height,
-            width,
-            height,
-            imageFormat.ToString().ToLowerInvariant());
+        // Calculate scale factor to fit within max dimensions while maintaining aspect ratio
+        var scaleX = (double)MaxWidth / width;
+        var scaleY = (double)MaxHeight / height;
+        var scale = Math.Min(scaleX, scaleY);
+
+        var newWidth = (int)(width * scale);
+        var newHeight = (int)(height * scale);
+
+        // Create scaled bitmap with high-quality interpolation
+        var scaled = new Bitmap(newWidth, newHeight);
+        using (var graphics = Graphics.FromImage(scaled))
+        {
+            graphics.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.HighQuality;
+            graphics.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+            graphics.DrawImage(source, 0, 0, newWidth, newHeight);
+        }
+
+        return (scaled, newWidth, newHeight);
     }
 
     /// <summary>

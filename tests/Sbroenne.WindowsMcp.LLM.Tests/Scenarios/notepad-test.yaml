@@ -1,8 +1,4 @@
-# Windows based test
-# Tests a UI Automation scenario with Windows MCP Server
-# https://windowsmcpserver.dev/
-# https://github.com/sbroenne/mcp-windows
-#
+# Windows Notepad Test
 # Testing framework: Agent Benchmark
 # https://github.com/mykhaliev/agent-benchmark
 #
@@ -14,7 +10,6 @@
 # - Windows MCP Server executable in examples folder
 # - Environment variables set:
 #   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
-#   - AZURE_OPENAI_API_KEY: Azure OpenAI API key
 #
 
 
@@ -22,19 +17,20 @@ criteria:
   success_rate: 1 # 100%
 
 providers:
-  - name: azure-openai-gpt41
-    type: AZURE
-    token: "{{AZURE_OPENAI_API_KEY}}"
-    model: gpt-4.1
-    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
-    version: 2025-01-01-preview
-
   - name: azure-openai-gpt4o
     type: AZURE
-    token: "{{AZURE_OPENAI_API_KEY}}"
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
     model: gpt-4o
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
+
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-5-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
 
 servers:
   - name: windows-mcp
@@ -43,15 +39,15 @@ servers:
     server_delay: 10s
 
 agents:
-  - name: gpt41-agent
-    servers:
-      - name: windows-mcp
-    provider: azure-openai-gpt41
-
   - name: gpt4o-agent
     servers:
       - name: windows-mcp
     provider: azure-openai-gpt4o
+
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5-chat
 
 settings:
   verbose: true

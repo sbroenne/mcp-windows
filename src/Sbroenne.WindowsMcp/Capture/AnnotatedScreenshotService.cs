@@ -232,7 +232,7 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
                 result.Diagnostics);
         }
 
-        return UIAutomationResult.CreateSuccess(result.Action, visibleElements, result.Diagnostics);
+        return UIAutomationResult.CreateSuccessCompact(result.Action, visibleElements, result.Diagnostics);
     }
 
     /// <summary>

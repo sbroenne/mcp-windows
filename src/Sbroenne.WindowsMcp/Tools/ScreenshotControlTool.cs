@@ -43,7 +43,7 @@ public sealed partial class ScreenshotControlTool
     /// If you see a button at pixel (450, 300) in the screenshot, use mouse_control(x=450, y=300, monitorIndex=N).
     ///
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
-    /// Default: JPEG format at quality 85, at logical resolution (matching mouse coordinate space).
+    /// Default: JPEG format at quality 40, at logical resolution (matching mouse coordinate space).
     ///
     /// **ANNOTATION MODE** (annotate=true):
     /// - Returns screenshot with numbered labels on interactive UI elements
@@ -71,8 +71,7 @@ public sealed partial class ScreenshotControlTool
     /// <param name="regionWidth">Width in pixels for 'region' target. Must be positive.</param>
     /// <param name="regionHeight">Height in pixels for 'region' target. Must be positive.</param>
     /// <param name="includeCursor">Include mouse cursor in capture. Default: false.</param>
-    /// <param name="imageFormat">Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).</param>
-    /// <param name="quality">Image compression quality 1-100. Default: 85. Only affects JPEG format.</param>
+    /// <param name="quality">JPEG compression quality 1-100. Default: 40.</param>
     /// <param name="outputMode">How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.</param>
     /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -92,9 +91,8 @@ public sealed partial class ScreenshotControlTool
         [Description("Width in pixels for 'region' target. Must be positive.")] int? regionWidth = null,
         [Description("Height in pixels for 'region' target. Must be positive.")] int? regionHeight = null,
         [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
-        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
-        [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
-        [Description("Output mode: 'inline' (base64) or 'file' (saves to disk)")] string? outputMode = null,
+        [Description("JPEG compression quality 1-100. Default: 40.")] int? quality = null,
+        [Description("Output mode: 'inline' (default, base64) or 'file' (saves to disk)")] string? outputMode = null,
         [Description("Output path for 'file' mode")] string? outputPath = null,
         CancellationToken cancellationToken = default)
     {
@@ -111,15 +109,6 @@ public sealed partial class ScreenshotControlTool
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
                 $"Invalid target: '{target}'. Valid values: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'");
-        }
-
-        // Parse and validate image format
-        var parsedImageFormat = ParseImageFormat(imageFormat);
-        if (parsedImageFormat == null && imageFormat != null)
-        {
-            return ScreenshotControlResult.Error(
-                ScreenshotErrorCode.InvalidRequest,
-                $"Invalid imageFormat: '{imageFormat}'. Valid values: 'jpeg', 'jpg', 'png'");
         }
 
         // Validate quality
@@ -169,7 +158,7 @@ public sealed partial class ScreenshotControlTool
         // Handle annotated screenshot mode
         if (annotate && action == ScreenshotAction.Capture)
         {
-            return await CaptureAnnotatedAsync(windowHandle, parsedImageFormat, parsedQuality, parsedOutputMode, outputPath, cancellationToken);
+            return await CaptureAnnotatedAsync(windowHandle, parsedQuality, parsedOutputMode, outputPath, cancellationToken);
         }
 
         // Build request with all parameters
@@ -181,15 +170,14 @@ public sealed partial class ScreenshotControlTool
             WindowHandle = windowHandle,
             Region = region,
             IncludeCursor = includeCursor,
-            ImageFormat = parsedImageFormat ?? ScreenshotConfiguration.DefaultImageFormat,
+            ImageFormat = ScreenshotConfiguration.DefaultImageFormat,
             Quality = parsedQuality,
             OutputMode = parsedOutputMode ?? ScreenshotConfiguration.DefaultOutputMode,
             OutputPath = outputPath
         };
 
-        // Execute and return result
-        var result = await _screenshotService.ExecuteAsync(request, cancellationToken);
-        return result;
+        // Execute the screenshot capture
+        return await _screenshotService.ExecuteAsync(request, cancellationToken);
     }
 
     /// <summary>
@@ -210,24 +198,6 @@ public sealed partial class ScreenshotControlTool
             "window" => CaptureTarget.Window,
             "region" => CaptureTarget.Region,
             "all_monitors" or "allmonitors" => CaptureTarget.AllMonitors,
-            _ => null
-        };
-    }
-
-    /// <summary>
-    /// Parses the image format string to enum.
-    /// </summary>
-    private static Models.ImageFormat? ParseImageFormat(string? format)
-    {
-        if (string.IsNullOrWhiteSpace(format))
-        {
-            return null; // Will use default
-        }
-
-        return format.ToLowerInvariant() switch
-        {
-            "jpeg" or "jpg" => Models.ImageFormat.Jpeg,
-            "png" => Models.ImageFormat.Png,
             _ => null
         };
     }
@@ -255,13 +225,15 @@ public sealed partial class ScreenshotControlTool
     /// </summary>
     private async Task<ScreenshotControlResult> CaptureAnnotatedAsync(
         string? windowHandle,
-        Models.ImageFormat? imageFormat,
         int quality,
         OutputMode? outputMode,
         string? outputPath,
         CancellationToken cancellationToken)
     {
-        var format = imageFormat ?? ScreenshotConfiguration.DefaultImageFormat;
+        // Apply default output mode if not specified
+        var effectiveOutputMode = outputMode ?? ScreenshotConfiguration.DefaultOutputMode;
+
+        var format = ScreenshotConfiguration.DefaultImageFormat;
         var result = await _annotatedScreenshotService.CaptureAsync(
             windowHandle,
             controlTypeFilter: null,
@@ -281,7 +253,7 @@ public sealed partial class ScreenshotControlTool
 
         // Save to file if outputPath or outputMode is file
         string? savedFilePath = null;
-        var shouldSaveToFile = outputMode == OutputMode.File || !string.IsNullOrEmpty(outputPath);
+        var shouldSaveToFile = effectiveOutputMode == OutputMode.File || !string.IsNullOrEmpty(outputPath);
 
         if (shouldSaveToFile && !string.IsNullOrEmpty(result.ImageData))
         {
@@ -314,7 +286,7 @@ public sealed partial class ScreenshotControlTool
         }
 
         // Return inline or file result
-        var returnInline = outputMode != OutputMode.File && savedFilePath == null;
+        var returnInline = effectiveOutputMode != OutputMode.File && savedFilePath == null;
         return ScreenshotControlResult.AnnotatedSuccess(
             returnInline ? result.ImageData : null,
             result.Width ?? 0,

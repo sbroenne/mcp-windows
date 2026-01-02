@@ -41,10 +41,19 @@ public sealed record UIAutomationResult
     public required string Action { get; init; }
 
     /// <summary>
-    /// Full element details. Only populated for single-element results or get_element_details.
+    /// Full element details for internal use (e.g., AnnotatedScreenshotService).
+    /// NOT serialized to JSON - use Tree, Items, or Detail for client responses.
     /// </summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonIgnore]
     public UIElementInfo[]? Elements { get; init; }
+
+    /// <summary>
+    /// Full element details for single-element responses (e.g., get_element_details).
+    /// SERIALIZED to JSON for client consumption.
+    /// </summary>
+    [JsonPropertyName("detail")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIElementInfo? Detail { get; init; }
 
     /// <summary>
     /// Compact element list for Find actions (token-optimized, flat list).
@@ -158,7 +167,8 @@ public sealed record UIAutomationResult
     public AnnotatedElement[]? AnnotatedElements { get; init; }
 
     /// <summary>
-    /// Creates a success result with a single element (wrapped in an array for consistency).
+    /// Creates a success result with a single element's full details (e.g., for get_element_details).
+    /// Uses Detail property which IS serialized to JSON.
     /// </summary>
     /// <param name="action">The action performed.</param>
     /// <param name="element">The element found.</param>
@@ -172,7 +182,8 @@ public sealed record UIAutomationResult
         {
             Success = true,
             Action = action,
-            Elements = [element],
+            Detail = element,
+            Elements = [element], // Also keep in internal array for consistency
             ElementCount = 1,
             UsageHint = GetUsageHintForElement(element),
             Diagnostics = diagnostics
@@ -196,35 +207,13 @@ public sealed record UIAutomationResult
     }
 
     /// <summary>
-    /// Creates a success result with multiple elements.
-    /// </summary>
-    /// <param name="action">The action performed.</param>
-    /// <param name="elements">The elements found.</param>
-    /// <param name="diagnostics">Optional diagnostics.</param>
-    /// <returns>A success result.</returns>
-    public static UIAutomationResult CreateSuccess(string action, UIElementInfo[] elements, UIAutomationDiagnostics? diagnostics = null)
-    {
-        ArgumentNullException.ThrowIfNull(elements);
-
-        return new UIAutomationResult
-        {
-            Success = true,
-            Action = action,
-            Elements = elements,
-            ElementCount = elements.Length,
-            UsageHint = elements.Length == 1 ? GetUsageHintForElement(elements[0]) : "Multiple elements found. Refine your query or iterate through the elements array.",
-            Diagnostics = diagnostics
-        };
-    }
-
-    /// <summary>
-    /// Creates a success result with compact elements (token-optimized for lists).
-    /// Use this for Find actions to reduce response token count by ~70%.
+    /// Creates a success result with elements (token-optimized for serialization).
+    /// Sets both Elements (for internal use) and Items (compact, for client serialization).
     /// </summary>
     /// <param name="action">The action performed.</param>
     /// <param name="elements">The full elements (will be converted to compact).</param>
     /// <param name="diagnostics">Optional diagnostics.</param>
-    /// <returns>A success result with compact element list (Items).</returns>
+    /// <returns>A success result with compact element list (Items) and Elements for internal use.</returns>
     public static UIAutomationResult CreateSuccessCompact(string action, UIElementInfo[] elements, UIAutomationDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(elements);
@@ -235,6 +224,7 @@ public sealed record UIAutomationResult
         {
             Success = true,
             Action = action,
+            Elements = elements, // Internal use only (not serialized)
             Items = compactElements,
             ElementCount = elements.Length,
             UsageHint = elements.Length == 1
