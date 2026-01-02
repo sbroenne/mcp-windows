@@ -92,7 +92,15 @@ public sealed partial class UIAutomationService
             if (element.TryInvoke())
             {
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
+                if (info == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "click",
+                        UIAutomationErrorType.ElementStale,
+                        "Click succeeded but element became unavailable.",
+                        CreateDiagnostics(stopwatch));
+                }
+                return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
             }
 
             // Fall back to clicking at element's clickable point
@@ -101,7 +109,15 @@ public sealed partial class UIAutomationService
             {
                 PerformPhysicalClick(clickablePoint.Value);
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
+                if (info == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "click",
+                        UIAutomationErrorType.ElementStale,
+                        "Click succeeded but element became unavailable.",
+                        CreateDiagnostics(stopwatch));
+                }
+                return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
             }
 
             return UIAutomationResult.CreateFailure(
@@ -240,7 +256,15 @@ public sealed partial class UIAutomationService
                     if (element.TrySetValue(text))
                     {
                         var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                        return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
+                        if (info == null)
+                        {
+                            return (Success: false, Result: UIAutomationResult.CreateFailure(
+                                "type",
+                                UIAutomationErrorType.ElementStale,
+                                "Type succeeded but element became unavailable.",
+                                CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        }
+                        return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                     }
                 }
             }
@@ -249,7 +273,15 @@ public sealed partial class UIAutomationService
                 if (element.TrySetValue(text))
                 {
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
+                    if (info == null)
+                    {
+                        return (Success: false, Result: UIAutomationResult.CreateFailure(
+                            "type",
+                            UIAutomationErrorType.ElementStale,
+                            "Type succeeded but element became unavailable.",
+                            CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    }
+                    return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                 }
             }
 
@@ -281,7 +313,15 @@ public sealed partial class UIAutomationService
         return await _staThread.ExecuteAsync(() =>
         {
             var info = ConvertToElementInfo(staResult.Element!, staResult.RootElement!, _coordinateConverter);
-            return UIAutomationResult.CreateSuccessCompact("type", [info!], CreateDiagnostics(stopwatch));
+            if (info == null)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.ElementStale,
+                    "Type succeeded but element became unavailable.",
+                    CreateDiagnostics(stopwatch));
+            }
+            return UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch));
         }, cancellationToken);
     }
 
@@ -366,7 +406,15 @@ public sealed partial class UIAutomationService
             if (TrySelectItem(element, value))
             {
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                return UIAutomationResult.CreateSuccessCompact("select", [info!], CreateDiagnostics(stopwatch));
+                if (info == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "select",
+                        UIAutomationErrorType.ElementStale,
+                        "Select succeeded but element became unavailable.",
+                        CreateDiagnostics(stopwatch));
+                }
+                return UIAutomationResult.CreateSuccessCompact("select", [info], CreateDiagnostics(stopwatch));
             }
 
             // Try ExpandCollapse + find item
@@ -387,7 +435,15 @@ public sealed partial class UIAutomationService
                         if (item.TryInvoke() || TrySelectElement(item))
                         {
                             var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                            return UIAutomationResult.CreateSuccessCompact("select", [info!], CreateDiagnostics(stopwatch));
+                            if (info == null)
+                            {
+                                return UIAutomationResult.CreateFailure(
+                                    "select",
+                                    UIAutomationErrorType.ElementStale,
+                                    "Select succeeded but element became unavailable.",
+                                    CreateDiagnostics(stopwatch));
+                            }
+                            return UIAutomationResult.CreateSuccessCompact("select", [info], CreateDiagnostics(stopwatch));
                         }
                     }
                 }
@@ -569,7 +625,15 @@ public sealed partial class UIAutomationService
                 if (element.TryInvoke())
                 {
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
+                    if (info == null)
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "click",
+                            UIAutomationErrorType.ElementStale,
+                            "Click succeeded but element became unavailable.",
+                            CreateDiagnostics(stopwatch));
+                    }
+                    return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
                 }
 
                 // Fall back to clicking at element's clickable point
@@ -578,7 +642,15 @@ public sealed partial class UIAutomationService
                 {
                     PerformPhysicalClick(clickablePoint.Value);
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    return UIAutomationResult.CreateSuccessCompact("click", [info!], CreateDiagnostics(stopwatch));
+                    if (info == null)
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "click",
+                            UIAutomationErrorType.ElementStale,
+                            "Click succeeded but element became unavailable.",
+                            CreateDiagnostics(stopwatch));
+                    }
+                    return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
                 }
 
                 return UIAutomationResult.CreateFailure(
@@ -642,8 +714,15 @@ public sealed partial class UIAutomationService
 
                 var rootElement = GetRootElementForScroll(element);
                 var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-
-                return UIAutomationResult.CreateSuccessCompact("highlight", [elementInfo!], CreateDiagnostics(stopwatch));
+                if (elementInfo == null)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "highlight",
+                        UIAutomationErrorType.ElementStale,
+                        "Highlight succeeded but element became unavailable.",
+                        CreateDiagnostics(stopwatch));
+                }
+                return UIAutomationResult.CreateSuccessCompact("highlight", [elementInfo], CreateDiagnostics(stopwatch));
             }, cancellationToken);
         }
         catch (COMException ex)

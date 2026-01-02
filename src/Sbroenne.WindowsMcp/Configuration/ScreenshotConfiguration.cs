@@ -13,9 +13,19 @@ public sealed class ScreenshotConfiguration
     public const string TimeoutEnvVar = "MCP_WINDOWS_SCREENSHOT_TIMEOUT_MS";
 
     /// <summary>
+    /// Environment variable name for maximum pixels configuration.
+    /// </summary>
+    public const string MaxPixelsEnvVar = "MCP_WINDOWS_SCREENSHOT_MAX_PIXELS";
+
+    /// <summary>
     /// Default timeout in milliseconds.
     /// </summary>
     public const int DefaultTimeoutMs = 5000;
+
+    /// <summary>
+    /// Default maximum pixels (8K resolution: 7680 × 4320).
+    /// </summary>
+    public const int DefaultMaxPixels = 33_177_600;
 
     /// <summary>
     /// Default image format for LLM-optimized captures.
@@ -23,9 +33,9 @@ public sealed class ScreenshotConfiguration
     public const ImageFormat DefaultImageFormat = ImageFormat.Jpeg;
 
     /// <summary>
-    /// Default JPEG quality (1-100). 40 provides acceptable quality while minimizing token consumption for LLM vision APIs.
+    /// Default JPEG quality (1-100). 85 provides optimal balance between size and quality.
     /// </summary>
-    public const int DefaultQuality = 40;
+    public const int DefaultQuality = 85;
 
     /// <summary>
     /// Default output mode (inline base64).
@@ -38,12 +48,18 @@ public sealed class ScreenshotConfiguration
     public int TimeoutMs { get; init; } = DefaultTimeoutMs;
 
     /// <summary>
+    /// Gets the maximum number of pixels allowed in a capture.
+    /// </summary>
+    public int MaxPixels { get; init; } = DefaultMaxPixels;
+
+    /// <summary>
     /// Creates a configuration instance from environment variables.
     /// </summary>
     /// <returns>A new <see cref="ScreenshotConfiguration"/> instance.</returns>
     public static ScreenshotConfiguration FromEnvironment()
     {
         var timeoutMs = GetEnvInt(TimeoutEnvVar, DefaultTimeoutMs);
+        var maxPixels = GetEnvInt(MaxPixelsEnvVar, DefaultMaxPixels);
 
         // Ensure reasonable bounds
         if (timeoutMs < 100)
@@ -56,9 +72,15 @@ public sealed class ScreenshotConfiguration
             timeoutMs = 60000;
         }
 
+        if (maxPixels < 1)
+        {
+            maxPixels = DefaultMaxPixels;
+        }
+
         return new ScreenshotConfiguration
         {
-            TimeoutMs = timeoutMs
+            TimeoutMs = timeoutMs,
+            MaxPixels = maxPixels
         };
     }
 

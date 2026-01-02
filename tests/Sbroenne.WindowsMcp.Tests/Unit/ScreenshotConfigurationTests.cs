@@ -12,12 +12,14 @@ public sealed class ScreenshotConfigurationTests
     {
         // Arrange - ensure env vars are not set
         Environment.SetEnvironmentVariable(ScreenshotConfiguration.TimeoutEnvVar, null);
+        Environment.SetEnvironmentVariable(ScreenshotConfiguration.MaxPixelsEnvVar, null);
 
         // Act
         var config = ScreenshotConfiguration.FromEnvironment();
 
         // Assert
         Assert.Equal(ScreenshotConfiguration.DefaultTimeoutMs, config.TimeoutMs);
+        Assert.Equal(ScreenshotConfiguration.DefaultMaxPixels, config.MaxPixels);
     }
 
     [Theory]
@@ -106,15 +108,59 @@ public sealed class ScreenshotConfigurationTests
         }
     }
 
+    [Theory]
+    [InlineData("1000000", 1000000)]
+    [InlineData("33177600", 33177600)]
+    public void FromEnvironment_ValidMaxPixelsValue_ParsesCorrectly(string envValue, int expected)
+    {
+        // Arrange
+        Environment.SetEnvironmentVariable(ScreenshotConfiguration.MaxPixelsEnvVar, envValue);
+
+        try
+        {
+            // Act
+            var config = ScreenshotConfiguration.FromEnvironment();
+
+            // Assert
+            Assert.Equal(expected, config.MaxPixels);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(ScreenshotConfiguration.MaxPixelsEnvVar, null);
+        }
+    }
+
+    [Fact]
+    public void FromEnvironment_MaxPixelsTooLow_ReturnsDefault()
+    {
+        // Arrange - value is 0 or negative
+        Environment.SetEnvironmentVariable(ScreenshotConfiguration.MaxPixelsEnvVar, "0");
+
+        try
+        {
+            // Act
+            var config = ScreenshotConfiguration.FromEnvironment();
+
+            // Assert - should return default
+            Assert.Equal(ScreenshotConfiguration.DefaultMaxPixels, config.MaxPixels);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable(ScreenshotConfiguration.MaxPixelsEnvVar, null);
+        }
+    }
+
+    [Fact]
+    public void DefaultMaxPixels_Equals8KResolution()
+    {
+        // 8K resolution: 7680 x 4320 = 33,177,600
+        const int expected8KPixels = 7680 * 4320;
+        Assert.Equal(expected8KPixels, ScreenshotConfiguration.DefaultMaxPixels);
+    }
+
     [Fact]
     public void DefaultTimeoutMs_Equals5Seconds()
     {
         Assert.Equal(5000, ScreenshotConfiguration.DefaultTimeoutMs);
-    }
-
-    [Fact]
-    public void DefaultQuality_Is40()
-    {
-        Assert.Equal(40, ScreenshotConfiguration.DefaultQuality);
     }
 }

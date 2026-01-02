@@ -28,7 +28,7 @@ public enum MouseAction
     [JsonStringEnumMemberName("middle_click")]
     MiddleClick,
 
-    /// <summary>Mouse drag operation.</summary>
+    /// <summary>Mouse drag operation - hold button and move from (x,y) to (endX,endY).</summary>
     [JsonStringEnumMemberName("drag")]
     Drag,
 
