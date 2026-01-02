@@ -1,0 +1,149 @@
+# Windows based test
+# Tests a UI Automation scenario with Windows MCP Server
+# https://windowsmcpserver.dev/
+# https://github.com/sbroenne/mcp-windows
+#
+# Testing framework: Agent Benchmark
+# https://github.com/mykhaliev/agent-benchmark
+#
+# Test: Complete Notepad workflow with proof
+# Success = proof provided + Notepad closed
+#
+# Prerequisites:
+# - Windows 10/11
+# - Windows MCP Server executable in examples folder
+# - Environment variables set:
+#   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+#   - AZURE_OPENAI_API_KEY: Azure OpenAI API key
+#
+
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    token: "{{AZURE_OPENAI_API_KEY}}"
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: azure-openai-gpt4o
+    type: AZURE
+    token: "{{AZURE_OPENAI_API_KEY}}"
+    model: gpt-4o
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+
+  - name: gpt4o-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt4o
+
+settings:
+  verbose: true
+  max_iterations: 10      # launch + type + close + dialog + verify + buffer
+  test_delay: 60s         # Longer delay to avoid rate limits between agents
+
+sessions:
+  - name: Notepad Workflow
+    tests:
+      - name: "Complete Notepad automation"
+        description: "Open Notepad, type text, close without saving"
+        prompt: |
+          1. Launch Notepad
+          2. Type "Hello World"
+          3. Record proof that this worked (no screenshots, just text)
+          4. Close Notepad and click "Don't Save" if prompted
+          5. Verify no Notepad window is open (search for it)
+
+          Report "VERIFIED: No Notepad window open" if closed successfully.
+        assertions:
+          # OUTCOME: LLM verified no Notepad window open
+          - type: output_regex
+            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found))"
+
+          # OUTCOME: Proof that "Hello World" was typed
+          - type: output_regex
+            pattern: "(?i)hello\\s*world"
+
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "failed"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # REQUIRED: Must use window_management to launch/close/find windows
+          - type: tool_called
+            tool: window_management
+
+          # VERIFY: Notepad was launched with correct program
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "launch"
+              programPath: "notepad.exe"
+
+          # VERIFY: Launch succeeded (ok: true in JSON response)
+          - type: tool_result_matches_json
+            tool: window_management
+            path: "$.ok"
+            value: true
+
+          # FLEXIBLE: Text input can use different tools depending on the LLM
+          # GPT-4.1 often uses keyboard_control, GPT-4o may use ui_automation
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_automation
+
+          # VERIFY: Window was closed (find returned empty or no matches)
+          - anyOf:
+              # Either the output confirms closure
+              - type: output_regex
+                pattern: "(?i)(no.*windows?.*found|0.*windows?|empty.*list|windows.*\\[\\])"
+
+          # VERIFY: "Hello World" was typed using one of these methods
+          - anyOf:
+              # Via keyboard_control with the text
+              - type: tool_param_matches_regex
+                tool: keyboard_control
+                params:
+                  text: "(?i)hello.*world"
+              # Via ui_automation type action
+              - type: tool_param_equals
+                tool: ui_automation
+                params:
+                  action: "type"
+              # Via ui_automation setValue action
+              - type: tool_param_equals
+                tool: ui_automation
+                params:
+                  action: "set_value"
+
+          # PERFORMANCE: Complete within 60 seconds
+          - type: max_latency_ms
+            value: 60000
+
+          # EFFICIENCY: Stay under token limits
+          - type: max_tokens
+            value: 60000
+

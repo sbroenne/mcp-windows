@@ -1,53 +1,130 @@
 <#
 .SYNOPSIS
     Runs Windows MCP Server LLM integration tests using agent-benchmark.
-    
+
 .DESCRIPTION
     This script runs the agent-benchmark test suite against the Windows MCP Server.
     It builds the MCP server, downloads agent-benchmark if needed, and runs all test scenarios.
-    
+
+    Configuration can be provided via command-line parameters or a config file.
+    The script looks for config files in this order:
+    1. llm-tests.config.local.json (git-ignored, for personal settings)
+    2. llm-tests.config.json (shared defaults)
+
+    Command-line parameters override config file settings.
+
 .PARAMETER Model
     The Azure OpenAI model deployment name to use for testing.
-    Default: gpt-4o
-    
+    Default: gpt-4o (or value from config file)
+
 .PARAMETER Scenario
     Optional. Run only a specific test scenario file. If not specified, runs all scenarios.
     Example: notepad-workflow.yaml
-    
+
 .PARAMETER Build
     If specified, builds the MCP server before running tests.
-    
+
+.PARAMETER AgentBenchmarkPath
+    Path to agent-benchmark executable. Can be absolute or relative to the test directory.
+    If not specified, downloads from GitHub releases.
+
 .PARAMETER Verbose
     If specified, shows detailed output during test execution.
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -Build
     Builds the MCP server and runs all tests with gpt-4o.
-    
+
 .EXAMPLE
     .\Run-LLMTests.ps1 -Model gpt-4.1 -Scenario notepad-workflow.yaml
     Runs only the notepad-workflow test with gpt-4.1.
+
+.EXAMPLE
+    .\Run-LLMTests.ps1 -AgentBenchmarkPath "..\..\..\..\agent-benchmark\agent-benchmark.exe"
+    Uses local agent-benchmark build with relative path.
 #>
 
 [CmdletBinding()]
 param(
-    [string]$Model = "gpt-4o",
+    [string]$Model,
     [string]$Scenario = "",
-    [switch]$Build
+    [switch]$Build,
+    [string]$AgentBenchmarkPath
 )
 
 $ErrorActionPreference = "Stop"
 
 # Paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$RepoRoot = (Get-Item $ScriptDir).Parent.Parent.Parent.FullName
+$RepoRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
 $SrcDir = Join-Path $RepoRoot "src\Sbroenne.WindowsMcp"
+$ProjectPath = Join-Path $SrcDir "Sbroenne.WindowsMcp.csproj"
 $TestDir = Join-Path $RepoRoot "tests\Sbroenne.WindowsMcp.LLM.Tests"
 $ScenariosDir = Join-Path $TestDir "Scenarios"
-$OutputDir = Join-Path $TestDir "bin\Release\net10.0-windows10.0.22621"
-$ServerPath = Join-Path $OutputDir "Sbroenne.WindowsMcp.exe"
-$AgentBenchmarkPath = Join-Path $TestDir "agent-benchmark.exe"
 $ReportsDir = Join-Path $TestDir "TestResults"
+
+# The server command uses dotnet run with the project
+# Use forward slashes for YAML compatibility (Windows handles both)
+$ProjectPathForYaml = $ProjectPath -replace '\\', '/'
+$ServerCommand = "dotnet run --project $ProjectPathForYaml -c Release --"
+
+# Load configuration from file
+$ConfigLocalPath = Join-Path $TestDir "llm-tests.config.local.json"
+$ConfigPath = Join-Path $TestDir "llm-tests.config.json"
+$Config = $null
+
+if (Test-Path $ConfigLocalPath) {
+    Write-Host "Loading config from: llm-tests.config.local.json" -ForegroundColor DarkGray
+    $Config = Get-Content $ConfigLocalPath -Raw | ConvertFrom-Json
+}
+elseif (Test-Path $ConfigPath) {
+    Write-Host "Loading config from: llm-tests.config.json" -ForegroundColor DarkGray
+    $Config = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+}
+
+# Apply config defaults (command-line parameters override config)
+if (-not $Model) {
+    $Model = if ($Config -and $Config.model) { $Config.model } else { "gpt-4o" }
+}
+
+if (-not $Build -and $Config -and $Config.build) {
+    $Build = $Config.build
+}
+
+# Determine agent-benchmark path and mode
+$ResolvedAgentBenchmarkPath = $null
+$AgentBenchmarkMode = "executable"  # Default mode
+
+if ($AgentBenchmarkPath) {
+    # Command-line parameter takes precedence
+    if ([System.IO.Path]::IsPathRooted($AgentBenchmarkPath)) {
+        $ResolvedAgentBenchmarkPath = $AgentBenchmarkPath
+    }
+    else {
+        $JoinedPath = Join-Path $TestDir $AgentBenchmarkPath
+        $ResolvedAgentBenchmarkPath = [System.IO.Path]::GetFullPath($JoinedPath)
+    }
+}
+elseif ($Config -and $Config.agentBenchmarkPath) {
+    # Config file path
+    $ConfigAgentPath = $Config.agentBenchmarkPath
+    if ([System.IO.Path]::IsPathRooted($ConfigAgentPath)) {
+        $ResolvedAgentBenchmarkPath = $ConfigAgentPath
+    }
+    else {
+        $JoinedPath = Join-Path $TestDir $ConfigAgentPath
+        $ResolvedAgentBenchmarkPath = [System.IO.Path]::GetFullPath($JoinedPath)
+    }
+
+    # Check for mode from config
+    if ($Config.agentBenchmarkMode) {
+        $AgentBenchmarkMode = $Config.agentBenchmarkMode
+    }
+}
+else {
+    # Default: download location in test directory
+    $ResolvedAgentBenchmarkPath = Join-Path $TestDir "agent-benchmark.exe"
+}
 
 # Ensure reports directory exists
 if (-not (Test-Path $ReportsDir)) {
@@ -64,7 +141,7 @@ if (-not $env:AZURE_OPENAI_API_KEY) {
     exit 1
 }
 
-# Build MCP server if requested
+# Build MCP server if requested (optional, dotnet run will build anyway)
 if ($Build) {
     Write-Host "Building Windows MCP Server..." -ForegroundColor Cyan
     Push-Location $SrcDir
@@ -80,26 +157,49 @@ if ($Build) {
     }
 }
 
-# Verify server exists
-if (-not (Test-Path $ServerPath)) {
-    Write-Error "MCP server not found at: $ServerPath`nRun with -Build to build the server first."
+# Verify project exists
+if (-not (Test-Path $ProjectPath)) {
+    Write-Error "MCP server project not found at: $ProjectPath"
     exit 1
 }
 
-# Download agent-benchmark if not present
-if (-not (Test-Path $AgentBenchmarkPath)) {
-    Write-Host "Downloading agent-benchmark..." -ForegroundColor Cyan
-    $AgentBenchmarkVersion = "v0.1.0"
-    $DownloadUrl = "https://github.com/mykhaliev/agent-benchmark/releases/download/$AgentBenchmarkVersion/agent-benchmark-windows-amd64.exe"
-    
-    try {
-        Invoke-WebRequest -Uri $DownloadUrl -OutFile $AgentBenchmarkPath
-        Write-Host "Downloaded agent-benchmark to: $AgentBenchmarkPath" -ForegroundColor Green
+# Download agent-benchmark if not present (only for executable mode with default path)
+if ($AgentBenchmarkMode -eq "executable") {
+    if (-not (Test-Path $ResolvedAgentBenchmarkPath)) {
+        # Only attempt download if using default location
+        $DefaultDownloadPath = Join-Path $TestDir "agent-benchmark.exe"
+        if ($ResolvedAgentBenchmarkPath -eq $DefaultDownloadPath) {
+            Write-Host "Downloading agent-benchmark..." -ForegroundColor Cyan
+            $AgentBenchmarkVersion = "v0.1.0"
+            $DownloadUrl = "https://github.com/mykhaliev/agent-benchmark/releases/download/$AgentBenchmarkVersion/agent-benchmark-windows-amd64.exe"
+
+            try {
+                Invoke-WebRequest -Uri $DownloadUrl -OutFile $ResolvedAgentBenchmarkPath
+                Write-Host "Downloaded agent-benchmark to: $ResolvedAgentBenchmarkPath" -ForegroundColor Green
+            }
+            catch {
+                Write-Warning "Could not download agent-benchmark. Please download manually or build from source."
+                Write-Host "Download URL: $DownloadUrl"
+                Write-Host "Or clone and build: https://github.com/mykhaliev/agent-benchmark"
+                exit 1
+            }
+        }
+        else {
+            Write-Error "agent-benchmark not found at: $ResolvedAgentBenchmarkPath`nPlease verify the path in your config file or command-line parameter."
+            exit 1
+        }
     }
-    catch {
-        Write-Warning "Could not download agent-benchmark. Please download manually or build from source."
-        Write-Host "Download URL: $DownloadUrl"
-        Write-Host "Or clone and build: https://github.com/mykhaliev/agent-benchmark"
+}
+elseif ($AgentBenchmarkMode -eq "go-run") {
+    # Verify Go project directory exists
+    if (-not (Test-Path $ResolvedAgentBenchmarkPath)) {
+        Write-Error "agent-benchmark Go project not found at: $ResolvedAgentBenchmarkPath`nPlease verify the path in your config file."
+        exit 1
+    }
+    # Verify it's a Go project (has go.mod or .go files)
+    $GoModPath = Join-Path $ResolvedAgentBenchmarkPath "go.mod"
+    if (-not (Test-Path $GoModPath)) {
+        Write-Error "No go.mod found at: $ResolvedAgentBenchmarkPath`nThis doesn't appear to be a Go project."
         exit 1
     }
 }
@@ -121,14 +221,10 @@ Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Windows MCP Server - LLM Integration Tests" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Model: $Model"
-Write-Host "Server: $ServerPath"
+Write-Host "Server: dotnet run --project $ProjectPath"
+Write-Host "Agent-Benchmark: $ResolvedAgentBenchmarkPath ($AgentBenchmarkMode)"
 Write-Host "Scenarios: $($ScenarioFiles.Count) file(s)"
 Write-Host ""
-
-# Kill any existing Notepad processes before tests
-Write-Host "Cleaning up Notepad processes..." -ForegroundColor Yellow
-Get-Process -Name notepad -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
 
 # Run each scenario
 $TotalPassed = 0
@@ -138,36 +234,45 @@ $Results = @()
 foreach ($ScenarioFile in $ScenarioFiles) {
     Write-Host "`nRunning: $($ScenarioFile.Name)" -ForegroundColor Cyan
     Write-Host ("-" * 40)
-    
+
     # Create temp file with substituted variables
     $TempFile = Join-Path $env:TEMP "mcp-test-$($ScenarioFile.BaseName).yaml"
     $Content = Get-Content $ScenarioFile.FullName -Raw
-    $Content = $Content -replace '\{\{SERVER_PATH\}\}', $ServerPath
+    $Content = $Content -replace '\{\{SERVER_COMMAND\}\}', $ServerCommand
     $Content = $Content -replace '\{\{MODEL\}\}', $Model
     $Content | Set-Content $TempFile -Encoding UTF8
-    
+
     # Run agent-benchmark
-    $ReportFile = Join-Path $ReportsDir "$($ScenarioFile.BaseName)-report.html"
+    $ReportFile = Join-Path $ReportsDir "$($ScenarioFile.BaseName)-report"
     $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
-    
+
     $Args = @(
-        "-test", $TempFile,
-        "-endpoint", $env:AZURE_OPENAI_ENDPOINT,
-        "-key", $env:AZURE_OPENAI_API_KEY,
-        "-report", $ReportFile
+        "-f", $TempFile,
+        "-o", $ReportFile,
+        "-verbose"
     )
-    
-    Write-Host "Command: agent-benchmark $($Args -join ' ')" -ForegroundColor DarkGray
-    
-    & $AgentBenchmarkPath @Args
-    $ExitCode = $LASTEXITCODE
-    
+
+    # Execute agent-benchmark based on mode
+    if ($AgentBenchmarkMode -eq "go-run") {
+        Write-Host "Command: go run . $($Args -join ' ')" -ForegroundColor DarkGray
+        Push-Location $ResolvedAgentBenchmarkPath
+        try {
+            & go run . @Args
+            $ExitCode = $LASTEXITCODE
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    else {
+        Write-Host "Command: agent-benchmark $($Args -join ' ')" -ForegroundColor DarkGray
+        & $ResolvedAgentBenchmarkPath @Args
+        $ExitCode = $LASTEXITCODE
+    }
+
     # Clean up temp file
     Remove-Item $TempFile -Force -ErrorAction SilentlyContinue
-    
-    # Clean up Notepad processes after each test
-    Get-Process -Name notepad -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    
+
     if ($ExitCode -eq 0) {
         Write-Host "PASSED" -ForegroundColor Green
         $TotalPassed++

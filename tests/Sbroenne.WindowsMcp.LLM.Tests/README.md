@@ -31,6 +31,53 @@ These tests automate Windows UI elements (Notepad, windows, keyboard/mouse). The
 The PowerShell runner script will automatically download agent-benchmark on first run. Alternatively, you can:
 - Download from [agent-benchmark releases](https://github.com/mykhaliev/agent-benchmark/releases)
 - Build from source: `git clone https://github.com/mykhaliev/agent-benchmark && cd agent-benchmark && go build`
+- Use a local Go project with `go run` mode (see Configuration below)
+
+## Configuration
+
+The test runner supports configuration via JSON files. Settings are loaded in this order (later overrides earlier):
+
+1. `llm-tests.config.json` - Shared defaults (committed to repo)
+2. `llm-tests.config.local.json` - Personal settings (git-ignored)
+3. Command-line parameters - Override everything
+
+### Configuration File
+
+Create `llm-tests.config.local.json` for your personal settings:
+
+```json
+{
+  "$schema": "./llm-tests.config.schema.json",
+  "model": "gpt-4o",
+  "agentBenchmarkPath": "../../../../agent-benchmark",
+  "agentBenchmarkMode": "go-run",
+  "verbose": false,
+  "build": false
+}
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `model` | string | `"gpt-4o"` | Azure OpenAI model deployment name |
+| `agentBenchmarkPath` | string | `null` | Path to agent-benchmark (absolute or relative to test dir) |
+| `agentBenchmarkMode` | string | `"executable"` | `"executable"` for .exe, `"go-run"` for Go project |
+| `verbose` | boolean | `false` | Show detailed output |
+| `build` | boolean | `false` | Build MCP server before tests |
+
+### Using a Local agent-benchmark
+
+If you have a local clone of agent-benchmark, you can run it directly with Go:
+
+```json
+{
+  "agentBenchmarkPath": "../../../../agent-benchmark",
+  "agentBenchmarkMode": "go-run"
+}
+```
+
+This runs `go run .` in the specified directory, which is useful for development.
 
 ## Running the Tests
 
@@ -70,6 +117,9 @@ Sbroenne.WindowsMcp.LLM.Tests/
 │   ├── handle-based-window-management.yaml # Window lifecycle with handles
 │   └── notepad-workflow.yaml              # Complete Notepad automation
 ├── Run-LLMTests.ps1                       # PowerShell test runner
+├── llm-tests.config.json                  # Shared configuration defaults
+├── llm-tests.config.local.json            # Personal settings (git-ignored)
+├── llm-tests.config.schema.json           # JSON schema for config files
 ├── TestResults/                           # HTML reports (generated)
 └── README.md                              # This file
 ```
