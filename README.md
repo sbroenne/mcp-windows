@@ -188,6 +188,10 @@ cd tests/Sbroenne.WindowsMcp.LLM.Tests
 
 Requires `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` environment variables. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for details.
 
+## Acknowledgments
+
+- **[agent-benchmark](https://github.com/mykhaliev/agent-benchmark)** by [@mykhaliev](https://github.com/mykhaliev) - LLM agent testing framework used for our integration tests
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
