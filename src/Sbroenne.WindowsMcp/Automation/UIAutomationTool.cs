@@ -75,7 +75,7 @@ public sealed partial class UIAutomationTool
     /// <param name="className">Element class name to filter by (e.g., 'Chrome_WidgetWin_1' for Chromium apps).</param>
     /// <param name="elementId">Element ID from a previous find operation.</param>
     /// <param name="parentElementId">Parent element ID to scope search to a subtree.</param>
-    /// <param name="maxDepth">Maximum tree depth for get_tree (default: 5).</param>
+    /// <param name="maxDepth">Maximum depth for get_ancestors (default: 2).</param>
     /// <param name="exactDepth">Search only at this exact depth (skips other depths).</param>
     /// <param name="foundIndex">Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd match.</param>
     /// <param name="includeChildren">Include child elements in response.</param>
@@ -91,12 +91,12 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. WORKFLOW: 1) Call window_management(action='find') to get windowHandle, 2) Use that handle with ui_automation actions. windowHandle is REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). Example: click(windowHandle='123456', nameContains='Close'). Works with title bar buttons, dialogs, and all standard UI controls. DIALOG BUTTONS: nameContains='save' finds 'Save'/'Don't save', nameContains='cancel' finds 'Cancel'. Actions NOT requiring windowHandle: invoke/highlight/get_ancestors/get_element_details (use elementId instead), get_element_at_cursor, get_focused_element, ocr_status. ALWAYS prefer over mouse_control.")]
+    [Description("UI element interaction via Windows UIA. PREFERRED over mouse_control for buttons, menus, text fields. DISCOVERY: Use screenshot_control(annotate=true) first to see all interactive elements with coordinates. WORKFLOW: 1) window_management(find) → get handle, 2) screenshot_control to discover elements, 3) ui_automation(click/type/toggle) to interact. KEY ACTIONS: click, type, toggle, wait_for, find. DIALOG BUTTONS: nameContains='save'/'cancel'. windowHandle REQUIRED for most actions.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("The UI automation action to perform.")]
         UIAutomationAction action,
 
-        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
+        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
         string? windowHandle = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
@@ -120,11 +120,11 @@ public sealed partial class UIAutomationTool
         [Description("Element ID from a previous find operation (for element-specific actions like toggle, invoke, focus)")]
         string? elementId = null,
 
-        [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
+        [Description("Parent element ID to scope search to a subtree (for find action). Improves performance on complex UIs.")]
         string? parentElementId = null,
 
-        [Description("Max tree depth for get_tree (default: 5)")]
-        int maxDepth = 5,
+        [Description("Max depth for get_ancestors (default: 2, max: 20).")]
+        int maxDepth = 2,
 
         [Description("Search only at this depth (1=immediate children)")]
         int? exactDepth = null,
@@ -214,7 +214,6 @@ public sealed partial class UIAutomationTool
             var result = action switch
             {
                 UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, inRegion, nearElement, timeoutMs, cancellationToken),
-                UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, timeoutMs, cancellationToken),
@@ -279,7 +278,7 @@ public sealed partial class UIAutomationTool
         action is UIAutomationAction.Click or UIAutomationAction.Type
             or UIAutomationAction.Select or UIAutomationAction.Toggle
             or UIAutomationAction.EnsureState or UIAutomationAction.Focus
-            or UIAutomationAction.Find or UIAutomationAction.GetTree
+            or UIAutomationAction.Find
             or UIAutomationAction.WaitFor or UIAutomationAction.WaitForDisappear
             or UIAutomationAction.WaitForState or UIAutomationAction.GetText
             or UIAutomationAction.ScrollIntoView or UIAutomationAction.Ocr;
@@ -288,7 +287,6 @@ public sealed partial class UIAutomationTool
         action switch
         {
             UIAutomationAction.Find => "find",
-            UIAutomationAction.GetTree => "get_tree",
             UIAutomationAction.WaitFor => "wait_for",
             UIAutomationAction.WaitForDisappear => "wait_for_disappear",
             UIAutomationAction.WaitForState => "wait_for_state",
@@ -412,12 +410,6 @@ public sealed partial class UIAutomationTool
         };
 
         return await _automationService.FindElementsAsync(query, cancellationToken);
-    }
-
-    private async Task<UIAutomationResult> HandleGetTreeAsync(
-        string? windowHandle, string? parentElementId, int maxDepth, string? controlType, CancellationToken cancellationToken)
-    {
-        return await _automationService.GetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken);
     }
 
     private async Task<UIAutomationResult> HandleWaitForAsync(
@@ -1124,10 +1116,6 @@ public enum UIAutomationAction
     /// <summary>Search for elements matching criteria.</summary>
     [JsonStringEnumMemberName("find")]
     Find,
-
-    /// <summary>Get UI element hierarchy.</summary>
-    [JsonStringEnumMemberName("get_tree")]
-    GetTree,
 
     /// <summary>Wait for an element to appear.</summary>
     [JsonStringEnumMemberName("wait_for")]

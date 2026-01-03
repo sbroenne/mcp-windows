@@ -239,7 +239,8 @@ foreach ($ScenarioFile in $ScenarioFiles) {
     $Content = Get-Content $ScenarioFile.FullName -Raw
     $Content = $Content -replace '\{\{SERVER_COMMAND\}\}', $ServerCommand
     $Content = $Content -replace '\{\{MODEL\}\}', $Model
-    $Content = $Content -replace '\{\{TEST_RESULTS_PATH\}\}', $ReportsDir
+    $ReportsDirForYaml = $ReportsDir -replace '\\', '/'
+    $Content = $Content -replace '\{\{TEST_RESULTS_PATH\}\}', $ReportsDirForYaml
     $Content | Set-Content $TempFile -Encoding UTF8
 
     # Run agent-benchmark

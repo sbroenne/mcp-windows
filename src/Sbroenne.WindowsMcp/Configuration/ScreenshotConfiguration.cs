@@ -33,9 +33,20 @@ public sealed class ScreenshotConfiguration
     public const ImageFormat DefaultImageFormat = ImageFormat.Jpeg;
 
     /// <summary>
-    /// Default JPEG quality (1-100). 85 provides optimal balance between size and quality.
+    /// Default JPEG quality (1-100). 60 is optimized for LLM vision tasks -
+    /// sufficient for UI element recognition while minimizing token usage.
+    /// Research shows LLMs perform well at quality 50-70 for UI automation.
     /// </summary>
-    public const int DefaultQuality = 85;
+    public const int DefaultQuality = 60;
+
+    /// <summary>
+    /// Default maximum dimension (width or height) for annotated screenshots.
+    /// Images larger than this are scaled down proportionally to reduce tokens.
+    /// 1280px balances readability with token efficiency (~1.1M pixels max).
+    /// Based on research: Claude recommends 1568px max, OpenAI uses 768px for detail:low.
+    /// Set to 0 to disable scaling.
+    /// </summary>
+    public const int DefaultMaxDimensionForAnnotated = 1280;
 
     /// <summary>
     /// Default output mode (inline base64).

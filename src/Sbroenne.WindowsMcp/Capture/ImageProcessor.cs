@@ -1,10 +1,11 @@
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 
 namespace Sbroenne.WindowsMcp.Capture;
 
 /// <summary>
-/// Processes captured bitmaps: format encoding.
+/// Processes captured bitmaps: scaling and format encoding.
 /// </summary>
 public sealed class ImageProcessor : IImageProcessor
 {
@@ -34,6 +35,81 @@ public sealed class ImageProcessor : IImageProcessor
             width,
             height,
             imageFormat.ToString().ToLowerInvariant());
+    }
+
+    /// <inheritdoc />
+    public ProcessedImage ProcessWithScaling(
+        Bitmap source,
+        Models.ImageFormat imageFormat,
+        int quality,
+        int maxDimension)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var originalWidth = source.Width;
+        var originalHeight = source.Height;
+
+        // Check if scaling is needed
+        if (maxDimension <= 0 || (originalWidth <= maxDimension && originalHeight <= maxDimension))
+        {
+            // No scaling needed
+            return Process(source, imageFormat, quality);
+        }
+
+        // Calculate scaled dimensions preserving aspect ratio
+        var (scaledWidth, scaledHeight) = CalculateScaledDimensions(originalWidth, originalHeight, maxDimension);
+
+        // Create scaled bitmap
+        using var scaledBitmap = new Bitmap(scaledWidth, scaledHeight, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(scaledBitmap))
+        {
+            // High-quality scaling for best LLM readability
+            graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+            graphics.SmoothingMode = SmoothingMode.HighQuality;
+            graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
+            graphics.CompositingQuality = CompositingQuality.HighQuality;
+
+            graphics.DrawImage(source, 0, 0, scaledWidth, scaledHeight);
+        }
+
+        // Encode the scaled bitmap
+        var data = imageFormat switch
+        {
+            Models.ImageFormat.Jpeg => EncodeToJpeg(scaledBitmap, quality),
+            Models.ImageFormat.Png => EncodeToPng(scaledBitmap),
+            _ => throw new ArgumentOutOfRangeException(nameof(imageFormat), imageFormat, "Unsupported image format")
+        };
+
+        return new ProcessedImage(
+            data,
+            scaledWidth,
+            scaledHeight,
+            originalWidth,
+            originalHeight,
+            imageFormat.ToString().ToLowerInvariant());
+    }
+
+    /// <summary>
+    /// Calculates scaled dimensions preserving aspect ratio.
+    /// </summary>
+    private static (int Width, int Height) CalculateScaledDimensions(int width, int height, int maxDimension)
+    {
+        if (width <= maxDimension && height <= maxDimension)
+        {
+            return (width, height);
+        }
+
+        double ratio;
+        if (width > height)
+        {
+            ratio = (double)maxDimension / width;
+        }
+        else
+        {
+            ratio = (double)maxDimension / height;
+        }
+
+        return ((int)(width * ratio), (int)(height * ratio));
     }
 
     /// <summary>

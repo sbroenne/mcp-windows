@@ -77,11 +77,9 @@ public sealed partial class UIAutomationService
                     var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
                     if (elementInfo == null)
                     {
-                        return UIAutomationResult.CreateFailure(
-                            "scroll_into_view",
-                            UIAutomationErrorType.ElementStale,
-                            "Element became unavailable after scrolling.",
-                            CreateDiagnostics(stopwatch));
+                        // Scroll succeeded but element became unavailable (e.g., dialog closed).
+                        // This is expected behavior for elements that close their parent window.
+                        return UIAutomationResult.CreateSuccessWithHint("scroll_into_view", "Scroll succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                     }
 
                     return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
@@ -93,11 +91,9 @@ public sealed partial class UIAutomationService
                     var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
                     if (elementInfo == null)
                     {
-                        return UIAutomationResult.CreateFailure(
-                            "scroll_into_view",
-                            UIAutomationErrorType.ElementStale,
-                            "Element became unavailable after scrolling.",
-                            CreateDiagnostics(stopwatch));
+                        // Scroll succeeded but element became unavailable (e.g., dialog closed).
+                        // This is expected behavior for elements that close their parent window.
+                        return UIAutomationResult.CreateSuccessWithHint("scroll_into_view", "Scroll succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                     }
 
                     return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));

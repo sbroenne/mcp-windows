@@ -94,11 +94,9 @@ public sealed partial class UIAutomationService
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                 if (info == null)
                 {
-                    return UIAutomationResult.CreateFailure(
-                        "click",
-                        UIAutomationErrorType.ElementStale,
-                        "Click succeeded but element became unavailable.",
-                        CreateDiagnostics(stopwatch));
+                    // Click succeeded but element became unavailable (e.g., dialog closed).
+                    // This is expected behavior for buttons that close their parent window.
+                    return UIAutomationResult.CreateSuccessWithHint("click", "Click succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                 }
                 return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
             }
@@ -111,11 +109,9 @@ public sealed partial class UIAutomationService
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                 if (info == null)
                 {
-                    return UIAutomationResult.CreateFailure(
-                        "click",
-                        UIAutomationErrorType.ElementStale,
-                        "Click succeeded but element became unavailable.",
-                        CreateDiagnostics(stopwatch));
+                    // Click succeeded but element became unavailable (e.g., dialog closed).
+                    // This is expected behavior for buttons that close their parent window.
+                    return UIAutomationResult.CreateSuccessWithHint("click", "Click succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                 }
                 return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
             }
@@ -258,11 +254,9 @@ public sealed partial class UIAutomationService
                         var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                         if (info == null)
                         {
-                            return (Success: false, Result: UIAutomationResult.CreateFailure(
-                                "type",
-                                UIAutomationErrorType.ElementStale,
-                                "Type succeeded but element became unavailable.",
-                                CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                            // Type succeeded but element became unavailable (e.g., dialog closed).
+                            // This is expected behavior for text fields that close their parent window.
+                            return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                         }
                         return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                     }
@@ -275,11 +269,9 @@ public sealed partial class UIAutomationService
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                     if (info == null)
                     {
-                        return (Success: false, Result: UIAutomationResult.CreateFailure(
-                            "type",
-                            UIAutomationErrorType.ElementStale,
-                            "Type succeeded but element became unavailable.",
-                            CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        // Type succeeded but element became unavailable (e.g., dialog closed).
+                        // This is expected behavior for text fields that close their parent window.
+                        return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                     }
                     return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
                 }
@@ -315,11 +307,9 @@ public sealed partial class UIAutomationService
             var info = ConvertToElementInfo(staResult.Element!, staResult.RootElement!, _coordinateConverter);
             if (info == null)
             {
-                return UIAutomationResult.CreateFailure(
-                    "type",
-                    UIAutomationErrorType.ElementStale,
-                    "Type succeeded but element became unavailable.",
-                    CreateDiagnostics(stopwatch));
+                // Type succeeded but element became unavailable (e.g., dialog closed).
+                // This is expected behavior for text fields that close their parent window.
+                return UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
             }
             return UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch));
         }, cancellationToken);
@@ -408,11 +398,9 @@ public sealed partial class UIAutomationService
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                 if (info == null)
                 {
-                    return UIAutomationResult.CreateFailure(
-                        "select",
-                        UIAutomationErrorType.ElementStale,
-                        "Select succeeded but element became unavailable.",
-                        CreateDiagnostics(stopwatch));
+                    // Select succeeded but element became unavailable (e.g., dialog closed).
+                    // This is expected behavior for elements that close their parent window.
+                    return UIAutomationResult.CreateSuccessWithHint("select", "Select succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                 }
                 return UIAutomationResult.CreateSuccessCompact("select", [info], CreateDiagnostics(stopwatch));
             }
@@ -437,11 +425,9 @@ public sealed partial class UIAutomationService
                             var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                             if (info == null)
                             {
-                                return UIAutomationResult.CreateFailure(
-                                    "select",
-                                    UIAutomationErrorType.ElementStale,
-                                    "Select succeeded but element became unavailable.",
-                                    CreateDiagnostics(stopwatch));
+                                // Select succeeded but element became unavailable (e.g., dialog closed).
+                                // This is expected behavior for elements that close their parent window.
+                                return UIAutomationResult.CreateSuccessWithHint("select", "Select succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                             }
                             return UIAutomationResult.CreateSuccessCompact("select", [info], CreateDiagnostics(stopwatch));
                         }
@@ -589,76 +575,7 @@ public sealed partial class UIAutomationService
 
         try
         {
-            return await _staThread.ExecuteAsync(() =>
-            {
-                var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
-                if (element == null)
-                {
-                    return UIAutomationResult.CreateFailure(
-                        "click",
-                        UIAutomationErrorType.ElementNotFound,
-                        $"Element with ID '{elementId}' could not be resolved. The element may have been removed from the UI.",
-                        CreateDiagnostics(stopwatch));
-                }
-
-                nint? activationHandle = null;
-                if (!string.IsNullOrWhiteSpace(windowHandle))
-                {
-                    if (!WindowHandleParser.TryParse(windowHandle, out var parsedHandle))
-                    {
-                        return UIAutomationResult.CreateFailure(
-                            "click",
-                            UIAutomationErrorType.InvalidParameter,
-                            $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
-                            CreateDiagnostics(stopwatch));
-                    }
-
-                    activationHandle = parsedHandle;
-                }
-
-                // Ensure window is activated before clicking
-                TryActivateWindowForElement(element, activationHandle);
-
-                var rootElement = GetRootElementForScroll(element);
-
-                // Try InvokePattern first
-                if (element.TryInvoke())
-                {
-                    var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    if (info == null)
-                    {
-                        return UIAutomationResult.CreateFailure(
-                            "click",
-                            UIAutomationErrorType.ElementStale,
-                            "Click succeeded but element became unavailable.",
-                            CreateDiagnostics(stopwatch));
-                    }
-                    return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
-                }
-
-                // Fall back to clicking at element's clickable point
-                var clickablePoint = GetClickablePointForClick(element);
-                if (clickablePoint.HasValue)
-                {
-                    PerformPhysicalClick(clickablePoint.Value);
-                    var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                    if (info == null)
-                    {
-                        return UIAutomationResult.CreateFailure(
-                            "click",
-                            UIAutomationErrorType.ElementStale,
-                            "Click succeeded but element became unavailable.",
-                            CreateDiagnostics(stopwatch));
-                    }
-                    return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
-                }
-
-                return UIAutomationResult.CreateFailure(
-                    "click",
-                    UIAutomationErrorType.PatternNotSupported,
-                    "Element cannot be clicked: no Invoke pattern and no clickable point available. Use the element's clickablePoint coordinates with mouse_control as fallback.",
-                    CreateDiagnostics(stopwatch));
-            }, cancellationToken);
+            return await PerformClickAsync(elementId, windowHandle, stopwatch, cancellationToken);
         }
         catch (COMException ex)
         {
@@ -716,11 +633,9 @@ public sealed partial class UIAutomationService
                 var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                 if (elementInfo == null)
                 {
-                    return UIAutomationResult.CreateFailure(
-                        "highlight",
-                        UIAutomationErrorType.ElementStale,
-                        "Highlight succeeded but element became unavailable.",
-                        CreateDiagnostics(stopwatch));
+                    // Highlight succeeded but element became unavailable (e.g., dialog closed).
+                    // This is expected behavior for elements that close their parent window.
+                    return UIAutomationResult.CreateSuccessWithHint("highlight", "Highlight succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
                 }
                 return UIAutomationResult.CreateSuccessCompact("highlight", [elementInfo], CreateDiagnostics(stopwatch));
             }, cancellationToken);

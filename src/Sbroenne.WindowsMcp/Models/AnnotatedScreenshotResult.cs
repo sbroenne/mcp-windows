@@ -21,14 +21,24 @@ public sealed record AnnotatedScreenshotResult
     public string? ImageFormat { get; init; }
 
     /// <summary>
-    /// Width of the captured image in pixels.
+    /// Width of the output image in pixels (after scaling if applied).
     /// </summary>
     public int? Width { get; init; }
 
     /// <summary>
-    /// Height of the captured image in pixels.
+    /// Height of the output image in pixels (after scaling if applied).
     /// </summary>
     public int? Height { get; init; }
+
+    /// <summary>
+    /// Original width before scaling. Null if not scaled.
+    /// </summary>
+    public int? OriginalWidth { get; init; }
+
+    /// <summary>
+    /// Original height before scaling. Null if not scaled.
+    /// </summary>
+    public int? OriginalHeight { get; init; }
 
     /// <summary>
     /// Array of annotated elements with their indices matching the numbered labels on the image.
@@ -53,7 +63,9 @@ public sealed record AnnotatedScreenshotResult
         string imageFormat,
         int width,
         int height,
-        AnnotatedElement[] elements)
+        AnnotatedElement[] elements,
+        int? originalWidth = null,
+        int? originalHeight = null)
     {
         ArgumentNullException.ThrowIfNull(elements);
         return new()
@@ -63,6 +75,8 @@ public sealed record AnnotatedScreenshotResult
             ImageFormat = imageFormat,
             Width = width,
             Height = height,
+            OriginalWidth = originalWidth,
+            OriginalHeight = originalHeight,
             Elements = elements,
             ElementCount = elements.Length
         };

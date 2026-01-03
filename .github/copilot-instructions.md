@@ -1,5 +1,35 @@
 # Copilot Instructions for mcp-windows
 
+## Running LLM Tests
+
+**ALWAYS use the PowerShell script to run LLM tests:**
+
+```powershell
+d:\source\mcp-windows\tests\Sbroenne.WindowsMcp.LLM.Tests\Run-LLMTests.ps1 -Model "gpt-5.2-chat" -Scenario "paint-smiley-test.yaml"
+```
+
+**Parameters:**
+- `-Model <model-name>` - Azure OpenAI model deployment name (e.g., "gpt-5.2-chat", "gpt-4o")
+- `-Scenario <scenario-file>` - Run specific scenario (e.g., "paint-smiley-test.yaml")
+- `-Build` - Build MCP server first (optional, dotnet run builds anyway)
+
+**The script handles:**
+- Setting up paths and environment variables
+- Substituting `{{SERVER_COMMAND}}`, `{{MODEL}}`, `{{TEST_RESULTS_PATH}}` in YAML
+- Running agent-benchmark with correct arguments
+- Generating reports to `TestResults` directory
+
+**Do NOT:**
+- Publish to .exe manually
+- Set MCP_PROJECT_PATH or TEST_RESULTS_PATH manually
+- Run agent-benchmark.exe directly
+- cd to agent-benchmark directory
+
+**IMPORTANT: LLM tests are EXPENSIVE (time and cost). Be surgical:**
+- Only run LLM tests when specifically requested by the user
+- Verify code changes compile and unit tests pass BEFORE running LLM tests
+- Never run LLM tests "just to check" - they cost real money
+
 ## LLM Test Scenarios - Critical Rules
 
 **NEVER modify test scenario USER prompts to include implementation hints.**

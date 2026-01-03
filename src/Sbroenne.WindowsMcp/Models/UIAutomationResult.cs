@@ -196,6 +196,25 @@ public sealed record UIAutomationResult
     }
 
     /// <summary>
+    /// Creates a success result with a hint message but no elements.
+    /// Use this when an action succeeded but no element data should be returned (e.g., click that closed a window).
+    /// </summary>
+    /// <param name="action">The action performed.</param>
+    /// <param name="hint">A hint message explaining the outcome.</param>
+    /// <param name="diagnostics">Optional diagnostics.</param>
+    /// <returns>A success result with a hint.</returns>
+    public static UIAutomationResult CreateSuccessWithHint(string action, string hint, UIAutomationDiagnostics? diagnostics = null)
+    {
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            UsageHint = hint,
+            Diagnostics = diagnostics
+        };
+    }
+
+    /// <summary>
     /// Creates a success result with multiple elements.
     /// </summary>
     /// <param name="action">The action performed.</param>
@@ -334,7 +353,7 @@ public sealed record UIAutomationResult
     private static string GetDefaultRecoverySuggestion(string errorType) => errorType switch
     {
         UIAutomationErrorType.ElementNotFound =>
-            "Element not found after auto-retry with partial matching. Use get_tree to explore available elements, or verify the window is visible.",
+            "Element not found. Try get_tree (default depth=2) to explore, or use parentElementId to drill into a specific subtree.",
 
         UIAutomationErrorType.MultipleMatches =>
             "Multiple elements matched. Add automationId, use parentElementId to scope search, or specify foundIndex to select which match.",

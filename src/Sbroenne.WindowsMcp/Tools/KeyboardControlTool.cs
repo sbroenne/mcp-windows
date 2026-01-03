@@ -74,14 +74,14 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the keyboard operation including success status and operation details.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S), special keys. For typing into a specific UI element by handle, use ui_automation(action='type') instead.")]
+    [Description("Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S = key='s', modifiers='ctrl'), special keys. For typing into a specific UI element by handle, use ui_automation(action='type') instead.")]
     [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The keyboard action to perform.")] KeyboardAction action,
         [Description("Text to type (required for type action)")] string? text = null,
-        [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
-        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string? modifiers = null,
+        [Description("The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').")] string? key = null,
+        [Description("Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.")] string? modifiers = null,
         [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
         [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
         [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,

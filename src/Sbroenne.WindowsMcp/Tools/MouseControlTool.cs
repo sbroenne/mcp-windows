@@ -100,16 +100,16 @@ public sealed partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Low-level mouse input - AVOID for UI elements. USE ui_automation(action='click') instead for buttons/controls. mouse_control is ONLY for: raw coordinate clicks with exact x,y, custom-drawn controls without UIA support, games. When using windowHandle, x/y become window-relative coordinates. Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
+    [Description("Low-level mouse input for canvas/drawing. AVOID for buttons/controls - use ui_automation(click) instead. BEFORE USING: Get coordinates from ui_automation(find) bounding rects OR screenshot_control(annotate=true). Never guess positions. USE FOR: drag operations, canvas drawing, custom controls without UIA. DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY). Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
     [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The mouse action to perform.")] MouseAction action,
         [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
-        [Description("X-coordinate relative to the monitor's left edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? x = null,
-        [Description("Y-coordinate relative to the monitor's top edge. Required for move, optional for clicks. Omit for coordinate-less click at current position.")] int? y = null,
-        [Description("End x-coordinate relative to the monitor. Required for drag action.")] int? endX = null,
-        [Description("End y-coordinate relative to the monitor. Required for drag action.")] int? endY = null,
+        [Description("X start coordinate. For drag: START position. Required for move/drag, optional for clicks.")] int? x = null,
+        [Description("Y start coordinate. For drag: START position. Required for move/drag, optional for clicks.")] int? y = null,
+        [Description("X end coordinate. For drag: END position. Required for drag only.")] int? endX = null,
+        [Description("Y end coordinate. For drag: END position. Required for drag only.")] int? endY = null,
         [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
         [Description("Number of scroll clicks (default: 1)")] int amount = 1,
         [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
@@ -683,14 +683,14 @@ public sealed partial class MouseControlTool
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.MissingRequiredParameter,
-                "Drag action requires x and y coordinates for start position");
+                "Drag requires x and y for START position (not startX/startY)");
         }
 
         if (!endX.HasValue || !endY.HasValue)
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.MissingRequiredParameter,
-                "Drag action requires end_x and end_y coordinates for end position");
+                "Drag requires endX and endY for END position");
         }
 
         // Check if secure desktop is active before any operation

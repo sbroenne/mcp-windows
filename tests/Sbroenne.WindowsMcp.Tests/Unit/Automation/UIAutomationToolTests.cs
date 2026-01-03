@@ -113,23 +113,6 @@ public sealed class UIAutomationToolTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_GetTreeAction_CallsGetTreeAsync()
-    {
-        // Arrange
-        var expectedResult = UIAutomationResult.CreateSuccessCompact("get_tree", Array.Empty<UIElementInfo>(), null);
-        _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(expectedResult);
-
-        // Act
-        var result = await _tool.ExecuteAsync(UIAutomationAction.GetTree, windowHandle: "12345", maxDepth: 3);
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.Equal("get_tree", result.Action);
-        await _mockService.Received(1).GetTreeAsync("12345", null, 3, null, Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
     public async Task ExecuteAsync_WaitForAction_CallsWaitForElementAsync()
     {
         // Arrange
@@ -298,25 +281,6 @@ public sealed class UIAutomationToolTests
     #endregion
 
     #region Parameter Clamping Tests
-
-    [Theory]
-    [InlineData(-5, 0)]   // Below minimum
-    [InlineData(0, 0)]    // At minimum
-    [InlineData(10, 10)]  // Normal
-    [InlineData(20, 20)]  // At maximum
-    [InlineData(100, 20)] // Above maximum
-    public async Task ExecuteAsync_GetTree_ClampsMaxDepthAsync(int inputDepth, int expectedClampedDepth)
-    {
-        // Arrange
-        _mockService.GetTreeAsync(Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns(UIAutomationResult.CreateSuccessCompact("get_tree", Array.Empty<UIElementInfo>(), null));
-
-        // Act - GetTree requires windowHandle per Constitution Principle VI
-        await _tool.ExecuteAsync(UIAutomationAction.GetTree, windowHandle: "12345", maxDepth: inputDepth);
-
-        // Assert
-        await _mockService.Received(1).GetTreeAsync("12345", null, expectedClampedDepth, null, Arg.Any<CancellationToken>());
-    }
 
     [Theory]
     [InlineData(-100, 0)]      // Below minimum

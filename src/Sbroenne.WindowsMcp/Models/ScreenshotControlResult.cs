@@ -280,6 +280,8 @@ public sealed record ScreenshotControlResult
     /// <param name="format">Image format (jpeg/png).</param>
     /// <param name="elements">List of annotated elements with indices.</param>
     /// <param name="filePath">File path if output mode is file.</param>
+    /// <param name="originalWidth">Original width before scaling (null if not scaled).</param>
+    /// <param name="originalHeight">Original height before scaling (null if not scaled).</param>
     /// <returns>A successful annotated capture result.</returns>
     public static ScreenshotControlResult AnnotatedSuccess(
         string? imageData,
@@ -287,10 +289,15 @@ public sealed record ScreenshotControlResult
         int height,
         string format,
         IReadOnlyList<AnnotatedElement> elements,
-        string? filePath = null)
+        string? filePath = null,
+        int? originalWidth = null,
+        int? originalHeight = null)
     {
         ArgumentNullException.ThrowIfNull(elements);
         var elementCount = elements.Count;
+        var sizeInfo = originalWidth.HasValue && originalHeight.HasValue
+            ? $"{originalWidth}x{originalHeight} (scaled to {width}x{height})"
+            : $"{width}x{height}";
         var usageHint = $"Screenshot with {elementCount} numbered elements. Reference elements by index (1-{elementCount}). " +
                         "Each element has an elementId for ui_automation operations (click, type, toggle).";
         if (filePath != null)
@@ -302,10 +309,12 @@ public sealed record ScreenshotControlResult
         {
             Success = true,
             ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
-            Message = $"Captured {width}x{height} {format} with {elementCount} annotated elements",
+            Message = $"Captured {sizeInfo} {format} with {elementCount} annotated elements",
             ImageData = imageData,
             Width = width,
             Height = height,
+            OriginalWidth = originalWidth,
+            OriginalHeight = originalHeight,
             Format = format,
             FilePath = filePath,
             AnnotatedElements = elements,
