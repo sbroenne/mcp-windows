@@ -1,41 +1,29 @@
-# Windows Paint Smiley Test
+# Windows Paint Line Test
 #
 # Testing framework: Agent Benchmark
 # https://github.com/mykhaliev/agent-benchmark
 #
-# Test: Draw a yellow smiley face in Paint and save it
-# Success = image file saved to disk
-#
-# IMPORTANT: This test requires a higher Azure OpenAI quota than S0 tier.
-# The multi-step drawing task requires many iterations and can consume
-# 80-120K tokens total. If you see 429 rate limit errors, you need to:
-# 1. Wait a few minutes between test runs
-# 2. Upgrade your Azure OpenAI tier
-# 3. Use a deployment with higher TPM limits
+# Test: Draw a simple diagonal line in Paint and save it
+# Success = image file saved to disk (verified by filesystem tools)
 #
 # Prerequisites:
 # - Windows 10/11 with Paint app
 # - Windows MCP Server
+# - Filesystem MCP Server (for verification)
 # - Azure OpenAI with sufficient TPM quota (recommended: S1+ tier)
 # - Environment variables set:
 #   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+#   - TEST_RESULTS_PATH: Directory for output files
 
 
 criteria:
   success_rate: 1 # 100%
 
 providers:
-  - name: azure-openai-gpt4o
-    type: AZURE
-    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
-    model: gpt-4o
-    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
-    version: 2025-01-01-preview
-
   - name: azure-openai-gpt5-chat
     type: AZURE
     auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
-    model: gpt-5-chat
+    model: gpt-5.2-chat
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
 
@@ -43,48 +31,62 @@ servers:
   - name: windows-mcp
     type: stdio
     command: "{{SERVER_COMMAND}}"
-    server_delay: 10s
+    server_delay: 15s
+
+  - name: filesystem
+    type: stdio
+    command: "npx -y @modelcontextprotocol/server-filesystem {{TEST_RESULTS_PATH}}"
+    server_delay: 15s
 
 agents:
-  - name: gpt4o-agent
-    servers:
-      - name: windows-mcp
-    provider: azure-openai-gpt4o
-
   - name: gpt5-chat-agent
     servers:
       - name: windows-mcp
+      - name: filesystem
     provider: azure-openai-gpt5-chat
+    system_prompt: |
+      You are an autonomous Windows automation agent. You MUST call tools to perform actions.
+
+      CRITICAL RULES:
+      1. You CANNOT perform any action without calling a tool. Text responses do NOT execute anything.
+      2. NEVER claim you did something unless you called tools and got a success response.
+      3. Start calling tools IMMEDIATELY in your first response. No planning, no explaining.
+      4. If you respond with only text and no tool calls, you have FAILED the task.
+
+      SAVE AS DIALOG WORKFLOW (for apps like Paint, Notepad, etc.):
+      1. Press Ctrl+S to open Save As dialog
+      2. Wait for the "Save as" window to appear (use window_management to find it)
+      3. The filename field only accepts FILENAMES, not paths with slashes
+      4. To navigate to a folder: click the address bar, type the folder path, press Enter
+      5. Then type just the filename (e.g., "line.png") in the filename field
+      6. Click the Save button
 
 settings:
   verbose: true
-  max_iterations: 25      # More iterations needed for drawing operations
+  max_iterations: 25
 
 sessions:
-  - name: Paint Smiley Workflow
+  - name: Paint Line Test
     tests:
-      - name: "Draw yellow smiley in Paint"
-        description: "Open Paint, draw a yellow smiley face using shape tools, and save the image"
+      - name: "Draw a line in Paint and save"
+        description: "Open Paint, draw a single diagonal line, save the image, and verify with filesystem"
         prompt: |
-          1. Launch mspaint.exe (Windows Paint)
-          2. Draw a yellow smiley face using Paint's shape tools
-          3. Save the image to: {{TEST_RESULTS_PATH}}\smiley.png
-          4. Close Paint
-          5. Verify the file exists
+          Delete "{{TEST_RESULTS_PATH}}/line.png" if it exists, and close any existing Paint windows.
 
-          Report "VERIFIED: Smiley saved" when complete.
+          Then open Paint, find out where the canvas area is and draw a diagonal line on the canvas, save it as "{{TEST_RESULTS_PATH}}/line.png", and close Paint.
+
+          Finally, verify the file exists and was created within the last minute.
+
+          Report "VERIFIED: Line saved successfully" if the file exists and was recently created.
+          Report "FAILED: File not found or stale" if the file doesn't exist or is old.
         assertions:
-          # OUTCOME: LLM confirmed the file was saved
+          # OUTCOME: LLM verified the file was saved
           - type: output_regex
-            pattern: "(?i)(saved|created|verified|smiley.*png|file.*exists)"
-
-          # OUTCOME: Smiley mentioned in output
-          - type: output_regex
-            pattern: "(?i)smiley"
+            pattern: "(?i)VERIFIED.*line.*saved"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
-            value: "failed"
+            value: "FAILED"
 
           # QUALITY: Only used real tools
           - type: no_hallucinated_tools
@@ -103,32 +105,33 @@ sessions:
               action: "launch"
               programPath: "mspaint.exe"
 
-          # REQUIRED: Must use mouse_control for drawing
+          # REQUIRED: Must use mouse_control to draw the line
           - type: tool_called
             tool: mouse_control
 
-          # FLEXIBLE: May use keyboard for shortcuts or UI automation for buttons
-          - anyOf:
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_automation
+          # VERIFY: Mouse drag was used for drawing
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
 
-          # VERIFY: Mouse was used for drawing (drag or click operations)
-          - anyOf:
-              - type: tool_param_equals
-                tool: mouse_control
-                params:
-                  action: "drag"
-              - type: tool_param_equals
-                tool: mouse_control
-                params:
-                  action: "click"
+          # REQUIRED: Must use keyboard_control for saving (Ctrl+S)
+          - type: tool_called
+            tool: keyboard_control
 
-          # PERFORMANCE: Complete within 120 seconds (drawing takes time)
+          # PERFORMANCE: Complete within 120 seconds
           - type: max_latency_ms
             value: 120000
 
           # EFFICIENCY: Stay under token limits
           - type: max_tokens
-            value: 80000
+            value: 120000
+
+          # VERIFICATION: Must use filesystem tools to verify the file exists
+          - anyOf:
+              - type: tool_called
+                tool: read_file
+              - type: tool_called
+                tool: list_directory
+              - type: tool_called
+                tool: get_file_info

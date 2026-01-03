@@ -159,26 +159,9 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         var elementId = findResult.Items![0].Id;
         Assert.NotNull(elementId);
 
-        // Parse the element ID to understand its structure
-        var parts = elementId.Split('|');
-        Assert.Equal(3, parts.Length);
-
-        var windowPart = parts[0].Replace("window:", "");
-        var runtimePart = parts[1].Replace("runtime:", "");
-        var pathPart = parts[2].Replace("path:", "");
-
-        // Note: The window handle in the element ID may differ from _windowHandle
-        // because some controls (like TextBox) have their own native window handle.
-        // This is expected behavior.
-        Assert.True(nint.TryParse(windowPart, out var parsedHandle), $"Failed to parse window handle from: {windowPart}");
-        Assert.NotEqual(nint.Zero, parsedHandle);
-
-        // Verify runtime ID is not empty
-        Assert.False(string.IsNullOrEmpty(runtimePart), "Runtime ID should not be empty");
-        Assert.NotEqual("0", runtimePart);
-
-        // Verify path is not stale
-        Assert.NotEqual("stale", pathPart);
+        // Element IDs are now short numeric values (e.g., "1", "2", "3")
+        Assert.True(int.TryParse(elementId, out int parsedId), $"Element ID should be numeric: {elementId}");
+        Assert.True(parsedId > 0, $"Element ID should be positive: {parsedId}");
 
         // Now test the round trip via ElementIdGenerator - THIS IS THE CRITICAL TEST
         var resolvedElement = await _staThread.ExecuteAsync(() =>
@@ -461,10 +444,8 @@ public sealed class UIAutomationIntegrationTests : IDisposable
         var textBoxId = findResult.Items![0].Id;
         Assert.NotNull(textBoxId);
 
-        // Debug: log the element ID format
-        Assert.True(textBoxId.Contains("window:"), $"Element ID format unexpected: {textBoxId}");
-        Assert.True(textBoxId.Contains("runtime:"), $"Element ID format unexpected: {textBoxId}");
-        Assert.True(textBoxId.Contains("path:"), $"Element ID format unexpected: {textBoxId}");
+        // Element IDs are now short numeric identifiers
+        Assert.True(int.TryParse(textBoxId, out _), $"Element ID format unexpected: {textBoxId}");
 
         // Act - try to focus using the element ID
         var focusResult = await _automationService.FocusElementAsync(textBoxId);

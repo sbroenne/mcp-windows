@@ -292,14 +292,16 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         Assert.NotNull(result.Elements);
         Assert.True(result.Elements.Length > 0);
 
-        // Verify all elements have non-empty Ids in the expected format
+        // Verify all elements have non-empty Ids
         foreach (var element in result.Elements)
         {
             Assert.False(
                 string.IsNullOrEmpty(element.Id),
                 $"Element {element.Index} should have a valid Id");
-            Assert.Contains("window:", element.Id);
-            Assert.Contains("runtime:", element.Id);
+            // Element IDs are now short numeric identifiers (e.g., "1", "2", "744")
+            Assert.True(
+                int.TryParse(element.Id, out _),
+                $"Element ID '{element.Id}' should be a numeric string");
         }
     }
 

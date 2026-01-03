@@ -1,0 +1,156 @@
+# Windows based test
+# Tests a UI Automation scenario with Windows MCP Server
+# https://windowsmcpserver.dev/
+# https://github.com/sbroenne/mcp-windows
+#
+# Testing framework: Agent Benchmark
+# https://github.com/mykhaliev/agent-benchmark
+#
+# Test: Complete Microsoft Word workflow with proof
+# Success = proof provided + Word closed
+#
+# Prerequisites:
+# - Windows 10/11
+# - Microsoft Word installed
+# - Windows MCP Server executable in examples folder
+# - Azure OpenAI resource with Entra ID authentication configured
+# - One of the following authentication methods:
+#   * Azure CLI logged in (az login)
+#   * Environment variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET
+#   * Managed Identity (when running in Azure)
+#   * Visual Studio Code Azure Account extension
+# - Environment variables set:
+#   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+#
+# Run command:
+#   go run . -f examples/windows-mcp-word-test.yaml -reportType html,json
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt5
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-5-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: azure-openai-gpt4o
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-4o
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: ./examples/Sbroenne.WindowsMcp.exe
+    server_delay: 10s
+
+agents:
+  - name: gpt5-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5
+
+  # - name: gpt4o-agent
+  #   servers:
+  #     - name: windows-mcp
+  #   provider: azure-openai-gpt4o
+
+settings:
+  verbose: true
+  max_iterations: 20x      # Word may need more iterations for UI navigation
+  test_delay: 5s         # Longer delay to avoid rate limits between agents
+
+sessions:
+  - name: Word Workflow
+    tests:
+      - name: "Complete Word automation"
+        description: "Open Microsoft Word, create a new document, type text, close without saving"
+        prompt: |
+          1. Launch Microsoft Word (WINWORD.EXE)
+          2. Create a new blank document
+          3. Type "Hello World from {{AGENT_NAME}}" in the document
+          4. Save the document as "test-{{AGENT_NAME}}.docx" in the current folder
+          5. Close Word
+          6. Verify no Word window is open (search for it)
+
+          Report "VERIFIED: No Word window open" if closed successfully.
+        assertions:
+          # OUTCOME: LLM verified no Word window open
+          - type: output_regex
+            pattern: "(?i)(no.*(word|window).*(open|found|running)|verified|word.*(closed|not found))"
+
+          # OUTCOME: Proof that "Hello World" was typed
+          - type: output_regex
+            pattern: "(?i)hello\\s*world"
+
+          # OUTCOME: File was saved
+          - type: output_regex
+            pattern: "(?i)(saved|test-.*\\.docx)"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # REQUIRED: Must use window_management to launch/close/find windows
+          - type: tool_called
+            tool: window_management
+
+          # VERIFY: Word was launched with correct program
+          - type: tool_param_matches_regex
+            tool: window_management
+            params:
+              action: "launch"
+              programPath: "(?i)(winword\\.exe|word)"
+
+          # VERIFY: Launch succeeded (ok: true in JSON response)
+          - type: tool_result_matches_json
+            tool: window_management
+            path: "$.ok"
+            value: true
+
+          # FLEXIBLE: Text input can use different tools depending on the LLM
+          # GPT-5 often uses keyboard_control, GPT-4o may use ui_automation
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_automation
+
+          # VERIFY: Window was closed (find returned empty or no matches)
+          - anyOf:
+              # Either the output confirms closure
+              - type: output_regex
+                pattern: "(?i)(no.*windows?.*found|0.*windows?|empty.*list|windows.*\\[\\])"
+
+          # VERIFY: "Hello World" was typed using one of these methods
+          - anyOf:
+              # Via keyboard_control with the text
+              - type: tool_param_matches_regex
+                tool: keyboard_control
+                params:
+                  text: "(?i)hello.*world"
+              # Via ui_automation Type action (case-insensitive)
+              - type: tool_param_matches_regex
+                tool: ui_automation
+                params:
+                  action: "(?i)^type$"
+              # Via ui_automation setValue action (case-insensitive)
+              - type: tool_param_matches_regex
+                tool: ui_automation
+                params:
+                  action: "(?i)^setvalue$"
+
+          # PERFORMANCE: Complete within 90 seconds (Word is slower to start)
+          - type: max_latency_ms
+            value: 90000
+
+          # EFFICIENCY: Stay under token limits
+          - type: max_tokens
+            value: 250000
