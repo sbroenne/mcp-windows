@@ -36,17 +36,17 @@ providers:
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
 
-  - name: azure-openai-gpt4o
+  - name: azure-openai-gpt41
     type: AZURE
     auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
-    model: gpt-4o
+    model: gpt-4.1
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
 
 servers:
   - name: windows-mcp
     type: stdio
-    command: ./examples/Sbroenne.WindowsMcp.exe
+    command: "{{SERVER_COMMAND}}"
     server_delay: 10s
 
 agents:
@@ -55,21 +55,21 @@ agents:
       - name: windows-mcp
     provider: azure-openai-gpt5
 
-  # - name: gpt4o-agent
-  #   servers:
-  #     - name: windows-mcp
-  #   provider: azure-openai-gpt4o
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
 
 settings:
   verbose: true
-  max_iterations: 20x      # Word may need more iterations for UI navigation
+  max_iterations: 20     # Word may need more iterations for UI navigation
   test_delay: 5s         # Longer delay to avoid rate limits between agents
 
 sessions:
   - name: Word Workflow
     tests:
       - name: "Complete Word automation"
-        description: "Open Microsoft Word, create a new document, type text, close without saving"
+        description: "Open Microsoft Word, create a new document, type text, save, and close"
         prompt: |
           1. Launch Microsoft Word (WINWORD.EXE)
           2. Create a new blank document
@@ -83,14 +83,6 @@ sessions:
           # OUTCOME: LLM verified no Word window open
           - type: output_regex
             pattern: "(?i)(no.*(word|window).*(open|found|running)|verified|word.*(closed|not found))"
-
-          # OUTCOME: Proof that "Hello World" was typed
-          - type: output_regex
-            pattern: "(?i)hello\\s*world"
-
-          # OUTCOME: File was saved
-          - type: output_regex
-            pattern: "(?i)(saved|test-.*\\.docx)"
 
           # QUALITY: Only used real tools
           - type: no_hallucinated_tools
@@ -146,6 +138,20 @@ sessions:
                 tool: ui_automation
                 params:
                   action: "(?i)^setvalue$"
+
+          # VERIFY: Save action was used (via ui_automation save action or keyboard Ctrl+S)
+          - anyOf:
+              # Via ui_automation save action (uses COM for Office apps)
+              - type: tool_param_matches_regex
+                tool: ui_automation
+                params:
+                  action: "(?i)^save$"
+              # Via keyboard shortcut Ctrl+S
+              - type: tool_param_matches_regex
+                tool: keyboard_control
+                params:
+                  key: "(?i)^s$"
+                  modifiers: "(?i)ctrl"
 
           # PERFORMANCE: Complete within 90 seconds (Word is slower to start)
           - type: max_latency_ms

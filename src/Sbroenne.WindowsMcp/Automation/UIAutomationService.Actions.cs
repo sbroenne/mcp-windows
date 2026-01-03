@@ -870,12 +870,12 @@ public sealed partial class UIAutomationService
             var comResult = OfficeComHelper.SaveDocument(officeAppType, filePath);
             if (comResult.IsSuccess)
             {
-                return UIAutomationResult.CreateSuccessWithHint("save_dialog", comResult.Message);
+                return UIAutomationResult.CreateSuccessWithHint("save", comResult.Message);
             }
             else
             {
                 return UIAutomationResult.CreateFailure(
-                    "save_dialog",
+                    "save",
                     UIAutomationErrorType.InternalError,
                     comResult.Message);
             }
@@ -902,7 +902,7 @@ public sealed partial class UIAutomationService
                 if (!nint.TryParse(windowHandle, out var hwnd))
                 {
                     return (Error: UIAutomationResult.CreateFailure(
-                        "save_dialog",
+                        "save",
                         UIAutomationErrorType.InvalidParameter,
                         $"Invalid window handle format: '{windowHandle}'",
                         CreateDiagnostics(stopwatch)), FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: (UIA.IUIAutomationElement?)null, IsOfficeBackstage: false);
@@ -999,7 +999,7 @@ public sealed partial class UIAutomationService
                 }
 
                 return (Error: UIAutomationResult.CreateFailure(
-                    "save_dialog",
+                    "save",
                     UIAutomationErrorType.ElementNotFound,
                     "Could not find filename field. Neither standard Windows dialog (FileNameControlHost) nor Office Backstage detected.",
                     CreateDiagnostics(stopwatch),
@@ -1048,7 +1048,7 @@ public sealed partial class UIAutomationService
             if (findResult.FilenameElement == null)
             {
                 return UIAutomationResult.CreateFailure(
-                    "save_dialog",
+                    "save",
                     UIAutomationErrorType.ElementNotFound,
                     "Could not find filename field.",
                     CreateDiagnostics(stopwatch));
@@ -1087,7 +1087,7 @@ public sealed partial class UIAutomationService
             if (findResult.SaveButton == null)
             {
                 return UIAutomationResult.CreateFailure(
-                    "save_dialog",
+                    "save",
                     UIAutomationErrorType.ElementNotFound,
                     "Could not find Save button in the dialog.",
                     CreateDiagnostics(stopwatch),
@@ -1110,22 +1110,22 @@ public sealed partial class UIAutomationService
             // Handle overwrite confirmation
             await HandleOverwriteConfirmationAsync(cancellationToken);
 
-            return UIAutomationResult.CreateSuccess("save_dialog", CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
         {
             return UIAutomationResult.CreateFailure(
-                "save_dialog",
+                "save",
                 COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
-                COMExceptionHelper.GetErrorMessage(ex, "SaveFileDialog"),
+                COMExceptionHelper.GetErrorMessage(ex, "Save"),
                 CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return UIAutomationResult.CreateFailure(
-                "save_dialog",
+                "save",
                 UIAutomationErrorType.InternalError,
-                $"SaveFileDialog failed: {ex.Message}",
+                $"Save failed: {ex.Message}",
                 CreateDiagnostics(stopwatch));
         }
     }

@@ -235,7 +235,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
                 UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
-                UIAutomationAction.SaveDialog => await HandleSaveDialogAsync(windowHandle, text, cancellationToken),
+                UIAutomationAction.Save => await HandleSaveAsync(windowHandle, text, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -309,7 +309,7 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
             UIAutomationAction.GetElementDetails => "get_element_details",
-            UIAutomationAction.SaveDialog => "save_dialog",
+            UIAutomationAction.Save => "save",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -1103,21 +1103,21 @@ public sealed partial class UIAutomationTool
     /// For complex save scenarios (format conversion, specific options), use keyboard_control
     /// to navigate the Save As dialog manually.
     /// </summary>
-    private async Task<UIAutomationResult> HandleSaveDialogAsync(
+    private async Task<UIAutomationResult> HandleSaveAsync(
         string? windowHandle, string? filePath, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(filePath))
         {
-            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
-                "filePath is required for save_dialog action. Provide full path including filename (e.g., 'C:\\temp\\file.png').",
+            return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.InvalidParameter,
+                "filePath is required for save action. Provide full path including filename (e.g., 'C:\\temp\\file.png').",
                 null,
-                "Example: save_dialog(windowHandle='123456', text='C:\\temp\\myfile.png')");
+                "Example: save(windowHandle='123456', text='C:\\temp\\myfile.png')");
         }
 
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
-                "windowHandle is required for save_dialog action. Get the dialog window handle from window_management(action='find').",
+            return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.InvalidParameter,
+                "windowHandle is required for save action. Get the window handle from window_management(action='find').",
                 null);
         }
 
@@ -1242,6 +1242,6 @@ public enum UIAutomationAction
     /// or handles standard Windows Save As dialogs. File format determined by extension.
     /// For complex save options, use keyboard_control to navigate dialogs manually.
     /// </summary>
-    [JsonStringEnumMemberName("save_dialog")]
-    SaveDialog
+    [JsonStringEnumMemberName("save")]
+    Save
 }

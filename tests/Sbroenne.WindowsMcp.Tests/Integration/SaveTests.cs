@@ -10,11 +10,11 @@ using Sbroenne.WindowsMcp.Window;
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
-/// Integration tests for the save_dialog action.
-/// Tests the SaveFileDialogAsync method against real Windows Save As dialogs.
+/// Integration tests for the save action.
+/// Tests the SaveFileDialogAsync method against real Windows Save As dialogs and Office COM.
 /// </summary>
 [Collection("UITestHarness")]
-public sealed class SaveDialogTests : IDisposable
+public sealed class SaveTests : IDisposable
 {
     private readonly UITestHarnessFixture _fixture;
     private readonly UIAutomationService _automationService;
@@ -24,7 +24,7 @@ public sealed class SaveDialogTests : IDisposable
     private readonly string _windowHandle;
     private readonly string _testOutputDir;
 
-    public SaveDialogTests(UITestHarnessFixture fixture)
+    public SaveTests(UITestHarnessFixture fixture)
     {
         _fixture = fixture;
         _fixture.Reset();
@@ -85,7 +85,7 @@ public sealed class SaveDialogTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDialog_StandardWindowsDialog_SavesFile()
+    public async Task Save_StandardWindowsDialog_SavesFile()
     {
         // Arrange: Switch to Dialogs tab and prepare test file path
         var testFilePath = Path.Combine(_testOutputDir, $"test-{Guid.NewGuid()}.txt");
@@ -209,7 +209,7 @@ public sealed class SaveDialogTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDialog_InvalidWindowHandle_ReturnsError()
+    public async Task Save_InvalidWindowHandle_ReturnsError()
     {
         // Act
         var result = await _automationService.SaveFileDialogAsync("invalid", @"C:\test\file.txt");
@@ -220,7 +220,7 @@ public sealed class SaveDialogTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDialog_NonExistentWindow_ReturnsError()
+    public async Task Save_NonExistentWindow_ReturnsError()
     {
         // Act
         var result = await _automationService.SaveFileDialogAsync("999999999", @"C:\test\file.txt");
@@ -231,7 +231,7 @@ public sealed class SaveDialogTests : IDisposable
     }
 
     [Fact]
-    public async Task SaveDialog_WindowWithoutDialog_ReturnsNotFoundError()
+    public async Task Save_WindowWithoutDialog_ReturnsNotFoundError()
     {
         // Act: Try to use SaveFileDialogAsync on a window that isn't a Save As dialog
         var result = await _automationService.SaveFileDialogAsync(_windowHandle, @"C:\test\file.txt");
