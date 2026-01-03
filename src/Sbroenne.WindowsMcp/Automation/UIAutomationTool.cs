@@ -235,6 +235,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
                 UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
+                UIAutomationAction.SaveDialog => await HandleSaveDialogAsync(windowHandle, text, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -308,6 +309,7 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
             UIAutomationAction.GetElementDetails => "get_element_details",
+            UIAutomationAction.SaveDialog => "save_dialog",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -1088,6 +1090,40 @@ public sealed partial class UIAutomationTool
         return UIAutomationResult.CreateSuccess("get_element_details", elementInfo, null);
     }
 
+    /// <summary>
+    /// Convenience method for saving files quickly. Handles standard Windows Save As dialogs
+    /// and Office apps (Word, Excel, PowerPoint, Visio, Publisher) via COM automation.
+    /// 
+    /// LIMITATIONS:
+    /// - For Office apps: Saves using the file extension to determine format (.docx, .xlsx, .pptx).
+    ///   Cannot change advanced options like compatibility mode or specific save settings.
+    /// - For standard dialogs: Types the path and clicks Save. Cannot navigate folder trees or
+    ///   change dialog options.
+    /// 
+    /// For complex save scenarios (format conversion, specific options), use keyboard_control
+    /// to navigate the Save As dialog manually.
+    /// </summary>
+    private async Task<UIAutomationResult> HandleSaveDialogAsync(
+        string? windowHandle, string? filePath, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
+                "filePath is required for save_dialog action. Provide full path including filename (e.g., 'C:\\temp\\file.png').",
+                null,
+                "Example: save_dialog(windowHandle='123456', text='C:\\temp\\myfile.png')");
+        }
+
+        if (string.IsNullOrWhiteSpace(windowHandle))
+        {
+            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
+                "windowHandle is required for save_dialog action. Get the dialog window handle from window_management(action='find').",
+                null);
+        }
+
+        return await _automationService.SaveFileDialogAsync(windowHandle, filePath, cancellationToken);
+    }
+
     #endregion
 
     #region LoggerMessage Methods
@@ -1199,5 +1235,13 @@ public enum UIAutomationAction
 
     /// <summary>Get full element details by ID (bounds, patterns, value, etc.).</summary>
     [JsonStringEnumMemberName("get_element_details")]
-    GetElementDetails
+    GetElementDetails,
+
+    /// <summary>
+    /// Quick save convenience action. Saves files in Office apps (Word, Excel, PowerPoint) via COM,
+    /// or handles standard Windows Save As dialogs. File format determined by extension.
+    /// For complex save options, use keyboard_control to navigate dialogs manually.
+    /// </summary>
+    [JsonStringEnumMemberName("save_dialog")]
+    SaveDialog
 }

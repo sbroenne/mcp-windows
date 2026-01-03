@@ -169,7 +169,7 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
 
         // Should have a hint explaining what happened, not an empty items array
         Assert.NotNull(clickResult.UsageHint);
-        Assert.Contains("closed", clickResult.UsageHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("dialog", clickResult.UsageHint, StringComparison.OrdinalIgnoreCase);
 
         // Items array should be null (not returned), not an empty array
         Assert.Null(clickResult.Items);

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Office;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -32,7 +33,21 @@ public sealed partial class UIAutomationService
             var targetElement = findResult.Items[0];
             var elementId = targetElement.Id;
 
-            return await PerformClickAsync(elementId, query.WindowHandle, stopwatch, cancellationToken);
+            // Extract pre-computed click coordinates as fallback
+            // FindElementsAsync uses cached bounds which may differ from current bounds
+            // (e.g., WinForms TabPage children report 0,0,0,0 current bounds even when visible)
+            Point? fallbackClickPoint = null;
+            if (targetElement.Click != null && targetElement.Click.Length >= 2)
+            {
+                // Convert monitor-relative coordinates back to screen coordinates
+                var monitorIndex = targetElement.Click.Length >= 3 ? targetElement.Click[2] : 0;
+                var monitorOrigin = _coordinateConverter.GetMonitorOrigin(monitorIndex);
+                fallbackClickPoint = new Point(
+                    targetElement.Click[0] + monitorOrigin.X,
+                    targetElement.Click[1] + monitorOrigin.Y);
+            }
+
+            return await PerformClickAsync(elementId, query.WindowHandle, fallbackClickPoint, stopwatch, cancellationToken);
         }
         catch (COMException ex)
         {
@@ -54,7 +69,7 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private async Task<UIAutomationResult> PerformClickAsync(string elementId, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> PerformClickAsync(string elementId, string? windowHandle, Point? fallbackClickPoint, Stopwatch stopwatch, CancellationToken cancellationToken)
     {
         return await _staThread.ExecuteAsync(() =>
         {
@@ -87,9 +102,84 @@ public sealed partial class UIAutomationService
             TryActivateWindowForElement(element, activationHandle);
 
             var rootElement = GetRootElementForScroll(element);
+            var controlType = element.GetControlTypeId();
 
-            // Try InvokePattern first
-            if (element.TryInvoke())
+            // For TabItems: prefer physical click over SelectionItemPattern.Select()
+            // In WinForms, Select() changes selection state but doesn't always trigger visual update.
+            // Physical click simulates user interaction and properly switches visible tab content.
+            if (controlType == UIA3ControlTypeIds.TabItem)
+            {
+                var tabClickPoint = GetClickablePointForClick(element) ?? fallbackClickPoint;
+                if (tabClickPoint.HasValue)
+                {
+                    PerformPhysicalClick(tabClickPoint.Value);
+                    // Give UI time to process the tab switch (WinForms needs this)
+                    Thread.Sleep(50);
+                    var tabInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    return UIAutomationResult.CreateSuccessCompact("click", tabInfo != null ? [tabInfo] : [], CreateDiagnostics(stopwatch));
+                }
+                // Fall back to Select() if no clickable point (e.g., tab header not visible)
+                if (element.TrySelect())
+                {
+                    Thread.Sleep(50);
+                    var tabInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    return UIAutomationResult.CreateSuccessCompact("click", tabInfo != null ? [tabInfo] : [], CreateDiagnostics(stopwatch));
+                }
+            }
+
+            // For Buttons: prefer physical click to ensure click handlers fire
+            // InvokePattern.Invoke() may report success but not trigger the actual click handler
+            // in some WinForms scenarios (especially for buttons on TabPages).
+            if (controlType == UIA3ControlTypeIds.Button)
+            {
+                var buttonClickPoint = GetClickablePointForClick(element) ?? fallbackClickPoint;
+                if (buttonClickPoint.HasValue)
+                {
+                    PerformPhysicalClick(buttonClickPoint.Value);
+                    Thread.Sleep(50);
+                    var buttonInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    if (buttonInfo == null)
+                    {
+                        // Click succeeded but element became unavailable (e.g., dialog opened/closed).
+                        return UIAutomationResult.CreateSuccessWithHint("click", "Click succeeded. Element may have triggered a dialog.", CreateDiagnostics(stopwatch));
+                    }
+                    return UIAutomationResult.CreateSuccessCompact("click", [buttonInfo], CreateDiagnostics(stopwatch));
+                }
+                // Fall back to InvokePattern if no clickable point
+                if (element.TryInvoke())
+                {
+                    Thread.Sleep(50);
+                    var buttonInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter);
+                    if (buttonInfo == null)
+                    {
+                        return UIAutomationResult.CreateSuccessWithHint("click", "Click succeeded. Element may have triggered a dialog.", CreateDiagnostics(stopwatch));
+                    }
+                    return UIAutomationResult.CreateSuccessCompact("click", [buttonInfo], CreateDiagnostics(stopwatch));
+                }
+            }
+
+            // Use the appropriate pattern based on control type
+            var clicked = controlType switch
+            {
+                // ListItem, TreeItem, RadioButton: Use SelectionItemPattern
+                UIA3ControlTypeIds.ListItem or
+                UIA3ControlTypeIds.TreeItem or
+                UIA3ControlTypeIds.RadioButton => element.TrySelect(),
+
+                // CheckBox: Use TogglePattern
+                UIA3ControlTypeIds.CheckBox => element.TryToggle(),
+
+                // MenuItem, Hyperlink, SplitButton: Use InvokePattern
+                UIA3ControlTypeIds.MenuItem or
+                UIA3ControlTypeIds.Hyperlink or
+                UIA3ControlTypeIds.SplitButton => element.TryInvoke(),
+
+                // All other control types: Use physical click at coordinates
+                _ => false
+            };
+
+            // If pattern-based click succeeded, return success
+            if (clicked)
             {
                 var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                 if (info == null)
@@ -101,8 +191,9 @@ public sealed partial class UIAutomationService
                 return UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
             }
 
-            // Fall back to clicking at element's clickable point
-            var clickablePoint = GetClickablePointForClick(element);
+            // For control types without specific patterns, or if pattern failed, use physical click
+            // Try current bounds first, then fall back to pre-computed coordinates from find
+            var clickablePoint = GetClickablePointForClick(element) ?? fallbackClickPoint;
             if (clickablePoint.HasValue)
             {
                 PerformPhysicalClick(clickablePoint.Value);
@@ -119,7 +210,7 @@ public sealed partial class UIAutomationService
             return UIAutomationResult.CreateFailure(
                 "click",
                 UIAutomationErrorType.PatternNotSupported,
-                "Element cannot be clicked: no Invoke pattern and no clickable point available.",
+                $"Element (ControlType={UIA3ControlTypeIds.ToName(controlType)}) cannot be clicked: pattern not supported and no clickable point available.",
                 CreateDiagnostics(stopwatch));
         }, cancellationToken);
     }
@@ -575,7 +666,9 @@ public sealed partial class UIAutomationService
 
         try
         {
-            return await PerformClickAsync(elementId, windowHandle, stopwatch, cancellationToken);
+            // ClickElementAsync is used when clicking by element ID (not from find result)
+            // No pre-computed click coordinates available, so pass null
+            return await PerformClickAsync(elementId, windowHandle, fallbackClickPoint: null, stopwatch, cancellationToken);
         }
         catch (COMException ex)
         {
@@ -761,6 +854,330 @@ public sealed partial class UIAutomationService
         highlightThread.Start();
 
         // Don't wait for the highlight - return immediately
+    }
+
+    /// <inheritdoc/>
+    public async Task<UIAutomationResult> SaveFileDialogAsync(string windowHandle, string filePath, CancellationToken cancellationToken = default)
+    {
+        // For Office apps (Word, Excel, PowerPoint, Visio, Publisher), use COM Interop
+        // instead of UI Automation. This is more reliable as modern Office apps don't
+        // use standard Save As dialogs.
+        var processName = OfficeComHelper.GetProcessNameFromHandle(windowHandle);
+        var officeAppType = OfficeComHelper.GetOfficeAppType(processName);
+
+        if (officeAppType != OfficeComHelper.OfficeAppType.None)
+        {
+            var comResult = OfficeComHelper.SaveDocument(officeAppType, filePath);
+            if (comResult.IsSuccess)
+            {
+                return UIAutomationResult.CreateSuccessWithHint("save_dialog", comResult.Message);
+            }
+            else
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save_dialog",
+                    UIAutomationErrorType.InternalError,
+                    comResult.Message);
+            }
+        }
+
+        // Non-Office apps: Use UI Automation to interact with Save As dialog
+        // Implementation based on FlaUI patterns:
+        // 1. Get the parent window element from handle
+        // 2. Find the modal Save As dialog as a child/descendant window (like FlaUI's ModalWindows property)
+        // 3. Find filename field by AutomationId "FileNameControlHost" (ComboBox containing Edit)
+        // 4. Type full path into the field (Windows handles folder navigation)
+        // 5. Click "Save" button by name
+        // 6. Handle "Confirm Save As" overwrite dialog if it appears
+        // 7. For Office apps: Detect Backstage and navigate through it if needed
+
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            // Phase 1: Find dialog and elements on STA thread
+            var findResult = await _staThread.ExecuteAsync(() =>
+            {
+                // Validate window handle format
+                if (!nint.TryParse(windowHandle, out var hwnd))
+                {
+                    return (Error: UIAutomationResult.CreateFailure(
+                        "save_dialog",
+                        UIAutomationErrorType.InvalidParameter,
+                        $"Invalid window handle format: '{windowHandle}'",
+                        CreateDiagnostics(stopwatch)), FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: (UIA.IUIAutomationElement?)null, IsOfficeBackstage: false);
+                }
+
+                // Strategy: Search desktop first for Save As dialog (more reliable when modal is showing)
+                // This avoids timeout issues when parent window is blocked by modal dialog.
+                var filenameCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost");
+                UIA.IUIAutomationElement? dialogElement = null;
+                UIA.IUIAutomationElement? filenameCombo = null;
+
+                // Try 1: Search desktop children for "Save As" window (common file dialogs are top-level)
+                try
+                {
+                    var saveAsCondition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save As"));
+                    dialogElement = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, saveAsCondition);
+
+                    if (dialogElement != null)
+                    {
+                        filenameCombo = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, filenameCondition);
+                    }
+                }
+                catch (COMException)
+                {
+                    // Desktop search failed - continue with other strategies
+                }
+                catch (TimeoutException)
+                {
+                    // Desktop search timed out - continue with other strategies
+                }
+
+                // Try 2: Check if the provided handle IS the dialog itself
+                if (filenameCombo == null)
+                {
+                    try
+                    {
+                        var handleElement = Uia.ElementFromHandle(hwnd);
+                        if (handleElement != null)
+                        {
+                            // Check if this element itself has the FileNameControlHost
+                            filenameCombo = handleElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, filenameCondition);
+                            if (filenameCombo != null)
+                            {
+                                dialogElement = handleElement;
+                            }
+                        }
+                    }
+                    catch (COMException)
+                    {
+                        // Parent window may be blocked/unresponsive - continue
+                    }
+                    catch (TimeoutException)
+                    {
+                        // Parent window may timeout - continue
+                    }
+                }
+
+                if (filenameCombo != null && dialogElement != null)
+                {
+                    // Found standard dialog - find edit and save button
+                    var editCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+                    var editElement = filenameCombo.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
+                    var targetElement = editElement ?? filenameCombo;
+
+                    // Find Save button
+                    var saveCondition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save"));
+                    var saveButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, saveCondition);
+
+                    if (saveButton == null)
+                    {
+                        var buttonById = Uia.CreateAndCondition(
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
+                        saveButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonById);
+                    }
+
+                    return (Error: (UIAutomationResult?)null, FilenameElement: targetElement, SaveButton: saveButton, IsOfficeBackstage: false);
+                }
+
+                // Try Office Backstage - look for Browse button (only if we have a dialog element)
+                if (dialogElement != null)
+                {
+                    var browseCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Browse");
+                    var browseButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, browseCondition);
+
+                    if (browseButton != null)
+                    {
+                        return (Error: (UIAutomationResult?)null, FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: browseButton, IsOfficeBackstage: true);
+                    }
+                }
+
+                return (Error: UIAutomationResult.CreateFailure(
+                    "save_dialog",
+                    UIAutomationErrorType.ElementNotFound,
+                    "Could not find filename field. Neither standard Windows dialog (FileNameControlHost) nor Office Backstage detected.",
+                    CreateDiagnostics(stopwatch),
+                    "Ensure the Save As dialog is open and visible."), FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: (UIA.IUIAutomationElement?)null, IsOfficeBackstage: false);
+            }, cancellationToken);
+
+            // Check for errors
+            if (findResult.Error != null)
+            {
+                return findResult.Error;
+            }
+
+            // Phase 2: Handle Office Backstage if detected
+            if (findResult.IsOfficeBackstage && findResult.SaveButton != null)
+            {
+                // Click Browse to open standard file dialog
+                await _staThread.ExecuteAsync(() =>
+                {
+                    if (!findResult.SaveButton.TryInvoke())
+                    {
+                        var rect = findResult.SaveButton.CurrentBoundingRectangle;
+                        _mouseService.ClickAsync((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2, cancellationToken: cancellationToken).GetAwaiter().GetResult();
+                    }
+                    return true;
+                }, cancellationToken);
+
+                Thread.Sleep(500); // Wait for file dialog to open
+
+                // Recursively call to handle the now-open standard dialog
+                // Find the new Save As dialog window
+                var newDialogHandle = await _staThread.ExecuteAsync(() =>
+                {
+                    var saveAsCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save As");
+                    var saveAsDialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, saveAsCondition);
+                    if (saveAsDialog != null)
+                    {
+                        return saveAsDialog.CurrentNativeWindowHandle.ToString();
+                    }
+                    return windowHandle; // Fallback to original
+                }, cancellationToken);
+
+                return await SaveFileDialogAsync(newDialogHandle, filePath, cancellationToken);
+            }
+
+            // Phase 3: Standard dialog - set value and click save
+            if (findResult.FilenameElement == null)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save_dialog",
+                    UIAutomationErrorType.ElementNotFound,
+                    "Could not find filename field.",
+                    CreateDiagnostics(stopwatch));
+            }
+
+            // Set the filename value
+            bool valueSet = await _staThread.ExecuteAsync(() =>
+            {
+                return findResult.FilenameElement.TrySetValue(filePath);
+            }, cancellationToken);
+
+            // Fallback: Use keyboard input
+            if (!valueSet)
+            {
+                await _staThread.ExecuteAsync(() =>
+                {
+                    try
+                    {
+                        findResult.FilenameElement.SetFocus();
+                    }
+                    catch
+                    {
+                        // Best effort focus
+                    }
+                    return true;
+                }, cancellationToken);
+
+                Thread.Sleep(50);
+                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                Thread.Sleep(30);
+                await _keyboardService.TypeTextAsync(filePath, cancellationToken);
+                Thread.Sleep(50);
+            }
+
+            // Click Save button
+            if (findResult.SaveButton == null)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save_dialog",
+                    UIAutomationErrorType.ElementNotFound,
+                    "Could not find Save button in the dialog.",
+                    CreateDiagnostics(stopwatch),
+                    "The filename was entered but the Save button could not be found.");
+            }
+
+            bool clicked = await _staThread.ExecuteAsync(() =>
+            {
+                return findResult.SaveButton.TryInvoke();
+            }, cancellationToken);
+
+            if (!clicked)
+            {
+                var rect = await _staThread.ExecuteAsync(() => findResult.SaveButton.CurrentBoundingRectangle, cancellationToken);
+                await _mouseService.ClickAsync((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2, cancellationToken: cancellationToken);
+            }
+
+            Thread.Sleep(200);
+
+            // Handle overwrite confirmation
+            await HandleOverwriteConfirmationAsync(cancellationToken);
+
+            return UIAutomationResult.CreateSuccess("save_dialog", CreateDiagnostics(stopwatch));
+        }
+        catch (COMException ex)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save_dialog",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "SaveFileDialog"),
+                CreateDiagnostics(stopwatch));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save_dialog",
+                UIAutomationErrorType.InternalError,
+                $"SaveFileDialog failed: {ex.Message}",
+                CreateDiagnostics(stopwatch));
+        }
+    }
+
+    /// <summary>
+    /// Handles the "Confirm Save As" overwrite confirmation dialog if it appears.
+    /// </summary>
+    private async Task HandleOverwriteConfirmationAsync(CancellationToken cancellationToken)
+    {
+        // Check for common overwrite confirmation dialogs
+        var confirmNames = new[] { "Confirm Save As", "Replace or Skip Files", "Confirm" };
+        var buttonNames = new[] { "Yes", "Replace", "Confirm", "&Yes" };
+
+        var buttonToClick = await _staThread.ExecuteAsync(() =>
+        {
+            foreach (var confirmName in confirmNames)
+            {
+                var confirmDialogCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, confirmName);
+                var confirmDialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, confirmDialogCondition);
+
+                if (confirmDialog != null)
+                {
+                    foreach (var buttonName in buttonNames)
+                    {
+                        var yesCondition = Uia.CreateAndCondition(
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, buttonName));
+                        var yesButton = confirmDialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, yesCondition);
+
+                        if (yesButton != null)
+                        {
+                            return yesButton;
+                        }
+                    }
+                }
+            }
+            return (UIA.IUIAutomationElement?)null;
+        }, cancellationToken);
+
+        if (buttonToClick != null)
+        {
+            bool clicked = await _staThread.ExecuteAsync(() => buttonToClick.TryInvoke(), cancellationToken);
+
+            if (!clicked)
+            {
+                var rect = await _staThread.ExecuteAsync(() => buttonToClick.CurrentBoundingRectangle, cancellationToken);
+                await _mouseService.ClickAsync(
+                    (rect.left + rect.right) / 2,
+                    (rect.top + rect.bottom) / 2,
+                    cancellationToken: cancellationToken);
+            }
+        }
     }
 
     /// <summary>

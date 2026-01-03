@@ -66,6 +66,7 @@ public sealed class UIA3Automation : IDisposable
     /// <summary>
     /// Gets an element from a window handle.
     /// </summary>
+    /// <returns>The automation element, or null if the window handle is invalid or inaccessible.</returns>
     public UIA.IUIAutomationElement? ElementFromHandle(nint hwnd)
     {
         try
@@ -74,6 +75,12 @@ public sealed class UIA3Automation : IDisposable
         }
         catch (COMException)
         {
+            // Window handle may be invalid, stale, or the window may be unresponsive
+            return null;
+        }
+        catch (TimeoutException)
+        {
+            // COM operation may timeout for unresponsive windows
             return null;
         }
     }
@@ -257,6 +264,9 @@ internal static class UIA3PropertyIds
     internal const int IsSelectionItemPatternAvailable = 30036;
     internal const int IsTogglePatternAvailable = 30041;
     internal const int IsValuePatternAvailable = 30043;
+
+    // Window pattern properties
+    internal const int WindowIsModal = 30077;
 }
 
 /// <summary>

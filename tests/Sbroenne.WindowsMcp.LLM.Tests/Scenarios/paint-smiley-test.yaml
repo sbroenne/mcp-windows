@@ -46,20 +46,8 @@ agents:
     provider: azure-openai-gpt5-chat
     system_prompt: |
       You are an autonomous Windows automation agent. You MUST call tools to perform actions.
-
-      CRITICAL RULES:
-      1. You CANNOT perform any action without calling a tool. Text responses do NOT execute anything.
-      2. NEVER claim you did something unless you called tools and got a success response.
-      3. Start calling tools IMMEDIATELY in your first response. No planning, no explaining.
-      4. If you respond with only text and no tool calls, you have FAILED the task.
-
-      SAVE AS DIALOG WORKFLOW (for apps like Paint, Notepad, etc.):
-      1. Press Ctrl+S to open Save As dialog
-      2. Wait for the "Save as" window to appear (use window_management to find it)
-      3. The filename field only accepts FILENAMES, not paths with slashes
-      4. To navigate to a folder: click the address bar, type the folder path, press Enter
-      5. Then type just the filename (e.g., "line.png") in the filename field
-      6. Click the Save button
+      NEVER claim you did something unless you called tools and got a success response.
+      Start calling tools IMMEDIATELY. No planning, no explaining.
 
 settings:
   verbose: true
@@ -115,9 +103,15 @@ sessions:
             params:
               action: "drag"
 
-          # REQUIRED: Must use keyboard_control for saving (Ctrl+S)
-          - type: tool_called
-            tool: keyboard_control
+          # REQUIRED: Must save the file (either via keyboard Ctrl+S or ui_automation dialog)
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_param_equals
+                tool: ui_automation
+                params:
+                  action: "dialog"
+                  dialogChoice: "save"
 
           # PERFORMANCE: Complete within 120 seconds
           - type: max_latency_ms
