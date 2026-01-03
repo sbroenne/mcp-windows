@@ -14,6 +14,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.ElectronHarness;
 /// Validates that annotated screenshots correctly capture interactive elements in Chromium-based apps.
 /// </summary>
 [Collection("ElectronHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class AnnotatedScreenshotElectronTests : IDisposable
 {
     private readonly ElectronHarnessFixture _fixture;

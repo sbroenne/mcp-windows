@@ -207,8 +207,8 @@ public sealed class ElectronHarnessFixture : IDisposable
             _windowHandle = FindWindow(null, ELECTRON_HARNESS_TITLE);
             if (_windowHandle != nint.Zero)
             {
-                // Give the window a moment to fully initialize
-                Thread.Sleep(500);
+                // Give the window time to fully initialize (Chromium UIA tree needs extra time)
+                Thread.Sleep(1000);
                 return;
             }
 
