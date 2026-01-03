@@ -3,6 +3,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
@@ -123,21 +124,25 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             }
 
             // Step 4: Draw annotations on the screenshot
-            var (annotatedImageData, annotatedElements) = DrawAnnotations(
+            // Scale annotated images to reduce LLM tokens (coordinates remain in screen space)
+            var (annotatedImageData, annotatedElements, width, height, originalWidth, originalHeight) = DrawAnnotations(
                 screenshotResult.ImageData,
                 elementsResult.Elements,
                 windowRect.Value,
                 format,
-                quality);
+                quality,
+                ScreenshotConfiguration.DefaultMaxDimensionForAnnotated);
 
             _logger.LogCaptureSuccess(annotatedElements.Length);
 
             return AnnotatedScreenshotResult.CreateSuccess(
                 annotatedImageData,
                 format == ImageFormat.Jpeg ? "jpeg" : "png",
-                screenshotResult.Width ?? 0,
-                screenshotResult.Height ?? 0,
-                annotatedElements);
+                width,
+                height,
+                annotatedElements,
+                originalWidth,
+                originalHeight);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -311,12 +316,13 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// <summary>
     /// Draws numbered annotations on the screenshot and returns the annotated image with element mapping.
     /// </summary>
-    private (string ImageData, AnnotatedElement[] Elements) DrawAnnotations(
+    private (string ImageData, AnnotatedElement[] Elements, int Width, int Height, int? OriginalWidth, int? OriginalHeight) DrawAnnotations(
         string originalImageBase64,
         UIElementInfo[] elements,
         RECT windowRect,
         ImageFormat format,
-        int quality)
+        int quality,
+        int? maxDimension = null)
     {
         // Decode the original image
         var imageBytes = Convert.FromBase64String(originalImageBase64);
@@ -403,11 +409,17 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
             }
         }
 
-        // Encode to final format
-        var processed = _imageProcessor.Process(annotatedBitmap, format, quality);
+        // Encode to final format (with optional scaling for LLM token efficiency)
+        var processed = maxDimension.HasValue
+            ? _imageProcessor.ProcessWithScaling(annotatedBitmap, format, quality, maxDimension.Value)
+            : _imageProcessor.Process(annotatedBitmap, format, quality);
         var base64 = Convert.ToBase64String(processed.Data);
 
-        return (base64, [.. annotatedElements.OrderBy(e => e.Index)]);
+        // Return original dimensions only if scaling was applied
+        int? originalWidth = processed.Width != annotatedBitmap.Width ? annotatedBitmap.Width : null;
+        int? originalHeight = processed.Height != annotatedBitmap.Height ? annotatedBitmap.Height : null;
+
+        return (base64, [.. annotatedElements.OrderBy(e => e.Index)], processed.Width, processed.Height, originalWidth, originalHeight);
     }
 
     /// <summary>

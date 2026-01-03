@@ -102,3 +102,9 @@ tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/screenshots/
 # Runtime screenshots generated during test execution (not committed)
 **/bin/**/screenshots/
 nupkg/
+
+# LLM Test local configuration (user-specific settings)
+llm-tests.config.local.json
+
+# Agent-benchmark executable (downloaded on demand)
+agent-benchmark.exe

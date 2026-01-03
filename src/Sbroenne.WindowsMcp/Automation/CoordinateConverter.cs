@@ -78,4 +78,25 @@ public sealed class CoordinateConverter
 
         return (fallbackRect, primaryIndex);
     }
+
+    /// <summary>
+    /// Gets the origin (top-left corner) of a monitor in screen coordinates.
+    /// Used to convert monitor-relative coordinates back to screen coordinates.
+    /// </summary>
+    /// <param name="monitorIndex">The 0-based monitor index.</param>
+    /// <returns>The monitor origin as a Point.</returns>
+    public Capture.Point GetMonitorOrigin(int monitorIndex)
+    {
+        var monitors = _monitorService.GetMonitors();
+
+        if (monitorIndex >= 0 && monitorIndex < monitors.Count)
+        {
+            var monitor = monitors[monitorIndex];
+            return new Capture.Point { X = monitor.X, Y = monitor.Y };
+        }
+
+        // Fallback to primary monitor
+        var primary = _monitorService.GetPrimaryMonitor();
+        return new Capture.Point { X = primary.X, Y = primary.Y };
+    }
 }

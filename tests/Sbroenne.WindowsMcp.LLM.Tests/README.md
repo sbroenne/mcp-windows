@@ -1,6 +1,6 @@
-# Windows MCP Server - skUnit Integration Tests
+# Windows MCP Server - LLM Integration Tests
 
-This project contains integration tests for the Windows MCP Server using [skUnit](https://github.com/mehrandvd/skunit) - a semantic testing framework for AI applications.
+This project contains integration tests for the Windows MCP Server using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) - a framework for testing AI agents and MCP tool usage.
 
 ## Prerequisites
 
@@ -9,12 +9,12 @@ This project contains integration tests for the Windows MCP Server using [skUnit
 The tests require the MCP server executable to be built. Run the following command from the repository root:
 
 ```powershell
-dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj
+dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release
 ```
 
 ### 2. Azure OpenAI Configuration
 
-These tests use Azure OpenAI for semantic evaluations and MCP tool invocations. Configure the following environment variables:
+These tests use Azure OpenAI for LLM interactions and MCP tool invocations. Configure the following environment variables:
 
 - `AZURE_OPENAI_ENDPOINT` - Your Azure OpenAI endpoint URL
 - `AZURE_OPENAI_API_KEY` - Your Azure OpenAI API key
@@ -26,170 +26,231 @@ These tests automate Windows UI elements (Notepad, windows, keyboard/mouse). The
 - **NOT suitable for headless CI/CD pipelines**
 - Run on a Windows machine with an active desktop session
 
+### 4. Agent-Benchmark Tool
+
+The PowerShell runner script will automatically download agent-benchmark on first run. Alternatively, you can:
+- Download from [agent-benchmark releases](https://github.com/mykhaliev/agent-benchmark/releases)
+- Build from source: `git clone https://github.com/mykhaliev/agent-benchmark && cd agent-benchmark && go build`
+- Use a local Go project with `go run` mode (see Configuration below)
+
+## Configuration
+
+The test runner supports configuration via JSON files. Settings are loaded in this order (later overrides earlier):
+
+1. `llm-tests.config.json` - Shared defaults (committed to repo)
+2. `llm-tests.config.local.json` - Personal settings (git-ignored)
+3. Command-line parameters - Override everything
+
+### Configuration File
+
+Create `llm-tests.config.local.json` for your personal settings:
+
+```json
+{
+  "$schema": "./llm-tests.config.schema.json",
+  "model": "gpt-4o",
+  "agentBenchmarkPath": "../../../../agent-benchmark",
+  "agentBenchmarkMode": "go-run",
+  "verbose": false,
+  "build": false
+}
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `model` | string | `"gpt-4o"` | Azure OpenAI model deployment name |
+| `agentBenchmarkPath` | string | `null` | Path to agent-benchmark (absolute or relative to test dir) |
+| `agentBenchmarkMode` | string | `"executable"` | `"executable"` for .exe, `"go-run"` for Go project |
+| `verbose` | boolean | `false` | Show detailed output |
+| `build` | boolean | `false` | Build MCP server before tests |
+
+### Using a Local agent-benchmark
+
+If you have a local clone of agent-benchmark, you can run it directly with Go:
+
+```json
+{
+  "agentBenchmarkPath": "../../../../agent-benchmark",
+  "agentBenchmarkMode": "go-run"
+}
+```
+
+This runs `go run .` in the specified directory, which is useful for development.
+
 ## Running the Tests
 
+### Using PowerShell Runner (Recommended)
+
 ```powershell
-dotnet test tests/Sbroenne.WindowsMcp.McpTests/
+# Run all tests with gpt-4o (default)
+.\Run-LLMTests.ps1 -Build
+
+# Run with a specific model
+.\Run-LLMTests.ps1 -Model gpt-4.1
+
+# Run a specific scenario
+.\Run-LLMTests.ps1 -Scenario notepad-workflow.yaml
+```
+
+### Using agent-benchmark Directly
+
+```powershell
+# Build the server first
+dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release
+
+# Run a scenario
+agent-benchmark `
+    -test tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/notepad-workflow.yaml `
+    -endpoint $env:AZURE_OPENAI_ENDPOINT `
+    -key $env:AZURE_OPENAI_API_KEY `
+    -report report.html
 ```
 
 ## Project Structure
 
 ```
-Sbroenne.WindowsMcp.McpTests/
+Sbroenne.WindowsMcp.LLM.Tests/
 ├── Scenarios/
-│   └── NotepadWorkflow.md      # Multi-turn test scenario
-├── WindowsMcpTestBase.cs       # Base class (shared MCP server)
-├── WindowsMcpTests.cs          # xUnit test class
-└── README.md                   # This file
+│   ├── argument-assertion-test.yaml       # Basic argument validation
+│   ├── handle-based-window-management.yaml # Window lifecycle with handles
+│   └── notepad-workflow.yaml              # Complete Notepad automation
+├── Run-LLMTests.ps1                       # PowerShell test runner
+├── llm-tests.config.json                  # Shared configuration defaults
+├── llm-tests.config.local.json            # Personal settings (git-ignored)
+├── llm-tests.config.schema.json           # JSON schema for config files
+├── TestResults/                           # HTML reports (generated)
+└── README.md                              # This file
 ```
 
-## How skUnit Works
+## How agent-benchmark Works
 
-skUnit uses Markdown files to define test scenarios. Each scenario contains:
+Agent-benchmark uses YAML files to define test scenarios. Each scenario contains:
 
-1. **USER prompts** - What to ask the AI/MCP tools to do
-2. **AGENT assertions** - What to verify about the response
+1. **Steps** - Sequential prompts sent to the LLM
+2. **Assertions** - Validations for each step's response and tool usage
 
 ### Assertion Types
 
-- **FunctionCall** - Verifies that a specific MCP tool was invoked
-- **SemanticCondition** - Uses AI to evaluate whether a condition is semantically true
+- **tool_name** - Verifies a specific MCP tool was called
+- **tool_call_contains** - Verifies tool call arguments contain specific text
+- **response_contains** - Verifies the response contains specific text
+- **anyOf** - Passes if ANY child assertion passes (OR logic)
+- **allOf** - Passes if ALL child assertions pass (AND logic)
+- **not** - Passes if child assertion FAILS (negation)
 
 ### Example Scenario
 
-```markdown
-# SCENARIO Open Notepad
+```yaml
+name: "Open and Close Notepad"
+test_delay: 60s
 
-## [USER]
-Open Notepad using keyboard shortcuts
+mcp_servers:
+  - name: windows-mcp
+    command: "path/to/Sbroenne.WindowsMcp.exe"
 
-## [AGENT]
+scenarios:
+  - name: "Basic Window Operations"
+    model: "gpt-4o"
+    system_prompt: |
+      You are a Windows automation assistant.
+    
+    steps:
+      - prompt: "Open Notepad for me."
+        assertions:
+          - tool_name: window_management
+          - anyOf:
+              - tool_call_contains: '"action":"launch"'
+              - tool_call_contains: '"action":"Launch"'
 
-### CHECK FunctionCall
-```json
-{
-  "function_name": "keyboard_control"
-}
+      - prompt: "Close the Notepad window."
+        assertions:
+          - tool_name: window_management
+          - tool_call_contains: '"handle"'
 ```
 
-### CHECK SemanticCondition
-The response indicates Notepad was opened
-```
+## Test Scenarios
 
-## Test Architecture
+### argument-assertion-test.yaml
+Tests that function call arguments are correctly passed to MCP tools. Validates launch and close operations with proper handle usage.
 
-The tests follow the skUnit MCP Server testing pattern from [Demo.TddMcp](https://github.com/mehrandvd/skunit/tree/main/demos/Demo.TddMcp):
+### handle-based-window-management.yaml
+Tests the correct handle-based workflow for window management operations. Follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
 
-- **WindowsMcpTestBase** - Base class providing:
-  - `ScenarioRunner` - ChatScenarioRunner for running scenarios and assertions
-  - `SystemUnderTestClient` - Chat client with MCP tools attached
-  - Shared MCP server instance across tests
+Steps:
+1. Launch Notepad
+2. Find window to get handle
+3. Minimize with handle
+4. Restore with handle
+5. Close with handle
 
-- **WindowsMcpTests** - Test class that loads `.md` scenarios and runs them
-
-## Adding New Scenarios
-
-1. Create a new `.md` file in `Scenarios/`
-2. Follow the skUnit scenario format with `[USER]` prompts and `[AGENT]` + `ASSERT` assertions
-3. Add a test method that loads and runs the scenario:
-
-```csharp
-[Fact]
-public async Task MyNewScenario_WorksAsync()
-{
-    var scenarios = ChatScenario.LoadFromText(await File.ReadAllTextAsync("Scenarios/MyScenario.md"));
-    await ScenarioRunner.RunAsync(scenarios, SystemUnderTestClient);
-}
-```
+### notepad-workflow.yaml
+Tests a complete Notepad automation workflow:
+1. Open Notepad
+2. Type text (using keyboard_control or ui_automation)
+3. Take screenshot
+4. Check window state
+5. Close without saving
+6. Verify window is closed
 
 ## Writing Good Test Scenarios
 
 ### User Prompts: Use Natural Language
 
 **❌ BAD - Leading the witness (tells LLM exactly what to do):**
-```markdown
-## [USER]
-Use window_management with action "find" and title "Notepad". 
-Then use the handle parameter to call action "close".
+```yaml
+prompt: "Use window_management with action 'find' and title 'Notepad'"
 ```
 
 **✅ GOOD - Natural user request (tests if LLM understands the tools):**
-```markdown
-## [USER]
-I need to find that Notepad window so I can work with it.
+```yaml
+prompt: "I need to find that Notepad window so I can work with it."
 ```
 
-The test should verify the LLM can figure out the correct approach from tool descriptions alone, not by being told exactly what to do.
+The test should verify the LLM can figure out the correct approach from tool descriptions alone.
 
-### Assertions: Be Strict
+### Assertions: Use anyOf for Flexibility
 
-**❌ BAD - Too loose (matches almost anything):**
-```markdown
-### ASSERT ContainsAny
-success, done, ok, window, notepad
+LLMs may achieve the same goal using different tools or parameters. Use `anyOf` to accept multiple valid approaches:
+
+```yaml
+assertions:
+  # Accept either keyboard_control or ui_automation for typing
+  - anyOf:
+      - tool_name: keyboard_control
+      - allOf:
+          - tool_name: ui_automation
+          - anyOf:
+              - tool_call_contains: '"action":"Type"'
+              - tool_call_contains: '"action":"setValue"'
 ```
 
-**✅ GOOD - Specific required keywords:**
-```markdown
-### ASSERT ContainsAll
-found, handle
+### Handle Rate Limiting
+
+Azure OpenAI has rate limits. Use `test_delay` to add delays between tests:
+
+```yaml
+test_delay: 60s  # 60 second delay between scenarios
 ```
 
-### FunctionCall Assertions
+## Migrating from skUnit
 
-FunctionCall assertions verify that a specific MCP tool was called:
+This project was migrated from skUnit to agent-benchmark. Key differences:
 
-```markdown
-### ASSERT FunctionCall
-```json
-{
-  "function_name": "window_management"
-}
-```
+| Feature | skUnit | agent-benchmark |
+|---------|--------|-----------------|
+| Format | Markdown (.md) | YAML |
+| Language | C#/.NET | Go (standalone binary) |
+| FunctionCall | JSON object | tool_name + tool_call_contains |
+| ContainsAny | Comma-separated | anyOf with response_contains |
+| ContainsAll | Comma-separated | allOf with response_contains |
+| CI Integration | xUnit | Exit codes + HTML reports |
 
-> **Note**: `function_name` must be a simple string, not an array. Use `SemanticCondition` and `ContainsAll` assertions to verify behavior rather than trying to assert on specific argument values.
+## Test Reports
 
-### SemanticCondition: Be Specific
-
-**❌ BAD - Vague condition:**
-```markdown
-### ASSERT SemanticCondition
-The operation was successful
-```
-
-**✅ GOOD - Specific expected behavior:**
-```markdown
-### ASSERT SemanticCondition
-The Notepad window was successfully closed using the explicit window handle
-```
-
-### Testing Handle-Based Workflows
-
-When testing tools that require window handles (Constitution Principle VI: tools are dumb actuators):
-
-1. **First turn**: User asks to find/launch a window
-2. **Assert FunctionCall**: Check that `window_management` was called
-3. **Assert ContainsAll**: Verify `handle` is mentioned in the response
-4. **Subsequent turns**: User refers to "that window" naturally
-5. **Assert SemanticCondition**: Verify the operation used the handle appropriately
-
-## Troubleshooting
-
-### "MCP server executable not found"
-
-Build the main project first:
-```powershell
-dotnet build src/Sbroenne.WindowsMcp/
-```
-
-### "Azure OpenAI endpoint not configured"
-
-Set the environment variables:
-```powershell
-$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.cognitiveservices.azure.com"
-$env:AZURE_OPENAI_API_KEY = "your-api-key"
-```
-
-### Tests Fail on Headless Server
-
-These tests require a desktop environment. They cannot run on headless servers or in standard CI containers.
+HTML reports are generated in `TestResults/` directory after each test run. Reports include:
+- Scenario results (pass/fail)
+- Step-by-step execution details
+- Tool calls and responses
+- Assertion results

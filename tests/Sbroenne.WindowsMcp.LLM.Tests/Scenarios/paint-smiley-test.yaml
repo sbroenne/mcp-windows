@@ -1,0 +1,131 @@
+# Windows Paint Line Test
+#
+# Testing framework: Agent Benchmark
+# https://github.com/mykhaliev/agent-benchmark
+#
+# Test: Draw a simple diagonal line in Paint and save it
+# Success = image file saved to disk (verified by filesystem tools)
+#
+# Prerequisites:
+# - Windows 10/11 with Paint app
+# - Windows MCP Server
+# - Filesystem MCP Server (for verification)
+# - Azure OpenAI with sufficient TPM quota (recommended: S1+ tier)
+# - Environment variables set:
+#   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+#   - TEST_RESULTS_PATH: Directory for output files
+
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 15s
+
+  - name: filesystem
+    type: stdio
+    command: "npx -y @modelcontextprotocol/server-filesystem {{TEST_RESULTS_PATH}}"
+    server_delay: 15s
+
+agents:
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+      - name: filesystem
+    provider: azure-openai-gpt5-chat
+    system_prompt: |
+      You are an autonomous Windows automation agent. You MUST call tools to perform actions.
+      NEVER claim you did something unless you called tools and got a success response.
+      Start calling tools IMMEDIATELY. No planning, no explaining.
+
+settings:
+  verbose: true
+  max_iterations: 25
+
+sessions:
+  - name: Paint Line Test
+    tests:
+      - name: "Draw a line in Paint and save"
+        description: "Open Paint, draw a single diagonal line, save the image, and verify with filesystem"
+        prompt: |
+          Delete "{{TEST_RESULTS_PATH}}/line.png" if it exists, and close any existing Paint windows.
+
+          Then open Paint, find out where the canvas area is and draw a diagonal line on the canvas, save it as "{{TEST_RESULTS_PATH}}/line.png", and close Paint.
+
+          Finally, verify the file exists and was created within the last minute.
+
+          Report "VERIFIED: Line saved successfully" if the file exists and was recently created.
+          Report "FAILED: File not found or stale" if the file doesn't exist or is old.
+        assertions:
+          # OUTCOME: LLM verified the file was saved
+          - type: output_regex
+            pattern: "(?i)VERIFIED.*line.*saved"
+
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "FAILED"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # REQUIRED: Must use window_management to launch Paint
+          - type: tool_called
+            tool: window_management
+
+          # VERIFY: Paint was launched
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "launch"
+              programPath: "mspaint.exe"
+
+          # REQUIRED: Must use mouse_control to draw the line
+          - type: tool_called
+            tool: mouse_control
+
+          # VERIFY: Mouse drag was used for drawing
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
+
+          # REQUIRED: Must save the file (either via keyboard Ctrl+S or ui_automation dialog)
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_param_equals
+                tool: ui_automation
+                params:
+                  action: "dialog"
+                  dialogChoice: "save"
+
+          # PERFORMANCE: Complete within 120 seconds
+          - type: max_latency_ms
+            value: 120000
+
+          # EFFICIENCY: Stay under token limits
+          - type: max_tokens
+            value: 120000
+
+          # VERIFICATION: Must use filesystem tools to verify the file exists
+          - anyOf:
+              - type: tool_called
+                tool: read_file
+              - type: tool_called
+                tool: list_directory
+              - type: tool_called
+                tool: get_file_info

@@ -79,15 +79,15 @@ public sealed partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Window control and application launching. launch(programPath) starts a NEW instance and returns handle - only call ONCE per app, do NOT call again if already open. After launch, the window is focused and ready for keyboard_control. Use activate(handle) to refocus an existing window. CLOSE: sends close request but if app has unsaved changes a dialog appears - use ui_automation to click 'Don't Save' or 'Save' to dismiss it. Actions: launch, list, find, activate, close, minimize, maximize, restore, move, resize.")]
+    [Description("Window control and application launching. launch(programPath) starts a NEW instance and returns handle - only call ONCE per app, do NOT call again if already open. After launch, the window is focused and ready for keyboard_control. Use activate(handle) to refocus an existing window. CLOSE: sends close request but if app has unsaved changes a dialog appears - use ui_automation to click 'Don't Save' or 'Save' to dismiss it.")]
     [return: Description("The result includes window info (handle, title, process_name, state). SAVE the 'handle' to use with ui_automation, screenshot_control, and close.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The window action to perform: launch (start an application), list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible")] string action,
-        [Description("Program to launch (required for launch action). Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'mspaint.exe') or full path (e.g., 'C:\\Windows\\notepad.exe').")] string? programPath = null,
-        [Description("Command-line arguments for the launched program (optional, for launch action).")] string? arguments = null,
-        [Description("Working directory for the launched program (optional, for launch action).")] string? workingDirectory = null,
-        [Description("Wait for the launched application window to appear (default: true for launch action).")] bool waitForWindow = true,
+        [Description("The window action to perform.")] WindowAction action,
+        [Description("Program to launch (e.g., 'notepad.exe' or full path)")] string? programPath = null,
+        [Description("Command-line arguments for launch")] string? arguments = null,
+        [Description("Working directory for launch")] string? workingDirectory = null,
+        [Description("Wait for window to appear (default: true)")] bool waitForWindow = true,
         [Description("Window handle for actions that target a specific window (e.g., activate, close, minimize). Get the handle from the 'list' or 'find' action.")] string? handle = null,
         [Description("Window title to search for (required for find and wait_for)")] string? title = null,
         [Description("Filter windows by title or process name (for list action)")] string? filter = null,
@@ -98,10 +98,10 @@ public sealed partial class WindowManagementTool
         [Description("Width for resize or set_bounds action")] int? width = null,
         [Description("Height for resize or set_bounds action")] int? height = null,
         [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int? timeoutMs = null,
-        [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
-        [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
+        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
+        [Description("Monitor index (0-based, for 3+ monitors)")] int? monitorIndex = null,
         [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
-        [Description("Exclude windows whose title contains this text (for list action). Useful for filtering out dialogs or popups.")] string? excludeTitle = null,
+        [Description("Exclude windows with this title substring")] string? excludeTitle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -110,36 +110,16 @@ public sealed partial class WindowManagementTool
 
         // Create MCP client logger for observability
         var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("WindowManagement");
-        clientLogger?.LogWindowOperationStarted(action ?? "null");
+        clientLogger?.LogWindowOperationStarted(action.ToString());
 
         try
         {
-            // Validate and parse the action
-            if (string.IsNullOrWhiteSpace(action))
-            {
-                var result = WindowManagementResult.CreateFailure(
-                    WindowManagementErrorCode.InvalidAction,
-                    "Action parameter is required");
-                _logger?.LogWindowOperation("null", success: false, errorMessage: result.Error);
-                return result;
-            }
-
-            var windowAction = ParseAction(action);
-            if (windowAction is null)
-            {
-                var result = WindowManagementResult.CreateFailure(
-                    WindowManagementErrorCode.InvalidAction,
-                    $"Unknown action: '{action}'. Valid actions are: launch, list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor");
-                _logger?.LogWindowOperation(action, success: false, errorMessage: result.Error);
-                return result;
-            }
-
             // Use handle directly - no app resolution (LLMs should call list/find first)
             string? resolvedHandle = handle;
 
             WindowManagementResult operationResult;
 
-            switch (windowAction.Value)
+            switch (action)
             {
                 case WindowAction.Launch:
                     operationResult = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
@@ -223,7 +203,7 @@ public sealed partial class WindowManagementTool
             stopwatch.Stop();
 
             _logger?.LogWindowOperation(
-                action,
+                action.ToString(),
                 success: operationResult.Success,
                 windowCount: operationResult.Windows?.Count,
                 windowTitle: operationResult.Window?.Title,
@@ -237,13 +217,13 @@ public sealed partial class WindowManagementTool
             var errorResult = WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.Timeout,
                 "Operation was cancelled");
-            _logger?.LogWindowOperation(action ?? "null", success: false, errorMessage: errorResult.Error);
+            _logger?.LogWindowOperation(action.ToString(), success: false, errorMessage: errorResult.Error);
             return errorResult;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             stopwatch.Stop();
-            _logger?.LogError(action ?? "null", ex);
+            _logger?.LogError(action.ToString(), ex);
             var errorResult = WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SystemError,
                 $"An unexpected error occurred: {ex.Message}");
@@ -810,32 +790,6 @@ public sealed partial class WindowManagementTool
         PrimaryScreen,
         /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
         SecondaryScreen
-    }
-
-    private static WindowAction? ParseAction(string action)
-    {
-        return action.ToLowerInvariant() switch
-        {
-            "launch" => WindowAction.Launch,
-            "list" => WindowAction.List,
-            "find" => WindowAction.Find,
-            "activate" => WindowAction.Activate,
-            "get_foreground" => WindowAction.GetForeground,
-            "minimize" => WindowAction.Minimize,
-            "maximize" => WindowAction.Maximize,
-            "restore" => WindowAction.Restore,
-            "close" => WindowAction.Close,
-            "move" => WindowAction.Move,
-            "resize" => WindowAction.Resize,
-            "set_bounds" => WindowAction.SetBounds,
-            "wait_for" => WindowAction.WaitFor,
-            "move_to_monitor" => WindowAction.MoveToMonitor,
-            "get_state" => WindowAction.GetState,
-            "wait_for_state" => WindowAction.WaitForState,
-            "move_and_activate" or "moveandactivate" => WindowAction.MoveAndActivate,
-            "ensure_visible" or "ensurevisible" => WindowAction.EnsureVisible,
-            _ => null,
-        };
     }
 
 }

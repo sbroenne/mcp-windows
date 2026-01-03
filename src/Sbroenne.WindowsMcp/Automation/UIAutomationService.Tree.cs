@@ -234,7 +234,7 @@ public sealed partial class UIAutomationService
             if (Equals(currentValue, targetValue))
             {
                 stopwatch.Stop();
-                return UIAutomationResult.CreateSuccess(
+                return UIAutomationResult.CreateSuccessCompact(
                     "wait_for_state",
                     [element],
                     new UIAutomationDiagnostics { DurationMs = stopwatch.ElapsedMilliseconds });
@@ -302,23 +302,8 @@ public sealed partial class UIAutomationService
         try
         {
             // Create cache request with TreeScope_Subtree to cache entire tree including children
-            var cacheRequest = Uia.CreateCacheRequest();
-
-            // Add all properties needed for UIElementInfo conversion
-            cacheRequest.AddProperty(UIA3PropertyIds.Name);
-            cacheRequest.AddProperty(UIA3PropertyIds.AutomationId);
-            cacheRequest.AddProperty(UIA3PropertyIds.ControlType);
-            cacheRequest.AddProperty(UIA3PropertyIds.BoundingRectangle);
-            cacheRequest.AddProperty(UIA3PropertyIds.IsEnabled);
-            cacheRequest.AddProperty(UIA3PropertyIds.IsOffscreen);
-            cacheRequest.AddProperty(UIA3PropertyIds.FrameworkId);
-            cacheRequest.AddProperty(UIA3PropertyIds.ClassName);
-            cacheRequest.AddProperty(UIA3PropertyIds.NativeWindowHandle);
-            cacheRequest.AddProperty(UIA3PropertyIds.RuntimeId);
-
-            // CRITICAL: Set TreeScope to Subtree so GetCachedChildren works on ALL descendants
-            // TreeScope_Subtree = Element + Descendants - caches full tree structure
-            cacheRequest.TreeScope = UIA.TreeScope.TreeScope_Subtree;
+            // Uses shared cache request that includes all needed properties plus pattern availability
+            var cacheRequest = Uia.CreateElementCacheRequest(UIA.TreeScope.TreeScope_Subtree);
 
             // ONE COM call to fetch entire tree with all properties and children cached
             var cachedRoot = rootElement.FindFirstBuildCache(
@@ -416,7 +401,7 @@ public sealed partial class UIAutomationService
                 return null;
             }
 
-            var elementInfo = ConvertToElementInfoFromCache(element, rootElement, _coordinateConverter, null, skipPatterns: true);
+            var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
             if (elementInfo == null)
             {
                 return childInfos.Count == 1 ? childInfos[0] : null;
@@ -436,7 +421,7 @@ public sealed partial class UIAutomationService
             };
         }
 
-        var info = ConvertToElementInfoFromCache(element, rootElement, _coordinateConverter, null, skipPatterns: true);
+        var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
         if (info == null)
         {
             return null;

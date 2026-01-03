@@ -9,6 +9,8 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Tools;
 
+using Sbroenne.WindowsMcp.Models;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
@@ -45,7 +47,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: null);
 
         // Assert
@@ -63,7 +65,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: "");
 
         // Assert
@@ -81,7 +83,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: "   ");
 
         // Assert
@@ -99,7 +101,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: "nonexistent_program_xyz_12345.exe");
 
         // Assert
@@ -122,7 +124,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
             // For now, test with a simple built-in Windows utility that starts quickly
             var result = await _tool.ExecuteAsync(
                 context,
-                action: "launch",
+                action: WindowAction.Launch,
                 programPath: "cmd.exe",
                 arguments: "/c echo test",
                 waitForWindow: false);
@@ -135,7 +137,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var launchResult = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: testHarnessPath);
 
         // Assert
@@ -153,7 +155,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act - launch cmd with echo, don't wait for window
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: "cmd.exe",
             arguments: "/c timeout /t 5",
             waitForWindow: false);
@@ -176,7 +178,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act - test that "launch" action is recognized (with invalid path to avoid actually launching)
         var result = await _tool.ExecuteAsync(
             context,
-            action: "launch",
+            action: WindowAction.Launch,
             programPath: "");
 
         // Assert - should fail with programPath error, not "unknown action" error
@@ -228,3 +230,5 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
     }
 #pragma warning restore SYSLIB0050
 }
+
+

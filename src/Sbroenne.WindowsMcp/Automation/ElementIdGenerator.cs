@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Runtime.Versioning;
 using UIA = Interop.UIAutomationClient;
 
@@ -5,18 +6,110 @@ namespace Sbroenne.WindowsMcp.Automation;
 
 /// <summary>
 /// Generates and resolves unique element IDs for UI Automation elements.
-/// Format: "window:{hwnd}|runtime:{id}|path:{treePath}"
+/// Uses short IDs (1, 2, 3...) externally, mapped to full IDs internally.
+/// Full format: "window:{hwnd}|runtime:{id}|path:{treePath}"
+/// Thread-safe caching is built-in to minimize duplicate ID generation.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class ElementIdGenerator
+public static class ElementIdGenerator
 {
+    // Thread-safe cache for mapping short IDs to full IDs
+    private static readonly ConcurrentDictionary<string, string> s_shortToFull = new();
+    private static readonly ConcurrentDictionary<string, string> s_fullToShort = new();
+    private static long s_counter;
+
     /// <summary>
     /// Generates a unique ID for a UI Automation element.
+    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
     /// </summary>
     /// <param name="element">The automation element.</param>
     /// <param name="rootElement">The root element (window) for path calculation.</param>
-    /// <returns>A unique element ID string.</returns>
+    /// <returns>A short element ID string.</returns>
     public static string GenerateId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        var fullId = GenerateFullId(element, rootElement);
+        return RegisterFullId(fullId);
+    }
+
+    /// <summary>
+    /// Generates a unique ID for a UI Automation element optimized for token usage.
+    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
+    /// </summary>
+    /// <param name="element">The automation element.</param>
+    /// <param name="rootElement">The root element (window) for path calculation.</param>
+    /// <returns>A short element ID string optimized for LLM token usage.</returns>
+    public static string GenerateFastId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(rootElement);
+
+        var fullId = GenerateFastFullId(element, rootElement);
+        return RegisterFullId(fullId);
+    }
+
+    /// <summary>
+    /// Generates a unique ID for an element using only cached properties.
+    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
+    /// </summary>
+    /// <param name="element">The automation element.</param>
+    /// <param name="rootElement">The root element (window) for path calculation.</param>
+    /// <returns>A short element ID string.</returns>
+    public static string GenerateFastIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(rootElement);
+
+        var fullId = GenerateFastFullIdFromCurrent(element, rootElement);
+        return RegisterFullId(fullId);
+    }
+
+    /// <summary>
+    /// Resolves a short element ID to the actual UI Automation element.
+    /// </summary>
+    /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
+    /// <returns>The UI Automation element, or null if resolution fails.</returns>
+    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId)
+    {
+        ArgumentNullException.ThrowIfNull(elementId);
+
+        // Try to resolve short ID to full ID
+        var fullId = ResolveFullId(elementId) ?? elementId;
+
+        var parts = ParseElementId(fullId);
+        if (parts == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            UIA.IUIAutomationElement? element = null;
+
+            // Try to find by runtime ID first (most reliable)
+            if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
+            {
+                var runtimeId = parts.RuntimeId.Split('.').Select(int.Parse).ToArray();
+                element = FindByRuntimeId(parts.WindowHandle, runtimeId);
+            }
+
+            // Fall back to tree path if runtime ID didn't work
+            if (element == null && !string.IsNullOrEmpty(parts.TreePath) && parts.TreePath != "stale")
+            {
+                element = FindByTreePath(parts.WindowHandle, parts.TreePath);
+            }
+
+            return element;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Generates the full internal ID for an element (not for external use).
+    /// </summary>
+    private static string GenerateFullId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
     {
         ArgumentNullException.ThrowIfNull(element);
         ArgumentNullException.ThrowIfNull(rootElement);
@@ -54,47 +147,87 @@ public sealed class ElementIdGenerator
         }
         catch
         {
-            return $"window:0|runtime:0|path:stale";
+            return "window:0|runtime:0|path:stale";
         }
     }
 
     /// <summary>
-    /// Resolves an element ID to an IUIAutomationElement.
+    /// Generates the fast full ID (cached properties, no tree path).
     /// </summary>
-    /// <param name="elementId">The element ID to resolve.</param>
-    /// <returns>The IUIAutomationElement, or null if the element is stale.</returns>
-    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId)
+    private static string GenerateFastFullId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
     {
-        ArgumentNullException.ThrowIfNull(elementId);
-
-        var parts = ParseElementId(elementId);
-        if (parts == null)
-        {
-            return null;
-        }
-
         try
         {
-            UIA.IUIAutomationElement? element = null;
+            // Get cached window handle (fast - no COM call)
+            var windowHandle = element.GetCachedNativeWindowHandle();
 
-            // Try to find by runtime ID first (most reliable)
-            if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
+            // If no handle on element, use root's handle
+            if (windowHandle == 0)
             {
-                var runtimeId = parts.RuntimeId.Split('.').Select(int.Parse).ToArray();
-                element = FindByRuntimeId(parts.WindowHandle, runtimeId);
+                try
+                {
+                    windowHandle = rootElement.GetCachedNativeWindowHandle();
+                }
+                catch
+                {
+                    // Fall back to current property if not in cache
+                    windowHandle = rootElement.GetNativeWindowHandle();
+                }
             }
 
-            // Fall back to tree path if runtime ID didn't work
-            if (element == null && !string.IsNullOrEmpty(parts.TreePath) && parts.TreePath != "stale")
+            // Get runtime ID - try cached first
+            int[]? runtimeId = null;
+            try
             {
-                element = FindByTreePath(parts.WindowHandle, parts.TreePath);
+                runtimeId = (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId);
+            }
+            catch
+            {
+                // Fall back to current if not cached
+                runtimeId = element.GetRuntimeId();
             }
 
-            return element;
+            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
+                ? string.Join(".", runtimeId)
+                : "0";
+
+            // Simplified format - no tree path (expensive to calculate)
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached";
         }
         catch
         {
-            return null;
+            return "window:0|runtime:0|path:error";
+        }
+    }
+
+    /// <summary>
+    /// Generates the fast full ID from current properties.
+    /// </summary>
+    private static string GenerateFastFullIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    {
+        try
+        {
+            // Get window handle from current properties
+            var windowHandle = element.GetNativeWindowHandle();
+
+            // If no handle on element, use root's handle
+            if (windowHandle == 0)
+            {
+                windowHandle = rootElement.GetNativeWindowHandle();
+            }
+
+            // Get runtime ID
+            var runtimeId = element.GetRuntimeId();
+            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
+                ? string.Join(".", runtimeId)
+                : "0";
+
+            // Simplified format - no tree path
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast";
+        }
+        catch
+        {
+            return "window:0|runtime:0|path:error";
         }
     }
 
@@ -242,4 +375,45 @@ public sealed class ElementIdGenerator
     }
 
     private sealed record ElementIdParts(nint WindowHandle, string RuntimeId, string TreePath);
+
+    /// <summary>
+    /// Registers a full element ID and returns a short ID.
+    /// If the full ID is already registered, returns the existing short ID.
+    /// Thread-safe with automatic deduplication.
+    /// </summary>
+    private static string RegisterFullId(string fullId)
+    {
+        ArgumentNullException.ThrowIfNull(fullId);
+
+        // Check if already registered (common case for repeated element access)
+        if (s_fullToShort.TryGetValue(fullId, out var existingShortId))
+        {
+            return existingShortId;
+        }
+
+        // Generate new short ID
+        var shortId = Interlocked.Increment(ref s_counter).ToString();
+
+        // Try to add to both dictionaries atomically
+        // Use GetOrAdd to handle race conditions where another thread registered the same fullId
+        var actualShortId = s_fullToShort.GetOrAdd(fullId, shortId);
+
+        // Only add to shortToFull if we won the race
+        if (actualShortId == shortId)
+        {
+            s_shortToFull[shortId] = fullId;
+        }
+
+        return actualShortId;
+    }
+
+    /// <summary>
+    /// Resolves a short ID to the full element ID.
+    /// </summary>
+    private static string? ResolveFullId(string shortId)
+    {
+        ArgumentNullException.ThrowIfNull(shortId);
+
+        return s_shortToFull.TryGetValue(shortId, out var fullId) ? fullId : null;
+    }
 }

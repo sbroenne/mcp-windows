@@ -89,7 +89,7 @@ public sealed record MouseControlRequest
                 (false, MouseControlErrorCode.MissingRequiredParameter, "Move action requires both 'x' and 'y' coordinates."),
 
             MouseAction.Drag when !StartX.HasValue || !StartY.HasValue || !EndX.HasValue || !EndY.HasValue =>
-                (false, MouseControlErrorCode.MissingRequiredParameter, "Drag action requires 'start_x', 'start_y', 'end_x', and 'end_y' coordinates."),
+                (false, MouseControlErrorCode.MissingRequiredParameter, "Drag requires x,y for START and endX,endY for END (not startX/startY)."),
 
             MouseAction.Scroll when !Direction.HasValue =>
                 (false, MouseControlErrorCode.MissingRequiredParameter, "Scroll action requires 'direction' to be specified."),

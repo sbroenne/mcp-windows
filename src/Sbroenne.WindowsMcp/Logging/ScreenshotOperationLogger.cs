@@ -69,12 +69,6 @@ public sealed partial class ScreenshotOperationLogger
     public partial void LogInvalidMonitorIndex(int monitorIndex, int maxIndex);
 
     /// <summary>
-    /// Logs an image size limit exceeded error.
-    /// </summary>
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Image too large: {Width}x{Height} = {TotalPixels} pixels (max: {MaxPixels})")]
-    public partial void LogImageTooLarge(int width, int height, long totalPixels, int maxPixels);
-
-    /// <summary>
     /// Logs a capture operation duration.
     /// </summary>
     [LoggerMessage(Level = LogLevel.Debug, Message = "Screenshot capture completed in {DurationMs}ms")]

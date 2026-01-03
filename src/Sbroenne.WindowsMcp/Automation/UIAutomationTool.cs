@@ -75,7 +75,7 @@ public sealed partial class UIAutomationTool
     /// <param name="className">Element class name to filter by (e.g., 'Chrome_WidgetWin_1' for Chromium apps).</param>
     /// <param name="elementId">Element ID from a previous find operation.</param>
     /// <param name="parentElementId">Parent element ID to scope search to a subtree.</param>
-    /// <param name="maxDepth">Maximum tree depth for get_tree (default: 5).</param>
+    /// <param name="maxDepth">Maximum depth for get_ancestors (default: 2).</param>
     /// <param name="exactDepth">Search only at this exact depth (skips other depths).</param>
     /// <param name="foundIndex">Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd match.</param>
     /// <param name="includeChildren">Include child elements in response.</param>
@@ -91,12 +91,12 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. WORKFLOW: 1) Call window_management(action='find') to get windowHandle, 2) Use that handle with ui_automation actions. windowHandle is REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). Example: click(windowHandle='123456', nameContains='Close'). Works with title bar buttons, dialogs, and all standard UI controls. DIALOG BUTTONS: nameContains='save' finds 'Save'/'Don't save', nameContains='cancel' finds 'Cancel'. Actions NOT requiring windowHandle: invoke/highlight/get_ancestors/get_element_details (use elementId instead), get_element_at_cursor, get_focused_element, ocr_status. ALWAYS prefer over mouse_control.")]
+    [Description("UI element interaction via Windows UIA. PREFERRED over mouse_control for buttons, menus, text fields. DISCOVERY: Use screenshot_control(annotate=true) first to see all interactive elements with coordinates. WORKFLOW: 1) window_management(find) → get handle, 2) screenshot_control to discover elements, 3) ui_automation(click/type/toggle) to interact. KEY ACTIONS: click, type, toggle, wait_for, find. DIALOG BUTTONS: nameContains='save'/'cancel'. windowHandle REQUIRED for most actions.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Action: find, get_tree, wait_for, wait_for_disappear, wait_for_state, click, type, select, toggle, ensure_state, invoke, focus, scroll_into_view, get_text, highlight, hide_highlight, ocr, ocr_element, ocr_status, get_element_at_cursor, get_focused_element, get_ancestors, get_element_details")]
+        [Description("The UI automation action to perform.")]
         UIAutomationAction action,
 
-        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
+        [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
         string? windowHandle = null,
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
@@ -108,7 +108,7 @@ public sealed partial class UIAutomationTool
         [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
         string? namePattern = null,
 
-        [Description("Control type filter: Button, Edit, Text, List, ListItem, Tree, TreeItem, Menu, MenuItem, ComboBox, CheckBox, RadioButton, Tab, TabItem, Window, Pane, Document, Hyperlink, Image, ProgressBar, Slider, Spinner, StatusBar, ToolBar, ToolTip, Group, ScrollBar, DataGrid, DataItem, Custom")]
+        [Description("Control type filter (e.g., Button, Edit, Text, CheckBox, ComboBox, Menu, MenuItem)")]
         string? controlType = null,
 
         [Description("AutomationId to search for (exact match). More reliable than name for finding elements.")]
@@ -120,16 +120,16 @@ public sealed partial class UIAutomationTool
         [Description("Element ID from a previous find operation (for element-specific actions like toggle, invoke, focus)")]
         string? elementId = null,
 
-        [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
+        [Description("Parent element ID to scope search to a subtree (for find action). Improves performance on complex UIs.")]
         string? parentElementId = null,
 
-        [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
-        int maxDepth = 5,
+        [Description("Max depth for get_ancestors (default: 2, max: 20).")]
+        int maxDepth = 2,
 
-        [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]
+        [Description("Search only at this depth (1=immediate children)")]
         int? exactDepth = null,
 
-        [Description("Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd button, foundIndex=3 for the 3rd, etc.")]
+        [Description("Return Nth match (1-based, default: 1)")]
         int foundIndex = 1,
 
         [Description("Include child elements in response")]
@@ -153,13 +153,13 @@ public sealed partial class UIAutomationTool
         [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
         string? desiredState = null,
 
-        [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
+        [Description("Sort by element size (largest first)")]
         bool sortByProminence = false,
 
-        [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
+        [Description("Filter to region (format: 'x,y,width,height')")]
         string? inRegion = null,
 
-        [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
+        [Description("Find elements near this elementId (sorted by distance)")]
         string? nearElement = null,
 
         CancellationToken cancellationToken = default)
@@ -214,7 +214,6 @@ public sealed partial class UIAutomationTool
             var result = action switch
             {
                 UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, inRegion, nearElement, timeoutMs, cancellationToken),
-                UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
                 UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
                 UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, timeoutMs, cancellationToken),
@@ -236,6 +235,7 @@ public sealed partial class UIAutomationTool
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
                 UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
                 UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
+                UIAutomationAction.SaveDialog => await HandleSaveDialogAsync(windowHandle, text, cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -279,7 +279,7 @@ public sealed partial class UIAutomationTool
         action is UIAutomationAction.Click or UIAutomationAction.Type
             or UIAutomationAction.Select or UIAutomationAction.Toggle
             or UIAutomationAction.EnsureState or UIAutomationAction.Focus
-            or UIAutomationAction.Find or UIAutomationAction.GetTree
+            or UIAutomationAction.Find
             or UIAutomationAction.WaitFor or UIAutomationAction.WaitForDisappear
             or UIAutomationAction.WaitForState or UIAutomationAction.GetText
             or UIAutomationAction.ScrollIntoView or UIAutomationAction.Ocr;
@@ -288,7 +288,6 @@ public sealed partial class UIAutomationTool
         action switch
         {
             UIAutomationAction.Find => "find",
-            UIAutomationAction.GetTree => "get_tree",
             UIAutomationAction.WaitFor => "wait_for",
             UIAutomationAction.WaitForDisappear => "wait_for_disappear",
             UIAutomationAction.WaitForState => "wait_for_state",
@@ -310,6 +309,7 @@ public sealed partial class UIAutomationTool
             UIAutomationAction.GetFocusedElement => "get_focused_element",
             UIAutomationAction.GetAncestors => "get_ancestors",
             UIAutomationAction.GetElementDetails => "get_element_details",
+            UIAutomationAction.SaveDialog => "save_dialog",
             _ => action.ToString().ToLowerInvariant()
         };
 
@@ -373,7 +373,7 @@ public sealed partial class UIAutomationTool
             // Small delay to ensure the window is fully activated and ready for input
             await Task.Delay(50, cancellationToken);
 
-            return UIAutomationResult.CreateSuccess(actionName, Array.Empty<UIElementInfo>(), null);
+            return UIAutomationResult.CreateSuccess(actionName, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -412,12 +412,6 @@ public sealed partial class UIAutomationTool
         };
 
         return await _automationService.FindElementsAsync(query, cancellationToken);
-    }
-
-    private async Task<UIAutomationResult> HandleGetTreeAsync(
-        string? windowHandle, string? parentElementId, int maxDepth, string? controlType, CancellationToken cancellationToken)
-    {
-        return await _automationService.GetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken);
     }
 
     private async Task<UIAutomationResult> HandleWaitForAsync(
@@ -772,7 +766,7 @@ public sealed partial class UIAutomationTool
                 var activateResult = await _windowService.ActivateWindowAsync(parsed, cancellationToken);
                 if (activateResult.Success)
                 {
-                    return UIAutomationResult.CreateSuccess("focus", Array.Empty<UIElementInfo>(), null) with
+                    return UIAutomationResult.CreateSuccess("focus", null) with
                     {
                         UsageHint = "Window focused successfully. You can now use keyboard_control to type into it."
                     };
@@ -1096,6 +1090,40 @@ public sealed partial class UIAutomationTool
         return UIAutomationResult.CreateSuccess("get_element_details", elementInfo, null);
     }
 
+    /// <summary>
+    /// Convenience method for saving files quickly. Handles standard Windows Save As dialogs
+    /// and Office apps (Word, Excel, PowerPoint, Visio, Publisher) via COM automation.
+    /// 
+    /// LIMITATIONS:
+    /// - For Office apps: Saves using the file extension to determine format (.docx, .xlsx, .pptx).
+    ///   Cannot change advanced options like compatibility mode or specific save settings.
+    /// - For standard dialogs: Types the path and clicks Save. Cannot navigate folder trees or
+    ///   change dialog options.
+    /// 
+    /// For complex save scenarios (format conversion, specific options), use keyboard_control
+    /// to navigate the Save As dialog manually.
+    /// </summary>
+    private async Task<UIAutomationResult> HandleSaveDialogAsync(
+        string? windowHandle, string? filePath, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(filePath))
+        {
+            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
+                "filePath is required for save_dialog action. Provide full path including filename (e.g., 'C:\\temp\\file.png').",
+                null,
+                "Example: save_dialog(windowHandle='123456', text='C:\\temp\\myfile.png')");
+        }
+
+        if (string.IsNullOrWhiteSpace(windowHandle))
+        {
+            return UIAutomationResult.CreateFailure("save_dialog", UIAutomationErrorType.InvalidParameter,
+                "windowHandle is required for save_dialog action. Get the dialog window handle from window_management(action='find').",
+                null);
+        }
+
+        return await _automationService.SaveFileDialogAsync(windowHandle, filePath, cancellationToken);
+    }
+
     #endregion
 
     #region LoggerMessage Methods
@@ -1118,98 +1146,102 @@ public sealed partial class UIAutomationTool
 /// <summary>
 /// UI Automation action types.
 /// </summary>
-[JsonConverter(typeof(UIAutomationActionJsonConverter))]
+[JsonConverter(typeof(JsonStringEnumConverter<UIAutomationAction>))]
 public enum UIAutomationAction
 {
     /// <summary>Search for elements matching criteria.</summary>
-    [Description("Search for elements matching criteria")]
+    [JsonStringEnumMemberName("find")]
     Find,
 
-    /// <summary>Get UI element hierarchy.</summary>
-    [Description("Get UI element hierarchy")]
-    GetTree,
-
     /// <summary>Wait for an element to appear.</summary>
-    [Description("Wait for an element to appear")]
+    [JsonStringEnumMemberName("wait_for")]
     WaitFor,
 
     /// <summary>Wait for an element to disappear.</summary>
-    [Description("Wait for an element to disappear (inverse of wait_for)")]
+    [JsonStringEnumMemberName("wait_for_disappear")]
     WaitForDisappear,
 
     /// <summary>Wait for an element to reach a specific state.</summary>
-    [Description("Wait for an element to reach a specific state (toggleState, isEnabled, isOffscreen). Use with desiredState parameter.")]
+    [JsonStringEnumMemberName("wait_for_state")]
     WaitForState,
 
     /// <summary>Click an element.</summary>
-    [Description("Click an element")]
+    [JsonStringEnumMemberName("click")]
     Click,
 
     /// <summary>Type text into an element.</summary>
-    [Description("Type text into an element")]
+    [JsonStringEnumMemberName("type")]
     Type,
 
     /// <summary>Select an item from a list or combo box.</summary>
-    [Description("Select an item from a list or combo box")]
+    [JsonStringEnumMemberName("select")]
     Select,
 
     /// <summary>Toggle a checkbox or toggle button.</summary>
-    [Description("Toggle a checkbox or toggle button")]
+    [JsonStringEnumMemberName("toggle")]
     Toggle,
 
-    /// <summary>Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if needed.</summary>
-    [Description("Ensure a checkbox/toggle is in a specific state (on/off). Only toggles if current state differs from desiredState.")]
+    /// <summary>Ensure a checkbox/toggle is in a specific state (on/off).</summary>
+    [JsonStringEnumMemberName("ensure_state")]
     EnsureState,
 
     /// <summary>Invoke a pattern on an element.</summary>
-    [Description("Invoke a pattern on an element")]
+    [JsonStringEnumMemberName("invoke")]
     Invoke,
 
     /// <summary>Set keyboard focus to an element.</summary>
-    [Description("Set keyboard focus to an element")]
+    [JsonStringEnumMemberName("focus")]
     Focus,
 
     /// <summary>Scroll an element into view.</summary>
-    [Description("Scroll an element into view")]
+    [JsonStringEnumMemberName("scroll_into_view")]
     ScrollIntoView,
 
     /// <summary>Get text content from an element.</summary>
-    [Description("Get text content from an element")]
+    [JsonStringEnumMemberName("get_text")]
     GetText,
 
-    /// <summary>Visually highlight an element for debugging. Persists until HideHighlight is called.</summary>
-    [Description("Visually highlight an element for debugging. Persists until HideHighlight is called.")]
+    /// <summary>Visually highlight an element for debugging.</summary>
+    [JsonStringEnumMemberName("highlight")]
     Highlight,
 
     /// <summary>Hide the current highlight rectangle.</summary>
-    [Description("Hide the current highlight rectangle")]
+    [JsonStringEnumMemberName("hide_highlight")]
     HideHighlight,
 
     /// <summary>Extract text from screen or window using OCR.</summary>
-    [Description("Extract text from screen or window using OCR")]
+    [JsonStringEnumMemberName("ocr")]
     Ocr,
 
     /// <summary>Extract text from a specific element's bounding rectangle using OCR.</summary>
-    [Description("Extract text from a specific element's bounding rectangle using OCR")]
+    [JsonStringEnumMemberName("ocr_element")]
     OcrElement,
 
     /// <summary>Get OCR engine availability and status information.</summary>
-    [Description("Get OCR engine availability and status information")]
+    [JsonStringEnumMemberName("ocr_status")]
     OcrStatus,
 
     /// <summary>Get the UI element at the current cursor position.</summary>
-    [Description("Get the UI element at the current cursor position")]
+    [JsonStringEnumMemberName("get_element_at_cursor")]
     GetElementAtCursor,
 
     /// <summary>Get the currently focused UI element.</summary>
-    [Description("Get the currently focused UI element")]
+    [JsonStringEnumMemberName("get_focused_element")]
     GetFocusedElement,
 
     /// <summary>Get all ancestor elements of an element up to the window root.</summary>
-    [Description("Get all ancestor elements of an element up to the window root")]
+    [JsonStringEnumMemberName("get_ancestors")]
     GetAncestors,
 
     /// <summary>Get full element details by ID (bounds, patterns, value, etc.).</summary>
-    [Description("Get full element details by ID. Use after find to get complete info for a specific element.")]
-    GetElementDetails
+    [JsonStringEnumMemberName("get_element_details")]
+    GetElementDetails,
+
+    /// <summary>
+    /// Quick save convenience action. Saves files in Office apps (Word, Excel, PowerPoint) via COM,
+    /// or handles standard Windows Save As dialogs. File format determined by extension.
+    /// For complex save options, use keyboard_control to navigate dialogs manually.
+    /// </summary>
+    [JsonStringEnumMemberName("save_dialog")]
+    SaveDialog
 }

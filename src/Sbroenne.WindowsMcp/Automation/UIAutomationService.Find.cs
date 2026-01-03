@@ -204,7 +204,8 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
-    /// Fast element finding using FindAll.
+    /// Fast element finding using FindAllBuildCache.
+    /// Uses caching to batch all property retrieval into a single COM call per element.
     /// </summary>
     private void FindElementsWithFindAll(
         UIA.IUIAutomationElement rootElement,
@@ -216,7 +217,12 @@ public sealed partial class UIAutomationService
     {
         try
         {
-            var elements = rootElement.FindAll(UIA.TreeScope.TreeScope_Descendants, condition);
+            // Create cache request with all properties needed for element conversion
+            // This reduces ~40+ COM calls per element to 1 bulk fetch
+            var cacheRequest = Uia.CreateElementCacheRequest(UIA.TreeScope.TreeScope_Element);
+
+            // Use FindAllBuildCache instead of FindAll - returns elements with cached properties
+            var elements = rootElement.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, condition, cacheRequest);
             if (elements == null)
             {
                 return;
@@ -238,7 +244,8 @@ public sealed partial class UIAutomationService
                 if (matchCount >= query.FoundIndex)
                 {
                     var children = query.IncludeChildren ? GetChildren(element, rootElement) : null;
-                    var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, children);
+                    // Use cached properties since element was retrieved with FindAllBuildCache
+                    var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, children, fromCachedElement: true);
                     if (elementInfo != null)
                     {
                         results.Add(elementInfo);

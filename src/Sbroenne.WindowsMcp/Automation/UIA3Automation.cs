@@ -66,6 +66,7 @@ public sealed class UIA3Automation : IDisposable
     /// <summary>
     /// Gets an element from a window handle.
     /// </summary>
+    /// <returns>The automation element, or null if the window handle is invalid or inaccessible.</returns>
     public UIA.IUIAutomationElement? ElementFromHandle(nint hwnd)
     {
         try
@@ -74,6 +75,12 @@ public sealed class UIA3Automation : IDisposable
         }
         catch (COMException)
         {
+            // Window handle may be invalid, stale, or the window may be unresponsive
+            return null;
+        }
+        catch (TimeoutException)
+        {
+            // COM operation may timeout for unresponsive windows
             return null;
         }
     }
@@ -144,12 +151,12 @@ public sealed class UIA3Automation : IDisposable
     }
 
     /// <summary>
-    /// Creates a pre-configured cache request for tree operations.
-    /// Includes all commonly needed properties for element info conversion.
+    /// Creates a pre-configured cache request for element operations.
+    /// Includes all commonly needed properties for element info conversion plus pattern availability.
     /// </summary>
-    /// <param name="includeChildren">Whether to include TreeScope.Children for subtree operations.</param>
-    /// <returns>A configured cache request ready for use with FindAllBuildCache.</returns>
-    public UIA.IUIAutomationCacheRequest CreateTreeCacheRequest(bool includeChildren = true)
+    /// <param name="scope">The tree scope to cache. Use Subtree for tree operations, Element for find operations.</param>
+    /// <returns>A configured cache request ready for use with FindAllBuildCache or FindFirstBuildCache.</returns>
+    public UIA.IUIAutomationCacheRequest CreateElementCacheRequest(UIA.TreeScope scope = UIA.TreeScope.TreeScope_Element)
     {
         var request = _automation.CreateCacheRequest();
 
@@ -165,15 +172,35 @@ public sealed class UIA3Automation : IDisposable
         request.AddProperty(UIA3PropertyIds.NativeWindowHandle);
         request.AddProperty(UIA3PropertyIds.RuntimeId);
 
-        // Set tree scope - Element for consistent behavior with FindAllBuildCache
-        // Note: TreeScope affects what gets cached when retrieving the element,
-        // not what FindAllBuildCache returns (that's controlled by its scope parameter)
-        request.TreeScope = UIA.TreeScope.TreeScope_Element;
+        // Add pattern availability properties - O(1) check for what actions are possible
+        // This allows LLM to know element capabilities without expensive GetCurrentPattern calls
+        request.AddProperty(UIA3PropertyIds.IsInvokePatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsExpandCollapsePatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsScrollItemPatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsSelectionItemPatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsTogglePatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsValuePatternAvailable);
+
+        // Set tree scope - controls what children/descendants get cached
+        request.TreeScope = scope;
 
         // Don't set TreeFilter - let FindAllBuildCache use default (control view)
         // The condition passed to FindAllBuildCache controls filtering
 
         return request;
+    }
+
+    /// <summary>
+    /// Creates a pre-configured cache request for tree operations.
+    /// Includes all commonly needed properties for element info conversion.
+    /// </summary>
+    /// <param name="includeChildren">Whether to include TreeScope.Children for subtree operations.</param>
+    /// <returns>A configured cache request ready for use with FindAllBuildCache.</returns>
+    [Obsolete("Use CreateElementCacheRequest(TreeScope) instead.")]
+    public UIA.IUIAutomationCacheRequest CreateTreeCacheRequest(bool includeChildren = true)
+    {
+        // Delegate to new method for backward compatibility
+        return CreateElementCacheRequest(UIA.TreeScope.TreeScope_Element);
     }
 
     /// <inheritdoc/>
@@ -213,6 +240,7 @@ public sealed class UIA3Automation : IDisposable
 /// </summary>
 internal static class UIA3PropertyIds
 {
+    // Basic element properties
     internal const int Name = 30005;
     internal const int AutomationId = 30011;
     internal const int ClassName = 30012;
@@ -227,6 +255,18 @@ internal static class UIA3PropertyIds
     internal const int ProcessId = 30002;
     internal const int HasKeyboardFocus = 30008;
     internal const int IsKeyboardFocusable = 30009;
+
+    // Pattern availability properties - O(1) way to check if patterns are supported
+    // These enable LLM to know what actions are possible without expensive GetCurrentPattern calls
+    internal const int IsInvokePatternAvailable = 30031;
+    internal const int IsExpandCollapsePatternAvailable = 30033;
+    internal const int IsScrollItemPatternAvailable = 30035;
+    internal const int IsSelectionItemPatternAvailable = 30036;
+    internal const int IsTogglePatternAvailable = 30041;
+    internal const int IsValuePatternAvailable = 30043;
+
+    // Window pattern properties
+    internal const int WindowIsModal = 30077;
 }
 
 /// <summary>

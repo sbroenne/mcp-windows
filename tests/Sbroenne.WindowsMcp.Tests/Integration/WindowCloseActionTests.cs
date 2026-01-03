@@ -159,7 +159,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Step 1: Find the window (LLM would do this)
         var findResult = await _tool.ExecuteAsync(
             context,
-            action: "find",
+            action: WindowAction.Find,
             title: SacrificialWindowTitle);
 
         Assert.True(findResult.Success, $"Find should locate sacrificial window. Error: {findResult.Error}");
@@ -171,7 +171,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Step 2: Close using the handle (LLM would use the handle from step 1)
         var closeResult = await _tool.ExecuteAsync(
             context,
-            action: "close",
+            action: WindowAction.Close,
             handle: windowHandle);
 
         // Assert
@@ -192,7 +192,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Find and close
         var findResult = await _tool.ExecuteAsync(
             context,
-            action: "find",
+            action: WindowAction.Find,
             title: SacrificialWindowTitle);
 
         Assert.True(findResult.Success);
@@ -203,7 +203,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
         var closeResult = await _tool.ExecuteAsync(
             context,
-            action: "close",
+            action: WindowAction.Close,
             handle: windowHandle);
 
         Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
@@ -214,7 +214,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Verify window is gone
         var listResult = await _tool.ExecuteAsync(
             context,
-            action: "list",
+            action: WindowAction.List,
             filter: SacrificialWindowTitle);
 
         Assert.True(listResult.Success);
@@ -247,3 +247,5 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         }
     }
 }
+
+
