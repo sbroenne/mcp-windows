@@ -18,6 +18,10 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public sealed partial class UIAutomationTool
 {
+    // NOTE: Some LLM integrations reject JSON Schemas that use nullable union types.
+    // Use sentinel defaults for optional numeric parameters to keep schemas compatible.
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly IUIAutomationService _automationService;
     private readonly IOcrService _ocrService;
     private readonly IScreenshotService _screenshotService;
@@ -97,37 +101,37 @@ public sealed partial class UIAutomationTool
         UIAutomationAction action,
 
         [Description("Window handle to target as a decimal string (get from window_management 'find' or 'list' action). REQUIRED for most actions (click, type, find, get_tree, wait_for, ocr, etc.). NOT required for: invoke/highlight/get_ancestors/get_element_details (use elementId), get_element_at_cursor, get_focused_element, ocr_status.")]
-        string? windowHandle = null,
+        string windowHandle = "",
 
         [Description("Element name to search for (exact match, case-insensitive). For Electron apps, this is typically the ARIA label.")]
-        string? name = null,
+        string name = "",
 
         [Description("Substring to search for in element names (partial match, case-insensitive). PREFERRED for dialog buttons - e.g., nameContains=\"Don't save\" finds the discard button in Windows save dialogs. Use instead of 'name' when you only know part of the element's name.")]
-        string? nameContains = null,
+        string nameContains = "",
 
         [Description("Regex pattern to match element names. Use for complex name matching like 'Button [0-9]+' or 'Save|Cancel'.")]
-        string? namePattern = null,
+        string namePattern = "",
 
         [Description("Control type filter: Button, Edit, Text, List, ListItem, Tree, TreeItem, Menu, MenuItem, ComboBox, CheckBox, RadioButton, Tab, TabItem, Window, Pane, Document, Hyperlink, Image, ProgressBar, Slider, Spinner, StatusBar, ToolBar, ToolTip, Group, ScrollBar, DataGrid, DataItem, Custom")]
-        string? controlType = null,
+        string controlType = "",
 
         [Description("AutomationId to search for (exact match). More reliable than name for finding elements.")]
-        string? automationId = null,
+        string automationId = "",
 
         [Description("Element class name to filter by (e.g., 'Chrome_WidgetWin_1' for Chromium apps, 'Button' for Win32 buttons).")]
-        string? className = null,
+        string className = "",
 
         [Description("Element ID from a previous find operation (for element-specific actions like toggle, invoke, focus)")]
-        string? elementId = null,
+        string elementId = "",
 
         [Description("Parent element ID to scope search/tree to a subtree (for find, get_tree actions). Improves performance on complex UIs.")]
-        string? parentElementId = null,
+        string parentElementId = "",
 
         [Description("Maximum tree depth for get_tree. Framework auto-detection sets optimal defaults (5 for WinForms, 10 for WPF, 15 for Electron). Only override if needed.")]
         int maxDepth = 5,
 
         [Description("Search only at this exact depth from the root (e.g., exactDepth=1 searches only immediate children). Skips elements at other depths.")]
-        int? exactDepth = null,
+        int exactDepth = UnspecifiedInt,
 
         [Description("Return the Nth matching element (1-based, default: 1). Use foundIndex=2 to get the 2nd button, foundIndex=3 for the 3rd, etc.")]
         int foundIndex = 1,
@@ -139,31 +143,33 @@ public sealed partial class UIAutomationTool
         int timeoutMs = 5000,
 
         [Description("Text to type (for type action)")]
-        string? text = null,
+        string text = "",
 
         [Description("Clear existing text before typing (default: false)")]
         bool clearFirst = false,
 
         [Description("Value for select or invoke actions")]
-        string? value = null,
+        string value = "",
 
         [Description("OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified.")]
-        string? language = null,
+        string language = "",
 
         [Description("Desired state for ensure_state and wait_for_state actions: 'on', 'off', 'indeterminate', 'enabled', 'disabled', 'visible', 'offscreen'.")]
-        string? desiredState = null,
+        string desiredState = "",
 
         [Description("Sort results by element prominence (bounding box area, largest first). Useful when multiple elements match - larger elements are typically more prominent.")]
         bool sortByProminence = false,
 
         [Description("Filter elements to those within a screen region. Format: 'x,y,width,height' in screen coordinates. Only elements intersecting this region are returned.")]
-        string? inRegion = null,
+        string inRegion = "",
 
         [Description("Find elements near a reference element. Pass the elementId of the reference. Results are sorted by distance from the reference element's center.")]
-        string? nearElement = null,
+        string nearElement = "",
 
         CancellationToken cancellationToken = default)
     {
+        int? exactDepthOpt = exactDepth == UnspecifiedInt ? null : exactDepth;
+
         LogActionStarted(_logger, action, name, controlType, automationId);
 
         // Clamp maxDepth to reasonable limits
@@ -213,29 +219,29 @@ public sealed partial class UIAutomationTool
         {
             var result = action switch
             {
-                UIAutomationAction.Find => await HandleFindAsync(windowHandle, parentElementId, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, includeChildren, sortByProminence, inRegion, nearElement, timeoutMs, cancellationToken),
-                UIAutomationAction.GetTree => await HandleGetTreeAsync(windowHandle, parentElementId, maxDepth, controlType, cancellationToken),
-                UIAutomationAction.WaitFor => await HandleWaitForAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
-                UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(windowHandle, name, nameContains, namePattern, controlType, automationId, className, exactDepth, foundIndex, timeoutMs, cancellationToken),
-                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, timeoutMs, cancellationToken),
-                UIAutomationAction.Click => await HandleClickAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
-                UIAutomationAction.Type => await HandleTypeAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, text, clearFirst, cancellationToken),
-                UIAutomationAction.Select => await HandleSelectAsync(elementId, windowHandle, name, controlType, automationId, value, cancellationToken),
-                UIAutomationAction.Toggle => await HandleToggleAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
-                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, desiredState, cancellationToken),
-                UIAutomationAction.Invoke => await HandleInvokeAsync(elementId, value, cancellationToken),
-                UIAutomationAction.Focus => await HandleFocusAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, cancellationToken),
-                UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(elementId, windowHandle, name, controlType, automationId, timeoutMs, cancellationToken),
-                UIAutomationAction.GetText => await HandleGetTextAsync(elementId, windowHandle, name, nameContains, namePattern, controlType, automationId, className, foundIndex, includeChildren, cancellationToken),
-                UIAutomationAction.Highlight => await HandleHighlightAsync(elementId, cancellationToken),
+                UIAutomationAction.Find => await HandleFindAsync(ToNullIfBlank(windowHandle), ToNullIfBlank(parentElementId), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), exactDepthOpt, foundIndex, includeChildren, sortByProminence, ToNullIfBlank(inRegion), ToNullIfBlank(nearElement), timeoutMs, cancellationToken),
+                UIAutomationAction.GetTree => await HandleGetTreeAsync(ToNullIfBlank(windowHandle), ToNullIfBlank(parentElementId), maxDepth, ToNullIfBlank(controlType), cancellationToken),
+                UIAutomationAction.WaitFor => await HandleWaitForAsync(ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), exactDepthOpt, foundIndex, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForDisappear => await HandleWaitForDisappearAsync(ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), exactDepthOpt, foundIndex, timeoutMs, cancellationToken),
+                UIAutomationAction.WaitForState => await HandleWaitForStateAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, ToNullIfBlank(desiredState), timeoutMs, cancellationToken),
+                UIAutomationAction.Click => await HandleClickAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, cancellationToken),
+                UIAutomationAction.Type => await HandleTypeAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, ToNullIfBlank(text), clearFirst, cancellationToken),
+                UIAutomationAction.Select => await HandleSelectAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(value), cancellationToken),
+                UIAutomationAction.Toggle => await HandleToggleAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, cancellationToken),
+                UIAutomationAction.EnsureState => await HandleEnsureStateAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, ToNullIfBlank(desiredState), cancellationToken),
+                UIAutomationAction.Invoke => await HandleInvokeAsync(ToNullIfBlank(elementId), ToNullIfBlank(value), cancellationToken),
+                UIAutomationAction.Focus => await HandleFocusAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, cancellationToken),
+                UIAutomationAction.ScrollIntoView => await HandleScrollIntoViewAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(controlType), ToNullIfBlank(automationId), timeoutMs, cancellationToken),
+                UIAutomationAction.GetText => await HandleGetTextAsync(ToNullIfBlank(elementId), ToNullIfBlank(windowHandle), ToNullIfBlank(name), ToNullIfBlank(nameContains), ToNullIfBlank(namePattern), ToNullIfBlank(controlType), ToNullIfBlank(automationId), ToNullIfBlank(className), foundIndex, includeChildren, cancellationToken),
+                UIAutomationAction.Highlight => await HandleHighlightAsync(ToNullIfBlank(elementId), cancellationToken),
                 UIAutomationAction.HideHighlight => await _automationService.HideHighlightAsync(cancellationToken),
-                UIAutomationAction.Ocr => await HandleOcrAsync(windowHandle, language, cancellationToken),
-                UIAutomationAction.OcrElement => await HandleOcrElementAsync(elementId, language, cancellationToken),
+                UIAutomationAction.Ocr => await HandleOcrAsync(ToNullIfBlank(windowHandle), ToNullIfBlank(language), cancellationToken),
+                UIAutomationAction.OcrElement => await HandleOcrElementAsync(ToNullIfBlank(elementId), ToNullIfBlank(language), cancellationToken),
                 UIAutomationAction.OcrStatus => HandleOcrStatus(),
                 UIAutomationAction.GetElementAtCursor => await _automationService.GetElementAtCursorAsync(cancellationToken),
                 UIAutomationAction.GetFocusedElement => await _automationService.GetFocusedElementAsync(cancellationToken),
-                UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(elementId, maxDepth, cancellationToken),
-                UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(elementId, cancellationToken),
+                UIAutomationAction.GetAncestors => await HandleGetAncestorsAsync(ToNullIfBlank(elementId), maxDepth, cancellationToken),
+                UIAutomationAction.GetElementDetails => await HandleGetElementDetailsAsync(ToNullIfBlank(elementId), cancellationToken),
                 _ => UIAutomationResult.CreateFailure(GetActionName(action), UIAutomationErrorType.InvalidParameter, $"Unknown action: {action}", null)
             };
 
@@ -261,6 +267,8 @@ public sealed partial class UIAutomationTool
                 null);
         }
     }
+
+    private static string? ToNullIfBlank(string value) => string.IsNullOrWhiteSpace(value) ? null : value;
 
     /// <summary>
     /// Determines if an action is interactive (affects the target window and should trigger auto-activation).

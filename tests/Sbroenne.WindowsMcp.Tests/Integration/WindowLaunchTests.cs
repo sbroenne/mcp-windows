@@ -46,7 +46,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         var result = await _tool.ExecuteAsync(
             context,
             action: "launch",
-            programPath: null);
+            programPath: null!);
 
         // Assert
         Assert.False(result.Success);
