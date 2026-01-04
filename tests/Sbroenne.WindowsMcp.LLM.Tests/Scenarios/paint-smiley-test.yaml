@@ -107,8 +107,16 @@ sessions:
               action: "drag"
 
           # REQUIRED: Must interact with UI (File menu, Save As dialog, etc.)
-          - type: tool_called
-            tool: ui_automation
+          # Can use any of the ui_* tools: ui_click, ui_type, ui_find, ui_file
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_type
+              - type: tool_called
+                tool: ui_find
+              - type: tool_called
+                tool: ui_file
 
           # PERFORMANCE: Complete within 120 seconds
           - type: max_latency_ms

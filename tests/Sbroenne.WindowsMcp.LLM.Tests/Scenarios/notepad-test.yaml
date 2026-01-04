@@ -120,12 +120,12 @@ sessions:
             value: true
 
           # FLEXIBLE: Text input can use different tools depending on the LLM
-          # GPT-4.1 often uses keyboard_control, GPT-4o may use ui_automation
+          # GPT-4.1 often uses keyboard_control, others may use ui_type
           - anyOf:
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called
-                tool: ui_automation
+                tool: ui_type
 
           # VERIFY: Window was closed (find returned empty or no matches)
           - anyOf:
@@ -140,16 +140,9 @@ sessions:
                 tool: keyboard_control
                 params:
                   text: "(?i)hello.*world"
-              # Via ui_automation type action
-              - type: tool_param_equals
-                tool: ui_automation
-                params:
-                  action: "type"
-              # Via ui_automation setValue action
-              - type: tool_param_equals
-                tool: ui_automation
-                params:
-                  action: "set_value"
+              # Via ui_type tool
+              - type: tool_called
+                tool: ui_type
 
           # PERFORMANCE: Complete within 60 seconds
           - type: max_latency_ms
@@ -195,7 +188,7 @@ sessions:
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called
-                tool: ui_automation
+                tool: ui_type
 
           # PERFORMANCE: Complete within 90 seconds
           - type: max_latency_ms
