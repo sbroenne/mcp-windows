@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
@@ -8,6 +9,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
+using Sbroenne.WindowsMcp.Serialization;
 using Sbroenne.WindowsMcp.Tools;
 using Sbroenne.WindowsMcp.Window;
 
@@ -67,6 +69,25 @@ builder.Services
             Name = "sbroenne.windows-mcp",
             Version = "1.0.0",
         };
+
+        // Gemini tool declarations currently reject certain JSON Schema keywords (e.g., "default",
+        // "minItems", "maxItems"). Sanitize emitted tool schemas to maximize compatibility.
+        options.Filters.ListToolsFilters.Add(next =>
+            async (request, cancellationToken) =>
+            {
+                var result = await next(request, cancellationToken).ConfigureAwait(false);
+                if (result.Tools is { Count: > 0 })
+                {
+                    for (int i = 0; i < result.Tools.Count; i++)
+                    {
+                        Tool tool = result.Tools[i];
+                        result.Tools[i] = ToolSchemaSanitizer.Sanitize(tool);
+                    }
+                }
+
+                return result;
+            });
+
         options.ServerInstructions =
             "WORKFLOW: 1) window_management(find/launch) → get handle, " +
             "2) Use that handle for ALL subsequent operations on that window. " +
