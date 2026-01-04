@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -10,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for finding UI elements in Windows applications.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UIFindTool
+public sealed partial class UIFindTool
 {
     private readonly UIAutomationService _automationService;
     private readonly ILogger<UIFindTool> _logger;
@@ -28,54 +27,43 @@ public sealed class UIFindTool
     }
 
     /// <summary>
-    /// Finds UI elements matching the specified criteria.
-    /// Returns element IDs and details for use with other ui_* tools.
+    /// Finds UI elements matching the specified criteria. Returns element IDs and details for use with other ui_* tools.
     /// </summary>
+    /// <remarks>
+    /// Finds UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc. REQUIRED: windowHandle (from window_management tool).
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
+    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, this is the ARIA label.</param>
+    /// <param name="nameContains">Substring to search in element names (case-insensitive). Preferred for dialog buttons - e.g., 'Don\\'t save'.</param>
+    /// <param name="namePattern">Regex pattern to match element names. Use for complex matching like 'Button [0-9]+' or 'Save|Cancel'.</param>
+    /// <param name="controlType">Control type filter (Button, Edit, Text, CheckBox, ComboBox, Menu, MenuItem, etc.)</param>
+    /// <param name="automationId">AutomationId for precise matching (exact match, most reliable).</param>
+    /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium, 'Button' for Win32).</param>
+    /// <param name="exactDepth">Exact depth to search (1=immediate children). Skips other depths, improves performance.</param>
+    /// <param name="foundIndex">Return the Nth match (1-based, default: 1). Use 2 for second match, etc.</param>
+    /// <param name="includeChildren">Include child elements in response (default: false).</param>
+    /// <param name="sortByProminence">Sort results by size (largest first). Useful for disambiguation.</param>
+    /// <param name="inRegion">Filter to region: 'x,y,width,height' in screen coordinates.</param>
+    /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
+    /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result containing list of found elements with their properties and element IDs.</returns>
     [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Find UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc. REQUIRED: windowHandle (from window_management tool).")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.")]
         string windowHandle,
-
-        [Description("Element name (exact match, case-insensitive). For Electron apps, this is the ARIA label.")]
         string? name = null,
-
-        [Description("Substring to search in element names (case-insensitive). Preferred for dialog buttons - e.g., 'Don\\'t save'.")]
         string? nameContains = null,
-
-        [Description("Regex pattern to match element names. Use for complex matching like 'Button [0-9]+' or 'Save|Cancel'.")]
         string? namePattern = null,
-
-        [Description("Control type filter (Button, Edit, Text, CheckBox, ComboBox, Menu, MenuItem, etc.)")]
         string? controlType = null,
-
-        [Description("AutomationId for precise matching (exact match, most reliable).")]
         string? automationId = null,
-
-        [Description("Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium, 'Button' for Win32).")]
         string? className = null,
-
-        [Description("Exact depth to search (1=immediate children). Skips other depths, improves performance.")]
         int? exactDepth = null,
-
-        [Description("Return the Nth match (1-based, default: 1). Use 2 for second match, etc.")]
         int foundIndex = 1,
-
-        [Description("Include child elements in response (default: false).")]
         bool includeChildren = false,
-
-        [Description("Sort results by size (largest first). Useful for disambiguation.")]
         bool sortByProminence = false,
-
-        [Description("Filter to region: 'x,y,width,height' in screen coordinates.")]
         string? inRegion = null,
-
-        [Description("Find elements near this elementId (results sorted by distance).")]
         string? nearElement = null,
-
-        [Description("Timeout in milliseconds (default: 5000).")]
         int timeoutMs = 5000,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

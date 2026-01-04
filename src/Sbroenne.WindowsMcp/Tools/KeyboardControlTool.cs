@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
@@ -58,13 +57,18 @@ public sealed partial class KeyboardControlTool : IDisposable
     }
 
     /// <summary>
-    /// Control keyboard input on Windows. Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions.
+    /// Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. 
+    /// Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S = key='s', modifiers='ctrl'), special keys. 
+    /// For typing into a specific UI element by handle, use ui_automation(action='type') instead.
     /// </summary>
+    /// <remarks>
+    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions.
+    /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
     /// <param name="text">Text to type (required for type action).</param>
-    /// <param name="key">Key name to press (for press, key_down, key_up, combo actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot.</param>
-    /// <param name="modifiers">Modifier keys: ctrl, shift, alt, win (comma-separated, for press and combo actions).</param>
+    /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
+    /// <param name="modifiers">Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.</param>
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
     /// <param name="sequence">JSON array of key sequence items, e.g., [{"key":"ctrl"},{"key":"c"}] (for sequence action).</param>
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
@@ -72,22 +76,20 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="clearFirst">For type action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the keyboard operation including success status and operation details.</returns>
+    /// <returns>The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S = key='s', modifiers='ctrl'), special keys. For typing into a specific UI element by handle, use ui_automation(action='type') instead.")]
-    [return: Description("The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.")]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The keyboard action to perform.")] KeyboardAction action,
-        [Description("Text to type (required for type action)")] string? text = null,
-        [Description("The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').")] string? key = null,
-        [Description("Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.")] string? modifiers = null,
-        [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
-        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
-        [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
-        [Description("Expected window title (fails if not matched)")] string? expectedWindowTitle = null,
-        [Description("Expected process name (fails if not matched)")] string? expectedProcessName = null,
-        [Description("Clear field before typing (Ctrl+A then type)")] bool clearFirst = false,
+        KeyboardAction action,
+        string? text = null,
+        string? key = null,
+        string? modifiers = null,
+        int repeat = 1,
+        string? sequence = null,
+        int? interKeyDelayMs = null,
+        string? expectedWindowTitle = null,
+        string? expectedProcessName = null,
+        bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

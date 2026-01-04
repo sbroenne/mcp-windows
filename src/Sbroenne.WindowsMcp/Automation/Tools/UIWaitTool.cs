@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -10,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for waiting for UI elements to appear or disappear.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UIWaitTool
+public sealed partial class UIWaitTool
 {
     private readonly UIAutomationService _automationService;
     private readonly ILogger<UIWaitTool> _logger;
@@ -30,42 +29,35 @@ public sealed class UIWaitTool
     /// <summary>
     /// Waits for a UI element to appear or disappear.
     /// </summary>
+    /// <remarks>
+    /// Wait for an element to appear, disappear, or reach a state. Use after async operations, dialogs, loading spinners.
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
+    /// <param name="mode">Wait mode: 'appear' (default), 'disappear', 'enabled', 'disabled', 'visible', 'offscreen'.</param>
+    /// <param name="name">Element name (exact match, case-insensitive).</param>
+    /// <param name="nameContains">Substring in element name (case-insensitive).</param>
+    /// <param name="namePattern">Regex pattern for element name matching.</param>
+    /// <param name="controlType">Control type (Button, Edit, ProgressBar, etc.)</param>
+    /// <param name="automationId">AutomationId for precise matching.</param>
+    /// <param name="className">Element class name.</param>
+    /// <param name="exactDepth">Exact depth to search (1=immediate children).</param>
+    /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result indicating whether the wait condition was satisfied.</returns>
     [McpServerTool(Name = "ui_wait", Title = "Wait for UI Element", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Wait for an element to appear, disappear, or reach a state. Use after async operations, dialogs, loading spinners.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.")]
         string windowHandle,
-
-        [Description("Wait mode: 'appear' (default), 'disappear', 'enabled', 'disabled', 'visible', 'offscreen'.")]
         string mode = "appear",
-
-        [Description("Element name (exact match, case-insensitive).")]
         string? name = null,
-
-        [Description("Substring in element name (case-insensitive).")]
         string? nameContains = null,
-
-        [Description("Regex pattern for element name matching.")]
         string? namePattern = null,
-
-        [Description("Control type (Button, Edit, ProgressBar, etc.)")]
         string? controlType = null,
-
-        [Description("AutomationId for precise matching.")]
         string? automationId = null,
-
-        [Description("Element class name.")]
         string? className = null,
-
-        [Description("Exact depth to search (1=immediate children).")]
         int? exactDepth = null,
-
-        [Description("Return Nth match (1-based, default: 1).")]
         int foundIndex = 1,
-
-        [Description("Timeout in milliseconds (default: 5000).")]
         int timeoutMs = 5000,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

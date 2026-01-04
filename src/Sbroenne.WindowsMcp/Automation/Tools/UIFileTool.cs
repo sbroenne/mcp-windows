@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -10,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for file operations (save, open dialogs).
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UIFileTool
+public sealed partial class UIFileTool
 {
     private readonly UIAutomationService _automationService;
     private readonly ILogger<UIFileTool> _logger;
@@ -30,15 +29,17 @@ public sealed class UIFileTool
     /// <summary>
     /// Handles file operations like saving and opening files.
     /// </summary>
+    /// <remarks>
+    /// Save or open files. Triggers dialogs, auto-fills paths, handles confirmations. Pass APPLICATION window (not dialog).
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED. Pass the app window, not a dialog.</param>
+    /// <param name="filePath">File path to save to. Use backslashes for Windows format (e.g., C:\\Users\\User\\file.txt). Required for save action if dialog appears.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the file operation including success status.</returns>
     [McpServerTool(Name = "ui_file", Title = "File Operations", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Save or open files. Triggers dialogs, auto-fills paths, handles confirmations. Pass APPLICATION window (not dialog).")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED. Pass the app window, not a dialog.")]
         string windowHandle,
-
-        [Description("File path to save to. Use backslashes for Windows format (e.g., C:\\Users\\User\\file.txt). Required for save action if dialog appears.")]
         string? filePath = null,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

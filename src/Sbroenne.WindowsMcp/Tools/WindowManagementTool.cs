@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using ModelContextProtocol.Protocol;
@@ -75,33 +74,31 @@ public sealed partial class WindowManagementTool
     /// <param name="target">Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups).</param>
     /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Alternative to target for 3+ monitor setups.</param>
     /// <param name="state">Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'.</param>
-    /// <param name="excludeTitle">Exclude windows whose title contains this text (for list action).</param>
+    /// <param name="excludeTitle">Window title to exclude from list results (for list action).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Window control and application launching. launch(programPath) starts a NEW instance and returns handle - only call ONCE per app, do NOT call again if already open. After launch, the window is focused and ready for keyboard_control. Use activate(handle) to refocus an existing window. CLOSE: sends close request but if app has unsaved changes a dialog appears - use ui_automation to click 'Don't Save' or 'Save' to dismiss it.")]
-    [return: Description("The result includes window info (handle, title, process_name, state). SAVE the 'handle' to use with ui_automation, screenshot_control, and close.")]
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The window action to perform.")] WindowAction action,
-        [Description("Program to launch (e.g., 'notepad.exe' or full path)")] string? programPath = null,
-        [Description("Command-line arguments for launch")] string? arguments = null,
-        [Description("Working directory for launch")] string? workingDirectory = null,
-        [Description("Wait for window to appear (default: true)")] bool waitForWindow = true,
-        [Description("Window handle for actions that target a specific window (e.g., activate, close, minimize). Get the handle from the 'list' or 'find' action.")] string? handle = null,
-        [Description("Window title to search for (required for find and wait_for)")] string? title = null,
-        [Description("Filter windows by title or process name (for list action)")] string? filter = null,
-        [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
-        [Description("Include windows on other virtual desktops (default: false)")] bool includeAllDesktops = false,
-        [Description("X-coordinate for move or set_bounds action")] int? x = null,
-        [Description("Y-coordinate for move or set_bounds action")] int? y = null,
-        [Description("Width for resize or set_bounds action")] int? width = null,
-        [Description("Height for resize or set_bounds action")] int? height = null,
-        [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int? timeoutMs = null,
-        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
-        [Description("Monitor index (0-based, for 3+ monitors)")] int? monitorIndex = null,
-        [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
-        [Description("Exclude windows with this title substring")] string? excludeTitle = null,
+        WindowAction action,
+        string? programPath = null,
+        string? arguments = null,
+        string? workingDirectory = null,
+        bool waitForWindow = true,
+        string? handle = null,
+        string? title = null,
+        string? filter = null,
+        bool regex = false,
+        bool includeAllDesktops = false,
+        int? x = null,
+        int? y = null,
+        int? width = null,
+        int? height = null,
+        int? timeoutMs = null,
+        string? target = null,
+        int? monitorIndex = null,
+        string? state = null,
+        string? excludeTitle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

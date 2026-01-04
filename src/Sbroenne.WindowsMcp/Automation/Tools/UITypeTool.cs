@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -10,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for typing text into UI elements.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UITypeTool
+public sealed partial class UITypeTool
 {
     private readonly UIAutomationService _automationService;
     private readonly ILogger<UITypeTool> _logger;
@@ -30,39 +29,33 @@ public sealed class UITypeTool
     /// <summary>
     /// Types text into a text field or other input element. Automatically activates the target window.
     /// </summary>
+    /// <remarks>
+    /// Type text into Edit, Document, TextBox, or search fields. Auto-activates window, optionally clears existing text first.
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
+    /// <param name="text">Text to type. Required.</param>
+    /// <param name="name">Element name (exact match, case-insensitive).</param>
+    /// <param name="nameContains">Substring in element name (case-insensitive).</param>
+    /// <param name="namePattern">Regex pattern for element name matching.</param>
+    /// <param name="controlType">Control type (Edit, Document, TextBox, etc.)</param>
+    /// <param name="automationId">AutomationId for precise matching.</param>
+    /// <param name="className">Element class name.</param>
+    /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="clearFirst">Clear existing text before typing (default: false).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the type operation including success status and element information.</returns>
     [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Type text into Edit, Document, TextBox, or search fields. Auto-activates window, optionally clears existing text first.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.")]
         string windowHandle,
-
-        [Description("Text to type. Required.")]
         string text,
-
-        [Description("Element name (exact match, case-insensitive).")]
         string? name = null,
-
-        [Description("Substring in element name (case-insensitive).")]
         string? nameContains = null,
-
-        [Description("Regex pattern for element name matching.")]
         string? namePattern = null,
-
-        [Description("Control type (Edit, Document, TextBox, etc.)")]
         string? controlType = null,
-
-        [Description("AutomationId for precise matching.")]
         string? automationId = null,
-
-        [Description("Element class name.")]
         string? className = null,
-
-        [Description("Return Nth match (1-based, default: 1).")]
         int foundIndex = 1,
-
-        [Description("Clear existing text before typing (default: false).")]
         bool clearFirst = false,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

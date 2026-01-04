@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -12,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for reading text from UI elements with automatic OCR fallback.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UIReadTool
+public sealed partial class UIReadTool
 {
     private readonly UIAutomationService _automationService;
     private readonly LegacyOcrService _ocrService;
@@ -42,39 +41,33 @@ public sealed class UIReadTool
     /// <summary>
     /// Reads text from a UI element. If UIA text extraction fails, automatically tries OCR.
     /// </summary>
+    /// <remarks>
+    /// Extract text from UI elements or screen regions. Auto-falls back to OCR if normal text extraction fails.
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
+    /// <param name="name">Element name (exact match, case-insensitive).</param>
+    /// <param name="nameContains">Substring in element name (case-insensitive).</param>
+    /// <param name="namePattern">Regex pattern for element name matching.</param>
+    /// <param name="controlType">Control type (Text, Edit, Document, etc.)</param>
+    /// <param name="automationId">AutomationId for precise matching.</param>
+    /// <param name="className">Element class name.</param>
+    /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="includeChildren">Include child element text (default: false).</param>
+    /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The extracted text content from the element or screen region.</returns>
     [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Extract text from UI elements or screen regions. Auto-falls back to OCR if normal text extraction fails.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.")]
         string windowHandle,
-
-        [Description("Element name (exact match, case-insensitive).")]
         string? name = null,
-
-        [Description("Substring in element name (case-insensitive).")]
         string? nameContains = null,
-
-        [Description("Regex pattern for element name matching.")]
         string? namePattern = null,
-
-        [Description("Control type (Text, Edit, Document, etc.)")]
         string? controlType = null,
-
-        [Description("AutomationId for precise matching.")]
         string? automationId = null,
-
-        [Description("Element class name.")]
         string? className = null,
-
-        [Description("Return Nth match (1-based, default: 1).")]
         int foundIndex = 1,
-
-        [Description("Include child element text (default: false).")]
         bool includeChildren = false,
-
-        [Description("OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.")]
         string? language = null,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

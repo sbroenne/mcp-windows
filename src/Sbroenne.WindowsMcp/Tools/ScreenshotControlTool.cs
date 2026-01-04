@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
@@ -84,25 +83,23 @@ public sealed partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Capture screenshots with UI element discovery. PRIMARY TOOL for finding UI elements. annotate=true (default): returns element list with coordinates/elementIds. Works well with ALL app types including Electron/Chromium. USE FIRST before ui_automation to discover clickable elements. Targets: primary_screen (default), window (requires windowHandle), secondary_screen, monitor, region, all_monitors.")]
-    [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
-        [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
-        [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
-        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
-        [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,
-        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int? regionX = null,
-        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")] int? regionY = null,
-        [Description("Width in pixels for 'region' target. Must be positive.")] int? regionWidth = null,
-        [Description("Height in pixels for 'region' target. Must be positive.")] int? regionHeight = null,
-        [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
-        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
-        [Description("Image compression quality 1-100. Default: 60 (LLM-optimized). Only affects JPEG format.")] int? quality = null,
-        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
-        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
-        [Description("Include the image in the response. Default: false for annotated (element metadata is sufficient), true for non-annotated. Set true to see the actual screenshot pixels.")] bool? includeImage = null,
+        string? action = null,
+        bool annotate = true,
+        string? target = null,
+        int? monitorIndex = null,
+        string? windowHandle = null,
+        int? regionX = null,
+        int? regionY = null,
+        int? regionWidth = null,
+        int? regionHeight = null,
+        bool includeCursor = false,
+        string? imageFormat = null,
+        int? quality = null,
+        string? outputMode = null,
+        string? outputPath = null,
+        bool? includeImage = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);

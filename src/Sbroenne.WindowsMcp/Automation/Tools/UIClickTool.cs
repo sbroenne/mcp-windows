@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.Versioning;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
@@ -11,7 +10,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for clicking UI elements.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class UIClickTool
+public sealed partial class UIClickTool
 {
     private readonly UIAutomationService _automationService;
     private readonly WindowService _windowService;
@@ -35,35 +34,31 @@ public sealed class UIClickTool
     }
 
     /// <summary>
-    /// Clicks a UI element. Automatically activates the target window before clicking.
+    /// Click a button, link, menu item, or other element. Auto-activates window. Preferred over mouse_control for UI interactions.
     /// </summary>
+    /// <remarks>
+    /// Clicks a UI element. Automatically activates the target window before clicking.
+    /// </remarks>
+    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
+    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, the ARIA label.</param>
+    /// <param name="nameContains">Substring in element name (case-insensitive). Preferred for dialog buttons like 'Don\\'t save'.</param>
+    /// <param name="namePattern">Regex pattern for element name matching.</param>
+    /// <param name="controlType">Control type (Button, MenuItem, Hyperlink, ListItem, etc.)</param>
+    /// <param name="automationId">AutomationId for precise matching.</param>
+    /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1').</param>
+    /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the click operation including success status and element information.</returns>
     [McpServerTool(Name = "ui_click", Title = "Click UI Element", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Click a button, link, menu item, or other element. Auto-activates window. Preferred over mouse_control for UI interactions.")]
     public async Task<UIAutomationResult> ExecuteAsync(
-        [Description("Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.")]
         string windowHandle,
-
-        [Description("Element name (exact match, case-insensitive). For Electron apps, the ARIA label.")]
         string? name = null,
-
-        [Description("Substring in element name (case-insensitive). Preferred for dialog buttons like 'Don\\'t save'.")]
         string? nameContains = null,
-
-        [Description("Regex pattern for element name matching.")]
         string? namePattern = null,
-
-        [Description("Control type (Button, MenuItem, Hyperlink, ListItem, etc.)")]
         string? controlType = null,
-
-        [Description("AutomationId for precise matching.")]
         string? automationId = null,
-
-        [Description("Element class name (e.g., 'Chrome_WidgetWin_1').")]
         string? className = null,
-
-        [Description("Return Nth match (1-based, default: 1).")]
         int foundIndex = 1,
-
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))

@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Diagnostics;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -62,7 +61,7 @@ public sealed partial class MouseControlTool
     }
 
     /// <summary>
-    /// Control mouse input on Windows. Supports move, click, double_click, right_click, middle_click, drag, scroll, and get_position actions.
+    /// Low-level mouse input for canvas/drawing. AVOID for buttons/controls - use ui_automation(click) instead. BEFORE USING: Get coordinates from ui_automation(find) bounding rects OR screenshot_control(annotate=true). Never guess positions. USE FOR: drag operations, canvas drawing, custom controls without UIA. DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY). Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.
     /// </summary>
     /// <remarks>
     /// <para><strong>MONITOR TARGETING:</strong></para>
@@ -98,26 +97,24 @@ public sealed partial class MouseControlTool
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="windowHandle">Window handle for window-relative coordinates. When provided, x/y are relative to the window's top-left corner.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the mouse operation including success status, monitor-relative cursor position, monitor context (index, width, height), window title at cursor, and error details if failed.</returns>
+    /// <returns>The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("Low-level mouse input for canvas/drawing. AVOID for buttons/controls - use ui_automation(click) instead. BEFORE USING: Get coordinates from ui_automation(find) bounding rects OR screenshot_control(annotate=true). Never guess positions. USE FOR: drag operations, canvas drawing, custom controls without UIA. DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY). Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.")]
-    [return: Description("The result includes success status, cursor position, monitor context, and 'target_window' (handle, title, process_name) for click actions. If expectedWindowTitle/expectedProcessName was specified but didn't match, success=false with error_code='wrong_target_window'.")]
     public async Task<MouseControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The mouse action to perform.")] MouseAction action,
-        [Description("Monitor: 'primary_screen' or 'secondary_screen'")] string? target = null,
-        [Description("X start coordinate. For drag: START position. Required for move/drag, optional for clicks.")] int? x = null,
-        [Description("Y start coordinate. For drag: START position. Required for move/drag, optional for clicks.")] int? y = null,
-        [Description("X end coordinate. For drag: END position. Required for drag only.")] int? endX = null,
-        [Description("Y end coordinate. For drag: END position. Required for drag only.")] int? endY = null,
-        [Description("Scroll direction: up, down, left, or right (required for scroll action)")] string? direction = null,
-        [Description("Number of scroll clicks (default: 1)")] int amount = 1,
-        [Description("Modifier keys to hold during action: ctrl, shift, alt (comma-separated)")] string? modifiers = null,
-        [Description("Mouse button for drag: left, right, or middle (default: left)")] string? button = null,
-        [Description("Monitor index (0-based, for 3+ monitors)")] int? monitorIndex = null,
-        [Description("Expected window title (fails if not matched)")] string? expectedWindowTitle = null,
-        [Description("Expected process name (fails if not matched)")] string? expectedProcessName = null,
-        [Description("Window handle - makes x/y relative to window")] string? windowHandle = null,
+        MouseAction action,
+        string? target = null,
+        int? x = null,
+        int? y = null,
+        int? endX = null,
+        int? endY = null,
+        string? direction = null,
+        int amount = 1,
+        string? modifiers = null,
+        string? button = null,
+        int? monitorIndex = null,
+        string? expectedWindowTitle = null,
+        string? expectedProcessName = null,
+        string? windowHandle = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
