@@ -22,7 +22,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 {
     private readonly WindowManagementTool _tool;
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
     private SacrificialWindowForm? _sacrificialWindow;
     private Thread? _uiThread;
     private readonly ManualResetEventSlim _formReady = new(false);

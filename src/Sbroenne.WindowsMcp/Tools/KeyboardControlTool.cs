@@ -20,11 +20,11 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class KeyboardControlTool : IDisposable
 {
-    private readonly IKeyboardInputService _keyboardInputService;
-    private readonly IWindowEnumerator _windowEnumerator;
-    private readonly IWindowService _windowService;
-    private readonly IElevationDetector _elevationDetector;
-    private readonly ISecureDesktopDetector _secureDesktopDetector;
+    private readonly KeyboardInputService _keyboardInputService;
+    private readonly WindowEnumerator _windowEnumerator;
+    private readonly WindowService _windowService;
+    private readonly ElevationDetector _elevationDetector;
+    private readonly SecureDesktopDetector _secureDesktopDetector;
     private readonly KeyboardOperationLogger _logger;
     private readonly KeyboardConfiguration _configuration;
     private bool _disposed;
@@ -40,11 +40,11 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="logger">The operation logger.</param>
     /// <param name="configuration">The keyboard configuration.</param>
     public KeyboardControlTool(
-        IKeyboardInputService keyboardInputService,
-        IWindowEnumerator windowEnumerator,
-        IWindowService windowService,
-        IElevationDetector elevationDetector,
-        ISecureDesktopDetector secureDesktopDetector,
+        KeyboardInputService keyboardInputService,
+        WindowEnumerator windowEnumerator,
+        WindowService windowService,
+        ElevationDetector elevationDetector,
+        SecureDesktopDetector secureDesktopDetector,
         KeyboardOperationLogger logger,
         KeyboardConfiguration configuration)
     {

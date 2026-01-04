@@ -12,7 +12,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
     private readonly WindowTestFixture _fixture;
 
     /// <summary>
@@ -247,3 +247,4 @@ public class WindowMoveResizeTests : IClassFixture<WindowTestFixture>
         await Task.Delay(100);
     }
 }
+

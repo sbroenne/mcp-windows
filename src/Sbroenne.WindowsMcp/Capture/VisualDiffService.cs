@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// <summary>
 /// Provides visual diff computation between screenshots using pixel-by-pixel comparison.
 /// </summary>
-public sealed class VisualDiffService : IVisualDiffService
+public sealed class VisualDiffService
 {
     /// <inheritdoc />
     public Task<VisualDiffResult> ComputeDiffAsync(

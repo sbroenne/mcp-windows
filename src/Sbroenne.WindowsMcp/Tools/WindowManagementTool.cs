@@ -19,8 +19,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowManagementTool
 {
-    private readonly IWindowService _windowService;
-    private readonly IMonitorService _monitorService;
+    private readonly WindowService _windowService;
+    private readonly MonitorService _monitorService;
     private readonly WindowOperationLogger? _logger;
     private readonly WindowConfiguration _configuration;
 
@@ -32,8 +32,8 @@ public sealed partial class WindowManagementTool
     /// <param name="configuration">The window configuration.</param>
     /// <param name="logger">Optional operation logger.</param>
     public WindowManagementTool(
-        IWindowService windowService,
-        IMonitorService monitorService,
+        WindowService windowService,
+        MonitorService monitorService,
         WindowConfiguration configuration,
         WindowOperationLogger? logger = null)
     {

@@ -12,7 +12,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowStateTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
     private readonly WindowTestFixture _fixture;
 
     /// <summary>
@@ -445,3 +445,4 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
     #endregion
 }
+

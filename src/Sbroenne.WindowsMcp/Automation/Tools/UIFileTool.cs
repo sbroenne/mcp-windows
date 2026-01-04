@@ -12,13 +12,13 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class UIFileTool
 {
-    private readonly IUIAutomationService _automationService;
+    private readonly UIAutomationService _automationService;
     private readonly ILogger<UIFileTool> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIFileTool"/> class.
     /// </summary>
-    public UIFileTool(IUIAutomationService automationService, ILogger<UIFileTool> logger)
+    public UIFileTool(UIAutomationService automationService, ILogger<UIFileTool> logger)
     {
         ArgumentNullException.ThrowIfNull(automationService);
         ArgumentNullException.ThrowIfNull(logger);

@@ -9,6 +9,8 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
+    <!-- Disable CA1822 (CA1822: Member can be static) - acceptable for DI container registrations and alternative patterns -->
+    <NoWarn>$(NoWarn);CA1822;CA1805</NoWarn>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>

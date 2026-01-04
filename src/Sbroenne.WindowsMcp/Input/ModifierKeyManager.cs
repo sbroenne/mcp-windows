@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Input;
 /// <summary>
 /// Manages modifier key (Ctrl, Shift, Alt) state during mouse operations.
 /// </summary>
-public class ModifierKeyManager : IModifierKeyManager
+public class ModifierKeyManager
 {
     /// <inheritdoc/>
     public IReadOnlyList<int> PressModifiers(ModifierKey modifiers)

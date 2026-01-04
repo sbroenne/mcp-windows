@@ -7,9 +7,8 @@ using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Tools;
-
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 

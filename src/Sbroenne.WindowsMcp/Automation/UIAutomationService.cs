@@ -16,14 +16,14 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// to the managed System.Windows.Automation API (UIA2).
 /// </remarks>
 [SupportedOSPlatform("windows")]
-public sealed partial class UIAutomationService : IUIAutomationService, IDisposable
+public sealed partial class UIAutomationService : IDisposable
 {
     private readonly UIAutomationThread _staThread;
-    private readonly IMonitorService _monitorService;
-    private readonly IMouseInputService _mouseService;
-    private readonly IKeyboardInputService _keyboardService;
-    private readonly IWindowService? _windowService;
-    private readonly IElevationDetector _elevationDetector;
+    private readonly MonitorService _monitorService;
+    private readonly MouseInputService _mouseService;
+    private readonly KeyboardInputService _keyboardService;
+    private readonly WindowService? _windowService;
+    private readonly ElevationDetector _elevationDetector;
     private readonly ILogger<UIAutomationService> _logger;
     private readonly CoordinateConverter _coordinateConverter;
 
@@ -43,11 +43,11 @@ public sealed partial class UIAutomationService : IUIAutomationService, IDisposa
     /// </summary>
     public UIAutomationService(
         UIAutomationThread staThread,
-        IMonitorService monitorService,
-        IMouseInputService mouseService,
-        IKeyboardInputService keyboardService,
-        IWindowService? windowService,
-        IElevationDetector elevationDetector,
+        MonitorService monitorService,
+        MouseInputService mouseService,
+        KeyboardInputService keyboardService,
+        WindowService? windowService,
+        ElevationDetector elevationDetector,
         ILogger<UIAutomationService> logger)
     {
         ArgumentNullException.ThrowIfNull(staThread);

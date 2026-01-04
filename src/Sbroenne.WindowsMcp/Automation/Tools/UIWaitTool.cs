@@ -12,13 +12,13 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class UIWaitTool
 {
-    private readonly IUIAutomationService _automationService;
+    private readonly UIAutomationService _automationService;
     private readonly ILogger<UIWaitTool> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIWaitTool"/> class.
     /// </summary>
-    public UIWaitTool(IUIAutomationService automationService, ILogger<UIWaitTool> logger)
+    public UIWaitTool(UIAutomationService automationService, ILogger<UIWaitTool> logger)
     {
         ArgumentNullException.ThrowIfNull(automationService);
         ArgumentNullException.ThrowIfNull(logger);

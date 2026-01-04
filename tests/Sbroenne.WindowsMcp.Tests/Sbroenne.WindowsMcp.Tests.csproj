@@ -31,7 +31,6 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Xunit.SkippableFact" />
     <PackageReference Include="Bogus" />
-    <PackageReference Include="NSubstitute" />
   </ItemGroup>
 
   <ItemGroup>

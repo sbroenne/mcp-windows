@@ -30,34 +30,34 @@ builder.Services.AddSingleton(_ => WindowConfiguration.FromEnvironment());
 builder.Services.AddSingleton(_ => ScreenshotConfiguration.FromEnvironment());
 
 // Register application services
-builder.Services.AddSingleton<IMouseInputService, MouseInputService>();
-builder.Services.AddSingleton<IKeyboardInputService, KeyboardInputService>();
-builder.Services.AddSingleton<IElevationDetector, ElevationDetector>();
-builder.Services.AddSingleton<ISecureDesktopDetector, SecureDesktopDetector>();
+builder.Services.AddSingleton<MouseInputService>();
+builder.Services.AddSingleton<KeyboardInputService>();
+builder.Services.AddSingleton<ElevationDetector>();
+builder.Services.AddSingleton<SecureDesktopDetector>();
 builder.Services.AddSingleton<MouseOperationLogger>();
 builder.Services.AddSingleton<KeyboardOperationLogger>();
 builder.Services.AddSingleton<WindowOperationLogger>();
 builder.Services.AddSingleton<ScreenshotOperationLogger>();
 
 // Register window management services
-builder.Services.AddSingleton<IWindowEnumerator, WindowEnumerator>();
-builder.Services.AddSingleton<IWindowActivator, WindowActivator>();
-builder.Services.AddSingleton<IWindowService, WindowService>();
+builder.Services.AddSingleton<WindowEnumerator>();
+builder.Services.AddSingleton<WindowActivator>();
+builder.Services.AddSingleton<WindowService>();
 
 // Register screenshot capture services
-builder.Services.AddSingleton<IMonitorService, MonitorService>();
-builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
-builder.Services.AddSingleton<IScreenshotService, ScreenshotService>();
-builder.Services.AddSingleton<IVisualDiffService, VisualDiffService>();
+builder.Services.AddSingleton<MonitorService>();
+builder.Services.AddSingleton<ImageProcessor>();
+builder.Services.AddSingleton<ScreenshotService>();
+builder.Services.AddSingleton<VisualDiffService>();
 
 // Register OCR services (Windows.Media.Ocr legacy engine)
-builder.Services.AddSingleton<IOcrService, LegacyOcrService>();
+builder.Services.AddSingleton<LegacyOcrService>();
 
 // Register UI Automation services
 builder.Services.AddSingleton<UIAutomationThread>();
-builder.Services.AddSingleton<IUIAutomationService, UIAutomationService>();
+builder.Services.AddSingleton<UIAutomationService>();
 builder.Services.AddSingleton<AnnotatedScreenshotLogger>();
-builder.Services.AddSingleton<IAnnotatedScreenshotService, AnnotatedScreenshotService>();
+builder.Services.AddSingleton<AnnotatedScreenshotService>();
 
 // Configure MCP server with stdio transport
 builder.Services
@@ -114,6 +114,6 @@ var host = builder.Build();
 
 // Force OCR service initialization to trigger startup logging (FR-044)
 // The NpuOcrService and LegacyOcrService log their availability status during construction
-_ = host.Services.GetRequiredService<IOcrService>();
+_ = host.Services.GetRequiredService<LegacyOcrService>();
 
 await host.RunAsync();

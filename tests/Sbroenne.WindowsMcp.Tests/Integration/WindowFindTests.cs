@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowFindTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowFindTests"/> class.
@@ -211,3 +211,4 @@ public class WindowFindTests : IClassFixture<WindowTestFixture>
         Assert.NotEmpty(findResult.Windows);
     }
 }
+

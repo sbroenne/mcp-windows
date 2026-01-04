@@ -13,16 +13,16 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class UIClickTool
 {
-    private readonly IUIAutomationService _automationService;
-    private readonly IWindowService _windowService;
+    private readonly UIAutomationService _automationService;
+    private readonly WindowService _windowService;
     private readonly ILogger<UIClickTool> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIClickTool"/> class.
     /// </summary>
     public UIClickTool(
-        IUIAutomationService automationService,
-        IWindowService windowService,
+        UIAutomationService automationService,
+        WindowService windowService,
         ILogger<UIClickTool> logger)
     {
         ArgumentNullException.ThrowIfNull(automationService);

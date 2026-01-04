@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// <summary>
 /// Detects whether a target window belongs to an elevated (admin) process.
 /// </summary>
-public class ElevationDetector : IElevationDetector
+public class ElevationDetector
 {
     /// <inheritdoc/>
     public bool IsTargetElevated(int x, int y)

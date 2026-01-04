@@ -15,11 +15,11 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// Service for creating annotated screenshots with numbered UI element labels.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
+public sealed class AnnotatedScreenshotService
 {
-    private readonly IUIAutomationService _automationService;
-    private readonly IScreenshotService _screenshotService;
-    private readonly IImageProcessor _imageProcessor;
+    private readonly UIAutomationService _automationService;
+    private readonly ScreenshotService _screenshotService;
+    private readonly ImageProcessor _imageProcessor;
     private readonly AnnotatedScreenshotLogger _logger;
 
     // Annotation styling constants
@@ -46,9 +46,9 @@ public sealed class AnnotatedScreenshotService : IAnnotatedScreenshotService
     /// Initializes a new instance of the <see cref="AnnotatedScreenshotService"/> class.
     /// </summary>
     public AnnotatedScreenshotService(
-        IUIAutomationService automationService,
-        IScreenshotService screenshotService,
-        IImageProcessor imageProcessor,
+        UIAutomationService automationService,
+        ScreenshotService screenshotService,
+        ImageProcessor imageProcessor,
         AnnotatedScreenshotLogger logger)
     {
         _automationService = automationService ?? throw new ArgumentNullException(nameof(automationService));

@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// <summary>
 /// Processes captured bitmaps: scaling and format encoding.
 /// </summary>
-public sealed class ImageProcessor : IImageProcessor
+public sealed class ImageProcessor
 {
     /// <inheritdoc />
     public ProcessedImage Process(

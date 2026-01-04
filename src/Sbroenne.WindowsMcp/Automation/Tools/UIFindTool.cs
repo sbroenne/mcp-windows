@@ -12,13 +12,13 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class UIFindTool
 {
-    private readonly IUIAutomationService _automationService;
+    private readonly UIAutomationService _automationService;
     private readonly ILogger<UIFindTool> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIFindTool"/> class.
     /// </summary>
-    public UIFindTool(IUIAutomationService automationService, ILogger<UIFindTool> logger)
+    public UIFindTool(UIAutomationService automationService, ILogger<UIFindTool> logger)
     {
         ArgumentNullException.ThrowIfNull(automationService);
         ArgumentNullException.ThrowIfNull(logger);

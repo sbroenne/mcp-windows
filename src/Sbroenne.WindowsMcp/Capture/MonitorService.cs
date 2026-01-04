@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// Provides monitor enumeration and information services.
 /// Uses native Win32 APIs to get physical pixel coordinates for DPI-aware screenshot capture.
 /// </summary>
-public sealed class MonitorService : IMonitorService
+public sealed class MonitorService
 {
     private const int ENUM_CURRENT_SETTINGS = -1;
 

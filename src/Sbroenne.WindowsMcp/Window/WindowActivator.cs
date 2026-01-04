@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Window;
 /// Activates windows and brings them to the foreground using multiple strategies.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class WindowActivator : IWindowActivator
+public sealed class WindowActivator
 {
     private readonly WindowConfiguration _configuration;
 

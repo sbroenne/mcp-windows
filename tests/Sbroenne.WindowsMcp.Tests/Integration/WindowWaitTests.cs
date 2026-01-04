@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowWaitTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowWaitTests"/> class.
@@ -214,3 +214,4 @@ public class WindowWaitTests : IClassFixture<WindowTestFixture>
         Assert.True(stopwatch.Elapsed.TotalSeconds <= 5, $"Timeout took too long: {stopwatch.Elapsed.TotalSeconds}s");
     }
 }
+

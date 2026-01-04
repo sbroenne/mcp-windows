@@ -18,7 +18,7 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// <summary>
 /// OCR service using Windows.Media.Ocr (available on Windows 11).
 /// </summary>
-public sealed partial class LegacyOcrService : IOcrService
+public sealed partial class LegacyOcrService
 {
     private readonly ILogger<LegacyOcrService> _logger;
     private readonly List<string> _availableLanguages;

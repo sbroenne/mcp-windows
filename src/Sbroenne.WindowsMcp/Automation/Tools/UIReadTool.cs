@@ -14,18 +14,18 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class UIReadTool
 {
-    private readonly IUIAutomationService _automationService;
-    private readonly IOcrService _ocrService;
-    private readonly IScreenshotService _screenshotService;
+    private readonly UIAutomationService _automationService;
+    private readonly LegacyOcrService _ocrService;
+    private readonly ScreenshotService _screenshotService;
     private readonly ILogger<UIReadTool> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIReadTool"/> class.
     /// </summary>
     public UIReadTool(
-        IUIAutomationService automationService,
-        IOcrService ocrService,
-        IScreenshotService screenshotService,
+        UIAutomationService automationService,
+        LegacyOcrService ocrService,
+        ScreenshotService screenshotService,
         ILogger<UIReadTool> logger)
     {
         ArgumentNullException.ThrowIfNull(automationService);

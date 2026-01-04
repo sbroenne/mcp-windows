@@ -15,7 +15,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowListTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
+    private readonly WindowService _windowService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowListTests"/> class.
@@ -252,17 +252,17 @@ public class WindowTestFixture : IAsyncLifetime, IDisposable
     /// <summary>
     /// Gets the window service instance for testing.
     /// </summary>
-    public IWindowService WindowService { get; }
+    public WindowService WindowService { get; }
 
     /// <summary>
     /// Gets the window enumerator instance for testing.
     /// </summary>
-    public IWindowEnumerator WindowEnumerator { get; }
+    public WindowEnumerator WindowEnumerator { get; }
 
     /// <summary>
     /// Gets the window activator instance for testing.
     /// </summary>
-    public IWindowActivator WindowActivator { get; }
+    public WindowActivator WindowActivator { get; }
 
     /// <summary>
     /// Gets the handle of the test window.

@@ -1,5 +1,6 @@
 using System.Drawing.Imaging;
 using Sbroenne.WindowsMcp.Capture;
+using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -37,7 +38,7 @@ public sealed class VisualDiffServiceTests : IDisposable
     private static string BitmapToBase64(Bitmap bitmap)
     {
         using var stream = new MemoryStream();
-        bitmap.Save(stream, ImageFormat.Png);
+        bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
         return Convert.ToBase64String(stream.ToArray());
     }
 

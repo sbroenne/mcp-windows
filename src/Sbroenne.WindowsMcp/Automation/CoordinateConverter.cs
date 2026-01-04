@@ -10,13 +10,13 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public sealed class CoordinateConverter
 {
-    private readonly IMonitorService _monitorService;
+    private readonly MonitorService _monitorService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CoordinateConverter"/> class.
     /// </summary>
     /// <param name="monitorService">The monitor service.</param>
-    public CoordinateConverter(IMonitorService monitorService)
+    public CoordinateConverter(MonitorService monitorService)
     {
         ArgumentNullException.ThrowIfNull(monitorService);
         _monitorService = monitorService;

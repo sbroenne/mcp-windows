@@ -14,13 +14,13 @@ namespace Sbroenne.WindowsMcp.Resources;
 [McpServerResourceType]
 public sealed class SystemResources
 {
-    private readonly IMonitorService _monitorService;
+    private readonly MonitorService _monitorService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SystemResources"/> class.
     /// </summary>
     /// <param name="monitorService">The monitor service for enumerating displays.</param>
-    public SystemResources(IMonitorService monitorService)
+    public SystemResources(MonitorService monitorService)
     {
         _monitorService = monitorService ?? throw new ArgumentNullException(nameof(monitorService));
     }

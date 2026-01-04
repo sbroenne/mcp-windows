@@ -9,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Input;
 /// Implementation of keyboard input operations using Windows SendInput API.
 /// Uses KEYEVENTF_UNICODE for layout-independent text typing.
 /// </summary>
-public sealed class KeyboardInputService : IKeyboardInputService, IDisposable
+public sealed class KeyboardInputService : IDisposable
 {
     private readonly KeyboardConfiguration _configuration;
     private readonly HeldKeyTracker _heldKeyTracker;

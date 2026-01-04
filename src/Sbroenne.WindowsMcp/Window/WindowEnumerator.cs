@@ -13,9 +13,9 @@ namespace Sbroenne.WindowsMcp.Window;
 /// Enumerates windows on the system and retrieves window information.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class WindowEnumerator : IWindowEnumerator
+public sealed class WindowEnumerator
 {
-    private readonly IElevationDetector _elevationDetector;
+    private readonly ElevationDetector _elevationDetector;
     private readonly WindowConfiguration _configuration;
 
     /// <summary>
@@ -23,7 +23,7 @@ public sealed class WindowEnumerator : IWindowEnumerator
     /// </summary>
     /// <param name="elevationDetector">Elevation detector for checking window elevation status.</param>
     /// <param name="configuration">Window configuration.</param>
-    public WindowEnumerator(IElevationDetector elevationDetector, WindowConfiguration configuration)
+    public WindowEnumerator(ElevationDetector elevationDetector, WindowConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(elevationDetector);
         ArgumentNullException.ThrowIfNull(configuration);

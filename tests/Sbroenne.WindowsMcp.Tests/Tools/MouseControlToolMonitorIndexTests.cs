@@ -6,11 +6,10 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Logging;
+using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Fixtures;
 using Sbroenne.WindowsMcp.Tools;
 using Sbroenne.WindowsMcp.Window;
-
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Tools;
 

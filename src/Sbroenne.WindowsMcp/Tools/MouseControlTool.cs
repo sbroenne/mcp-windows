@@ -21,12 +21,12 @@ public sealed partial class MouseControlTool
 {
     private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
 
-    private readonly IMouseInputService _mouseInputService;
-    private readonly IMonitorService _monitorService;
-    private readonly IWindowEnumerator _windowEnumerator;
-    private readonly IWindowService _windowService;
-    private readonly IElevationDetector _elevationDetector;
-    private readonly ISecureDesktopDetector _secureDesktopDetector;
+    private readonly MouseInputService _mouseInputService;
+    private readonly MonitorService _monitorService;
+    private readonly WindowEnumerator _windowEnumerator;
+    private readonly WindowService _windowService;
+    private readonly ElevationDetector _elevationDetector;
+    private readonly SecureDesktopDetector _secureDesktopDetector;
     private readonly MouseOperationLogger _logger;
     private readonly MouseConfiguration _configuration;
 
@@ -42,12 +42,12 @@ public sealed partial class MouseControlTool
     /// <param name="logger">The operation logger.</param>
     /// <param name="configuration">The mouse configuration.</param>
     public MouseControlTool(
-        IMouseInputService mouseInputService,
-        IMonitorService monitorService,
-        IWindowEnumerator windowEnumerator,
-        IWindowService windowService,
-        IElevationDetector elevationDetector,
-        ISecureDesktopDetector secureDesktopDetector,
+        MouseInputService mouseInputService,
+        MonitorService monitorService,
+        WindowEnumerator windowEnumerator,
+        WindowService windowService,
+        ElevationDetector elevationDetector,
+        SecureDesktopDetector secureDesktopDetector,
         MouseOperationLogger logger,
         MouseConfiguration configuration)
     {

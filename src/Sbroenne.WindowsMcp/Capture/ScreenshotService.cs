@@ -9,11 +9,11 @@ namespace Sbroenne.WindowsMcp.Capture;
 /// <summary>
 /// Provides screenshot capture services for screens, monitors, windows, and regions.
 /// </summary>
-public sealed class ScreenshotService : IScreenshotService
+public sealed class ScreenshotService
 {
-    private readonly IMonitorService _monitorService;
-    private readonly Automation.ISecureDesktopDetector _secureDesktopDetector;
-    private readonly IImageProcessor _imageProcessor;
+    private readonly MonitorService _monitorService;
+    private readonly Automation.SecureDesktopDetector _secureDesktopDetector;
+    private readonly ImageProcessor _imageProcessor;
     private readonly ScreenshotConfiguration _configuration;
     private readonly ScreenshotOperationLogger _logger;
 
@@ -26,9 +26,9 @@ public sealed class ScreenshotService : IScreenshotService
     /// <param name="configuration">The screenshot configuration.</param>
     /// <param name="logger">The operation logger.</param>
     public ScreenshotService(
-        IMonitorService monitorService,
-        Automation.ISecureDesktopDetector secureDesktopDetector,
-        IImageProcessor imageProcessor,
+        MonitorService monitorService,
+        Automation.SecureDesktopDetector secureDesktopDetector,
+        ImageProcessor imageProcessor,
         ScreenshotConfiguration configuration,
         ScreenshotOperationLogger logger)
     {

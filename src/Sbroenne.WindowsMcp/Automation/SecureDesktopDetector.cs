@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// <summary>
 /// Detects whether a secure desktop (UAC, lock screen) is currently active.
 /// </summary>
-public class SecureDesktopDetector : ISecureDesktopDetector
+public class SecureDesktopDetector
 {
     /// <inheritdoc/>
     public bool IsSecureDesktopActive()

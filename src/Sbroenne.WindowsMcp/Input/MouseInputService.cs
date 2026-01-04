@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Input;
 /// <summary>
 /// Implementation of mouse input operations using Windows SendInput API.
 /// </summary>
-public sealed class MouseInputService : IMouseInputService
+public sealed class MouseInputService
 {
     private readonly ModifierKeyManager _modifierKeyManager = new();
     /// <inheritdoc />

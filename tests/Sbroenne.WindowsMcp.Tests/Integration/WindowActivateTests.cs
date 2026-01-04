@@ -11,8 +11,8 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowActivateTests : IClassFixture<WindowTestFixture>
 {
-    private readonly IWindowService _windowService;
-    private readonly IWindowActivator _windowActivator;
+    private readonly WindowService _windowService;
+    private readonly WindowActivator _windowActivator;
     private readonly WindowTestFixture _fixture;
 
     /// <summary>

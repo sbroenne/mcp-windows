@@ -12,12 +12,12 @@ namespace Sbroenne.WindowsMcp.Window;
 /// Main window management service that orchestrates window operations.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed class WindowService : IWindowService
+public sealed class WindowService
 {
-    private readonly IWindowEnumerator _enumerator;
-    private readonly IWindowActivator _activator;
-    private readonly IMonitorService _monitorService;
-    private readonly ISecureDesktopDetector _secureDesktopDetector;
+    private readonly WindowEnumerator _enumerator;
+    private readonly WindowActivator _activator;
+    private readonly MonitorService _monitorService;
+    private readonly SecureDesktopDetector _secureDesktopDetector;
     private readonly WindowConfiguration _configuration;
     private readonly WindowOperationLogger? _logger;
 
@@ -31,10 +31,10 @@ public sealed class WindowService : IWindowService
     /// <param name="configuration">Window configuration.</param>
     /// <param name="logger">Optional operation logger.</param>
     public WindowService(
-        IWindowEnumerator enumerator,
-        IWindowActivator activator,
-        IMonitorService monitorService,
-        ISecureDesktopDetector secureDesktopDetector,
+        WindowEnumerator enumerator,
+        WindowActivator activator,
+        MonitorService monitorService,
+        SecureDesktopDetector secureDesktopDetector,
         WindowConfiguration configuration,
         WindowOperationLogger? logger = null)
     {

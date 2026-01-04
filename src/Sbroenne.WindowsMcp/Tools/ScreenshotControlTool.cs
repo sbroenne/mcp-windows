@@ -15,9 +15,9 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class ScreenshotControlTool
 {
-    private readonly IScreenshotService _screenshotService;
-    private readonly IAnnotatedScreenshotService _annotatedScreenshotService;
-    private readonly IWindowService _windowService;
+    private readonly ScreenshotService _screenshotService;
+    private readonly AnnotatedScreenshotService _annotatedScreenshotService;
+    private readonly WindowService _windowService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ScreenshotControlTool"/> class.
@@ -26,9 +26,9 @@ public sealed partial class ScreenshotControlTool
     /// <param name="annotatedScreenshotService">The annotated screenshot service for element discovery.</param>
     /// <param name="windowService">The window service for finding windows by title.</param>
     public ScreenshotControlTool(
-        IScreenshotService screenshotService,
-        IAnnotatedScreenshotService annotatedScreenshotService,
-        IWindowService windowService)
+        ScreenshotService screenshotService,
+        AnnotatedScreenshotService annotatedScreenshotService,
+        WindowService windowService)
     {
         _screenshotService = screenshotService;
         _annotatedScreenshotService = annotatedScreenshotService;
