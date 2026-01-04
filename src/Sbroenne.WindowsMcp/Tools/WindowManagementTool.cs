@@ -19,6 +19,10 @@ namespace Sbroenne.WindowsMcp.Tools;
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowManagementTool
 {
+    // NOTE: Some LLM integrations reject JSON Schemas that use nullable union types.
+    // Use sentinel defaults for optional numeric parameters to keep schemas compatible.
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly IWindowService _windowService;
     private readonly IMonitorService _monitorService;
     private readonly WindowOperationLogger? _logger;
@@ -84,27 +88,46 @@ public sealed partial class WindowManagementTool
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The window action to perform: launch (start an application), list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible")] string action,
-        [Description("Program to launch (required for launch action). Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'mspaint.exe') or full path (e.g., 'C:\\Windows\\notepad.exe').")] string? programPath = null,
-        [Description("Command-line arguments for the launched program (optional, for launch action).")] string? arguments = null,
-        [Description("Working directory for the launched program (optional, for launch action).")] string? workingDirectory = null,
+        [Description("Program to launch (required for launch action). Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'mspaint.exe') or full path (e.g., 'C:\\Windows\\notepad.exe').")] string programPath = "",
+        [Description("Command-line arguments for the launched program (optional, for launch action).")] string arguments = "",
+        [Description("Working directory for the launched program (optional, for launch action).")] string workingDirectory = "",
         [Description("Wait for the launched application window to appear (default: true for launch action).")] bool waitForWindow = true,
-        [Description("Window handle for actions that target a specific window (e.g., activate, close, minimize). Get the handle from the 'list' or 'find' action.")] string? handle = null,
-        [Description("Window title to search for (required for find and wait_for)")] string? title = null,
-        [Description("Filter windows by title or process name (for list action)")] string? filter = null,
+        [Description("Window handle for actions that target a specific window (e.g., activate, close, minimize). Get the handle from the 'list' or 'find' action.")] string handle = "",
+        [Description("Window title to search for (required for find and wait_for)")] string title = "",
+        [Description("Filter windows by title or process name (for list action)")] string filter = "",
         [Description("Use regex matching for title/filter (default: false)")] bool regex = false,
         [Description("Include windows on other virtual desktops (default: false)")] bool includeAllDesktops = false,
-        [Description("X-coordinate for move or set_bounds action")] int? x = null,
-        [Description("Y-coordinate for move or set_bounds action")] int? y = null,
-        [Description("Width for resize or set_bounds action")] int? width = null,
-        [Description("Height for resize or set_bounds action")] int? height = null,
-        [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int? timeoutMs = null,
-        [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string? target = null,
-        [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int? monitorIndex = null,
-        [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string? state = null,
-        [Description("Exclude windows whose title contains this text (for list action). Useful for filtering out dialogs or popups.")] string? excludeTitle = null,
+        [Description("X-coordinate for move or set_bounds action")] int x = UnspecifiedInt,
+        [Description("Y-coordinate for move or set_bounds action")] int y = UnspecifiedInt,
+        [Description("Width for resize or set_bounds action")] int width = UnspecifiedInt,
+        [Description("Height for resize or set_bounds action")] int height = UnspecifiedInt,
+        [Description("Timeout in milliseconds for wait_for and wait_for_state actions (default: 5000)")] int timeoutMs = UnspecifiedInt,
+        [Description("Monitor target for move_to_monitor action: 'primary_screen' (main display), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex.")] string target = "",
+        [Description("Target monitor index for move_to_monitor action (0-based). Alternative to 'target' for 3+ monitor setups.")] int monitorIndex = UnspecifiedInt,
+        [Description("Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'")] string state = "",
+        [Description("Exclude windows whose title contains this text (for list action). Useful for filtering out dialogs or popups.")] string excludeTitle = "",
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        // Normalize sentinel optional numeric parameters
+        int? xOpt = x == UnspecifiedInt ? null : x;
+        int? yOpt = y == UnspecifiedInt ? null : y;
+        int? widthOpt = width == UnspecifiedInt ? null : width;
+        int? heightOpt = height == UnspecifiedInt ? null : height;
+        int? timeoutMsOpt = timeoutMs == UnspecifiedInt ? null : timeoutMs;
+        int? monitorIndexOpt = monitorIndex == UnspecifiedInt ? null : monitorIndex;
+
+        // Normalize empty strings to null for internal logic
+        string? programPathOpt = string.IsNullOrWhiteSpace(programPath) ? null : programPath;
+        string? argumentsOpt = string.IsNullOrWhiteSpace(arguments) ? null : arguments;
+        string? workingDirectoryOpt = string.IsNullOrWhiteSpace(workingDirectory) ? null : workingDirectory;
+        string? handleOpt = string.IsNullOrWhiteSpace(handle) ? null : handle;
+        string? titleOpt = string.IsNullOrWhiteSpace(title) ? null : title;
+        string? filterOpt = string.IsNullOrWhiteSpace(filter) ? null : filter;
+        string? targetOpt = string.IsNullOrWhiteSpace(target) ? null : target;
+        string? stateOpt = string.IsNullOrWhiteSpace(state) ? null : state;
+        string? excludeTitleOpt = string.IsNullOrWhiteSpace(excludeTitle) ? null : excludeTitle;
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -135,22 +158,22 @@ public sealed partial class WindowManagementTool
             }
 
             // Use handle directly - no app resolution (LLMs should call list/find first)
-            string? resolvedHandle = handle;
+            string? resolvedHandle = handleOpt;
 
             WindowManagementResult operationResult;
 
             switch (windowAction.Value)
             {
                 case WindowAction.Launch:
-                    operationResult = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
+                    operationResult = await HandleLaunchAsync(programPathOpt, argumentsOpt, workingDirectoryOpt, waitForWindow, timeoutMsOpt, cancellationToken);
                     break;
 
                 case WindowAction.List:
-                    operationResult = await HandleListAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
+                    operationResult = await HandleListAsync(filterOpt, regex, includeAllDesktops, excludeTitleOpt, cancellationToken);
                     break;
 
                 case WindowAction.Find:
-                    operationResult = await HandleFindAsync(title, regex, cancellationToken);
+                    operationResult = await HandleFindAsync(titleOpt, regex, cancellationToken);
                     break;
 
                 case WindowAction.Activate:
@@ -178,23 +201,23 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Move:
-                    operationResult = await HandleMoveAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAsync(resolvedHandle, xOpt, yOpt, cancellationToken);
                     break;
 
                 case WindowAction.Resize:
-                    operationResult = await HandleResizeAsync(resolvedHandle, width, height, cancellationToken);
+                    operationResult = await HandleResizeAsync(resolvedHandle, widthOpt, heightOpt, cancellationToken);
                     break;
 
                 case WindowAction.SetBounds:
-                    operationResult = await HandleSetBoundsAsync(resolvedHandle, x, y, width, height, cancellationToken);
+                    operationResult = await HandleSetBoundsAsync(resolvedHandle, xOpt, yOpt, widthOpt, heightOpt, cancellationToken);
                     break;
 
                 case WindowAction.WaitFor:
-                    operationResult = await HandleWaitForAsync(title, regex, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForAsync(titleOpt, regex, timeoutMsOpt, cancellationToken);
                     break;
 
                 case WindowAction.MoveToMonitor:
-                    operationResult = await HandleMoveToMonitorAsync(resolvedHandle, target, monitorIndex, cancellationToken);
+                    operationResult = await HandleMoveToMonitorAsync(resolvedHandle, targetOpt, monitorIndexOpt, cancellationToken);
                     break;
 
                 case WindowAction.GetState:
@@ -202,11 +225,11 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.WaitForState:
-                    operationResult = await HandleWaitForStateAsync(resolvedHandle, state, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForStateAsync(resolvedHandle, stateOpt, timeoutMsOpt, cancellationToken);
                     break;
 
                 case WindowAction.MoveAndActivate:
-                    operationResult = await HandleMoveAndActivateAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAndActivateAsync(resolvedHandle, xOpt, yOpt, cancellationToken);
                     break;
 
                 case WindowAction.EnsureVisible:

@@ -102,3 +102,6 @@ tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/screenshots/
 # Runtime screenshots generated during test execution (not committed)
 **/bin/**/screenshots/
 nupkg/
+
+# Snyk Security Extension - AI Rules (auto-generated)
+.github/instructions/snyk_rules.instructions.md
