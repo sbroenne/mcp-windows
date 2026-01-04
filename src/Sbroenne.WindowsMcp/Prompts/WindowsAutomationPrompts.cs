@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Server;
 
@@ -11,17 +10,14 @@ namespace Sbroenne.WindowsMcp.Prompts;
 [McpServerPromptType]
 public sealed class WindowsAutomationPrompts
 {
-    /// <summary>
-    /// Canonical workflow for Windows UI automation using window handles.
-    /// </summary>
-    /// <param name="goal">What you want to achieve (1 sentence).</param>
-    /// <param name="target">App/window identifier (partial title match for finding).</param>
+    /// <summary>Canonical workflow for Windows UI automation. Find handle first, then interact.</summary>
+    /// <param name="goal">What you want to achieve (1 sentence). Example: 'Click the Settings gear and enable Dark Mode'.</param>
+    /// <param name="target">App/window identifier (partial title match). Example: 'Visual Studio Code' or 'Notepad'.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_quickstart")]
-    [Description("Canonical workflow for Windows UI automation. Find handle first, then interact.")]
     public static IEnumerable<ChatMessage> Quickstart(
-        [Description("What you want to achieve (1 sentence). Example: 'Click the Settings gear and enable Dark Mode'.")] string goal,
-        [Description("App/window identifier (partial title match). Example: 'Visual Studio Code' or 'Notepad'.")] string target)
+        string goal,
+        string target)
     {
         return
         [
@@ -55,21 +51,18 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Find a UI element and click it using window handle.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
-    /// <param name="elementDescription">What you want to click.</param>
-    /// <param name="nameContains">Optional element name substring.</param>
-    /// <param name="automationId">Optional AutomationId if known.</param>
+    /// <summary>Find a UI element and click it using window handle.</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.</param>
+    /// <param name="elementDescription">What you want to click. Example: 'Save button', 'OK', 'Settings gear'.</param>
+    /// <param name="nameContains">Optional element name substring. Example: 'Save' or 'OK'.</param>
+    /// <param name="automationId">Optional AutomationId if known (most reliable).</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_find_and_click")]
-    [Description("Find a UI element and click it using window handle.")]
     public static IEnumerable<ChatMessage> FindAndClick(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.")] string windowTitle,
-        [Description("What you want to click. Example: 'Save button', 'OK', 'Settings gear'.")] string elementDescription,
-        [Description("Optional element name substring. Example: 'Save' or 'OK'.")] string? nameContains = null,
-        [Description("Optional AutomationId if known (most reliable).")] string? automationId = null)
+        string windowTitle,
+        string elementDescription,
+        string? nameContains = null,
+        string? automationId = null)
     {
         return
         [
@@ -93,25 +86,21 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Enter text into a field using window handle.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
+    /// <summary>Enter text into a field using window handle.</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.</param>
     /// <param name="text">The text to enter.</param>
-    /// <param name="fieldDescription">What field you want to type into.</param>
+    /// <param name="fieldDescription">What field you want to type into. Example: 'Search box', 'Username field'.</param>
     /// <param name="nameContains">Optional element name substring for the target Edit control.</param>
     /// <param name="automationId">Optional AutomationId if known.</param>
-    /// <param name="clearFirst">Whether to clear existing text before typing.</param>
+    /// <param name="clearFirst">Whether to clear existing text before typing (default: true).</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_type_text")]
-    [Description("Enter text into a field using window handle.")]
     public static IEnumerable<ChatMessage> TypeText(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.")] string windowTitle,
-        [Description("The text to enter.")] string text,
-        [Description("What field you want to type into. Example: 'Search box', 'Username field'.")] string fieldDescription,
-        [Description("Optional element name substring for the target Edit control.")] string? nameContains = null,
-        [Description("Optional AutomationId if known.")] string? automationId = null,
-        [Description("Whether to clear existing text before typing (default: true).")]
+        string windowTitle,
+        string text,
+        string fieldDescription,
+        string? nameContains = null,
+        string? automationId = null,
         bool clearFirst = true)
     {
         return
@@ -136,17 +125,14 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Element discovery strategy for Electron/Chromium apps (VS Code, Teams, Slack).
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
-    /// <param name="intent">What you are trying to locate/click/type.</param>
+    /// <summary>Element discovery strategy for Electron/Chromium apps (VS Code, Teams, Slack).</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Teams', 'Slack'.</param>
+    /// <param name="intent">What you are trying to locate/click/type. Example: 'Settings', 'Search', 'Run and Debug'.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_electron_discovery")]
-    [Description("Element discovery strategy for Electron/Chromium apps (VS Code, Teams, Slack).")]
     public static IEnumerable<ChatMessage> ElectronDiscovery(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Teams', 'Slack'.")] string windowTitle,
-        [Description("What you are trying to locate/click/type. Example: 'Settings', 'Search', 'Run and Debug'.")] string intent)
+        string windowTitle,
+        string intent)
     {
         return
         [
@@ -167,17 +153,14 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Verification workflow when you need high confidence after an interaction.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
-    /// <param name="expectedOutcome">What should have changed.</param>
+    /// <summary>Verification workflow when you need high confidence after an interaction.</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.</param>
+    /// <param name="expectedOutcome">What should have changed. Example: 'Dialog closed', 'Toggle is ON', 'Text appears'.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_verify_change")]
-    [Description("Verification workflow when you need high confidence after an interaction.")]
     public static IEnumerable<ChatMessage> VerifyChange(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.")] string windowTitle,
-        [Description("What should have changed. Example: 'Dialog closed', 'Toggle is ON', 'Text appears'.")] string expectedOutcome)
+        string windowTitle,
+        string expectedOutcome)
     {
         return
         [
@@ -199,23 +182,20 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Atomic toggle operation using ensure_state.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
-    /// <param name="toggleDescription">What toggle/checkbox you want to set.</param>
+    /// <summary>Atomic toggle operation using ui_click (handles toggle state automatically).</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Settings'.</param>
+    /// <param name="toggleDescription">What toggle/checkbox you want to set. Example: 'Dark Mode toggle', 'Enable notifications'.</param>
     /// <param name="desiredState">The desired state: 'on' or 'off'.</param>
     /// <param name="nameContains">Optional element name substring.</param>
-    /// <param name="automationId">Optional AutomationId if known.</param>
+    /// <param name="automationId">Optional AutomationId if known (most reliable).</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_toggle_element")]
-    [Description("Atomic toggle operation using ui_click (handles toggle state automatically).")]
     public static IEnumerable<ChatMessage> ToggleElement(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Settings'.")] string windowTitle,
-        [Description("What toggle/checkbox you want to set. Example: 'Dark Mode toggle', 'Enable notifications'.")] string toggleDescription,
-        [Description("The desired state: 'on' or 'off'.")] string desiredState,
-        [Description("Optional element name substring.")] string? nameContains = null,
-        [Description("Optional AutomationId if known (most reliable).")] string? automationId = null)
+        string windowTitle,
+        string toggleDescription,
+        string desiredState,
+        string? nameContains = null,
+        string? automationId = null)
     {
         return
         [
@@ -239,17 +219,14 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Save a file using Ctrl+S with automatic Save As dialog handling.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
-    /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx').</param>
+    /// <summary>Save a file using ui_file tool. Handles Save As dialog automatically if filePath provided.</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.</param>
+    /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_save_file")]
-    [Description("Save a file using ui_file tool. Handles Save As dialog automatically if filePath provided.")]
     public static IEnumerable<ChatMessage> SaveFile(
-        [Description("Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.")] string windowTitle,
-        [Description("Optional: Full file path for Save As dialog (e.g., 'C:\\temp\\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.")] string? filePath = null)
+        string windowTitle,
+        string? filePath = null)
     {
         return
         [
@@ -283,19 +260,16 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>
-    /// Wait for UI changes to complete before proceeding.
-    /// </summary>
-    /// <param name="windowTitle">Window title to find (partial match).</param>
+    /// <summary>Wait for UI changes to complete before proceeding (dialogs closing, states changing).</summary>
+    /// <param name="windowTitle">Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.</param>
     /// <param name="waitType">What kind of wait: 'element_disappear', 'element_state', or 'input_idle'.</param>
-    /// <param name="targetDescription">What you're waiting for.</param>
+    /// <param name="targetDescription">What you're waiting for. Example: 'Save dialog to close', 'Toggle to be ON'.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_wait_for_change")]
-    [Description("Wait for UI changes to complete before proceeding (dialogs closing, states changing).")]
     public static IEnumerable<ChatMessage> WaitForChange(
-        [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Notepad'.")] string windowTitle,
-        [Description("What kind of wait: 'element_disappear', 'element_state', or 'input_idle'.")] string waitType,
-        [Description("What you're waiting for. Example: 'Save dialog to close', 'Toggle to be ON'.")] string targetDescription)
+        string windowTitle,
+        string waitType,
+        string targetDescription)
     {
         return
         [

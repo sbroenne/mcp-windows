@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
@@ -25,24 +24,16 @@ public sealed class SystemResources
         _monitorService = monitorService ?? throw new ArgumentNullException(nameof(monitorService));
     }
 
-    /// <summary>
-    /// Gets information about all connected monitors including resolution, position, and primary status.
-    /// </summary>
-    /// <returns>JSON array of monitor information.</returns>
+    /// <summary>List of all connected monitors with resolution, position, and primary status. Use this to understand the display configuration before capturing screenshots or positioning windows.</summary>
     [McpServerResource(UriTemplate = "system://monitors", Name = "monitors", Title = "Connected Monitors", MimeType = "application/json")]
-    [Description("List of all connected monitors with resolution, position, and primary status. Use this to understand the display configuration before capturing screenshots or positioning windows.")]
     public string GetMonitors()
     {
         var monitors = _monitorService.GetMonitors();
         return JsonSerializer.Serialize(monitors, McpJsonOptions.Default);
     }
 
-    /// <summary>
-    /// Gets information about the current keyboard layout including language tag and display name.
-    /// </summary>
-    /// <returns>JSON object with keyboard layout information.</returns>
+    /// <summary>Current keyboard layout information including BCP-47 language tag (e.g., 'en-US'), display name, and layout identifier. Use this to understand input context for keyboard operations.</summary>
     [McpServerResource(UriTemplate = "system://keyboard/layout", Name = "keyboard-layout", Title = "Keyboard Layout", MimeType = "application/json")]
-    [Description("Current keyboard layout information including BCP-47 language tag (e.g., 'en-US'), display name, and layout identifier. Use this to understand input context for keyboard operations.")]
     public static string GetKeyboardLayout()
     {
         // Get the foreground window's thread
@@ -122,12 +113,8 @@ public sealed class SystemResources
         }
     }
 
-    /// <summary>
-    /// Gets best practices guidance for using Windows automation tools effectively.
-    /// </summary>
-    /// <returns>Markdown document with best practices.</returns>
+    /// <summary>Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications.</summary>
     [McpServerResource(UriTemplate = "system://best-practices", Name = "best-practices", Title = "Windows Automation Best Practices", MimeType = "text/markdown")]
-    [Description("Best practices and workflow guidance for using Windows automation tools effectively. READ THIS FIRST when automating Windows applications.")]
     public static string GetBestPractices()
     {
         return """
@@ -224,12 +211,8 @@ public sealed class SystemResources
             """;
     }
 
-    /// <summary>
-    /// Gets error recovery guidance for common error codes.
-    /// </summary>
-    /// <returns>Markdown document with error code recovery actions.</returns>
+    /// <summary>Error code → recovery action mapping. Fetch when you encounter an error to get specific recovery guidance.</summary>
     [McpServerResource(UriTemplate = "system://error-recovery", Name = "error-recovery", Title = "Error Recovery Guide", MimeType = "text/markdown")]
-    [Description("Error code → recovery action mapping. Fetch when you encounter an error to get specific recovery guidance.")]
     public static string GetErrorRecovery()
     {
         return """
@@ -290,12 +273,8 @@ public sealed class SystemResources
             """;
     }
 
-    /// <summary>
-    /// Gets result schema documentation for all tools.
-    /// </summary>
-    /// <returns>Markdown document with result schema examples.</returns>
-    [McpServerResource(UriTemplate = "system://result-schemas", Name = "result-schemas", Title = "Result Schema Reference", MimeType = "text/markdown")]
-    [Description("JSON result schema examples for all tools. Fetch to understand what fields to expect in responses for planning multi-step workflows.")]
+    /// <summary>JSON result schema examples for all tools. Fetch to understand what fields to expect in responses for planning multi-step workflows.</summary>
+    [McpServerResource(UriTemplate = "system://result-schemas", Name = "result-schemas", Title = "Result Schema Reference", MimeType = "application/json")]
     public static string GetResultSchemas()
     {
         return """
