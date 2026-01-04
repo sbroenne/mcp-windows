@@ -30,10 +30,10 @@ public sealed partial class UIFileTool
     /// Handles file operations like saving and opening files.
     /// </summary>
     /// <remarks>
-    /// Save or open files. Triggers dialogs, auto-fills paths, handles confirmations. Pass APPLICATION window (not dialog).
+    /// PREFERRED for saving files. Sends Ctrl+S, auto-fills Save As dialog if it appears, handles overwrite confirmations. Pass APPLICATION window (not dialog). Forward slashes are auto-converted to backslashes.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED. Pass the app window, not a dialog.</param>
-    /// <param name="filePath">File path to save to. Use backslashes for Windows format (e.g., C:\\Users\\User\\file.txt). Required for save action if dialog appears.</param>
+    /// <param name="filePath">File path to save to. Both forward slashes and backslashes work (e.g., D:/folder/file.txt or D:\\folder\\file.txt). Required for Save As.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the file operation including success status.</returns>
     [McpServerTool(Name = "ui_file", Title = "File Operations", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
