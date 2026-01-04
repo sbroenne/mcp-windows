@@ -15,6 +15,10 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class ScreenshotControlTool
 {
+    // NOTE: Some LLM integrations reject JSON Schemas that use nullable union types.
+    // Use sentinel defaults for optional numeric parameters to keep schemas compatible.
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly IScreenshotService _screenshotService;
     private readonly IAnnotatedScreenshotService _annotatedScreenshotService;
     private readonly IWindowService _windowService;
@@ -82,23 +86,31 @@ public sealed partial class ScreenshotControlTool
     [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string? action = null,
+        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'")] string action = "",
         [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
-        [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string? target = null,
-        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int? monitorIndex = null,
-        [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,
-        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int? regionX = null,
-        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")] int? regionY = null,
-        [Description("Width in pixels for 'region' target. Must be positive.")] int? regionWidth = null,
-        [Description("Height in pixels for 'region' target. Must be positive.")] int? regionHeight = null,
+        [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'")] string target = "",
+        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int monitorIndex = UnspecifiedInt,
+        [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string windowHandle = "",
+        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int regionX = UnspecifiedInt,
+        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")] int regionY = UnspecifiedInt,
+        [Description("Width in pixels for 'region' target. Must be positive.")] int regionWidth = UnspecifiedInt,
+        [Description("Height in pixels for 'region' target. Must be positive.")] int regionHeight = UnspecifiedInt,
         [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
-        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
-        [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int? quality = null,
-        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
-        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
+        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string imageFormat = "",
+        [Description("Image compression quality 1-100. Default: 85. Only affects JPEG format.")] int quality = UnspecifiedInt,
+        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string outputMode = "",
+        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string outputPath = "",
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        // Normalize sentinel optional numeric parameters
+        int? monitorIndexOpt = monitorIndex == UnspecifiedInt ? null : monitorIndex;
+        int? regionXOpt = regionX == UnspecifiedInt ? null : regionX;
+        int? regionYOpt = regionY == UnspecifiedInt ? null : regionY;
+        int? regionWidthOpt = regionWidth == UnspecifiedInt ? null : regionWidth;
+        int? regionHeightOpt = regionHeight == UnspecifiedInt ? null : regionHeight;
+        int? qualityOpt = quality == UnspecifiedInt ? null : quality;
 
         // Create MCP client logger for observability
         var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("ScreenshotControl");
@@ -124,7 +136,7 @@ public sealed partial class ScreenshotControlTool
 
         // Parse and validate image format
         var parsedImageFormat = ParseImageFormat(imageFormat);
-        if (parsedImageFormat == null && imageFormat != null)
+        if (parsedImageFormat == null && !string.IsNullOrEmpty(imageFormat))
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
@@ -132,7 +144,7 @@ public sealed partial class ScreenshotControlTool
         }
 
         // Validate quality
-        var parsedQuality = quality ?? ScreenshotConfiguration.DefaultQuality;
+        var parsedQuality = qualityOpt ?? ScreenshotConfiguration.DefaultQuality;
         if (parsedQuality < 1 || parsedQuality > 100)
         {
             return ScreenshotControlResult.Error(
@@ -142,7 +154,7 @@ public sealed partial class ScreenshotControlTool
 
         // Parse and validate output mode
         var parsedOutputMode = ParseOutputMode(outputMode);
-        if (parsedOutputMode == null && outputMode != null)
+        if (parsedOutputMode == null && !string.IsNullOrEmpty(outputMode))
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
@@ -150,7 +162,7 @@ public sealed partial class ScreenshotControlTool
         }
 
         // Validate output path if provided
-        if (outputPath != null)
+        if (!string.IsNullOrEmpty(outputPath))
         {
             var directory = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -165,14 +177,14 @@ public sealed partial class ScreenshotControlTool
         CaptureRegion? region = null;
         if (captureTarget == CaptureTarget.Region)
         {
-            if (regionX == null || regionY == null || regionWidth == null || regionHeight == null)
+            if (regionXOpt == null || regionYOpt == null || regionWidthOpt == null || regionHeightOpt == null)
             {
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.InvalidRegion,
                     "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters");
             }
 
-            region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
+            region = new CaptureRegion(regionXOpt.Value, regionYOpt.Value, regionWidthOpt.Value, regionHeightOpt.Value);
         }
 
         // Handle annotated screenshot mode
@@ -186,14 +198,14 @@ public sealed partial class ScreenshotControlTool
         {
             Action = screenshotAction.Value,
             Target = captureTarget ?? CaptureTarget.PrimaryScreen,
-            MonitorIndex = monitorIndex,
-            WindowHandle = windowHandle,
+            MonitorIndex = monitorIndexOpt,
+            WindowHandle = string.IsNullOrWhiteSpace(windowHandle) ? null : windowHandle,
             Region = region,
             IncludeCursor = includeCursor,
             ImageFormat = parsedImageFormat ?? ScreenshotConfiguration.DefaultImageFormat,
             Quality = parsedQuality,
             OutputMode = parsedOutputMode ?? ScreenshotConfiguration.DefaultOutputMode,
-            OutputPath = outputPath
+            OutputPath = string.IsNullOrWhiteSpace(outputPath) ? null : outputPath
         };
 
         // Execute and return result

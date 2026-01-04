@@ -20,6 +20,11 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class KeyboardControlTool : IDisposable
 {
+    // NOTE: Some LLM integrations (e.g., Gemini tool declarations) reject JSON Schemas that use
+    // nullable union types (e.g., {"type":["integer","null"]}). To keep tool schemas broadly
+    // compatible, optional numeric parameters use a sentinel default.
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly IKeyboardInputService _keyboardInputService;
     private readonly IWindowEnumerator _windowEnumerator;
     private readonly IWindowService _windowService;
@@ -79,18 +84,21 @@ public sealed partial class KeyboardControlTool : IDisposable
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         [Description("The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, wait_for_idle")] string action,
-        [Description("Text to type (required for type action)")] string? text = null,
-        [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string? key = null,
-        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string? modifiers = null,
+        [Description("Text to type (required for type action)")] string text = "",
+        [Description("Key name to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, ctrl, shift, alt, win, copilot")] string key = "",
+        [Description("Modifier keys: ctrl, shift, alt, win (comma-separated, for press action)")] string modifiers = "",
         [Description("Number of times to repeat key press (default: 1, for press action)")] int repeat = 1,
-        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string? sequence = null,
-        [Description("Delay between keys in sequence (milliseconds)")] int? interKeyDelayMs = null,
-        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string? expectedWindowTitle = null,
-        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string? expectedProcessName = null,
+        [Description("JSON array of key sequence items, e.g., [{\"key\":\"ctrl\"},{\"key\":\"c\"}] (for sequence action)")] string sequence = "",
+        [Description("Delay between keys in sequence (milliseconds)")] int interKeyDelayMs = UnspecifiedInt,
+        [Description("Expected window title (partial match). If specified, operation fails with 'wrong_target_window' if the foreground window title doesn't contain this text. Use this to prevent sending input to the wrong application.")] string expectedWindowTitle = "",
+        [Description("Expected process name (e.g., 'Code', 'chrome', 'notepad'). If specified, operation fails with 'wrong_target_window' if the foreground window's process doesn't match. Use this to prevent sending input to the wrong application.")] string expectedProcessName = "",
         [Description("For 'type' action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text. Default is false.")] bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        // Normalize sentinel optional parameters
+        int? interKeyDelayMsOpt = interKeyDelayMs == UnspecifiedInt ? null : interKeyDelayMs;
 
         var correlationId = KeyboardOperationLogger.GenerateCorrelationId();
         var stopwatch = Stopwatch.StartNew();
@@ -160,7 +168,7 @@ public sealed partial class KeyboardControlTool : IDisposable
                     break;
 
                 case KeyboardAction.Sequence:
-                    operationResult = await HandleSequenceAsync(sequence, interKeyDelayMs, linkedToken);
+                    operationResult = await HandleSequenceAsync(sequence, interKeyDelayMsOpt, linkedToken);
                     break;
 
                 case KeyboardAction.ReleaseAll:
