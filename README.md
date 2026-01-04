@@ -89,16 +89,21 @@ For detailed feature documentation, see [FEATURES.md](FEATURES.md).
 window_management(action='find', title='Notepad') → handle='123456'
 
 # 2. Click elements by name using the handle
-ui_automation(action='click', windowHandle='123456', nameContains='Save')
+ui_click(windowHandle='123456', nameContains='Save')
 
 # 3. If you don't know element names → discover with annotated screenshot
 screenshot_control(windowHandle='123456')  # Returns numbered elements + image
 
-# 4. For toggles → atomic state management
-window_management(action='find', title='Settings') → handle='789'
-ui_automation(action='ensure_state', windowHandle='789', nameContains='Dark Mode', desiredState='on')
+# 4. Type text into fields
+ui_type(windowHandle='123456', controlType='Edit', text='Hello World')
 
-# 5. Fallback for games/custom UIs → full mouse + keyboard support
+# 5. Read text from elements
+ui_read(windowHandle='123456', elementId='...')
+
+# 6. Wait for elements to appear
+ui_wait(windowHandle='123456', mode='appear', nameContains='Save')
+
+# 7. Fallback for games/custom UIs → full mouse + keyboard support
 screenshot_control(windowHandle='...')  # Get element coordinates
 mouse_control(action='click', x=450, y=300)
 keyboard_control(action='type', text='player1')
@@ -152,7 +157,12 @@ If you downloaded from the releases page, add to your MCP client configuration:
 
 | Tool | Description | Key Actions |
 |------|-------------|-------------|
-| `ui_automation` | **Primary tool** — semantic UI interaction | find, click, type, toggle, ensure_state, get_tree |
+| `ui_find` | Find UI elements by name, type, or ID | Find elements for discovery |
+| `ui_click` | Click UI elements | Click buttons, tabs, checkboxes |
+| `ui_type` | Type text into fields | Enter text, clear existing |
+| `ui_read` | Read text from elements | Text extraction + OCR fallback |
+| `ui_wait` | Wait for UI state changes | appear, disappear, enabled, disabled |
+| `ui_file` | File operations | Save dialog handling |
 | `screenshot_control` | Annotated screenshots for discovery | capture with element overlays (default) |
 | `mouse_control` | Fallback mouse input | click, move, drag, scroll |
 | `keyboard_control` | Keyboard input & hotkeys | type, press, key sequences |

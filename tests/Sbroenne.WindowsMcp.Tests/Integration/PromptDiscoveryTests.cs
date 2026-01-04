@@ -83,8 +83,9 @@ public sealed class PromptDiscoveryTests
                 "Expected prompts/get result.messages array");
 
             var allText = string.Join("\n", EnumerateAllText(messages));
-            Assert.Contains("app", allText, StringComparison.OrdinalIgnoreCase);
-            Assert.Contains("ui_automation", allText, StringComparison.OrdinalIgnoreCase);
+            // Verify prompts mention key tools (ui_find, ui_click, window_management)
+            Assert.Contains("ui_find", allText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("window_management", allText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

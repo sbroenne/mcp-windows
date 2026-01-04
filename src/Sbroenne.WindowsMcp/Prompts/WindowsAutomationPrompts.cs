@@ -26,9 +26,9 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "You are operating a Windows automation MCP server. " +
+                "You are operating a Windows automation MCP server with 6 focused UI tools. " +
                 "WORKFLOW: 1) Find window handle first with window_management(action='find'), " +
-                "2) Use the handle with ui_automation for element interaction. " +
+                "2) Use the handle with ui_find, ui_click, ui_type, ui_read, ui_wait, or ui_file tools. " +
                 "Use mouse_control and keyboard_control only as fallbacks."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
@@ -39,14 +39,17 @@ public sealed class WindowsAutomationPrompts
                 "• Extract 'handle' from the result\n" +
                 "\n" +
                 "Step 2 - Interact with elements (using handle from step 1):\n" +
-                "• Click: ui_automation(action='click', windowHandle='<handle>', nameContains='...')\n" +
-                "• Type: ui_automation(action='type', windowHandle='<handle>', controlType='Edit', text='...')\n" +
-                "• Toggle: ui_automation(action='ensure_state', windowHandle='<handle>', nameContains='...', desiredState='on'/'off')\n" +
+                "• Find: ui_find(windowHandle='<handle>', nameContains='...') — discover elements\n" +
+                "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
+                "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
+                "• Read: ui_read(windowHandle='<handle>', elementId='...') — get text content\n" +
+                "• Wait: ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') — wait for elements\n" +
+                "• Save: ui_file(windowHandle='<handle>', filePath='...') — save files\n" +
                 "\n" +
                 "If you don't know element names:\n" +
                 "• screenshot_control(target='window', windowHandle='<handle>') — see all interactive elements with numbered labels\n" +
                 "\n" +
-                "Fallbacks (only if ui_automation fails):\n" +
+                "Fallbacks (only if ui_* tools fail):\n" +
                 "• mouse_control(action='click', windowHandle='<handle>', x=..., y=...) — use clickablePoint from find result\n" +
                 "• keyboard_control(action='press', key='s', modifiers='ctrl') — for hotkeys (ensure window is active)")
         ];
@@ -71,8 +74,8 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "First find the window handle, then use ui_automation click directly. For toggles/checkboxes, use ensure_state. " +
-                "Use mouse_control only as fallback when ui_automation patterns fail."),
+                "First find the window handle, then use ui_click directly. " +
+                "Use mouse_control only as fallback when ui_click fails."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Click target: {elementDescription}\n" +
@@ -83,8 +86,8 @@ public sealed class WindowsAutomationPrompts
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
                 "Step 2: Click the element (using handle from step 1):\n" +
-                "• For Button: ui_automation(action='click', windowHandle='<handle>', automationId=... OR nameContains=...).\n" +
-                "• For CheckBox/Toggle: ui_automation(action='ensure_state', windowHandle='<handle>', nameContains=..., desiredState='on'/'off').\n" +
+                "• ui_click(windowHandle='<handle>', automationId=... OR nameContains=...)\n" +
+                "• For checkboxes: ui_click also handles toggle state automatically.\n" +
                 "\n" +
                 "If click fails, use mouse_control(action='click', windowHandle='<handle>', x=..., y=...) with element's clickablePoint.")
         ];
@@ -114,7 +117,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "First find the window handle, then use ui_automation type. Only use keyboard_control as fallback."),
+                "First find the window handle, then use ui_type. Only use keyboard_control as fallback."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Field: {fieldDescription}\n" +
@@ -127,7 +130,7 @@ public sealed class WindowsAutomationPrompts
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
                 "Step 2: Type into the field (using handle from step 1):\n" +
-                $"ui_automation(action='type', windowHandle='<handle>', controlType='Edit', automationId=... OR nameContains=..., text='{text}', clearFirst={clearFirst.ToString().ToLowerInvariant()})\n" +
+                $"ui_type(windowHandle='<handle>', controlType='Edit', automationId=... OR nameContains=..., text='{text}', clearFirst={clearFirst.ToString().ToLowerInvariant()})\n" +
                 "\n" +
                 "If UIA typing fails: Activate window first, then use keyboard_control(action='type', text='...').")
         ];
@@ -157,10 +160,10 @@ public sealed class WindowsAutomationPrompts
                 "Strategy:\n" +
                 $"1) window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "2) screenshot_control(target='window', windowHandle='<handle>') — see interactable elements with numbered labels.\n" +
-                "3) ui_automation(action='find', windowHandle='<handle>', nameContains='...', sortByProminence=true).\n" +
+                "3) ui_find(windowHandle='<handle>', nameContains='...', sortByProminence=true) — discover elements.\n" +
                 "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
-                "5) Use ui_automation(action='scroll_into_view') before clicking if element is off-screen.\n" +
-                "6) For toggles, use ensure_state(desiredState='on'/'off') instead of click.")
+                "5) ui_click(windowHandle='<handle>', nameContains='...') — click the element.\n" +
+                "6) For text input, use ui_type with the element.")
         ];
     }
 
@@ -179,7 +182,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer deterministic verification with wait actions. These block until condition is met or timeout."),
+                "Prefer deterministic verification with ui_wait. These block until condition is met or timeout."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Expected outcome: {expectedOutcome}\n" +
@@ -187,12 +190,12 @@ public sealed class WindowsAutomationPrompts
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
                 "Verification options (choose the most deterministic):\n" +
-                "1) ui_automation(action='wait_for_disappear', windowHandle='<handle>', elementId=...) — verify dialog/element closed.\n" +
-                "2) ui_automation(action='wait_for_state', windowHandle='<handle>', elementId=..., desiredState='on'/'off'/'enabled') — verify element state.\n" +
-                "3) ui_automation(action='wait_for', windowHandle='<handle>') for a specific element appearing.\n" +
-                "4) ui_automation(action='get_text', windowHandle='<handle>', elementId=...) when text content changed.\n" +
-                "5) screenshot_control(target='window', windowHandle='<handle>', annotate=true) for visual element discovery.\n" +
-                "6) ui_automation(action='ocr_element', windowHandle='<handle>') for custom-rendered text.")
+                "1) ui_wait(windowHandle='<handle>', mode='disappear', elementId=...) — verify dialog/element closed.\n" +
+                "2) ui_wait(windowHandle='<handle>', mode='enabled'/'disabled', elementId=...) — verify element state.\n" +
+                "3) ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') — wait for element appearing.\n" +
+                "4) ui_read(windowHandle='<handle>', elementId=...) — check text content changed.\n" +
+                "5) screenshot_control(target='window', windowHandle='<handle>', annotate=true) — visual element discovery.\n" +
+                "6) ui_read(windowHandle='<handle>') — for custom-rendered text (uses OCR fallback).")
         ];
     }
 
@@ -206,7 +209,7 @@ public sealed class WindowsAutomationPrompts
     /// <param name="automationId">Optional AutomationId if known.</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_toggle_element")]
-    [Description("Atomic toggle operation using ensure_state (avoids find → check → toggle roundtrips).")]
+    [Description("Atomic toggle operation using ui_click (handles toggle state automatically).")]
     public static IEnumerable<ChatMessage> ToggleElement(
         [Description("Window title to find (partial match). Example: 'Visual Studio Code', 'Settings'.")] string windowTitle,
         [Description("What toggle/checkbox you want to set. Example: 'Dark Mode toggle', 'Enable notifications'.")] string toggleDescription,
@@ -217,7 +220,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Use ensure_state for atomic toggle operations. It checks current state and only toggles if needed."),
+                "Use ui_click for toggle operations. It handles checkbox/toggle states."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Toggle target: {toggleDescription}\n" +
@@ -228,11 +231,11 @@ public sealed class WindowsAutomationPrompts
                 "Step 1: Find the window:\n" +
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
-                "Step 2: Toggle the element (using handle from step 1):\n" +
-                $"ui_automation(action='ensure_state', windowHandle='<handle>', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=..., desiredState='{desiredState}')\n" +
+                "Step 2: Click the toggle (using handle from step 1):\n" +
+                "ui_click(windowHandle='<handle>', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=...)\n" +
                 "\n" +
-                "Response includes: previousState, currentState, actionTaken ('toggled' or 'already_in_state').\n" +
-                "Verify with wait_for_state if additional confirmation needed.")
+                "The response includes the current toggle state after clicking.\n" +
+                "Verify with ui_wait(mode='enabled'/'disabled', ...) if additional confirmation needed.")
         ];
     }
 
@@ -243,7 +246,7 @@ public sealed class WindowsAutomationPrompts
     /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx').</param>
     /// <returns>A multi-message prompt template.</returns>
     [McpServerPrompt(Name = "windows_mcp_save_file")]
-    [Description("Save a file using Ctrl+S. Handles Save As dialog automatically if filePath provided.")]
+    [Description("Save a file using ui_file tool. Handles Save As dialog automatically if filePath provided.")]
     public static IEnumerable<ChatMessage> SaveFile(
         [Description("Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.")] string windowTitle,
         [Description("Optional: Full file path for Save As dialog (e.g., 'C:\\temp\\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.")] string? filePath = null)
@@ -251,7 +254,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Use ui_automation(action='save') for saving files. It sends Ctrl+S and handles Save As dialogs automatically. " +
+                "Use ui_file for saving files. It handles Save As dialogs automatically. " +
                 "Works universally across all Windows apps including Office, Notepad, and Electron apps."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
@@ -262,8 +265,8 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 "Step 2: Save the file (using handle from step 1):\n" +
                 (string.IsNullOrWhiteSpace(filePath)
-                    ? "ui_automation(action='save', windowHandle='<handle>') — just sends Ctrl+S\n"
-                    : $"ui_automation(action='save', windowHandle='<handle>', text='{filePath}')\n") +
+                    ? "ui_file(windowHandle='<handle>') — triggers Ctrl+S\n"
+                    : $"ui_file(windowHandle='<handle>', filePath='{filePath}')\n") +
                 "\n" +
                 "What happens:\n" +
                 "• Sends Ctrl+S to the focused window\n" +
@@ -271,15 +274,12 @@ public sealed class WindowsAutomationPrompts
                 "• If dialog appears AND filePath provided: auto-fills filename and confirms\n" +
                 "• Handles overwrite confirmation dialogs automatically\n" +
                 "\n" +
-                "If Save As dialog appears without filePath:\n" +
-                "Use ui_automation(action='type') to fill the filename field, then ui_automation(action='click', nameContains='Save').\n" +
-                "\n" +
                 "FALLBACK if save action fails:\n" +
                 "1) keyboard_control(action='press', key='s', modifiers='ctrl') — manual Ctrl+S\n" +
                 "2) screenshot_control(target='window', windowHandle='<handle>') — see what dialog appeared\n" +
-                "3) ui_automation(action='find', windowHandle='<handle>', controlType='Edit') — find filename field\n" +
-                "4) ui_automation(action='type', windowHandle='<handle>', elementId='...', text='<path>') — type path\n" +
-                "5) ui_automation(action='click', windowHandle='<handle>', nameContains='Save') — click Save button")
+                "3) ui_find(windowHandle='<handle>', controlType='Edit') — find filename field\n" +
+                "4) ui_type(windowHandle='<handle>', elementId='...', text='<path>') — type path\n" +
+                "5) ui_click(windowHandle='<handle>', nameContains='Save') — click Save button")
         ];
     }
 
@@ -300,7 +300,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Use wait actions to block until UI changes complete. This is more reliable than polling or fixed delays."),
+                "Use ui_wait tool to block until UI changes complete. This is more reliable than polling or fixed delays."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Wait type: {waitType}\n" +
@@ -308,12 +308,15 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
-                "Choose the appropriate wait action:\n" +
-                "• element_disappear: ui_automation(action='wait_for_disappear', windowHandle='<handle>', elementId=..., timeoutMs=5000)\n" +
+                "Choose the appropriate wait mode:\n" +
+                "• element_disappear: ui_wait(windowHandle='<handle>', mode='disappear', elementId=..., timeoutMs=5000)\n" +
                 "  Use for: dialogs closing, loading spinners vanishing, popups dismissing.\n" +
                 "\n" +
-                "• element_state: ui_automation(action='wait_for_state', windowHandle='<handle>', elementId=..., desiredState='on'/'off'/'enabled'/'disabled')\n" +
+                "• element_state: ui_wait(windowHandle='<handle>', mode='enabled'/'disabled'/'visible'/'offscreen', elementId=...)\n" +
                 "  Use for: toggle state changes, button becoming enabled, element becoming visible.\n" +
+                "\n" +
+                "• element_appear: ui_wait(windowHandle='<handle>', mode='appear', nameContains='...', timeoutMs=5000)\n" +
+                "  Use for: waiting for elements to appear.\n" +
                 "\n" +
                 "• input_idle: keyboard_control(action='wait_for_idle')\n" +
                 "  Use for: waiting for application to process input before sending more keystrokes.")

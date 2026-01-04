@@ -10,7 +10,8 @@ public class WindowsAutomationPromptsTests
         var messages = WindowsAutomationPrompts.Quickstart("Click OK", "Notepad").ToList();
 
         Assert.NotEmpty(messages);
-        Assert.Contains(messages, m => m.Text?.Contains("ui_automation", StringComparison.OrdinalIgnoreCase) == true);
+        // Check for the new focused UI tools (ui_find, ui_click, ui_type)
+        Assert.Contains(messages, m => m.Text?.Contains("ui_find", StringComparison.OrdinalIgnoreCase) == true);
         Assert.Contains(messages, m => m.Text?.Contains("window_management", StringComparison.OrdinalIgnoreCase) == true);
     }
 
@@ -36,14 +37,15 @@ public class WindowsAutomationPromptsTests
     }
 
     [Fact]
-    public void TypeText_IncludesUiAutomationTypeWithWindowHandle()
+    public void TypeText_IncludesUiTypeWithWindowHandle()
     {
         var messages = WindowsAutomationPrompts.TypeText(
             windowTitle: "Notepad",
             text: "hello",
             fieldDescription: "Search box").ToList();
 
-        Assert.Contains(messages, m => m.Text?.Contains("ui_automation(action='type'", StringComparison.OrdinalIgnoreCase) == true);
+        // Check for ui_type tool (replaced ui_automation action='type')
+        Assert.Contains(messages, m => m.Text?.Contains("ui_type", StringComparison.OrdinalIgnoreCase) == true);
         Assert.Contains(messages, m => m.Text?.Contains("keyboard_control", StringComparison.OrdinalIgnoreCase) == true);
         Assert.Contains(messages, m => m.Text?.Contains("windowHandle", StringComparison.OrdinalIgnoreCase) == true);
     }

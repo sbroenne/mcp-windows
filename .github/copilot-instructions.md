@@ -46,6 +46,16 @@ The test USER prompts should be:
 
 If a test fails, ASK THE USER before making changes - don't assume modifying test prompts is acceptable.
 
+## Integration Tests MUST Pass
+
+**ALL integration tests MUST pass. No exceptions.**
+
+- Never dismiss integration test failures as "expected" or "transient"
+- If integration tests fail, investigate and fix the root cause
+- Run `dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release` to verify ALL tests pass
+- Only tests explicitly marked `[Skip]` (e.g., requiring 3+ monitors) are acceptable to skip
+- If tests fail due to timing/window focus issues, that's a BUG to fix, not an acceptable state
+
 ## Constitution Principle VI
 
 Tools MUST be "dumb actuators"—return raw data for LLM interpretation. This means:

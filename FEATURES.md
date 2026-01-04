@@ -14,9 +14,13 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 
 | Scenario | Tool | Why |
 |----------|------|-----|
-| Click a button by name | `ui_automation` | Semantic, works at any DPI/theme |
-| Toggle a setting | `ui_automation` | Atomic state management |
-| Discover UI elements | `screenshot_control` | Annotated screenshots with element data |
+| Discover UI elements | `ui_find` | Find elements by name, type, or ID |
+| Click a button by name | `ui_click` | Semantic, works at any DPI/theme |
+| Type text into a field | `ui_type` | Direct text input with clear option |
+| Read text from elements | `ui_read` | Get text via UIA or OCR |
+| Wait for element state | `ui_wait` | Block until condition is met |
+| Save files | `ui_file` | Handle Save As dialogs automatically |
+| Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
 | Find/move windows | `window_management` | Window lifecycle control |
@@ -25,7 +29,12 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 
 | Tool | Description |
 |------|-------------|
-| `ui_automation` | **Primary** — Semantic UI interaction via UIA3 |
+| `ui_find` | Find UI elements by name, type, or ID |
+| `ui_click` | Click buttons, tabs, checkboxes |
+| `ui_type` | Type text into edit controls |
+| `ui_read` | Read text from elements (UIA + OCR) |
+| `ui_wait` | Wait for elements to appear/disappear/change state |
+| `ui_file` | File operations (Save As dialog handling) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
@@ -33,54 +42,152 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 
 ---
 
-## 🔍 UI Automation
+## 🔍 UI Find (`ui_find`)
 
-Interact with Windows UI elements using the UI Automation API and OCR. **This is the primary tool** — use it for all standard Windows applications.
+Find and discover UI elements by name, type, or automation ID.
 
-### Actions
+### Parameters
 
-| Action | Description | Required Parameters |
-|--------|-------------|---------------------|
-| `find` | Find elements by name, type, or ID | `name`, `controlType`, or `automationId` |
-| `get_tree` | Get UI element hierarchy | none (optional `windowHandle`) |
-| `click` | Find and click element | Query filters |
-| `type` | Type text into edit control | Query filters + `text` |
-| `select` | Select item from list or combo box | Query filters + `value` |
-| `toggle` | Toggle checkbox or toggle button | `elementId` |
-| `ensure_state` | Ensure checkbox/toggle is in specific state (on/off) | `elementId` + `desiredState` |
-| `invoke` | Invoke pattern on element | `elementId` |
-| `focus` | Set keyboard focus to element | `elementId` |
-| `scroll_into_view` | Scroll element into view | `elementId` or query |
-| `get_text` | Get text from element | `elementId` or query |
-| `wait_for` | Wait for element to appear | Query filters + `timeoutMs` |
-| `wait_for_disappear` | Wait for element to disappear | Query filters + `timeoutMs` |
-| `wait_for_state` | Wait for element to reach a specific state | `elementId` + `desiredState` + `timeoutMs` |
-| `get_element_at_cursor` | Get element under mouse cursor | none |
-| `get_focused_element` | Get element with keyboard focus | none |
-| `get_ancestors` | Get parent chain to root | `elementId` |
-| `highlight` | Visually highlight element | `elementId` |
-| `hide_highlight` | Hide highlight rectangle | none |
-| `ocr` | OCR text in screen region | Region parameters |
-| `ocr_element` | OCR on element bounds | `elementId` |
-| `ocr_status` | Check OCR availability | none |
-
-> **Note**: For annotated screenshots with element discovery, use `screenshot_control(windowHandle='...')` which returns both an annotated image and structured element data. Get the handle from `window_management(action='find', title='...')`.
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `name` | Exact element name | No |
+| `nameContains` | Partial name match | No |
+| `namePattern` | Regex pattern for name | No |
+| `automationId` | Automation ID (most reliable) | No |
+| `controlType` | Control type (Button, Edit, CheckBox, etc.) | No |
+| `maxResults` | Maximum elements to return | No |
+| `sortByProminence` | Sort by bounding box area | No |
 
 ### Capabilities
 
-- **Pattern-based interaction** - Click buttons, toggle checkboxes, expand dropdowns without coordinates
-- **Element discovery** - Find UI elements by name, control type, or automation ID
-- **UI tree navigation** - Traverse the accessibility tree with depth limiting
-- **Wait for elements** - Wait for UI elements to appear or disappear with configurable timeout
-- **Wait for state** - Wait for elements to reach specific states (enabled, disabled, on, off, visible, offscreen)
-- **Ensure state** - Atomic get + conditional toggle for checkboxes (only toggles if needed)
-- **Sort by prominence** - Order results by bounding box area (largest first) for disambiguation
-- **Text extraction** - Get text from controls via UI Automation or OCR fallback
-- **OCR support** - Windows.Media.Ocr for text recognition when UI Automation doesn't expose text
-- **Multi-window workflows** - Use `windowHandle` parameter to target specific windows (get handle from `window_management`)
-- **Wrong window detection** - Verify expected window is active before interactive actions
-- **Scoped tree navigation** - Limit searches to subtrees with `parentElementId`
-- **Electron app support** - Works with VS Code, Teams, Slack, and other Electron apps
+- Find elements by name, control type, or automation ID
+- Partial name matching with `nameContains`
+- Regex pattern matching with `namePattern`
+- Sort results by prominence (largest first) for disambiguation
+- Returns element IDs for use with other ui_* tools
+- Electron app support (VS Code, Teams, Slack)
+
+---
+
+## 🖱️ UI Click (`ui_click`)
+
+Click buttons, tabs, checkboxes, and other interactive elements.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `elementId` | Element ID from ui_find | No* |
+| `name` / `nameContains` | Element name/partial match | No* |
+| `automationId` | Automation ID | No* |
+| `controlType` | Control type filter | No |
+
+*One of elementId, name, nameContains, or automationId required.
+
+### Capabilities
+
+- Click buttons, tabs, menu items
+- Toggle checkboxes and toggle buttons
+- Handles various control patterns automatically
+- Falls back to coordinate-based click if pattern fails
+
+---
+
+## ⌨️ UI Type (`ui_type`)
+
+Type text into edit controls and text fields.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `text` | Text to type | Yes |
+| `elementId` | Element ID from ui_find | No* |
+| `name` / `nameContains` | Element name/partial match | No* |
+| `automationId` | Automation ID | No* |
+| `controlType` | Control type (default: Edit) | No |
+| `clearFirst` | Clear existing text before typing | No (default: true) |
+
+### Capabilities
+
+- Type text into any editable control
+- Clear existing content before typing (clearFirst)
+- Append text to existing content
+- Unicode support for any language
+
+---
+
+## 📖 UI Read (`ui_read`)
+
+Read text from elements using UI Automation or OCR.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `name` / `nameContains` | Element name/partial match | No |
+| `automationId` | Automation ID | No |
+| `controlType` | Control type filter | No |
+| `includeChildren` | Include child element text | No (default: false) |
+| `language` | OCR language code (e.g., 'en-US') | No |
+
+### Capabilities
+
+- Extract text from any UI element
+- Automatic OCR fallback for custom-rendered text
+- Windows.Media.Ocr for local text recognition
+- Language support for international text
+
+---
+
+## ⏳ UI Wait (`ui_wait`)
+
+Wait for elements to appear, disappear, or change state.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `mode` | Wait mode: `appear`, `disappear`, `enabled`, `disabled`, `visible`, `offscreen` | No (default: appear) |
+| `name` / `nameContains` | Element name/partial match | No* |
+| `automationId` | Automation ID | No* |
+| `controlType` | Control type filter | No |
+| `timeoutMs` | Timeout in milliseconds | No (default: 5000) |
+
+*At least one search criterion required.
+
+### Capabilities
+
+- Block until element appears (`mode='appear'`)
+- Block until element disappears (`mode='disappear'`)
+- Wait for specific states (`mode='enabled'`, `mode='disabled'`)
+- Configurable timeout (0-60000ms)
+
+---
+
+## 💾 UI File (`ui_file`)
+
+Handle file save operations and Save As dialogs.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
+| `filePath` | File path to save to (e.g., 'C:\\Users\\User\\file.txt') | No |
+
+### Capabilities
+
+- Trigger Ctrl+S to save
+- Auto-detect Save As dialog appearance
+- Fill in filename automatically
+- Handle overwrite confirmation dialogs
+- Works with Office apps, Notepad, and more
 
 ---
 
