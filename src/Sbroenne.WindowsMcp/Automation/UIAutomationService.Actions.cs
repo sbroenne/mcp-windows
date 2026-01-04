@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Utilities;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -232,7 +233,7 @@ public sealed partial class UIAutomationService
         // Normalize Windows file paths: convert forward slashes to backslashes
         // This handles paths like "D:/folder/file.txt" → "D:\folder\file.txt"
         // Required because Save As dialogs reject forward slashes
-        text = NormalizeWindowsPath(text);
+        text = PathNormalizer.NormalizeWindowsPath(text);
 
         try
         {
@@ -1267,30 +1268,6 @@ public sealed partial class UIAutomationService
                     cancellationToken: cancellationToken);
             }
         }
-    }
-
-    /// <summary>
-    /// Normalizes Windows file paths by converting forward slashes to backslashes.
-    /// Only applies to strings that look like Windows paths (e.g., "D:/folder/file.txt").
-    /// </summary>
-    private static string NormalizeWindowsPath(string text)
-    {
-        // Check if text looks like a Windows path:
-        // - Contains forward slashes (the problem we're fixing)
-        // - AND either starts with drive letter (C:, D:, etc.) or is a UNC path (\\server)
-        if (string.IsNullOrEmpty(text) || !text.Contains('/'))
-        {
-            return text;
-        }
-
-        // Match patterns like "D:/..." or "//server/..." 
-        if ((text.Length >= 3 && char.IsLetter(text[0]) && text[1] == ':' && text[2] == '/') ||
-            text.StartsWith("//", StringComparison.Ordinal))
-        {
-            return text.Replace('/', '\\');
-        }
-
-        return text;
     }
 
     /// <summary>

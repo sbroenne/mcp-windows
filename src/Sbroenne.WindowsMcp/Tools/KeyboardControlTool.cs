@@ -9,6 +9,7 @@ using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Serialization;
+using Sbroenne.WindowsMcp.Utilities;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -58,11 +59,12 @@ public sealed partial class KeyboardControlTool : IDisposable
 
     /// <summary>
     /// Keyboard input to the FOREGROUND window. After window_management(launch), the window is already focused - just call keyboard_control directly. 
-    /// Do NOT launch the app again. Best for: typing text, hotkeys (Ctrl+S = key='s', modifiers='ctrl'), special keys. 
-    /// For typing into a specific UI element by handle, use ui_automation(action='type') instead.
+    /// Do NOT launch the app again. Best for: typing text, hotkeys (key='s', modifiers='ctrl' for Ctrl+S), special keys.
+    /// TO SAVE FILES: Use ui_file tool instead - it handles Save As dialogs automatically.
+    /// For typing into a specific UI element by handle, use ui_type instead.
     /// </summary>
     /// <remarks>
-    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions.
+    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'.
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
@@ -248,8 +250,12 @@ public sealed partial class KeyboardControlTool : IDisposable
             await Task.Delay(50, cancellationToken);
         }
 
+        // Normalize Windows file paths: convert forward slashes to backslashes
+        // This handles cases where LLMs provide paths like D:/folder/file.txt
+        var normalizedText = PathNormalizer.NormalizeWindowsPath(text);
+
         // Empty text is valid - returns success with 0 characters
-        return await _keyboardInputService.TypeTextAsync(text ?? string.Empty, cancellationToken);
+        return await _keyboardInputService.TypeTextAsync(normalizedText, cancellationToken);
     }
 
     private async Task<KeyboardControlResult> HandlePressAsync(string? key, string? modifiers, int repeat, CancellationToken cancellationToken)
