@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
-using Sbroenne.WindowsMcp.Office;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -12,6 +11,15 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 public sealed partial class UIAutomationService
 {
+    /// <summary>
+    /// Default timeout for waiting for dialogs to appear after Ctrl+S.
+    /// </summary>
+    private static readonly TimeSpan SaveDialogTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// Polling interval for dialog detection retry loop.
+    /// </summary>
+    private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
     /// <inheritdoc/>
     public async Task<UIAutomationResult> FindAndClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
@@ -857,259 +865,80 @@ public sealed partial class UIAutomationService
     }
 
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> SaveFileDialogAsync(string windowHandle, string filePath, CancellationToken cancellationToken = default)
+    /// <remarks>
+    /// Implementation based on FlaUI, pywinauto, and White Framework patterns:
+    /// 1. Focus window and send Ctrl+S (universal save shortcut)
+    /// 2. Wait for modal dialog using retry loop (FlaUI pattern)
+    /// 3. If dialog appears and filePath provided: type path + Enter (pywinauto pattern)
+    /// 4. Handle overwrite confirmation dialogs
+    /// 5. Wait for dialog to close (completion detection)
+    /// </remarks>
+    public async Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default)
     {
-        // For Office apps (Word, Excel, PowerPoint, Visio, Publisher), use COM Interop
-        // instead of UI Automation. This is more reliable as modern Office apps don't
-        // use standard Save As dialogs.
-        var processName = OfficeComHelper.GetProcessNameFromHandle(windowHandle);
-        var officeAppType = OfficeComHelper.GetOfficeAppType(processName);
-
-        if (officeAppType != OfficeComHelper.OfficeAppType.None)
-        {
-            var comResult = OfficeComHelper.SaveDocument(officeAppType, filePath);
-            if (comResult.IsSuccess)
-            {
-                return UIAutomationResult.CreateSuccessWithHint("save", comResult.Message);
-            }
-            else
-            {
-                return UIAutomationResult.CreateFailure(
-                    "save",
-                    UIAutomationErrorType.InternalError,
-                    comResult.Message);
-            }
-        }
-
-        // Non-Office apps: Use UI Automation to interact with Save As dialog
-        // Implementation based on FlaUI patterns:
-        // 1. Get the parent window element from handle
-        // 2. Find the modal Save As dialog as a child/descendant window (like FlaUI's ModalWindows property)
-        // 3. Find filename field by AutomationId "FileNameControlHost" (ComboBox containing Edit)
-        // 4. Type full path into the field (Windows handles folder navigation)
-        // 5. Click "Save" button by name
-        // 6. Handle "Confirm Save As" overwrite dialog if it appears
-        // 7. For Office apps: Detect Backstage and navigate through it if needed
-
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            // Phase 1: Find dialog and elements on STA thread
-            var findResult = await _staThread.ExecuteAsync(() =>
-            {
-                // Validate window handle format
-                if (!nint.TryParse(windowHandle, out var hwnd))
-                {
-                    return (Error: UIAutomationResult.CreateFailure(
-                        "save",
-                        UIAutomationErrorType.InvalidParameter,
-                        $"Invalid window handle format: '{windowHandle}'",
-                        CreateDiagnostics(stopwatch)), FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: (UIA.IUIAutomationElement?)null, IsOfficeBackstage: false);
-                }
-
-                // Strategy: Search desktop first for Save As dialog (more reliable when modal is showing)
-                // This avoids timeout issues when parent window is blocked by modal dialog.
-                var filenameCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost");
-                UIA.IUIAutomationElement? dialogElement = null;
-                UIA.IUIAutomationElement? filenameCombo = null;
-
-                // Try 1: Search desktop children for "Save As" window (common file dialogs are top-level)
-                try
-                {
-                    var saveAsCondition = Uia.CreateAndCondition(
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save As"));
-                    dialogElement = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, saveAsCondition);
-
-                    if (dialogElement != null)
-                    {
-                        filenameCombo = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, filenameCondition);
-                    }
-                }
-                catch (COMException)
-                {
-                    // Desktop search failed - continue with other strategies
-                }
-                catch (TimeoutException)
-                {
-                    // Desktop search timed out - continue with other strategies
-                }
-
-                // Try 2: Check if the provided handle IS the dialog itself
-                if (filenameCombo == null)
-                {
-                    try
-                    {
-                        var handleElement = Uia.ElementFromHandle(hwnd);
-                        if (handleElement != null)
-                        {
-                            // Check if this element itself has the FileNameControlHost
-                            filenameCombo = handleElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, filenameCondition);
-                            if (filenameCombo != null)
-                            {
-                                dialogElement = handleElement;
-                            }
-                        }
-                    }
-                    catch (COMException)
-                    {
-                        // Parent window may be blocked/unresponsive - continue
-                    }
-                    catch (TimeoutException)
-                    {
-                        // Parent window may timeout - continue
-                    }
-                }
-
-                if (filenameCombo != null && dialogElement != null)
-                {
-                    // Found standard dialog - find edit and save button
-                    var editCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
-                    var editElement = filenameCombo.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
-                    var targetElement = editElement ?? filenameCombo;
-
-                    // Find Save button
-                    var saveCondition = Uia.CreateAndCondition(
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save"));
-                    var saveButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, saveCondition);
-
-                    if (saveButton == null)
-                    {
-                        var buttonById = Uia.CreateAndCondition(
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
-                        saveButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonById);
-                    }
-
-                    return (Error: (UIAutomationResult?)null, FilenameElement: targetElement, SaveButton: saveButton, IsOfficeBackstage: false);
-                }
-
-                // Try Office Backstage - look for Browse button (only if we have a dialog element)
-                if (dialogElement != null)
-                {
-                    var browseCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Browse");
-                    var browseButton = dialogElement.FindFirst(UIA.TreeScope.TreeScope_Descendants, browseCondition);
-
-                    if (browseButton != null)
-                    {
-                        return (Error: (UIAutomationResult?)null, FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: browseButton, IsOfficeBackstage: true);
-                    }
-                }
-
-                return (Error: UIAutomationResult.CreateFailure(
-                    "save",
-                    UIAutomationErrorType.ElementNotFound,
-                    "Could not find filename field. Neither standard Windows dialog (FileNameControlHost) nor Office Backstage detected.",
-                    CreateDiagnostics(stopwatch),
-                    "Ensure the Save As dialog is open and visible."), FilenameElement: (UIA.IUIAutomationElement?)null, SaveButton: (UIA.IUIAutomationElement?)null, IsOfficeBackstage: false);
-            }, cancellationToken);
-
-            // Check for errors
-            if (findResult.Error != null)
-            {
-                return findResult.Error;
-            }
-
-            // Phase 2: Handle Office Backstage if detected
-            if (findResult.IsOfficeBackstage && findResult.SaveButton != null)
-            {
-                // Click Browse to open standard file dialog
-                await _staThread.ExecuteAsync(() =>
-                {
-                    if (!findResult.SaveButton.TryInvoke())
-                    {
-                        var rect = findResult.SaveButton.CurrentBoundingRectangle;
-                        _mouseService.ClickAsync((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2, cancellationToken: cancellationToken).GetAwaiter().GetResult();
-                    }
-                    return true;
-                }, cancellationToken);
-
-                Thread.Sleep(500); // Wait for file dialog to open
-
-                // Recursively call to handle the now-open standard dialog
-                // Find the new Save As dialog window
-                var newDialogHandle = await _staThread.ExecuteAsync(() =>
-                {
-                    var saveAsCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "Save As");
-                    var saveAsDialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, saveAsCondition);
-                    if (saveAsDialog != null)
-                    {
-                        return saveAsDialog.CurrentNativeWindowHandle.ToString();
-                    }
-                    return windowHandle; // Fallback to original
-                }, cancellationToken);
-
-                return await SaveFileDialogAsync(newDialogHandle, filePath, cancellationToken);
-            }
-
-            // Phase 3: Standard dialog - set value and click save
-            if (findResult.FilenameElement == null)
+            // Validate window handle format
+            if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
             {
                 return UIAutomationResult.CreateFailure(
                     "save",
-                    UIAutomationErrorType.ElementNotFound,
-                    "Could not find filename field.",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Invalid window handle format: '{windowHandle}'",
                     CreateDiagnostics(stopwatch));
             }
 
-            // Set the filename value
-            bool valueSet = await _staThread.ExecuteAsync(() =>
+            // Normalize file path if provided
+            if (!string.IsNullOrWhiteSpace(filePath))
             {
-                return findResult.FilenameElement.TrySetValue(filePath);
-            }, cancellationToken);
-
-            // Fallback: Use keyboard input
-            if (!valueSet)
-            {
-                await _staThread.ExecuteAsync(() =>
-                {
-                    try
-                    {
-                        findResult.FilenameElement.SetFocus();
-                    }
-                    catch
-                    {
-                        // Best effort focus
-                    }
-                    return true;
-                }, cancellationToken);
-
-                Thread.Sleep(50);
-                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                Thread.Sleep(30);
-                await _keyboardService.TypeTextAsync(filePath, cancellationToken);
-                Thread.Sleep(50);
+                filePath = Path.GetFullPath(filePath);
             }
 
-            // Click Save button
-            if (findResult.SaveButton == null)
+            // Step 1: Focus the target window (FlaUI/White pattern)
+            var focusResult = await FocusWindowAsync(hwnd, cancellationToken);
+            if (!focusResult)
             {
                 return UIAutomationResult.CreateFailure(
                     "save",
                     UIAutomationErrorType.ElementNotFound,
-                    "Could not find Save button in the dialog.",
-                    CreateDiagnostics(stopwatch),
-                    "The filename was entered but the Save button could not be found.");
+                    "Could not focus the target window.",
+                    CreateDiagnostics(stopwatch));
             }
 
-            bool clicked = await _staThread.ExecuteAsync(() =>
-            {
-                return findResult.SaveButton.TryInvoke();
-            }, cancellationToken);
+            await Task.Delay(100, cancellationToken); // Brief pause for focus
 
-            if (!clicked)
+            // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
+            await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+
+            // Step 3: Wait for Save dialog using retry loop (FlaUI Retry.WhileEmpty pattern)
+            var dialog = await WaitForSaveDialogAsync(hwnd, cancellationToken);
+
+            if (dialog != null)
             {
-                var rect = await _staThread.ExecuteAsync(() => findResult.SaveButton.CurrentBoundingRectangle, cancellationToken);
-                await _mouseService.ClickAsync((rect.left + rect.right) / 2, (rect.top + rect.bottom) / 2, cancellationToken: cancellationToken);
+                // Dialog appeared - need to fill in filename if provided
+                if (!string.IsNullOrWhiteSpace(filePath))
+                {
+                    var dialogResult = await FillSaveDialogAsync(dialog.Value.element, filePath, cancellationToken);
+                    if (!dialogResult.Success)
+                    {
+                        return dialogResult;
+                    }
+
+                    // Wait for dialog to close (completion detection - White pattern)
+                    await WaitForDialogCloseAsync(dialog.Value.element, cancellationToken);
+                }
+                else
+                {
+                    // No filePath - return hint that dialog is open
+                    return UIAutomationResult.CreateSuccessWithHint(
+                        "save",
+                        "Save dialog opened. Use ui_automation to interact with it or provide filePath to auto-fill.",
+                        CreateDiagnostics(stopwatch));
+                }
             }
 
-            Thread.Sleep(200);
-
-            // Handle overwrite confirmation
-            await HandleOverwriteConfirmationAsync(cancellationToken);
-
+            // No dialog appeared = file was saved directly (already had a name)
             return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
@@ -1131,37 +960,288 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
+    /// Focuses a window by handle.
+    /// </summary>
+    private async Task<bool> FocusWindowAsync(nint hwnd, CancellationToken cancellationToken)
+    {
+        return await _staThread.ExecuteAsync(() =>
+        {
+            var element = Uia.ElementFromHandle(hwnd);
+            if (element == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                element.SetFocus();
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for a Save dialog to appear using FlaUI-style retry loop.
+    /// Returns the dialog element and its name, or null if no dialog appeared.
+    /// </summary>
+    private async Task<(UIA.IUIAutomationElement element, string name)?> WaitForSaveDialogAsync(
+        nint parentHwnd, CancellationToken cancellationToken)
+    {
+        // Common save dialog title patterns (case-insensitive matching)
+        string[] dialogPatterns = ["Save As", "Save as", "Save this file", "Save"];
+
+        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var result = await _staThread.ExecuteAsync(() =>
+            {
+                // First, check for modal windows of the parent (FlaUI pattern: window.ModalWindows)
+                var parentElement = Uia.ElementFromHandle(parentHwnd);
+                if (parentElement != null)
+                {
+                    // Search for modal windows
+                    var windowCondition = Uia.CreatePropertyCondition(
+                        UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
+                    var children = parentElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
+
+                    if (children != null)
+                    {
+                        for (int i = 0; i < children.Length; i++)
+                        {
+                            var child = children.GetElement(i);
+                            var windowPattern = child.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
+                            if (windowPattern != null)
+                            {
+                                try
+                                {
+                                    if (windowPattern.CurrentIsModal != 0)
+                                    {
+                                        var name = child.CurrentName ?? "";
+                                        // Check if it matches any dialog pattern
+                                        foreach (var pattern in dialogPatterns)
+                                        {
+                                            if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                return (element: child, name: name);
+                                            }
+                                        }
+                                    }
+                                }
+                                catch
+                                {
+                                    // Skip this element
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: search top-level windows (for system dialogs)
+                foreach (var pattern in dialogPatterns)
+                {
+                    var condition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
+                    var dialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, condition);
+                    if (dialog != null)
+                    {
+                        return (element: dialog, name: pattern);
+                    }
+                }
+
+                return ((UIA.IUIAutomationElement element, string name)?)null;
+            }, cancellationToken);
+
+            if (result.HasValue)
+            {
+                return result;
+            }
+
+            await Task.Delay(SaveDialogPollInterval, cancellationToken);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Fills a Save dialog with the filename and confirms (pywinauto pattern).
+    /// </summary>
+    private async Task<UIAutomationResult> FillSaveDialogAsync(
+        UIA.IUIAutomationElement dialog, string filePath, CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        // Focus the dialog first
+        await _staThread.ExecuteAsync(() =>
+        {
+            try
+            {
+                dialog.SetFocus();
+            }
+            catch
+            {
+                // Best effort
+            }
+            return true;
+        }, cancellationToken);
+
+        await Task.Delay(100, cancellationToken);
+
+        // Find the filename edit field (common AutomationIds: FileNameControlHost, 1001, Edit)
+        var editField = await _staThread.ExecuteAsync(() =>
+        {
+            // Try by AutomationId first (most reliable)
+            string[] editAutomationIds = ["FileNameControlHost", "1001"];
+            foreach (var autoId in editAutomationIds)
+            {
+                var condition = Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, autoId);
+                var field = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
+                if (field != null)
+                {
+                    return field;
+                }
+            }
+
+            // Fallback: find any Edit control
+            var editCondition = Uia.CreatePropertyCondition(
+                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
+        }, cancellationToken);
+
+        if (editField == null)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save",
+                UIAutomationErrorType.ElementNotFound,
+                "Could not find filename field in save dialog.",
+                CreateDiagnostics(stopwatch));
+        }
+
+        // Focus the edit field
+        await _staThread.ExecuteAsync(() =>
+        {
+            editField.TrySetFocus();
+            return true;
+        }, cancellationToken);
+
+        await Task.Delay(50, cancellationToken);
+
+        // Clear existing text and type new path (pywinauto pattern: Ctrl+A then type)
+        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        await _keyboardService.TypeTextAsync(filePath, cancellationToken);
+        await Task.Delay(100, cancellationToken);
+
+        // Press Enter to save (equivalent to clicking Save button)
+        await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+        await Task.Delay(300, cancellationToken);
+
+        // Handle overwrite confirmation if it appears
+        await HandleOverwriteConfirmationAsync(cancellationToken);
+
+        return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
+    }
+
+    /// <summary>
+    /// Waits for a dialog to close (White Framework pattern: WaitWhileBusy).
+    /// </summary>
+    private async Task WaitForDialogCloseAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var stillExists = await _staThread.ExecuteAsync(() =>
+            {
+                try
+                {
+                    // Check if element is still valid
+                    var name = dialog.CurrentName;
+                    var rect = dialog.CurrentBoundingRectangle;
+                    return rect.right > rect.left && rect.bottom > rect.top;
+                }
+                catch
+                {
+                    // Element became stale = dialog closed
+                    return false;
+                }
+            }, cancellationToken);
+
+            if (!stillExists)
+            {
+                return;
+            }
+
+            await Task.Delay(SaveDialogPollInterval, cancellationToken);
+        }
+    }
+
+    /// <summary>
     /// Handles the "Confirm Save As" overwrite confirmation dialog if it appears.
+    /// Based on pywinauto pattern: check for Yes/Replace button and click it.
     /// </summary>
     private async Task HandleOverwriteConfirmationAsync(CancellationToken cancellationToken)
     {
         // Check for common overwrite confirmation dialogs
-        var confirmNames = new[] { "Confirm Save As", "Replace or Skip Files", "Confirm" };
-        var buttonNames = new[] { "Yes", "Replace", "Confirm", "&Yes" };
+        string[] confirmPatterns = ["Confirm Save As", "Replace or Skip Files", "Confirm", "already exists"];
+        string[] buttonNames = ["Yes", "Replace", "Confirm", "&Yes"];
 
         var buttonToClick = await _staThread.ExecuteAsync(() =>
         {
-            foreach (var confirmName in confirmNames)
+            // Search for confirmation dialogs
+            var windowCondition = Uia.CreatePropertyCondition(
+                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
+            var windows = Uia.RootElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
+
+            if (windows == null)
             {
-                var confirmDialogCondition = Uia.CreatePropertyCondition(UIA3PropertyIds.Name, confirmName);
-                var confirmDialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, confirmDialogCondition);
+                return (UIA.IUIAutomationElement?)null;
+            }
 
-                if (confirmDialog != null)
+            for (int i = 0; i < windows.Length; i++)
+            {
+                var window = windows.GetElement(i);
+                var windowName = window.CurrentName ?? "";
+
+                // Check if window matches any confirmation pattern
+                bool isConfirmDialog = false;
+                foreach (var pattern in confirmPatterns)
                 {
-                    foreach (var buttonName in buttonNames)
+                    if (windowName.Contains(pattern, StringComparison.OrdinalIgnoreCase))
                     {
-                        var yesCondition = Uia.CreateAndCondition(
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, buttonName));
-                        var yesButton = confirmDialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, yesCondition);
+                        isConfirmDialog = true;
+                        break;
+                    }
+                }
 
-                        if (yesButton != null)
-                        {
-                            return yesButton;
-                        }
+                if (!isConfirmDialog)
+                {
+                    continue;
+                }
+
+                // Look for Yes/Replace button
+                foreach (var buttonName in buttonNames)
+                {
+                    var buttonCondition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, buttonName));
+                    var button = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
+                    if (button != null)
+                    {
+                        return button;
                     }
                 }
             }
+
             return (UIA.IUIAutomationElement?)null;
         }, cancellationToken);
 
@@ -1171,6 +1251,7 @@ public sealed partial class UIAutomationService
 
             if (!clicked)
             {
+                // Fallback to physical click
                 var rect = await _staThread.ExecuteAsync(() => buttonToClick.CurrentBoundingRectangle, cancellationToken);
                 await _mouseService.ClickAsync(
                     (rect.left + rect.right) / 2,

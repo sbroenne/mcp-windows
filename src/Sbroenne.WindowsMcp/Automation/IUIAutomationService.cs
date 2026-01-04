@@ -180,13 +180,16 @@ public interface IUIAutomationService
     Task<UIAutomationResult> HideHighlightAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Handles Windows Save As dialog - types the full file path into the filename field
-    /// (AutomationId: FileNameControlHost) and clicks the Save button.
-    /// Based on WinAppDriver/FlaUI/pywinauto patterns.
+    /// Triggers save in an application using Ctrl+S and handles Save As dialog if it appears.
+    /// Based on FlaUI, pywinauto, and White Framework patterns:
+    /// 1. Focus window and send Ctrl+S (universal save shortcut)
+    /// 2. Wait for modal Save dialog using retry loop
+    /// 3. If dialog appears and filePath provided: fill in path and confirm
+    /// 4. Handle overwrite confirmation dialogs
     /// </summary>
-    /// <param name="windowHandle">Handle of the Save As dialog window.</param>
-    /// <param name="filePath">Full file path including filename (e.g., 'C:\temp\file.png').</param>
+    /// <param name="windowHandle">Handle of the application's main window.</param>
+    /// <param name="filePath">Optional: Full file path including filename. If provided and Save dialog appears, auto-fills it.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The UI Automation result.</returns>
-    Task<UIAutomationResult> SaveFileDialogAsync(string windowHandle, string filePath, CancellationToken cancellationToken = default);
+    Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default);
 }

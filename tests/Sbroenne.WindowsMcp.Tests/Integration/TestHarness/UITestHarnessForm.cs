@@ -115,6 +115,10 @@ public sealed class UITestHarnessForm : Form
         MaximizeBox = false;
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.White;
+        KeyPreview = true; // Enable form-level keyboard handling for Ctrl+S
+
+        // Handle Ctrl+S to show Save As dialog (like a real application)
+        KeyDown += OnFormKeyDown;
 
         // Status label at top
         _statusLabel = new Label
@@ -564,37 +568,7 @@ public sealed class UITestHarnessForm : Form
             Size = new Size(120, 35),
             Name = "SaveAsButton",
         };
-        _saveAsButton.Click += (_, _) =>
-        {
-            using var saveDialog = new SaveFileDialog
-            {
-                Title = "Save As",
-                Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt|PNG images (*.png)|*.png",
-                DefaultExt = "txt",
-                AddExtension = true,
-            };
-
-            if (saveDialog.ShowDialog(this) == DialogResult.OK)
-            {
-                _lastSavePath = saveDialog.FileName;
-                _lastSavePathLabel.Text = $"Last saved: {_lastSavePath}";
-                UpdateStatus($"Saved to: {_lastSavePath}");
-
-                // Actually write a test file to verify the save worked
-                try
-                {
-                    File.WriteAllText(_lastSavePath, $"Test file created at {DateTime.Now}");
-                }
-                catch (Exception ex)
-                {
-                    UpdateStatus($"Save failed: {ex.Message}");
-                }
-            }
-            else
-            {
-                UpdateStatus("Save cancelled");
-            }
-        };
+        _saveAsButton.Click += (_, _) => ShowSaveDialog();
         saveDialogGroup.Controls.Add(_saveAsButton);
 
         _lastSavePathLabel = new Label
@@ -646,5 +620,53 @@ public sealed class UITestHarnessForm : Form
     private void UpdateStatus(string message)
     {
         _statusLabel.Text = message;
+    }
+
+    /// <summary>
+    /// Handles Ctrl+S to show Save As dialog (like a real application).
+    /// </summary>
+    private void OnFormKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Control && e.KeyCode == Keys.S)
+        {
+            e.SuppressKeyPress = true; // Prevent the beep
+            ShowSaveDialog();
+        }
+    }
+
+    /// <summary>
+    /// Shows the Save dialog and saves the file.
+    /// Called by Ctrl+S or by the Save button.
+    /// </summary>
+    private void ShowSaveDialog()
+    {
+        using var saveDialog = new SaveFileDialog
+        {
+            Title = "Save",
+            Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt|PNG images (*.png)|*.png",
+            DefaultExt = "txt",
+            AddExtension = true,
+        };
+
+        if (saveDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _lastSavePath = saveDialog.FileName;
+            _lastSavePathLabel.Text = $"Last saved: {_lastSavePath}";
+            UpdateStatus($"Saved to: {_lastSavePath}");
+
+            // Actually write a test file to verify the save worked
+            try
+            {
+                File.WriteAllText(_lastSavePath, $"Test file created at {DateTime.Now}");
+            }
+            catch (Exception ex)
+            {
+                UpdateStatus($"Save failed: {ex.Message}");
+            }
+        }
+        else
+        {
+            UpdateStatus("Save cancelled");
+        }
     }
 }

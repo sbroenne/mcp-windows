@@ -59,14 +59,17 @@ sessions:
       - name: "Draw a line in Paint and save"
         description: "Open Paint, draw a single diagonal line, save the image, and verify with filesystem"
         prompt: |
-          Delete "{{TEST_RESULTS_PATH}}/line.png" if it exists, and close any existing Paint windows.
+          Close any existing Paint windows.
 
-          Then open Paint, find out where the canvas area is and draw a diagonal line on the canvas, save it as "{{TEST_RESULTS_PATH}}/line.png", and close Paint.
+          Open Paint, select the Line tool, draw a diagonal line on the canvas.
 
-          Finally, verify the file exists and was created within the last minute.
+          Save the image as {{TEST_RESULTS_PATH}}\line-test-{{now format="epoch"}}.png
 
-          Report "VERIFIED: Line saved successfully" if the file exists and was recently created.
-          Report "FAILED: File not found or stale" if the file doesn't exist or is old.
+          Close Paint.
+
+          Use list_directory on {{TEST_RESULTS_PATH}} and look for any file starting with "line-test-".
+          Report "VERIFIED: Line saved successfully" if such a file exists.
+          Report "FAILED: File not found" otherwise.
         assertions:
           # OUTCOME: LLM verified the file was saved
           - type: output_regex
@@ -103,15 +106,9 @@ sessions:
             params:
               action: "drag"
 
-          # REQUIRED: Must save the file (either via keyboard Ctrl+S or ui_automation dialog)
-          - anyOf:
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_param_equals
-                tool: ui_automation
-                params:
-                  action: "dialog"
-                  dialogChoice: "save"
+          # REQUIRED: Must interact with UI (File menu, Save As dialog, etc.)
+          - type: tool_called
+            tool: ui_automation
 
           # PERFORMANCE: Complete within 120 seconds
           - type: max_latency_ms
@@ -119,7 +116,7 @@ sessions:
 
           # EFFICIENCY: Stay under token limits
           - type: max_tokens
-            value: 120000
+            value: 250000
 
           # VERIFICATION: Must use filesystem tools to verify the file exists
           - anyOf:

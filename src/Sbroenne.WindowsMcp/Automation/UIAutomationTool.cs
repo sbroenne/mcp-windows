@@ -91,7 +91,7 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. PREFERRED over mouse_control for buttons, menus, text fields. DISCOVERY: Use screenshot_control(annotate=true) first to see all interactive elements with coordinates. WORKFLOW: 1) window_management(find) → get handle, 2) screenshot_control to discover elements, 3) ui_automation(click/type/toggle) to interact. KEY ACTIONS: click, type, toggle, wait_for, find. DIALOG BUTTONS: nameContains='save'/'cancel'. windowHandle REQUIRED for most actions.")]
+    [Description("UI element interaction via Windows UIA. PREFERRED over mouse_control for buttons, menus, text fields. DISCOVERY: Use screenshot_control(annotate=true) first to see all interactive elements with coordinates. WORKFLOW: 1) window_management(find) → get handle, 2) screenshot_control to discover elements, 3) ui_automation(click/type/toggle) to interact. KEY ACTIONS: click, type, toggle, wait_for, find, save. SAVE: Ctrl+S with optional auto-fill of Save As dialog. DIALOG BUTTONS: nameContains='save'/'cancel'. windowHandle REQUIRED for most actions.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("The UI automation action to perform.")]
         UIAutomationAction action,
@@ -1091,29 +1091,22 @@ public sealed partial class UIAutomationTool
     }
 
     /// <summary>
-    /// Convenience method for saving files quickly. Handles standard Windows Save As dialogs
-    /// and Office apps (Word, Excel, PowerPoint, Visio, Publisher) via COM automation.
-    /// 
-    /// LIMITATIONS:
-    /// - For Office apps: Saves using the file extension to determine format (.docx, .xlsx, .pptx).
-    ///   Cannot change advanced options like compatibility mode or specific save settings.
-    /// - For standard dialogs: Types the path and clicks Save. Cannot navigate folder trees or
-    ///   change dialog options.
-    /// 
-    /// For complex save scenarios (format conversion, specific options), use keyboard_control
-    /// to navigate the Save As dialog manually.
+    /// Triggers save using Ctrl+S (universal save shortcut) and handles Save As dialog if needed.
+    /// Based on FlaUI, pywinauto, and White Framework patterns.
+    ///
+    /// WORKFLOW:
+    /// 1. Focuses the target window
+    /// 2. Sends Ctrl+S
+    /// 3. Waits for Save As dialog using retry loop (2 second timeout)
+    /// 4. If dialog appears and filePath provided: fills in path, presses Enter
+    /// 5. Handles overwrite confirmation dialogs automatically
+    ///
+    /// NOTE: Pass the MAIN APPLICATION window handle, not a dialog handle.
+    /// If filePath is omitted and a Save dialog appears, returns success with a hint to interact with it.
     /// </summary>
     private async Task<UIAutomationResult> HandleSaveAsync(
         string? windowHandle, string? filePath, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(filePath))
-        {
-            return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.InvalidParameter,
-                "filePath is required for save action. Provide full path including filename (e.g., 'C:\\temp\\file.png').",
-                null,
-                "Example: save(windowHandle='123456', text='C:\\temp\\myfile.png')");
-        }
-
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
             return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.InvalidParameter,
@@ -1121,7 +1114,7 @@ public sealed partial class UIAutomationTool
                 null);
         }
 
-        return await _automationService.SaveFileDialogAsync(windowHandle, filePath, cancellationToken);
+        return await _automationService.SaveAsync(windowHandle, filePath, cancellationToken);
     }
 
     #endregion
@@ -1238,9 +1231,10 @@ public enum UIAutomationAction
     GetElementDetails,
 
     /// <summary>
-    /// Quick save convenience action. Saves files in Office apps (Word, Excel, PowerPoint) via COM,
-    /// or handles standard Windows Save As dialogs. File format determined by extension.
-    /// For complex save options, use keyboard_control to navigate dialogs manually.
+    /// Trigger save via Ctrl+S. Pass the APPLICATION window handle (not a dialog).
+    /// If Save As dialog appears: provide text (filePath) to auto-fill, or omit to interact manually.
+    /// Handles overwrite confirmations automatically.
+    /// FALLBACK if fails: keyboard_control(Ctrl+S), then screenshot + ui_automation to interact with dialog manually.
     /// </summary>
     [JsonStringEnumMemberName("save")]
     Save

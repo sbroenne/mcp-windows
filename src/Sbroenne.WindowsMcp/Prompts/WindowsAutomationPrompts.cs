@@ -237,6 +237,53 @@ public sealed class WindowsAutomationPrompts
     }
 
     /// <summary>
+    /// Save a file using Ctrl+S with automatic Save As dialog handling.
+    /// </summary>
+    /// <param name="windowTitle">Window title to find (partial match).</param>
+    /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx').</param>
+    /// <returns>A multi-message prompt template.</returns>
+    [McpServerPrompt(Name = "windows_mcp_save_file")]
+    [Description("Save a file using Ctrl+S. Handles Save As dialog automatically if filePath provided.")]
+    public static IEnumerable<ChatMessage> SaveFile(
+        [Description("Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.")] string windowTitle,
+        [Description("Optional: Full file path for Save As dialog (e.g., 'C:\\temp\\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.")] string? filePath = null)
+    {
+        return
+        [
+            new(ChatRole.System,
+                "Use ui_automation(action='save') for saving files. It sends Ctrl+S and handles Save As dialogs automatically. " +
+                "Works universally across all Windows apps including Office, Notepad, and Electron apps."),
+            new(ChatRole.User,
+                $"Window: {windowTitle}\n" +
+                (string.IsNullOrWhiteSpace(filePath) ? "" : $"File path: {filePath}\n") +
+                "\n" +
+                "Step 1: Find the window:\n" +
+                $"window_management(action='find', title='{windowTitle}')\n" +
+                "\n" +
+                "Step 2: Save the file (using handle from step 1):\n" +
+                (string.IsNullOrWhiteSpace(filePath)
+                    ? "ui_automation(action='save', windowHandle='<handle>') — just sends Ctrl+S\n"
+                    : $"ui_automation(action='save', windowHandle='<handle>', text='{filePath}')\n") +
+                "\n" +
+                "What happens:\n" +
+                "• Sends Ctrl+S to the focused window\n" +
+                "• Waits up to 2 seconds for a Save As dialog\n" +
+                "• If dialog appears AND filePath provided: auto-fills filename and confirms\n" +
+                "• Handles overwrite confirmation dialogs automatically\n" +
+                "\n" +
+                "If Save As dialog appears without filePath:\n" +
+                "Use ui_automation(action='type') to fill the filename field, then ui_automation(action='click', nameContains='Save').\n" +
+                "\n" +
+                "FALLBACK if save action fails:\n" +
+                "1) keyboard_control(action='press', key='s', modifiers='ctrl') — manual Ctrl+S\n" +
+                "2) screenshot_control(target='window', windowHandle='<handle>') — see what dialog appeared\n" +
+                "3) ui_automation(action='find', windowHandle='<handle>', controlType='Edit') — find filename field\n" +
+                "4) ui_automation(action='type', windowHandle='<handle>', elementId='...', text='<path>') — type path\n" +
+                "5) ui_automation(action='click', windowHandle='<handle>', nameContains='Save') — click Save button")
+        ];
+    }
+
+    /// <summary>
     /// Wait for UI changes to complete before proceeding.
     /// </summary>
     /// <param name="windowTitle">Window title to find (partial match).</param>

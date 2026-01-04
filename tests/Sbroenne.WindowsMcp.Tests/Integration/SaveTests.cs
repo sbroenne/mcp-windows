@@ -3,7 +3,6 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -11,7 +10,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for the save action.
-/// Tests the SaveFileDialogAsync method against real Windows Save As dialogs and Office COM.
+/// Tests the SaveAsync method using keyboard-first approach (Ctrl+S) based on FlaUI/pywinauto patterns.
 /// </summary>
 [Collection("UITestHarness")]
 public sealed class SaveTests : IDisposable
@@ -87,7 +86,7 @@ public sealed class SaveTests : IDisposable
     [Fact]
     public async Task Save_StandardWindowsDialog_SavesFile()
     {
-        // Arrange: Switch to Dialogs tab and prepare test file path
+        // Arrange: Prepare test file path
         var testFilePath = Path.Combine(_testOutputDir, $"test-{Guid.NewGuid()}.txt");
 
         // Ensure test file doesn't exist
@@ -100,104 +99,16 @@ public sealed class SaveTests : IDisposable
         _fixture.BringToFront();
         await Task.Delay(500);
 
-        // Verify tabs exist first
-        var tabsResult = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            ControlType = "TabItem",
-        });
-        Assert.True(tabsResult.Success, $"Find tabs failed: {tabsResult.ErrorMessage}");
-        Assert.NotNull(tabsResult.Items);
-        var tabNames = tabsResult.Items!.Select(e => e.Name).ToList();
-        Assert.Contains("Dialogs", tabNames);
-
-        // Find and click the Dialogs tab
-        var clickTabResult = await _automationService.FindAndClickAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Dialogs",
-            ControlType = "TabItem",
-        });
-        Assert.True(clickTabResult.Success, $"Click Dialogs tab failed: {clickTabResult.ErrorMessage}");
-        await Task.Delay(1000);  // Wait for tab to switch and button to become fully visible and interactable
-
-        // Verify the button is now accessible by finding it first
-        var buttonCheckResult = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Save As...",
-            ControlType = "Button",
-        });
-        Assert.True(buttonCheckResult.Success, $"Find Save As button failed: {buttonCheckResult.ErrorMessage}");
-        Assert.NotNull(buttonCheckResult.Items);
-        Assert.NotEmpty(buttonCheckResult.Items!);
-
-        // Debug output for button click coordinates
-        var buttonInfo = buttonCheckResult.Items![0];
-        var clickInfo = buttonInfo.Click != null && buttonInfo.Click.Length >= 2
-            ? $"x={buttonInfo.Click[0]}, y={buttonInfo.Click[1]}"
-            : "null or invalid";
-        Assert.True(
-            buttonInfo.Click != null && buttonInfo.Click.Length >= 2 && (buttonInfo.Click[0] > 0 || buttonInfo.Click[1] > 0),
-            $"Button has invalid click coordinates: [{clickInfo}]. Type={buttonInfo.Type}, Name={buttonInfo.Name}");
-
-        // Focus the button first to ensure it's ready for clicking
-        var focusResult = await _automationService.FocusElementAsync(buttonInfo.Id);
-        Assert.True(focusResult.Success, $"Focus on Save As button failed: {focusResult.ErrorMessage}");
-        await Task.Delay(100);
-
-        // Act: Start a task that will handle the dialog after it opens
-        var dialogHandlingTask = Task.Run(async () =>
-        {
-            // Wait for the dialog to open
-            await Task.Delay(2000);  // Increased wait time
-
-            // Use SaveFileDialogAsync with the PARENT window handle
-            // The action will find the modal Save As dialog automatically (FlaUI pattern)
-            var result = await _automationService.SaveFileDialogAsync(_windowHandle, testFilePath);
-            return (Success: result.Success, Error: result.ErrorMessage);
-        });
-
-        // Click the Save As button to open the dialog
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Save As...",
-            ControlType = "Button",
-        });
-        Assert.True(clickResult.Success, $"Click Save As button failed: {clickResult.ErrorMessage}");
-
-        // Wait for the Save As dialog to appear  
-        await Task.Delay(500);
-
-        // Verify the dialog appeared by using WaitForElement to find it
-        var dialogWaitResult = await _automationService.WaitForElementAsync(
-            new ElementQuery
-            {
-                ControlType = "Window",
-                Name = "Save As",  // Default title for WinForms SaveFileDialog
-            },
-            timeoutMs: 5000);
-
-        // If "Save As" not found, try broader search
-        if (!dialogWaitResult.Success)
-        {
-            // Try searching for the FileNameControlHost directly on desktop
-            dialogWaitResult = await _automationService.WaitForElementAsync(
-                new ElementQuery
-                {
-                    AutomationId = "FileNameControlHost",
-                },
-                timeoutMs: 5000);
-        }
-
-        Assert.True(dialogWaitResult.Success, $"Save As dialog did not appear: {dialogWaitResult.ErrorMessage}");
-
-        // Wait for dialog handling to complete - timeout after 30 seconds
-        var dialogResult = await dialogHandlingTask.WaitAsync(TimeSpan.FromSeconds(30));
+        // Act: Call SaveAsync on the main window
+        // This sends Ctrl+S, which triggers the Save As dialog in the test harness
+        // Then it fills in the filename and presses Enter
+        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
 
         // Assert
-        Assert.True(dialogResult.Success, $"SaveFileDialog handling failed: {dialogResult.Error}");
+        Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
+
+        // Wait for file system to settle
+        await Task.Delay(500);
 
         // Verify the file was created
         Assert.True(File.Exists(testFilePath), $"Expected file to exist at: {testFilePath}");
@@ -212,7 +123,7 @@ public sealed class SaveTests : IDisposable
     public async Task Save_InvalidWindowHandle_ReturnsError()
     {
         // Act
-        var result = await _automationService.SaveFileDialogAsync("invalid", @"C:\test\file.txt");
+        var result = await _automationService.SaveAsync("invalid", @"C:\test\file.txt");
 
         // Assert
         Assert.False(result.Success);
@@ -223,21 +134,57 @@ public sealed class SaveTests : IDisposable
     public async Task Save_NonExistentWindow_ReturnsError()
     {
         // Act
-        var result = await _automationService.SaveFileDialogAsync("999999999", @"C:\test\file.txt");
+        var result = await _automationService.SaveAsync("999999999", @"C:\test\file.txt");
 
         // Assert
         Assert.False(result.Success);
-        Assert.Contains("Could not find", result.ErrorMessage);
+        Assert.Contains("Could not focus", result.ErrorMessage);
     }
 
     [Fact]
-    public async Task Save_WindowWithoutDialog_ReturnsNotFoundError()
+    public async Task Save_WithFilePath_SavesFileWhenDialogAppears()
     {
-        // Act: Try to use SaveFileDialogAsync on a window that isn't a Save As dialog
-        var result = await _automationService.SaveFileDialogAsync(_windowHandle, @"C:\test\file.txt");
+        // This test verifies the Ctrl+S workflow works when a Save dialog appears
+        // The test harness shows a Save As dialog when it receives Ctrl+S
+
+        // Arrange
+        var testFilePath = Path.Combine(_testOutputDir, $"ctrlS-test-{Guid.NewGuid()}.txt");
+
+        _fixture.BringToFront();
+        await Task.Delay(300);
+
+        // Act
+        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
 
         // Assert
-        Assert.False(result.Success);
-        Assert.Contains("Could not find filename field", result.ErrorMessage);
+        Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
+
+        await Task.Delay(300);
+        Assert.True(File.Exists(testFilePath), $"File was not created at: {testFilePath}");
+    }
+
+    [Fact]
+    public async Task Save_WithoutFilePath_JustTriggersCtrlS()
+    {
+        // This test verifies that Save without filePath just sends Ctrl+S
+        // If a dialog appears, it returns a hint instead of failing
+
+        // Arrange
+        _fixture.BringToFront();
+        await Task.Delay(300);
+
+        // Act - no filePath provided
+        var result = await _automationService.SaveAsync(_windowHandle);
+
+        // Assert - should succeed (either saved directly or dialog hint returned)
+        Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
+
+        // Cleanup: if a dialog was opened (hint returned), close it with Escape
+        if (result.UsageHint != null && result.UsageHint.Contains("dialog"))
+        {
+            var keyboardService = new KeyboardInputService();
+            await keyboardService.PressKeyAsync("Escape");
+            await Task.Delay(200);
+        }
     }
 }
