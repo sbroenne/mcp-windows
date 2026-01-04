@@ -120,6 +120,21 @@ public sealed class SystemResources
         return """
             # Windows Automation Best Practices
 
+            ## Available Tools
+
+            | Tool | Purpose |
+            |------|---------|
+            | `window_management` | Find, activate, close, move windows. Get window handles. |
+            | `screenshot_control` | Capture screenshots with element discovery (annotate=true). |
+            | `ui_click` | Click buttons, checkboxes, menu items, links. |
+            | `ui_type` | Type text into input fields. |
+            | `ui_find` | Find elements, get details, inspect properties. |
+            | `ui_read` | Read text from elements (with OCR fallback). |
+            | `ui_wait` | Wait for elements to appear/disappear/change state. |
+            | `ui_file` | Save files (Office apps via COM, others via dialogs). |
+            | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
+            | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
+
             ## The Standard Workflow: Find Handle First, Then Act
 
             All window-targeting operations require a window handle. Get it using `window_management`:
@@ -128,11 +143,11 @@ public sealed class SystemResources
             window_management(action="find", title="Notepad")
             → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
 
-            ui_automation(action="click", windowHandle="123456", nameContains="Save")
+            ui_click(windowHandle="123456", nameContains="Save")
             screenshot_control(target="window", windowHandle="123456")
             ```
 
-            **This gives you full control over which window to target, especially when multiple windows match.**
+            **This gives you full control over which window to target.**
 
             ## Recommended Workflow
 
@@ -144,8 +159,8 @@ public sealed class SystemResources
 
             ### 2. Interact with Elements
             ```
-            ui_automation(action="click", windowHandle="<handle>", nameContains="Save")
-            ui_automation(action="type", windowHandle="<handle>", controlType="Edit", text="Hello")
+            ui_click(windowHandle="<handle>", nameContains="Save")
+            ui_type(windowHandle="<handle>", controlType="Edit", text="Hello")
             ```
 
             ### 3. If You Don't Know the Element Name → Discover First
@@ -154,56 +169,64 @@ public sealed class SystemResources
             → See screenshot with numbered labels + element list (default behavior)
             ```
 
-            ### 4. For Toggles → Use ensure_state
+            ### 4. For Toggles → Click handles state
             ```
-            ui_automation(action="ensure_state", windowHandle="<handle>", nameContains="Dark Mode", desiredState="on")
+            ui_click(windowHandle="<handle>", nameContains="Dark Mode", controlType="CheckBox")
             ```
-            Atomic operation - checks state and toggles only if needed.
+            The result includes toggle state after clicking.
 
             ### 5. Verify Results
             ```
-            ui_automation(action="wait_for_disappear", windowHandle="<handle>", nameContains="Save") // wait for dialog to close
+            ui_wait(windowHandle="<handle>", mode="disappear", nameContains="Save") // wait for dialog to close
             screenshot_control(target="window", windowHandle="<handle>") // visual check
             ```
+
+            ### 6. Save Files
+            ```
+            ui_file(windowHandle="<handle>", filePath="C:\\Users\\User\\document.docx")
+            ```
+            Works with Office apps (Word, Excel, PowerPoint) via COM and standard apps via Save As dialogs.
 
             ## When to Use Each Tool
 
             | Goal | Primary Tool | Fallback |
             |------|-------------|----------|
-            | Click button/checkbox | ui_automation(click, invoke, ensure_state) | mouse_control(windowHandle=...) |
-            | Type in text field | ui_automation(type) | keyboard_control with window activated |
+            | Click button/checkbox | ui_click(windowHandle=..., nameContains=...) | mouse_control(windowHandle=...) |
+            | Type in text field | ui_type(windowHandle=..., text=...) | keyboard_control with window activated |
+            | Save a file | ui_file(windowHandle=..., filePath=...) | keyboard_control(key='s', modifiers='ctrl') |
             | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | - |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
-            | Read text from element | ui_automation(get_text) | ui_automation(ocr_element) |
+            | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
+            | Wait for element | ui_wait(windowHandle=..., mode='appear') | - |
             | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
-            | Find visible elements | screenshot_control with annotate=true | ui_automation(get_tree) |
+            | Find visible elements | screenshot_control with annotate=true | ui_find(windowHandle=...) |
 
             ## Key Principles
 
             1. **Find handle first** - use `window_management(action='find')` to get window handle
             2. **Use explicit handles** - you control which window when multiple match
             3. **Use screenshot_control(annotate=true) when you don't know element names**
-            4. **Use ensure_state for toggles** - atomic on/off: `ensure_state(windowHandle='...', nameContains='...', desiredState='on')`
-            5. **Use wait_for_disappear for dialogs** - block until dialog closes
+            4. **Use ui_wait for dialogs** - block until dialog closes with mode='disappear'
+            5. **Use ui_file for saving** - handles Office COM + Save As dialogs automatically
 
-            ## When to Use `find` (Optional)
+            ## When to Use `ui_find` (Optional)
 
-            All actions support direct search, so `find` is rarely needed. Use it when:
+            All ui_* tools support direct search, so `ui_find` is rarely needed. Use it when:
 
-            - **Getting clickable_point** for mouse fallback: `find` returns coordinates
+            - **Getting clickable_point** for mouse fallback: `ui_find` returns coordinates
             - **Multiple matches** - see all matching elements, pick the right one
             - **Element inspection** - check patterns, children, properties
 
             ## Fallback Strategy
 
-            If ui_automation click/type doesn't work (custom controls, games, etc.):
+            If ui_click doesn't work (custom controls, games, etc.):
 
             ```
             window_management(action="find", title="MyApp")
             → Get handle: "123456"
 
-            ui_automation(action="find", windowHandle="123456", nameContains="Button")
-            → Get clickable_point: { x: 450, y: 300 }
+            ui_find(windowHandle="123456", nameContains="Button")
+            → Get clickable_point: [450, 300]
 
             window_management(action="activate", handle="123456")
             mouse_control(action="click", windowHandle="123456", x=450, y=300)
@@ -220,15 +243,24 @@ public sealed class SystemResources
 
             Quick lookup: error_code → recovery action.
 
-            ## UI Automation Errors
+            ## UI Automation Errors (ui_click, ui_type, ui_find, ui_read, ui_wait)
 
             | Error Code | Recovery Action |
             |------------|-----------------|
             | `element_not_found` | Broaden search: use `nameContains` instead of exact `name`, or use `screenshot_control(annotate=true)` first to discover available elements. |
-            | `element_stale` | Element was removed from UI. Re-run `find` to get fresh elementId. |
-            | `pattern_not_supported` | Element doesn't support this action. Check `supportedPatterns` in element info. Use `invoke` for buttons, `toggle` for checkboxes. |
+            | `element_stale` | Element was removed from UI. Re-run `ui_find` to get fresh elementId. |
+            | `pattern_not_supported` | Element doesn't support this action. Check `supportedPatterns` in element info. Try `ui_click` for buttons. |
             | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `screenshot_control(annotate=true)`. |
             | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
+
+            ## File Operation Errors (ui_file)
+
+            | Error Code | Recovery Action |
+            |------------|-----------------|
+            | `save_failed` | File save operation failed. Check file path is valid, disk has space, and file is not locked by another process. |
+            | `dialog_not_found` | Save As dialog didn't appear. Try `keyboard_control(key='s', modifiers='ctrl')` first, then retry. |
+            | `com_interop_failed` | Office COM automation failed. Ensure Office app is responding. Try closing and reopening the document. |
+            | `invalid_file_path` | File path is malformed. Use backslashes (C:\\Users\\...) and ensure directory exists. |
 
             ## Mouse/Keyboard Errors
 
@@ -260,8 +292,8 @@ public sealed class SystemResources
             ### Element Not Found → Discovery Workflow
             ```
             1. screenshot_control(annotate=true) → see all interactive elements
-            2. find with broader criteria (nameContains, controlType only)
-            3. get_tree → see element hierarchy for parent scoping
+            2. ui_find with broader criteria (nameContains, controlType only)
+            3. ui_find with includeChildren=true → see element hierarchy
             ```
 
             ### Wrong Window → Re-focus Workflow
@@ -269,6 +301,13 @@ public sealed class SystemResources
             1. window_management(action='find') → get fresh handle
             2. window_management(action='activate') → focus window
             3. Retry original operation with expectedWindowTitle guard
+            ```
+
+            ### File Save Failed → Recovery Workflow
+            ```
+            1. Check if file is locked: close other apps using the file
+            2. Try alternate path: use a different directory
+            3. For Office apps: check if dialog appeared, dismiss it manually
             ```
             """;
     }
@@ -312,10 +351,10 @@ public sealed class SystemResources
             **Key fields:** `h` (handle) - pass verbatim to other tools as `windowHandle`. `ok` = success.
             **Abbreviations:** h=handle, t=title, pn=process_name, pid=process_id, s=state, fg=foreground, b=bounds[x,y,w,h], n=count
 
-            ## ui_automation
+            ## ui_find / ui_click / ui_type / ui_read / ui_wait
 
             ```json
-            // find returns elements array (ae):
+            // ui_find returns elements array (ae):
             {
               "ok": true,
               "ae": [
@@ -334,25 +373,50 @@ public sealed class SystemResources
               "tw": { "h": "12345678", "t": "My App", "pn": "myapp" },
               "n": 1
             }
-            // screenshot_control(annotate=true) returns annotated elements + image:
+            // ui_click/ui_type returns single element (el):
             {
               "ok": true,
-              "ae": [
-                { "i": 1, "id": "...", "n": "File", "t": "MenuItem" },
-                { "i": 2, "id": "...", "n": "Edit", "t": "MenuItem" }
-              ],
-              "n": 25,
-              "img": "base64...",
-              "fmt": "jpeg"
+              "el": { "id": "...", "n": "Save", "t": "Button", "ts": "on" },
+              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
+            }
+            // ui_read returns text (txt):
+            {
+              "ok": true,
+              "txt": "Hello World",
+              "el": { "id": "...", "n": "Content", "t": "Text" },
+              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
             }
             ```
 
             **Key fields:**
-            - `id` (element_id) - pass to click/type/toggle actions
+            - `id` (element_id) - pass to other ui_* tools
             - `cp` (clickable_point) - fallback coords for mouse_control
             - `fw` (framework_type) - "Electron", "WPF", "WinForms" (affects search strategy)
+            - `ts` (toggle_state) - "on"/"off" for checkboxes after clicking
 
-            **Abbreviations:** id=element_id, n=name/count, t=type, cp=clickable_point, br=bounding_rect, en=enabled, pat=patterns, fw=framework, tw=target_window
+            **Abbreviations:** id=element_id, n=name/count, t=type, cp=clickable_point, br=bounding_rect, en=enabled, pat=patterns, fw=framework, tw=target_window, ts=toggle_state, txt=text
+
+            ## ui_file
+
+            ```json
+            // Save successful:
+            {
+              "ok": true,
+              "fp": "C:\\Users\\User\\document.docx",
+              "method": "com_interop",
+              "tw": { "h": "12345678", "t": "Document1 - Word", "pn": "WINWORD" }
+            }
+            // Save via dialog:
+            {
+              "ok": true,
+              "fp": "C:\\Users\\User\\file.txt",
+              "method": "save_dialog",
+              "tw": { "h": "12345678", "t": "Untitled - Notepad", "pn": "notepad" }
+            }
+            ```
+
+            **Key fields:** `fp` (file_path) - where file was saved. `method` - how it was saved (com_interop for Office, save_dialog for others).
+            **Abbreviations:** ok=success, fp=file_path, tw=target_window
 
             ## mouse_control
 
@@ -386,7 +450,18 @@ public sealed class SystemResources
             ## screenshot_control
 
             ```json
-            // capture:
+            // capture with annotate=true (default):
+            {
+              "ok": true,
+              "ae": [
+                { "i": 1, "id": "...", "n": "File", "t": "MenuItem" },
+                { "i": 2, "id": "...", "n": "Edit", "t": "MenuItem" }
+              ],
+              "n": 25,
+              "img": "base64...",
+              "fmt": "jpeg"
+            }
+            // capture with annotate=false:
             {
               "ok": true,
               "img": "base64...",
@@ -403,7 +478,7 @@ public sealed class SystemResources
             }
             ```
 
-            **Abbreviations:** ok=success, img=image_data, w=width, h=height, fmt=format, mon=monitors, i=index, p=is_primary
+            **Abbreviations:** ok=success, ae=annotated_elements, i=index, img=image_data, w=width, h=height, fmt=format, mon=monitors, p=is_primary
 
             ## Error Response (all tools)
 
