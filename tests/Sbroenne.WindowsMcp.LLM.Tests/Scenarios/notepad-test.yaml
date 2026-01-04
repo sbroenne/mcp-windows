@@ -2,15 +2,17 @@
 # Testing framework: Agent Benchmark
 # https://github.com/mykhaliev/agent-benchmark
 #
-# Test: Complete Notepad workflow with proof
-# Success = proof provided + Notepad closed
+# Tests:
+# 1. Complete Notepad workflow - type text, close without saving
+# 2. Notepad save workflow - type text, save to unique file, verify with filesystem
 #
 # Prerequisites:
 # - Windows 10/11
-# - Windows MCP Server executable in examples folder
+# - Windows MCP Server
+# - Filesystem MCP Server (for save test verification)
 # - Environment variables set:
 #   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
-#
+#   - TEST_RESULTS_PATH: Directory for output files
 
 
 criteria:
@@ -21,6 +23,13 @@ providers:
     type: AZURE
     auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
     model: gpt-4o
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-4.1
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
 
@@ -38,35 +47,42 @@ servers:
     command: "{{SERVER_COMMAND}}"
     server_delay: 10s
 
+  - name: filesystem
+    type: stdio
+    command: "npx -y @modelcontextprotocol/server-filesystem {{TEST_RESULTS_PATH}}"
+    server_delay: 10s
+
 agents:
   - name: gpt4o-agent
     servers:
       - name: windows-mcp
+      - name: filesystem
     provider: azure-openai-gpt4o
 
   - name: gpt5-chat-agent
     servers:
       - name: windows-mcp
+      - name: filesystem
     provider: azure-openai-gpt5-chat
+
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+      - name: filesystem
+    provider: azure-openai-gpt41
 
 settings:
   verbose: true
-  max_iterations: 10      # launch + type + close + dialog + verify + buffer
+  max_iterations: 15      # launch + type + save + close + verify + buffer
   test_delay: 60s         # Longer delay to avoid rate limits between agents
 
 sessions:
   - name: Notepad Workflow
     tests:
-      - name: "Complete Notepad automation"
+      - name: "Type and close without saving"
         description: "Open Notepad, type text, close without saving"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World"
-          3. Record proof that this worked (no screenshots, just text)
-          4. Close Notepad and click "Don't Save" if prompted
-          5. Verify no Notepad window is open (search for it)
-
-          Report "VERIFIED: No Notepad window open" if closed successfully.
+          Open Notepad, type "Hello World", then close it without saving.
         assertions:
           # OUTCOME: LLM verified no Notepad window open
           - type: output_regex
@@ -142,4 +158,59 @@ sessions:
           # EFFICIENCY: Stay under token limits
           - type: max_tokens
             value: 60000
+
+      - name: "Type and save to file"
+        description: "Open Notepad, type text, save to unique file, verify with filesystem"
+        prompt: |
+          Open Notepad, type some text, save to {{TEST_RESULTS_PATH}}\notepad-test-{{now format="epoch"}}.txt, and close it.
+          Verify the file was saved.
+        assertions:
+          # OUTCOME: LLM verified the file was saved (flexible matching)
+          - type: output_regex
+            pattern: "(?i)(file.*(saved|created|exists|verified)|saved.*successfully|isFile.*true)"
+
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "FAILED"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # REQUIRED: Must use window_management to launch Notepad
+          - type: tool_called
+            tool: window_management
+
+          # VERIFY: Notepad was launched
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "launch"
+              programPath: "notepad.exe"
+
+          # FLEXIBLE: Text input can use different tools
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_automation
+
+          # PERFORMANCE: Complete within 90 seconds
+          - type: max_latency_ms
+            value: 90000
+
+          # EFFICIENCY: Stay under token limits
+          - type: max_tokens
+            value: 120000
+
+          # VERIFICATION: Must use filesystem tools to verify the file exists
+          - anyOf:
+              - type: tool_called
+                tool: read_file
+              - type: tool_called
+                tool: list_directory
+              - type: tool_called
+                tool: get_file_info
 

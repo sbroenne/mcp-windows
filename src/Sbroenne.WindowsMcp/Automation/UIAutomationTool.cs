@@ -91,7 +91,7 @@ public sealed partial class UIAutomationTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the UI Automation operation.</returns>
     [McpServerTool(Name = "ui_automation", Title = "UI Automation", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    [Description("UI element interaction via Windows UIA. PREFERRED over mouse_control for buttons, menus, text fields. DISCOVERY: Use screenshot_control(annotate=true) first to see all interactive elements with coordinates. WORKFLOW: 1) window_management(find) → get handle, 2) screenshot_control to discover elements, 3) ui_automation(click/type/toggle) to interact. KEY ACTIONS: click, type, toggle, wait_for, find, save. SAVE: Ctrl+S with optional auto-fill of Save As dialog. DIALOG BUTTONS: nameContains='save'/'cancel'. windowHandle REQUIRED for most actions.")]
+    [Description("Interact with UI elements (buttons, menus, text fields, dialogs). PREFERRED over mouse_control. Use save action with text=filePath to save files. windowHandle REQUIRED for most actions.")]
     public async Task<UIAutomationResult> ExecuteAsync(
         [Description("The UI automation action to perform.")]
         UIAutomationAction action,
@@ -138,7 +138,7 @@ public sealed partial class UIAutomationTool
         [Description("Timeout in milliseconds for wait_for (default: 5000)")]
         int timeoutMs = 5000,
 
-        [Description("Text to type (for type action)")]
+        [Description("Text to type (for type action), or file path (for save action)")]
         string? text = null,
 
         [Description("Clear existing text before typing (default: false)")]
@@ -1231,10 +1231,9 @@ public enum UIAutomationAction
     GetElementDetails,
 
     /// <summary>
-    /// Trigger save via Ctrl+S. Pass the APPLICATION window handle (not a dialog).
-    /// If Save As dialog appears: provide text (filePath) to auto-fill, or omit to interact manually.
-    /// Handles overwrite confirmations automatically.
-    /// FALLBACK if fails: keyboard_control(Ctrl+S), then screenshot + ui_automation to interact with dialog manually.
+    /// Save a file. Pass the APPLICATION window handle (not a dialog).
+    /// Triggers Ctrl+S, detects Save As dialog, fills filename from text parameter, confirms save.
+    /// Handles overwrite confirmations. Use BACKSLASHES in file paths (Windows format).
     /// </summary>
     [JsonStringEnumMemberName("save")]
     Save

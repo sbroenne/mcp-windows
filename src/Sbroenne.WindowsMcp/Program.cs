@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
@@ -100,7 +101,12 @@ builder.Services
     .WithTools<KeyboardControlTool>()
     .WithTools<WindowManagementTool>()
     .WithTools<ScreenshotControlTool>()
-    .WithTools<UIAutomationTool>()
+    .WithTools<UIFindTool>()
+    .WithTools<UIClickTool>()
+    .WithTools<UITypeTool>()
+    .WithTools<UIWaitTool>()
+    .WithTools<UIReadTool>()
+    .WithTools<UIFileTool>()
     .WithPrompts<WindowsAutomationPrompts>()
     .WithResources<SystemResources>();
 

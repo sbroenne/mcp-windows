@@ -1136,7 +1136,10 @@ public sealed partial class UIAutomationService
         // Clear existing text and type new path (pywinauto pattern: Ctrl+A then type)
         await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
         await Task.Delay(50, cancellationToken);
-        await _keyboardService.TypeTextAsync(filePath, cancellationToken);
+
+        // Normalize path to Windows format (backslashes)
+        var normalizedPath = filePath.Replace('/', '\\');
+        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
         await Task.Delay(100, cancellationToken);
 
         // Press Enter to save (equivalent to clicking Save button)
