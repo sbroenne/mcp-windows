@@ -48,7 +48,6 @@ builder.Services.AddSingleton<WindowService>();
 builder.Services.AddSingleton<MonitorService>();
 builder.Services.AddSingleton<ImageProcessor>();
 builder.Services.AddSingleton<ScreenshotService>();
-builder.Services.AddSingleton<VisualDiffService>();
 
 // Register OCR services (Windows.Media.Ocr legacy engine)
 builder.Services.AddSingleton<LegacyOcrService>();
