@@ -59,7 +59,7 @@ public sealed class SaveTests : IDisposable
             monitorService,
             _mouseService,
             keyboardService,
-            windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

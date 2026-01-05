@@ -59,7 +59,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
 

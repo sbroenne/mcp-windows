@@ -56,7 +56,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            _windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

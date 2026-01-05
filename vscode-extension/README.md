@@ -62,6 +62,8 @@ Plus **local OCR** for text extraction — no image upload, ~100ms.
 
 - **🪙 Token Optimized** — JSON responses use short property names to minimize token usage. Reduces costs and improves response times.
 
+- **🧪 LLM-Tested** — Every tool is tested with real AI models to verify Copilot understands and uses them correctly.
+
 ---
 
 ## How It Works

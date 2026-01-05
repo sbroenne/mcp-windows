@@ -22,7 +22,7 @@ public sealed partial class UIAutomationService : IDisposable
     private readonly MonitorService _monitorService;
     private readonly MouseInputService _mouseService;
     private readonly KeyboardInputService _keyboardService;
-    private readonly WindowService? _windowService;
+    private readonly WindowActivator? _windowActivator;
     private readonly ElevationDetector _elevationDetector;
     private readonly ILogger<UIAutomationService> _logger;
     private readonly CoordinateConverter _coordinateConverter;
@@ -46,7 +46,7 @@ public sealed partial class UIAutomationService : IDisposable
         MonitorService monitorService,
         MouseInputService mouseService,
         KeyboardInputService keyboardService,
-        WindowService? windowService,
+        WindowActivator? windowActivator,
         ElevationDetector elevationDetector,
         ILogger<UIAutomationService> logger)
     {
@@ -61,7 +61,7 @@ public sealed partial class UIAutomationService : IDisposable
         _monitorService = monitorService;
         _mouseService = mouseService;
         _keyboardService = keyboardService;
-        _windowService = windowService;
+        _windowActivator = windowActivator;
         _elevationDetector = elevationDetector;
         _logger = logger;
         _coordinateConverter = new CoordinateConverter(monitorService);

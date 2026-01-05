@@ -127,6 +127,11 @@ Plus **local OCR** for text extraction — no image upload, ~100ms.
 <h3>🪙 Token Optimized</h3>
 <p>JSON responses use short property names to minimize token usage. Reduces LLM costs and improves response times.</p>
 </div>
+
+<div class="feature-card">
+<h3>🧪 LLM-Tested</h3>
+<p>Every tool is tested with real AI models to verify they understand the descriptions and use the tools correctly.</p>
+</div>
 </div>
 
 <p><a href="/features/">See complete feature reference →</a></p>

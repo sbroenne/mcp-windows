@@ -1,30 +1,39 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.6.2 → 2.7.0
+Version change: 2.7.0 → 3.0.0
 Modified principles:
-  - VII. Windows API Documentation-First → VII. Microsoft Libraries & Research-First (expanded scope)
-Added sections: None
+  - IV. Windows 11 Target Platform → IV. Windows 10/11 Target Platform (expanded to Windows 10)
+  - VI. Updated tool examples (OCR IS now implemented via Windows.Media.Ocr)
+Added sections:
+  - XXIII. LLM Integration Testing with agent-benchmark
+  - XXIV. Token Optimization for LLM Efficiency
+  - XXV. UI Automation First (Primary Approach)
+Technology Stack changes:
+  - Runtime: .NET 8.0 → .NET 10.0
+  - Language: C# 12 → C# 13
+  - Test Framework: Added agent-benchmark for LLM tests
+  - MCP SDK: Now version 0.5.0-preview.1
+  - Added: 11 specialized tools (5 base + 6 UI automation)
 Removed sections: None
-Technology Stack changes: None
-Templates requiring updates: ✅ No updates required
+Templates requiring updates: ✅ No updates required (constitution referenced in copilot-instructions.md)
 Follow-up TODOs: None
-Rationale: MINOR version bump - materially expanded Principle VII to mandate research of all 
-           Microsoft libraries (Microsoft.Extensions.*, System.*, Windows APIs) before planning
-           implementation. Previously only covered Windows APIs. This ensures standard library
-           solutions are discovered and preferred over custom implementations (e.g., 
-           Microsoft.Extensions.Compliance.Redaction for data redaction instead of custom regex).
+Rationale: MAJOR version bump - significant expansion of tool surface area (11 tools), 
+           .NET 10 runtime, addition of UI Automation tools (ui_find, ui_click, ui_type, 
+           ui_read, ui_wait, ui_file), new principles for LLM testing and token optimization,
+           expanded platform support to Windows 10. Breaking change: tool architecture 
+           fundamentally redesigned with semantic UI automation as primary approach.
 -->
 
 # mcp-windows Constitution
 
 **Project**: mcp-windows
-**Display Name**: MCP Server for Windows GUI
+**Display Name**: Windows MCP Server
 **Namespace**: `Sbroenne.WindowsMcp`
-**VS Code Extension ID**: mcp-windows
+**VS Code Extension ID**: windows-mcp
 **Repository**: [github.com/sbroenne/mcp-windows](https://github.com/sbroenne/mcp-windows)
 **License**: MIT
-**Description**: MCP Server enabling LLMs to control the Windows Desktop
+**Description**: MCP Server enabling LLMs to control Windows applications via UI Automation
 
 ---
 
@@ -36,6 +45,7 @@ Rationale: MINOR version bump - materially expanded Principle VII to mandate res
 - Tests MUST be written before implementation code
 - Integration tests MUST be the primary test type (Windows Desktop automation requires real system interaction)
 - Unit tests permitted only for pure logic with no external dependencies
+- LLM integration tests MUST validate tool usability by AI agents (see Principle XXIII)
 
 ### II. Latest Libraries Policy
 
@@ -63,11 +73,11 @@ This project serves as a **reference implementation** for the MCP C# SDK:
 
 **SDK Limitation Note**: The MCP SDK's `XmlToDescriptionGenerator` source generator requires `partial` methods to convert XML docs to `[Description]` attributes, but it has a bug where generated files only include `using System.ComponentModel;` and `using ModelContextProtocol.Server;`. This causes compile errors when tool methods use custom types (e.g., `WindowManagementResult`). Until fixed, use manual `[Description]` attributes on parameters.
 
-### IV. Windows 11 Target Platform
+### IV. Windows 10/11 Target Platform
 
-- Windows 11 is the sole supported platform—no compatibility shims for older versions
-- **Builds MUST be architecture-independent (portable)**: Published as framework-dependent assemblies that run on any Windows architecture via the `dotnet` runtime
-- Users MUST have .NET 8.0 runtime installed; the runtime handles x64/ARM64 automatically
+- Windows 10 and Windows 11 are supported platforms
+- **Self-contained builds** for releases: Published as single-file executables for x64 and ARM64
+- **Framework-dependent builds** for development: Require .NET 10.0 runtime
 - **.NET APIs MUST be preferred over COM** where equivalent functionality exists
 - COM interop permitted only when no .NET equivalent exists (e.g., `IVirtualDesktopManager`)
 
@@ -77,21 +87,22 @@ This project serves as a **reference implementation** for the MCP C# SDK:
 - Snap layouts & snap groups (detect via DWM extended frame bounds)
 - Taskbar & system tray enumeration
 
-**Key APIs**: `System.Windows.Automation`, `Windows.Graphics.Capture`, `IVirtualDesktopManager` (COM), DWM/Shell32 P/Invoke
+**Key APIs**: `Interop.UIAutomationClient`, `Windows.Graphics.Capture`, `Windows.Media.Ocr`, `IVirtualDesktopManager` (COM), DWM/Shell32 P/Invoke
 
 ### V. Dual Packaging Architecture
 
-- **Standalone**: Executable MCP Server via stdio transport
-- **VS Code Extension**: Bundled extension for integrated use
+- **Standalone**: Self-contained executable MCP Server via stdio transport (x64 and ARM64)
+- **VS Code Extension**: Bundled extension for integrated use with GitHub Copilot
 - Both modes MUST share identical core logic; packaging differences isolated to transport/activation layers
 
 ### VI. Augmentation, Not Duplication (NON-NEGOTIABLE)
 
 This server is the LLM's "hands" on Windows—it executes, the LLM decides:
 
-- **MUST NOT implement**: Computer vision, OCR, text extraction, image analysis, decision-making (LLMs have these natively)
-- **MUST implement**: Window/process enumeration, input simulation, screenshots, clipboard, system state access
+- **MUST NOT implement**: Computer vision, image analysis, decision-making, complex reasoning (LLMs have these natively)
+- **MUST implement**: UI element discovery, input simulation, screenshots, clipboard, system state access, local OCR
 - Tools MUST be "dumb actuators"—return raw data for LLM interpretation
+- **Local OCR is permitted**: `Windows.Media.Ocr` runs locally without vision model tokens and provides structured text data for LLM processing
 
 ### VII. Microsoft Libraries & Research-First (NON-NEGOTIABLE)
 
@@ -104,26 +115,17 @@ Before planning ANY feature implementation:
 **Research Scope** (in order of preference):
 - `Microsoft.Extensions.*` packages (logging, DI, compliance, resilience, etc.)
 - `System.*` BCL APIs
-- Windows-specific APIs (`System.Windows.Automation`, `Windows.Graphics.Capture`, DWM/Shell32)
+- Windows-specific APIs (`Interop.UIAutomationClient`, `Windows.Graphics.Capture`, `Windows.Media.Ocr`, DWM/Shell32)
 - Official Microsoft NuGet packages
 
 **Prohibited**:
-- MUST NOT build custom solutions when Microsoft libraries exist (e.g., use `Microsoft.Extensions.Compliance.Redaction` for data redaction, not custom regex)
+- MUST NOT build custom solutions when Microsoft libraries exist
 - MUST NOT duplicate functionality already provided by `Microsoft.Extensions.*`
 
 **Custom code permitted only when**:
 - No Microsoft library exists for the requirement
 - The Microsoft library has documented limitations that block the use case
 - Performance requirements cannot be met (must be measured, not assumed)
-
-**Examples of Required Library Usage**:
-| Need | Use This | Not This |
-|------|----------|----------|
-| Data redaction | `Microsoft.Extensions.Compliance.Redaction` | Custom regex patterns |
-| Retry/resilience | `Microsoft.Extensions.Resilience` or Polly | Manual retry loops |
-| Options validation | `Microsoft.Extensions.Options` with `ValidateOnStart()` | Manual validation |
-| Logging | `Microsoft.Extensions.Logging` | Custom logging |
-| DI | `Microsoft.Extensions.DependencyInjection` | Service locator |
 
 ### VIII. Security Best Practices (NON-NEGOTIABLE)
 
@@ -148,8 +150,7 @@ Before planning ANY feature implementation:
 - Expect failure: Windows/processes/UI elements can disappear at any time
 - Return meaningful MCP error responses with actionable context (what failed, why, what to try next)
 - Report partial success explicitly (e.g., "3 of 5 windows enumerated, 2 were closed")
-- Use Polly for transient failure retries (max 3, exponential backoff); never retry destructive operations
-- Default timeouts: 5 seconds for UI operations, 30 seconds for captures; MUST be configurable via environment variable (`MCP_*_TIMEOUT_MS`) for standalone server or VS Code settings for bundled extension
+- Default timeouts: 5 seconds for UI operations, 30 seconds for captures; MUST be configurable via environment variable (`MCP_WINDOWS_*_TIMEOUT_MS`) for standalone server or VS Code settings for bundled extension
 
 ### X. Thread-Safe Windows Interaction
 
@@ -164,12 +165,12 @@ Before planning ANY feature implementation:
 - Log to stderr to preserve stdout for MCP protocol (use console logger with `LogToStandardErrorThreshold`)
 - Default log level SHOULD be Warning to avoid noise in VS Code output panel
 - Log every tool invocation (name, sanitized parameters, duration, outcome) at Debug level
-- Support `--verbose` flag to enable Debug/Trace logging; implement health check tool for server status
+- Support `--verbose` flag to enable Debug/Trace logging
 - Do NOT log: screenshot image data, credentials, stack traces at Info level
 
 ### XII. Graceful Lifecycle Management
 
-- Validate Windows 11 at startup (fail fast otherwise)
+- Validate Windows 10/11 at startup (fail fast otherwise)
 - Handle `SIGTERM`, `SIGINT`, stdin close gracefully; complete or cancel in-flight operations (5s max)
 - Use `SafeHandle` for all native handles; implement `IAsyncDisposable`
 - Each tool call MUST be stateless where possible
@@ -183,13 +184,13 @@ Before planning ANY feature implementation:
 
 ### XIV. xUnit Testing Best Practices (NON-NEGOTIABLE)
 
-- Use xUnit 2.6+ with native xUnit assertions (Assert.Equal, Assert.True, etc.)
+- Use xUnit 2.9+ with native xUnit assertions (Assert.Equal, Assert.True, etc.)
 - Use `IAsyncLifetime` for async setup/teardown; `IClassFixture<T>` for shared state (e.g., STA thread)
-- Use `[Collection("WindowsDesktop")]` to serialize desktop-dependent tests
+- Use `[Collection("WindowManagement")]` to serialize desktop-dependent tests
 - Use `TheoryData<T>` and Bogus for test data; NSubstitute for rare mocking scenarios
 - Tests MUST be independent—clean up Windows state (close test windows, restore clipboard)
-- **Secondary Monitor Preference**: Integration tests that interact with the Windows desktop (mouse movements, keyboard input, window management, screenshots) MUST target the secondary monitor when available; this prevents interference with the developer's active VS Code session on the primary monitor; tests MUST detect available monitors at startup and select the secondary monitor if present, falling back to primary only when no secondary exists
-- **TestMonitorHelper Pattern**: A shared static helper class (`TestMonitorHelper`) MUST be used for all test coordinate generation; tests MUST NOT use hardcoded pixel coordinates; the helper provides `GetTestCoordinates(offsetX, offsetY)` for offset-based positioning, `GetTestMonitorBounds()` for boundary detection, and `GetTestMonitorCenter()` for centered operations; this ensures consistent monitor targeting across all integration tests
+- **Secondary Monitor Preference**: Integration tests that interact with the Windows desktop MUST target the secondary monitor when available
+- **TestMonitorHelper Pattern**: A shared static helper class MUST be used for all test coordinate generation; tests MUST NOT use hardcoded pixel coordinates
 
 ### XV. Input Simulation Best Practices (NON-NEGOTIABLE)
 
@@ -246,7 +247,6 @@ Before planning ANY feature implementation:
 - Use `IConfiguration` with layered providers: appsettings.json → environment variables → CLI args
 - Validate options at startup with `ValidateOnStart()`
 - Use `ILogger<T>` injected via constructor for logging
-- Use `System.CommandLine` for argument parsing; support `--help`, `--version`, `--verbose`
 - Handle `IHostApplicationLifetime.ApplicationStopping` for cleanup; set `HostOptions.ShutdownTimeout`
 
 ### XXII. Open Source Dependencies Only (NON-NEGOTIABLE)
@@ -259,29 +259,118 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 - Before adding any dependency, verify its license is compatible with MIT
 - Dependencies with "free for open source, paid for commercial" models are PROHIBITED to avoid contributor confusion
 
+### XXIII. LLM Integration Testing with agent-benchmark (NON-NEGOTIABLE)
+
+Every tool MUST be validated for real-world LLM usability using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark):
+
+**Test Structure**:
+- LLM tests live in `tests/Sbroenne.WindowsMcp.LLM.Tests/`
+- Each test scenario is a YAML file defining: name, tools, system prompt, test cases
+- Tests are run via `Run-LLMTests.ps1` script
+
+**Assertion Types**:
+- `screenshot`: Capture and verify visual state after actions
+- `script`: Run PowerShell scripts to verify side effects (e.g., file creation, registry)
+- `tool_call`: Assert that specific tools were called with expected parameters
+
+**Test Categories**:
+- **Basic**: Single-tool scenarios (e.g., launch Notepad, type text)
+- **Workflow**: Multi-tool scenarios (e.g., create document, save, close)
+- **Edge Cases**: Error handling, invalid inputs, recovery scenarios
+
+**When to Add LLM Tests**:
+- New tools MUST have at least one basic LLM test
+- Bug fixes SHOULD include an LLM test if the bug was about LLM usability
+- Tool description changes MUST be validated with LLM tests
+
+### XXIV. Token Optimization for LLM Efficiency (NON-NEGOTIABLE)
+
+All tool responses MUST minimize token usage to reduce LLM costs and improve response times:
+
+**Response Format**:
+- Use short property names in JSON responses (e.g., `s` instead of `success`, `h` instead of `handle`)
+- Omit null/empty values from responses
+- Use structured output with `UseStructuredContent = true`
+
+**Tool Descriptions**:
+- Tool descriptions MUST be concise but complete
+- Use action-based enum parameters for multi-action tools
+- Avoid redundant text; LLMs understand terse descriptions
+
+**Screenshot Optimization**:
+- Default to JPEG format (not PNG) for smaller payloads
+- Auto-scale to 1568px width (LLM vision model native limit)
+- Include structured element data alongside images for semantic fallback
+
+### XXV. UI Automation First (Primary Approach)
+
+This server uses **Windows UI Automation API as the primary interaction method**, not screenshot-based vision:
+
+**Why UI Automation First**:
+- ~50ms response time vs ~700ms-2.5s for vision models
+- Works regardless of DPI, theme, resolution, or window position
+- Provides semantic understanding (element names, types, states)
+- Dramatically lower token costs (~50 tokens vs ~1500 for images)
+
+**Tool Architecture**:
+| Category | Tools | Purpose |
+|----------|-------|---------|
+| UI Discovery | `ui_find` | Find elements by name, type, or ID |
+| UI Actions | `ui_click`, `ui_type`, `ui_read`, `ui_wait`, `ui_file` | Semantic element interaction |
+| Application | `app` | Launch applications, get handles |
+| Window | `window_management` | Window lifecycle and positioning |
+| Input Fallback | `mouse_control`, `keyboard_control` | Raw input for custom controls/games |
+| Visual Fallback | `screenshot_control` | Annotated screenshots for discovery |
+
+**Workflow**:
+1. Find window handle first: `window_management(action='find', title='...')`
+2. Use semantic UI tools: `ui_click`, `ui_type`, etc.
+3. Fall back to screenshots only for discovery or custom controls
+4. Use mouse/keyboard only when UI Automation patterns unavailable
+
 ---
 
 ## Technology Stack
 
 | Component | Requirement |
 |-----------|-------------|
-| Language | C# 12+ (latest stable) |
-| Runtime | .NET 8.0 (or latest LTS) |
-| Build Mode | Framework-dependent (portable), no RuntimeIdentifier |
-| Test Framework | xUnit 2.6+ with native assertions, Bogus, NSubstitute |
+| Language | C# 13 (latest stable) |
+| Runtime | .NET 10.0 |
+| Build Mode | Self-contained for releases (x64, ARM64); Framework-dependent for development |
+| Test Framework | xUnit 2.9+ with native assertions, Bogus, NSubstitute |
+| LLM Test Framework | agent-benchmark |
 | Logging | Microsoft.Extensions.Logging (built-in console provider) |
-| Resilience | Polly |
-| MCP SDK | Official C# MCP SDK (latest) |
-| Windows APIs | System.Windows.Automation, Windows.Graphics.Capture, DWM/Shell32 P/Invoke |
-| CLI | System.CommandLine |
+| MCP SDK | ModelContextProtocol 0.5.0+ |
+| UI Automation | Interop.UIAutomationClient |
+| OCR | Windows.Media.Ocr |
+| Screen Capture | Windows.Graphics.Capture |
+| Native APIs | DWM/Shell32 P/Invoke |
+
+**Tool Surface**:
+| Tool | Description |
+|------|-------------|
+| `app` | Launch applications |
+| `ui_find` | Find UI elements by name, type, or ID |
+| `ui_click` | Click buttons, tabs, checkboxes |
+| `ui_type` | Type text into edit controls |
+| `ui_read` | Read text from elements (UIA + OCR fallback) |
+| `ui_wait` | Wait for element state changes |
+| `ui_file` | Save file operations (English Windows only) |
+| `screenshot_control` | Annotated screenshots for discovery |
+| `keyboard_control` | Keyboard input and hotkeys |
+| `mouse_control` | Coordinate-based mouse input (fallback) |
+| `window_management` | Window control and management |
 
 **Namespace Structure**:
 - `Sbroenne.WindowsMcp` — Root
-- `Sbroenne.WindowsMcp.Tools` — MCP tool implementations
-- `Sbroenne.WindowsMcp.Automation` — Windows automation services
+- `Sbroenne.WindowsMcp.Tools` — Core MCP tool implementations
+- `Sbroenne.WindowsMcp.Automation` — UI Automation services
+- `Sbroenne.WindowsMcp.Automation.Tools` — UI Automation tools
 - `Sbroenne.WindowsMcp.Input` — Keyboard/mouse input handling
 - `Sbroenne.WindowsMcp.Capture` — Screenshot and screen capture
-- `Sbroenne.WindowsMcp.Tests` — Integration tests
+- `Sbroenne.WindowsMcp.Window` — Window management services
+- `Sbroenne.WindowsMcp.Tests` — Unit and integration tests
+- `Sbroenne.WindowsMcp.LLM.Tests` — LLM integration tests
 
 **Build Requirements**:
 - `dotnet build` MUST produce zero warnings
@@ -296,11 +385,12 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 **Branching**: `main` protected; feature branches via `feature/###-desc`, fixes via `fix/###-desc`
 
 **Quality Gates** (all required before merge):
-1. Integration tests pass on Windows 11 runner
+1. Unit and integration tests pass on Windows runner
 2. Code coverage does not decrease
 3. Zero compiler warnings
 4. XML documentation on all public members
 5. Constitution compliance verified
+6. LLM tests pass for affected tools
 
 **Commits**: Conventional Commits format — `type(scope): description`
 
@@ -315,4 +405,4 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 
 ---
 
-**Version**: 2.7.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2025-12-31
+**Version**: 3.0.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2026-01-05

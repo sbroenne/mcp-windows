@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Sbroenne.WindowsMcp.Serialization;
 
 namespace Sbroenne.WindowsMcp.Models;
 
@@ -15,8 +16,10 @@ public sealed record KeySequenceItem
 
     /// <summary>
     /// Gets or sets the modifier keys to hold during this key press.
+    /// Accepts numbers (1=ctrl, 2=shift, 4=alt, 8=win) or strings ("ctrl", "alt", "ctrl,shift").
     /// </summary>
     [JsonPropertyName("modifiers")]
+    [JsonConverter(typeof(ModifierKeyConverter))]
     public ModifierKey Modifiers { get; init; } = ModifierKey.None;
 
     /// <summary>

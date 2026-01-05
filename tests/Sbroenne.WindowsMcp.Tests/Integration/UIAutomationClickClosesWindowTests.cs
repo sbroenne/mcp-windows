@@ -56,7 +56,7 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
             monitorService,
             mouseService,
             keyboardService,
-            windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

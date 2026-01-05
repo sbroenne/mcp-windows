@@ -56,7 +56,7 @@ public sealed class UITypeToolIntegrationTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            _windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

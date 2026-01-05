@@ -14,11 +14,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ui_type` — Type text into edit controls
   - `ui_read` — Read text from elements (UIA + OCR fallback)
   - `ui_wait` — Wait for elements (mode: appear, disappear, enabled, disabled)
-  - `ui_file` — File operations (Save As dialog handling)
-- **Window launch action** - `window_management(action='launch', programPath='notepad.exe')`
-  - Launch applications directly from the MCP server
+  - `ui_file` — File operations (Save As dialog handling, English Windows only)
+- **Dedicated `app` tool** - Launch applications with `app(programPath='notepad.exe')`
+  - Separated from window_management for clearer intent
   - Automatic window detection after launch
   - Returns window handle for subsequent operations
+- **Close with discardChanges** - `window_management(action='close', handle='...', discardChanges=true)`
+  - Automatically dismisses "Save?" dialogs by clicking "Don't Save"
+  - English Windows only (detects English button text)
+- **Path auto-normalization** - Forward slashes automatically converted to backslashes
+  - `ui_type(text='C:/Users/file.txt')` → types `C:\Users\file.txt`
+  - Works in `ui_type` and `keyboard_control`
+- **LLM integration tests** - Tools tested with real AI models using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark)
+  - Verifies AI models understand tool descriptions and use them correctly
+  - Catches usability issues before release
 
 ### Changed
 - **Optimized JSON output for token efficiency** - Reduced token usage in tool responses

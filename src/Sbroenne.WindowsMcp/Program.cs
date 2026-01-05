@@ -12,6 +12,61 @@ using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
 using Sbroenne.WindowsMcp.Window;
 
+// Handle --version/-v flag for startup testing
+if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
+{
+    Console.WriteLine("sbroenne.windows-mcp version 1.0.0");
+    Console.WriteLine("Testing DI container initialization...");
+
+    try
+    {
+        var testBuilder = Host.CreateApplicationBuilder([]);
+        testBuilder.Logging.ClearProviders();
+
+        // Register all services (same as production)
+        testBuilder.Services.AddSingleton(_ => MouseConfiguration.FromEnvironment());
+        testBuilder.Services.AddSingleton(_ => KeyboardConfiguration.FromEnvironment());
+        testBuilder.Services.AddSingleton(_ => WindowConfiguration.FromEnvironment());
+        testBuilder.Services.AddSingleton(_ => ScreenshotConfiguration.FromEnvironment());
+        testBuilder.Services.AddSingleton<MouseInputService>();
+        testBuilder.Services.AddSingleton<KeyboardInputService>();
+        testBuilder.Services.AddSingleton<ElevationDetector>();
+        testBuilder.Services.AddSingleton<SecureDesktopDetector>();
+        testBuilder.Services.AddSingleton<MouseOperationLogger>();
+        testBuilder.Services.AddSingleton<KeyboardOperationLogger>();
+        testBuilder.Services.AddSingleton<WindowOperationLogger>();
+        testBuilder.Services.AddSingleton<ScreenshotOperationLogger>();
+        testBuilder.Services.AddSingleton<WindowEnumerator>();
+        testBuilder.Services.AddSingleton<WindowActivator>();
+        testBuilder.Services.AddSingleton<WindowService>();
+        testBuilder.Services.AddSingleton<MonitorService>();
+        testBuilder.Services.AddSingleton<ImageProcessor>();
+        testBuilder.Services.AddSingleton<ScreenshotService>();
+        testBuilder.Services.AddSingleton<LegacyOcrService>();
+        testBuilder.Services.AddSingleton<UIAutomationThread>();
+        testBuilder.Services.AddSingleton<UIAutomationService>();
+        testBuilder.Services.AddSingleton<AnnotatedScreenshotLogger>();
+        testBuilder.Services.AddSingleton<AnnotatedScreenshotService>();
+
+        var testHost = testBuilder.Build();
+
+        // Try to resolve key services to verify DI
+        Console.WriteLine("  WindowService: " + (testHost.Services.GetService<WindowService>() != null ? "OK" : "FAILED"));
+        Console.WriteLine("  UIAutomationService: " + (testHost.Services.GetService<UIAutomationService>() != null ? "OK" : "FAILED"));
+        Console.WriteLine("  ScreenshotService: " + (testHost.Services.GetService<ScreenshotService>() != null ? "OK" : "FAILED"));
+        Console.WriteLine("  KeyboardInputService: " + (testHost.Services.GetService<KeyboardInputService>() != null ? "OK" : "FAILED"));
+        Console.WriteLine("DI container initialization: OK");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"DI container initialization FAILED: {ex.Message}");
+        Console.WriteLine(ex.ToString());
+        return 1;
+    }
+
+    return 0;
+}
+
 var builder = Host.CreateApplicationBuilder(args);
 
 // Configure logging to stderr for MCP protocol compliance (stdout is reserved for MCP)
@@ -117,3 +172,5 @@ var host = builder.Build();
 _ = host.Services.GetRequiredService<LegacyOcrService>();
 
 await host.RunAsync();
+
+return 0;

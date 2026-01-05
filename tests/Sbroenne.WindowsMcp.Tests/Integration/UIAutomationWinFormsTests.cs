@@ -55,7 +55,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

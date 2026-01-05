@@ -53,6 +53,11 @@ public sealed partial class WindowManagementTool
     /// </summary>
     /// <remarks>
     /// To launch apps, use the app tool. This tool manages windows AFTER they exist.
+    ///
+    /// CLOSE WITHOUT SAVING: Use close action with discardChanges=true to automatically dismiss 'Save?' dialogs.
+    /// NOTE: discardChanges only works on English Windows (looks for 'Don't Save' button text).
+    /// Example: window_management(action='close', handle='123', discardChanges=true)
+    ///
     /// Use move_to_monitor to move a window to a specific monitor:
     /// - Use target='primary_screen' or target='secondary_screen' for easy targeting
     /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
@@ -73,6 +78,7 @@ public sealed partial class WindowManagementTool
     /// <param name="monitorIndex">Target monitor index for move_to_monitor action (0-based). Alternative to target for 3+ monitor setups.</param>
     /// <param name="state">Target window state for wait_for_state action: 'normal', 'minimized', 'maximized', or 'hidden'.</param>
     /// <param name="excludeTitle">Window title to exclude from list results (for list action).</param>
+    /// <param name="discardChanges">For close action: if true, automatically dismisses 'Save?' dialogs by clicking 'Don't Save'. Only works on English Windows. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
@@ -93,6 +99,7 @@ public sealed partial class WindowManagementTool
         int? monitorIndex = null,
         string? state = null,
         string? excludeTitle = null,
+        bool discardChanges = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -141,7 +148,7 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Close:
-                    operationResult = await HandleCloseAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleCloseAsync(resolvedHandle, discardChanges, cancellationToken);
                     break;
 
                 case WindowAction.Move:
@@ -318,6 +325,7 @@ public sealed partial class WindowManagementTool
 
     private async Task<WindowManagementResult> HandleCloseAsync(
         string? handleString,
+        bool discardChanges,
         CancellationToken cancellationToken)
     {
         if (!WindowHandleParser.TryParse(handleString, out nint handle))
@@ -327,7 +335,7 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for close action");
         }
 
-        return await _windowService.CloseWindowAsync(handle, cancellationToken);
+        return await _windowService.CloseWindowAsync(handle, discardChanges, cancellationToken);
     }
 
     private async Task<WindowManagementResult> HandleMoveAsync(

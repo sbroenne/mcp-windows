@@ -606,7 +606,7 @@ public sealed partial class UIAutomationService
     {
         try
         {
-            if (_windowService == null)
+            if (_windowActivator == null)
             {
                 return;
             }
@@ -639,7 +639,7 @@ public sealed partial class UIAutomationService
 
             if (handle.HasValue && handle.Value != IntPtr.Zero)
             {
-                _windowService.ActivateWindowAsync(handle.Value).GetAwaiter().GetResult();
+                _windowActivator.ActivateWindowAsync(handle.Value).GetAwaiter().GetResult();
                 Thread.Sleep(50);
             }
         }

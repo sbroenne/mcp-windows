@@ -29,12 +29,13 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 
 | Tool | Description |
 |------|-------------|
+| `app` | Launch applications |
 | `ui_find` | Find UI elements by name, type, or ID |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
 | `ui_read` | Read text from elements (UIA + OCR) |
 | `ui_wait` | Wait for elements to appear/disappear/change state |
-| `ui_file` | File operations (Save As dialog handling) |
+| `ui_file` | File operations (Save As dialog handling, English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
@@ -42,7 +43,36 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 
 ---
 
-## 🔍 UI Find (`ui_find`)
+## � App (`app`)
+
+Launch applications and get their window handles for subsequent operations.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `programPath` | Program to launch (e.g., 'notepad.exe', 'C:\\Program Files\\...\\app.exe') | Yes |
+| `arguments` | Command-line arguments | No |
+| `workingDirectory` | Working directory for the process | No |
+| `waitForWindow` | Wait for window to appear (default: true) | No |
+
+### Capabilities
+
+- Launch applications by name or full path
+- Automatic window detection after launch
+- Returns window handle for use with other tools
+- Configurable startup parameters
+
+### Example
+
+```
+app(programPath='notepad.exe') → handle='123456'
+ui_type(windowHandle='123456', text='Hello World')
+```
+
+---
+
+## �🔍 UI Find (`ui_find`)
 
 Find and discover UI elements by name, type, or automation ID.
 
@@ -172,7 +202,7 @@ Wait for elements to appear, disappear, or change state.
 
 ## 💾 UI File (`ui_file`)
 
-Handle file save operations and Save As dialogs.
+Handle file save operations and Save As dialogs. **English Windows only** (detects English dialog titles and button text).
 
 ### Parameters
 
@@ -277,34 +307,42 @@ Control keyboard input on Windows with Unicode support.
 
 ## 🪟 Window Management
 
-Control windows on the Windows desktop. All actions support the `app` parameter for easy window targeting.
+Control windows on the Windows desktop. Use `app` tool to launch applications, then use this tool to manage the windows.
 
 ### Actions
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `launch` | Launch an application | `programPath` |
 | `list` | List all visible windows | none |
-| `find` | Find windows by title | `title` or `app` |
-| `activate` | Bring window to foreground | `handle` or `app` |
+| `find` | Find windows by title | `title` |
+| `activate` | Bring window to foreground | `handle` |
 | `get_foreground` | Get current foreground window | none |
-| `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` or `app` |
-| `minimize` | Minimize window | `handle` or `app` |
-| `maximize` | Maximize window | `handle` or `app` |
-| `restore` | Restore window from min/max | `handle` or `app` |
-| `close` | Close window (sends WM_CLOSE) | `handle` or `app` |
-| `move` | Move window to position | `handle` or `app`, `x`, `y` |
-| `resize` | Resize window | `handle` or `app`, `width`, `height` |
-| `set_bounds` | Move and resize atomically | `handle` or `app`, `x`, `y`, `width`, `height` |
+| `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` |
+| `minimize` | Minimize window | `handle` |
+| `maximize` | Maximize window | `handle` |
+| `restore` | Restore window from min/max | `handle` |
+| `close` | Close window (sends WM_CLOSE) | `handle`, optional `discardChanges` |
+| `move` | Move window to position | `handle`, `x`, `y` |
+| `resize` | Resize window | `handle`, `width`, `height` |
+| `set_bounds` | Move and resize atomically | `handle`, `x`, `y`, `width`, `height` |
 | `wait_for` | Wait for window to appear | `title` |
-| `wait_for_state` | Wait for window to reach a specific state | `handle` or `app`, `state`, `timeoutMs` |
-| `move_to_monitor` | Move window to a specific monitor | `handle` or `app`, `target` or `monitorIndex` |
-| `move_and_activate` | Move to monitor and activate atomically | `handle` or `app`, `target` or `monitorIndex` |
-| `ensure_visible` | Ensure window is visible (restore if minimized, activate) | `handle` or `app` |
+| `wait_for_state` | Wait for window to reach a specific state | `handle`, `state`, `timeoutMs` |
+| `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
+| `move_and_activate` | Move to monitor and activate atomically | `handle`, `target` or `monitorIndex` |
+| `ensure_visible` | Ensure window is visible (restore if minimized, activate) | `handle` |
+
+### Close with discardChanges
+
+Use `discardChanges=true` to automatically dismiss "Save?" dialogs when closing:
+
+```
+window_management(action='close', handle='123456', discardChanges=true)
+```
+
+**English Windows only** — detects English button text like "Don't Save".
 
 ### Capabilities
 
-- **Launch applications** - Start programs by name or path with automatic window detection
 - List all visible top-level windows with titles, handles, process info, and bounds
 - Locate windows by title (substring or regex matching)
 - Bring windows to foreground with focus

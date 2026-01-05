@@ -20,6 +20,17 @@ public sealed class WindowService
     private readonly SecureDesktopDetector _secureDesktopDetector;
     private readonly WindowConfiguration _configuration;
     private readonly WindowOperationLogger? _logger;
+    private readonly UIAutomationService? _automationService;
+
+    /// <summary>
+    /// Timeout for waiting for save dialogs to appear after WM_CLOSE.
+    /// </summary>
+    private static readonly TimeSpan SaveDialogTimeout = TimeSpan.FromSeconds(1);
+
+    /// <summary>
+    /// Polling interval for dialog detection retry loop.
+    /// </summary>
+    private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowService"/> class.
@@ -29,6 +40,7 @@ public sealed class WindowService
     /// <param name="monitorService">Monitor service for multi-monitor support.</param>
     /// <param name="secureDesktopDetector">Secure desktop detector.</param>
     /// <param name="configuration">Window configuration.</param>
+    /// <param name="automationService">UI automation service for dialog dismissal.</param>
     /// <param name="logger">Optional operation logger.</param>
     public WindowService(
         WindowEnumerator enumerator,
@@ -36,6 +48,7 @@ public sealed class WindowService
         MonitorService monitorService,
         SecureDesktopDetector secureDesktopDetector,
         WindowConfiguration configuration,
+        UIAutomationService? automationService = null,
         WindowOperationLogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(enumerator);
@@ -49,6 +62,7 @@ public sealed class WindowService
         _monitorService = monitorService;
         _secureDesktopDetector = secureDesktopDetector;
         _configuration = configuration;
+        _automationService = automationService;
         _logger = logger;
     }
 
@@ -222,9 +236,16 @@ public sealed class WindowService
         return await ChangeWindowStateAsync(handle, WindowAction.Restore, NativeConstants.SW_RESTORE, cancellationToken);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Closes a window by sending WM_CLOSE message.
+    /// </summary>
+    /// <param name="handle">The window handle.</param>
+    /// <param name="discardChanges">If true, automatically dismisses save confirmation dialogs by clicking 'Don't Save'.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The result of the close operation.</returns>
     public async Task<WindowManagementResult> CloseWindowAsync(
         nint handle,
+        bool discardChanges = false,
         CancellationToken cancellationToken = default)
     {
         if (handle == IntPtr.Zero)
@@ -254,10 +275,140 @@ public sealed class WindowService
                 "Failed to send close message to window");
         }
 
+        // If discardChanges is true, wait for and dismiss any save confirmation dialogs
+        if (discardChanges && _automationService != null)
+        {
+            await DismissSaveDialogAsync(handle, cancellationToken);
+        }
+
         _logger?.LogWindowOperation("close", success: true, handle: handle, windowTitle: windowInfo.Title);
 
         // Note: We return the window info before close. The window may prompt for save, etc.
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
+    }
+
+    /// <summary>
+    /// Attempts to dismiss a save confirmation dialog by clicking "Don't Save" button.
+    /// </summary>
+    private async Task DismissSaveDialogAsync(nint parentHandle, CancellationToken cancellationToken)
+    {
+        // If automation service is not available, we can't dismiss dialogs
+        if (_automationService == null)
+        {
+            _logger?.LogWindowOperation("close_dialog_dismiss", success: false, handle: parentHandle,
+                errorMessage: "UIAutomationService not available for dialog dismissal");
+            return;
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        // Give the dialog time to appear
+        await Task.Delay(SaveDialogPollInterval, cancellationToken);
+
+        while (stopwatch.Elapsed < SaveDialogTimeout && !cancellationToken.IsCancellationRequested)
+        {
+            // Check if the parent window is still valid (it may have closed without a dialog)
+            if (!NativeMethods.IsWindow(parentHandle))
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Window closed without save dialog");
+                return;
+            }
+
+            // Try to find and click "Don't Save" button using UI Automation
+            // We search for common "Don't Save" button patterns:
+            // - Windows 11: Button with AutomationId "SecondaryButton"
+            // - Windows 10: Button with AutomationId "CommandButton_7"
+            // - Generic: Button with name containing "Don't Save" or "No"
+            //
+            // Note: We do NOT pass WindowHandle because the save dialog is a separate
+            // modal window (not a child of the parent in UI Automation terms).
+            // By omitting WindowHandle, the search uses the foreground window which
+            // will be the dialog when it appears (FlaUI/pywinauto pattern).
+
+            // Try Windows 11 pattern first (SecondaryButton)
+            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                AutomationId = "SecondaryButton",
+                ControlType = "Button",
+                TimeoutMs = 0
+            }, cancellationToken);
+
+            if (result.Success)
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Dismissed dialog using SecondaryButton");
+                return;
+            }
+
+            // Try Windows 10 pattern (CommandButton_7)
+            result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                AutomationId = "CommandButton_7",
+                ControlType = "Button",
+                TimeoutMs = 0
+            }, cancellationToken);
+
+            if (result.Success)
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Dismissed dialog using CommandButton_7");
+                return;
+            }
+
+            // Try generic pattern: button containing "Don't" (handles "Don't Save", "Don't save", etc.)
+            // Note: We use "t save" to avoid apostrophe encoding issues (Unicode ' vs ASCII ')
+            result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                NameContains = "t save",
+                ControlType = "Button",
+                TimeoutMs = 0
+            }, cancellationToken);
+
+            if (result.Success)
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Dismissed dialog using Don't Save button");
+                return;
+            }
+
+            // Also try "No" button (common in some dialogs)
+            // Note: MessageBox buttons use "&No" with ampersand accelerator key
+            result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                Name = "&No",
+                ControlType = "Button",
+                TimeoutMs = 0
+            }, cancellationToken);
+
+            if (result.Success)
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Dismissed dialog using &No button");
+                return;
+            }
+
+            // Also try without ampersand for non-MessageBox dialogs
+            result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                Name = "No",
+                ControlType = "Button",
+                TimeoutMs = 0
+            }, cancellationToken);
+
+            if (result.Success)
+            {
+                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+                    errorMessage: "Dismissed dialog using No button");
+                return;
+            }
+
+            await Task.Delay(SaveDialogPollInterval, cancellationToken);
+        }
+
+        // If we reach here, no dialog was found or dismissed - that's okay, the window may have closed normally
+        _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
+            errorMessage: "No save dialog found within timeout");
     }
 
     /// <inheritdoc/>

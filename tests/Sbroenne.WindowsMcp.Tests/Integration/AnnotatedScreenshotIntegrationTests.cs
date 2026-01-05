@@ -68,7 +68,7 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
 

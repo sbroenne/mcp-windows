@@ -59,7 +59,7 @@ public sealed partial class KeyboardControlTool : IDisposable
 
     /// <summary>
     /// ⚠️ TO SAVE FILES: STOP! Use ui_file(windowHandle, filePath) instead. keyboard_control does NOT handle Save As dialogs.
-    /// Keyboard input to the FOREGROUND window. After app(programPath='notepad.exe'), the window is already focused - just call keyboard_control directly. 
+    /// Keyboard input to the FOREGROUND window. After app(programPath='notepad.exe'), the window is already focused - just call keyboard_control directly.
     /// Best for: typing text, hotkeys (key='s', modifiers='ctrl'), special keys.
     /// For typing into a specific UI element by handle, use ui_type instead.
     /// </summary>
@@ -72,7 +72,7 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
     /// <param name="modifiers">Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.</param>
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
-    /// <param name="sequence">JSON array of key sequence items, e.g., [{"key":"ctrl"},{"key":"c"}] (for sequence action).</param>
+    /// <param name="sequence">JSON array for sequence action. Format: [{"key":"f","modifiers":"alt"},{"key":"s"}] for Alt+F then S. Modifiers: "ctrl", "shift", "alt", "win" (or numbers: 1,2,4,8).</param>
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
     /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
@@ -364,9 +364,16 @@ public sealed partial class KeyboardControlTool : IDisposable
         }
         catch (JsonException ex)
         {
+            // Provide helpful error message with correct format examples
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.InvalidAction,
-                $"Invalid sequence JSON: {ex.Message}");
+                $"Invalid sequence JSON: {ex.Message}. " +
+                "CORRECT FORMAT: JSON array of objects with 'key' property. " +
+                "Examples: " +
+                "[{\"key\":\"a\"}] for single key, " +
+                "[{\"key\":\"s\",\"modifiers\":1}] for Ctrl+S (modifiers: 1=ctrl, 2=shift, 4=alt, 8=win), " +
+                "[{\"key\":\"f\",\"modifiers\":4},{\"key\":\"s\"}] for Alt+F then S (menu navigation). " +
+                "TIP: For saving files, use ui_file tool instead.");
         }
 
         return await _keyboardInputService.ExecuteSequenceAsync(sequence, interKeyDelayMs, cancellationToken);

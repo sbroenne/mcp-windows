@@ -57,7 +57,7 @@ public sealed class UIFindToolIntegrationTests : IDisposable
             monitorService,
             mouseService,
             keyboardService,
-            _windowService,
+            windowActivator,
             elevationDetector,
             NullLogger<UIAutomationService>.Instance);
     }

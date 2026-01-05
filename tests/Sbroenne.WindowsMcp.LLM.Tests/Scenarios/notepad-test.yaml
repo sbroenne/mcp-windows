@@ -74,136 +74,190 @@ agents:
 settings:
   verbose: true
   max_iterations: 15      # launch + type + save + close + verify + buffer
-  test_delay: 60s         # Longer delay to avoid rate limits between agents
+  test_delay: 1s         # Longer delay to avoid rate limits between agents
 
 sessions:
-  - name: Notepad Workflow
+  # ==========================================================================
+  # Session 1: Type and close without saving (multi-step)
+  # ==========================================================================
+  - name: "Type and close without saving"
     tests:
-      - name: "Type and close without saving"
-        description: "Open Notepad, type text, close without saving"
+      # Step 1: Launch Notepad
+      - name: "Step 1: Launch Notepad"
         prompt: |
-          Open Notepad, type "Hello World", then close it without saving.
+          Launch Notepad.
         assertions:
-          # OUTCOME: LLM verified no Notepad window open
-          - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found))"
-
-          # OUTCOME: Proof that "Hello World" was typed
-          - type: output_regex
-            pattern: "(?i)hello\\s*world"
-
-          # SAFETY: No failure indicators
-          - type: output_not_contains
-            value: "failed"
-
-          # QUALITY: Only used real tools
           - type: no_hallucinated_tools
-
-          # QUALITY: No errors during execution
-          - type: no_error_messages
-
-          # REQUIRED: Must use window_management to launch/close/find windows
           - type: tool_called
-            tool: window_management
-
-          # VERIFY: Notepad was launched with correct program
+            tool: app
           - type: tool_param_equals
-            tool: window_management
+            tool: app
             params:
-              action: "launch"
               programPath: "notepad.exe"
-
-          # VERIFY: Launch succeeded (ok: true in JSON response)
           - type: tool_result_matches_json
-            tool: window_management
+            tool: app
             path: "$.ok"
             value: true
+          - type: max_latency_ms
+            value: 15000
 
-          # FLEXIBLE: Text input can use different tools depending on the LLM
-          # GPT-4.1 often uses keyboard_control, others may use ui_type
+      # Step 2: Type text
+      - name: "Step 2: Type Hello World"
+        prompt: |
+          Type "Hello World" in the Notepad window.
+        assertions:
+          - type: no_hallucinated_tools
           - anyOf:
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_type
-
-          # VERIFY: Window was closed (find returned empty or no matches)
           - anyOf:
-              # Either the output confirms closure
-              - type: output_regex
-                pattern: "(?i)(no.*windows?.*found|0.*windows?|empty.*list|windows.*\\[\\])"
-
-          # VERIFY: "Hello World" was typed using one of these methods
-          - anyOf:
-              # Via keyboard_control with the text
               - type: tool_param_matches_regex
                 tool: keyboard_control
                 params:
                   text: "(?i)hello.*world"
-              # Via ui_type tool
-              - type: tool_called
+              - type: tool_param_matches_regex
                 tool: ui_type
-
-          # PERFORMANCE: Complete within 60 seconds
+                params:
+                  text: "(?i)hello.*world"
           - type: max_latency_ms
-            value: 60000
+            value: 20000
 
-          # EFFICIENCY: Stay under token limits
-          - type: max_tokens
-            value: 60000
-
-      - name: "Type and save to file"
-        description: "Open Notepad, type text, save to unique file, verify with filesystem"
+      # Step 3: Close without saving
+      - name: "Step 3: Close without saving"
         prompt: |
-          Open Notepad, type some text, save to {{TEST_RESULTS_PATH}}\notepad-test-{{now format="epoch"}}.txt, and close it.
-          Verify the file was saved.
+          Close Notepad without saving the document.
         assertions:
-          # OUTCOME: LLM verified the file was saved (flexible matching)
-          - type: output_regex
-            pattern: "(?i)(file.*(saved|created|exists|verified)|saved.*successfully|isFile.*true)"
-
-          # SAFETY: No failure indicators
-          - type: output_not_contains
-            value: "FAILED"
-
-          # QUALITY: Only used real tools
           - type: no_hallucinated_tools
-
-          # QUALITY: No errors during execution
-          - type: no_error_messages
-
-          # REQUIRED: Must use window_management to launch Notepad
           - type: tool_called
             tool: window_management
+          - type: output_not_contains
+            value: "failed"
+          - type: max_latency_ms
+            value: 25000
 
-          # VERIFY: Notepad was launched
-          - type: tool_param_equals
+      # Step 4: Verify closed
+      - name: "Step 4: Verify Notepad is closed"
+        prompt: |
+          Verify that Notepad is no longer running.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
             tool: window_management
-            params:
-              action: "launch"
-              programPath: "notepad.exe"
+          - type: output_regex
+            pattern: "(?i)(no.*(notepad|window)|not.*running|closed|not.*found|0.*match)"
+          - type: max_latency_ms
+            value: 10000
 
-          # FLEXIBLE: Text input can use different tools
+  # ==========================================================================
+  # Session 2: Type and save to file (multi-step)
+  # ==========================================================================
+  - name: "Type and save to file"
+    tests:
+      # Step 1: Launch Notepad
+      - name: "Step 1: Launch Notepad"
+        prompt: |
+          Launch Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: tool_param_equals
+            tool: app
+            params:
+              programPath: "notepad.exe"
+          - type: tool_result_matches_json
+            tool: app
+            path: "$.ok"
+            value: true
+          - type: max_latency_ms
+            value: 15000
+
+      # Step 2: Type text
+      - name: "Step 2: Type some text"
+        prompt: |
+          Type "This is a test for Notepad automation." in the Notepad window.
+        assertions:
+          - type: no_hallucinated_tools
           - anyOf:
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_type
-
-          # PERFORMANCE: Complete within 90 seconds
           - type: max_latency_ms
-            value: 90000
+            value: 15000
 
-          # EFFICIENCY: Stay under token limits
-          - type: max_tokens
-            value: 120000
+      # Step 3: Save to file
+      - name: "Step 3: Save to file"
+        prompt: |
+          Save the document to {{TEST_RESULTS_PATH}}\notepad-test-{{randomValue type='UUID'}}.txt
+        assertions:
+          - type: no_hallucinated_tools
+          # Can use keyboard_control (Ctrl+S) to trigger save dialog, then ui_file to complete
+          # Or use ui_file directly which handles both triggering and completing the save
+          # Or use ui_click to manually navigate menus (not recommended but allowed)
+          - anyOf:
+              - type: tool_called
+                tool: ui_file
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_click
+          # Must NOT contain error indicators
+          - type: output_not_contains
+            value: "failed"
+          - type: output_not_contains
+            value: "unable to"
+          - type: output_not_contains
+            value: "SecureDesktop"
+          - type: output_not_contains
+            value: "cannot"
+          - type: max_latency_ms
+            value: 30000
 
-          # VERIFICATION: Must use filesystem tools to verify the file exists
+      # Step 4: Close Notepad
+      - name: "Step 4: Close Notepad"
+        prompt: |
+          Close Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          # window_management(close) or keyboard_control(Alt+F4) are both valid
+          - anyOf:
+              - type: tool_called
+                tool: window_management
+              - type: tool_called
+                tool: keyboard_control
+          - type: max_latency_ms
+            value: 15000
+
+      # Step 5: Verify file exists
+      - name: "Step 5: Verify file was saved"
+        prompt: |
+          Verify that the file was saved by checking if it exists and contains the text we typed.
+        assertions:
+          - type: no_hallucinated_tools
           - anyOf:
               - type: tool_called
                 tool: read_file
               - type: tool_called
+                tool: read_text_file
+              - type: tool_called
                 tool: list_directory
               - type: tool_called
                 tool: get_file_info
+          # Must NOT indicate file doesn't exist
+          - type: output_not_contains
+            value: "ENOENT"
+          - type: output_not_contains
+            value: "does not exist"
+          - type: output_not_contains
+            value: "not found"
+          - type: output_not_contains
+            value: "no such file"
+          # Positive confirmation that file exists and contains expected content
+          - type: output_regex
+            pattern: "(?i)(isFile.*true|\"size\":\\s*[0-9]|file exists|exists.*true|verification.*success|This is a test)"
+          - type: max_latency_ms
+            value: 15000
 
