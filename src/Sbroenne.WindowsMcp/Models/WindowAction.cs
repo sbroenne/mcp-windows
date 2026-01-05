@@ -74,9 +74,5 @@ public enum WindowAction
 
     /// <summary>Ensure window is visible (restore if minimized, activate).</summary>
     [JsonStringEnumMemberName("ensure_visible")]
-    EnsureVisible,
-
-    /// <summary>Launch an application and optionally wait for its window.</summary>
-    [JsonStringEnumMemberName("launch")]
-    Launch
+    EnsureVisible
 }

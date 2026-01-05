@@ -5,40 +5,36 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
-/// Integration tests for the window launch action.
+/// Integration tests for the app tool (application launching).
 /// Uses the existing WindowTestFixture to avoid launching external applications.
 /// </summary>
 [Collection("WindowManagement")]
 [SupportedOSPlatform("windows")]
-public class WindowLaunchTests : IClassFixture<WindowTestFixture>
+public class AppLaunchTests : IClassFixture<WindowTestFixture>
 {
-    private readonly WindowManagementTool _tool;
+    private readonly AppTool _tool;
     private readonly WindowTestFixture _fixture;
 
-    public WindowLaunchTests(WindowTestFixture fixture)
+    public AppLaunchTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
         _fixture = fixture;
 
         var configuration = WindowConfiguration.FromEnvironment();
-        var monitorService = new MonitorService();
 
-        _tool = new WindowManagementTool(
+        _tool = new AppTool(
             fixture.WindowService,
-            monitorService,
             configuration);
     }
 
     [Fact]
-    public async Task Launch_NullProgramPath_ReturnsError()
+    public async Task App_NullProgramPath_ReturnsError()
     {
         // Arrange
         var context = CreateMockContext();
@@ -46,8 +42,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
-            programPath: null);
+            programPath: null!);
 
         // Assert
         Assert.False(result.Success);
@@ -56,7 +51,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task Launch_EmptyProgramPath_ReturnsError()
+    public async Task App_EmptyProgramPath_ReturnsError()
     {
         // Arrange
         var context = CreateMockContext();
@@ -64,7 +59,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
             programPath: "");
 
         // Assert
@@ -74,7 +68,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task Launch_WhitespaceProgramPath_ReturnsError()
+    public async Task App_WhitespaceProgramPath_ReturnsError()
     {
         // Arrange
         var context = CreateMockContext();
@@ -82,7 +76,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
             programPath: "   ");
 
         // Assert
@@ -92,7 +85,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
-    public async Task Launch_InvalidProgram_ReturnsNotFoundError()
+    public async Task App_InvalidProgram_ReturnsNotFoundError()
     {
         // Arrange
         var context = CreateMockContext();
@@ -100,7 +93,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var result = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
             programPath: "nonexistent_program_xyz_12345.exe");
 
         // Assert
@@ -111,7 +103,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
 
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task Launch_TestHarness_StartsAndReturnsWindowInfo()
+    public async Task App_TestHarness_StartsAndReturnsWindowInfo()
     {
         // Arrange - use the test harness executable path
         var context = CreateMockContext();
@@ -123,7 +115,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
             // For now, test with a simple built-in Windows utility that starts quickly
             var result = await _tool.ExecuteAsync(
                 context,
-                action: WindowAction.Launch,
                 programPath: "cmd.exe",
                 arguments: "/c echo test",
                 waitForWindow: false);
@@ -136,7 +127,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act
         var launchResult = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
             programPath: testHarnessPath);
 
         // Assert
@@ -145,7 +135,7 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
 
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task Launch_WithWaitForWindowFalse_ReturnsQuicklyWithPid()
+    public async Task App_WithWaitForWindowFalse_ReturnsQuicklyWithPid()
     {
         // Arrange
         var context = CreateMockContext();
@@ -154,7 +144,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         // Act - launch cmd with echo, don't wait for window
         var result = await _tool.ExecuteAsync(
             context,
-            action: WindowAction.Launch,
             programPath: "cmd.exe",
             arguments: "/c timeout /t 5",
             waitForWindow: false);
@@ -166,25 +155,6 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result.Message);
         Assert.Contains("PID", result.Message); // Should mention the process ID
         Assert.True(stopwatch.ElapsedMilliseconds < 3000, $"Should return quickly without waiting, took {stopwatch.ElapsedMilliseconds}ms");
-    }
-
-    [Fact]
-    public async Task Launch_ActionIsParsedCorrectly()
-    {
-        // Arrange
-        var context = CreateMockContext();
-
-        // Act - test that "launch" action is recognized (with invalid path to avoid actually launching)
-        var result = await _tool.ExecuteAsync(
-            context,
-            action: WindowAction.Launch,
-            programPath: "");
-
-        // Assert - should fail with programPath error, not "unknown action" error
-        Assert.False(result.Success);
-        Assert.NotNull(result.Error);
-        Assert.Contains("programPath", result.Error, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Unknown action", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? GetTestHarnessPath()
@@ -229,5 +199,3 @@ public class WindowLaunchTests : IClassFixture<WindowTestFixture>
     }
 #pragma warning restore SYSLIB0050
 }
-
-

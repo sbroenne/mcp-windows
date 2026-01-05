@@ -8,11 +8,6 @@
       "type": "string",
       "description": "JSON schema reference"
     },
-    "model": {
-      "type": "string",
-      "description": "The Azure OpenAI model deployment name to use for testing",
-      "default": "gpt-4o"
-    },
     "agentBenchmarkPath": {
       "type": ["string", "null"],
       "description": "Path to agent-benchmark. For 'executable' mode: path to .exe file. For 'go-run' mode: path to Go project directory. Can be absolute or relative to this config file. If null, downloads from GitHub releases."

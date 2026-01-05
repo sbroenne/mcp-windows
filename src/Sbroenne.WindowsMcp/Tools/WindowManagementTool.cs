@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Logging;
@@ -47,20 +48,17 @@ public sealed partial class WindowManagementTool
     }
 
     /// <summary>
-    /// Manage windows on Windows. Supports launch, list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, and move_to_monitor actions.
+    /// Manage existing windows. Use app tool to launch applications first, then use this tool to manage the windows.
+    /// Supports: list, find, activate, minimize, maximize, restore, close, move, resize, and more.
     /// </summary>
     /// <remarks>
-    /// Use launch to start applications: launch(programPath='notepad.exe') or launch(programPath='C:\\Windows\\notepad.exe').
+    /// To launch apps, use the app tool. This tool manages windows AFTER they exist.
     /// Use move_to_monitor to move a window to a specific monitor:
     /// - Use target='primary_screen' or target='secondary_screen' for easy targeting
     /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
-    /// <param name="action">The window action to perform: launch, list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
-    /// <param name="programPath">Program to launch (required for launch action). Can be executable name (e.g., 'notepad.exe', 'calc.exe') or full path.</param>
-    /// <param name="arguments">Command-line arguments for the program (optional, for launch action).</param>
-    /// <param name="workingDirectory">Working directory for the launched program (optional, for launch action).</param>
-    /// <param name="waitForWindow">Wait for the launched application window to appear (default: true for launch action).</param>
+    /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
     /// <param name="handle">Window handle for actions that target a specific window. Get the handle from the list or find action.</param>
     /// <param name="title">Window title to search for (required for find and wait_for).</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
@@ -81,10 +79,6 @@ public sealed partial class WindowManagementTool
     public async Task<WindowManagementResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
         WindowAction action,
-        string? programPath = null,
-        string? arguments = null,
-        string? workingDirectory = null,
-        bool waitForWindow = true,
         string? handle = null,
         string? title = null,
         string? filter = null,
@@ -118,10 +112,6 @@ public sealed partial class WindowManagementTool
 
             switch (action)
             {
-                case WindowAction.Launch:
-                    operationResult = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
-                    break;
-
                 case WindowAction.List:
                     operationResult = await HandleListAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
                     break;
@@ -225,149 +215,6 @@ public sealed partial class WindowManagementTool
                 WindowManagementErrorCode.SystemError,
                 $"An unexpected error occurred: {ex.Message}");
             return errorResult;
-        }
-    }
-
-    private async Task<WindowManagementResult> HandleLaunchAsync(
-        string? programPath,
-        string? arguments,
-        string? workingDirectory,
-        bool waitForWindow,
-        int? timeoutMs,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(programPath))
-        {
-            return WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.MissingRequiredParameter,
-                "programPath is required for launch action. Specify the executable name (e.g., 'notepad.exe') or full path.");
-        }
-
-        try
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = programPath,
-                UseShellExecute = true // Allows launching by name without full path
-            };
-
-            if (!string.IsNullOrWhiteSpace(arguments))
-            {
-                startInfo.Arguments = arguments;
-            }
-
-            if (!string.IsNullOrWhiteSpace(workingDirectory))
-            {
-                startInfo.WorkingDirectory = workingDirectory;
-            }
-
-            var process = Process.Start(startInfo);
-            if (process is null)
-            {
-                return WindowManagementResult.CreateFailure(
-                    WindowManagementErrorCode.SystemError,
-                    $"Failed to start process: '{programPath}'");
-            }
-
-            // If we should wait for the window to appear
-            if (waitForWindow)
-            {
-                var timeout = timeoutMs ?? _configuration.WaitForTimeoutMs;
-                var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
-
-                // Wait for the process to have a main window
-                // Some apps (like Notepad) may not immediately set MainWindowHandle
-                // We also try to find any window belonging to this process
-                while (!process.HasExited && DateTime.UtcNow < deadline)
-                {
-                    await Task.Delay(100, cancellationToken);
-                    process.Refresh();
-
-                    // First try MainWindowHandle (works for most apps)
-                    if (process.MainWindowHandle != IntPtr.Zero)
-                    {
-                        // Found the main window, return its info
-                        var windowInfo = await _windowService.GetWindowInfoAsync(process.MainWindowHandle, cancellationToken);
-                        if (windowInfo != null)
-                        {
-                            return WindowManagementResult.CreateWindowSuccess(
-                                windowInfo,
-                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                        }
-
-                        // MainWindowHandle is set but window info is null (window may still be initializing)
-                        // Give it a bit more time before falling back to list search
-                        await Task.Delay(50, cancellationToken);
-                    }
-
-                    // Fallback: Search for any visible window owned by this process
-                    // Use includeAllDesktops: true to catch windows that might be briefly cloaked during initialization
-                    var listResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
-                    if (listResult.Success && listResult.Windows != null)
-                    {
-                        var processWindow = listResult.Windows.FirstOrDefault(w =>
-                            w.ProcessId == process.Id ||
-                            string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                        if (processWindow != null)
-                        {
-                            return WindowManagementResult.CreateWindowSuccess(
-                                processWindow,
-                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                        }
-                    }
-                }
-
-                if (process.HasExited)
-                {
-                    return WindowManagementResult.CreateFailure(
-                        WindowManagementErrorCode.SystemError,
-                        $"Process '{programPath}' exited unexpectedly with code {process.ExitCode}");
-                }
-
-                // Timeout waiting for window - but process is running
-                // Make one final attempt to find any window
-                var finalListResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
-                if (finalListResult.Success && finalListResult.Windows != null)
-                {
-                    var processWindow = finalListResult.Windows.FirstOrDefault(w =>
-                        w.ProcessId == process.Id ||
-                        string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                    if (processWindow != null)
-                    {
-                        return WindowManagementResult.CreateWindowSuccess(
-                            processWindow,
-                            $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                    }
-                }
-
-                // Truly couldn't find the window
-                return WindowManagementResult.CreateSuccess(
-                    $"Launched '{programPath}' (PID: {process.Id}), but window did not appear within timeout. Use list or wait_for to find the window.");
-            }
-
-            // Not waiting for window - just return success
-            return WindowManagementResult.CreateSuccess(
-                $"Launched '{programPath}' successfully (PID: {process.Id})");
-        }
-        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2) // ERROR_FILE_NOT_FOUND
-        {
-            return WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.WindowNotFound,
-                $"Program not found: '{programPath}'. Check the path or ensure the program is in the system PATH.");
-        }
-        catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 5) // ERROR_ACCESS_DENIED
-        {
-            return WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.AccessDenied,
-                $"Access denied when trying to launch '{programPath}'. Check permissions.");
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.SystemError,
-                $"Failed to launch '{programPath}': {ex.Message}");
         }
     }
 
@@ -788,5 +635,4 @@ public sealed partial class WindowManagementTool
         /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
         SecondaryScreen
     }
-
 }

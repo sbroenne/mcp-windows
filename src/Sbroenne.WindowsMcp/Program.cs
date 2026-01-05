@@ -96,6 +96,7 @@ builder.Services
             "ui_automation(action='wait_for_disappear'/'wait_for_state') - wait for UI changes";
     })
     .WithStdioServerTransport()
+    .WithTools<AppTool>()
     .WithTools<MouseControlTool>()
     .WithTools<KeyboardControlTool>()
     .WithTools<WindowManagementTool>()

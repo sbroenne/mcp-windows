@@ -22,17 +22,17 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "You are operating a Windows automation MCP server with 6 focused UI tools. " +
-                "WORKFLOW: 1) Find window handle first with window_management(action='find'), " +
-                "2) Use the handle with ui_find, ui_click, ui_type, ui_read, ui_wait, or ui_file tools. " +
+                "You are operating a Windows automation MCP server with focused tools for app launching and UI interaction. " +
+                "WORKFLOW: 1) Launch app with app(programPath='...') OR find existing window with window_management(action='find'), " +
+                "2) Use the returned handle with ui_click, ui_type, ui_read, ui_wait, or ui_file tools. " +
                 "Use mouse_control and keyboard_control only as fallbacks."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
                 $"App: {target}\n" +
                 "\n" +
-                "Step 1 - Find the window:\n" +
-                $"• window_management(action='find', title='{target}')\n" +
-                "• Extract 'handle' from the result\n" +
+                "Step 1 - Get a window handle (choose one):\n" +
+                $"• app(programPath='{target}') — launch new app instance, returns handle\n" +
+                $"• window_management(action='find', title='{target}') — find already-running app\n" +
                 "\n" +
                 "Step 2 - Interact with elements (using handle from step 1):\n" +
                 "• Find: ui_find(windowHandle='<handle>', nameContains='...') — discover elements\n" +
@@ -232,7 +232,8 @@ public sealed class WindowsAutomationPrompts
         [
             new(ChatRole.System,
                 "Use ui_file for saving files. It handles Save As dialogs automatically. " +
-                "Works universally across all Windows apps including Office, Notepad, and Electron apps."),
+                "Works universally across all Windows apps including Office, Notepad, and Electron apps. " +
+                "Pattern based on FlaUI and pywinauto modal window handling."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 (string.IsNullOrWhiteSpace(filePath) ? "" : $"File path: {filePath}\n") +
@@ -251,12 +252,16 @@ public sealed class WindowsAutomationPrompts
                 "• If dialog appears AND filePath provided: auto-fills filename and confirms\n" +
                 "• Handles overwrite confirmation dialogs automatically\n" +
                 "\n" +
-                "FALLBACK if save action fails:\n" +
-                "1) keyboard_control(action='press', key='s', modifiers='ctrl') — manual Ctrl+S\n" +
-                "2) screenshot_control(target='window', windowHandle='<handle>') — see what dialog appeared\n" +
-                "3) ui_find(windowHandle='<handle>', controlType='Edit') — find filename field\n" +
-                "4) ui_type(windowHandle='<handle>', elementId='...', text='<path>') — type path\n" +
-                "5) ui_click(windowHandle='<handle>', nameContains='Save') — click Save button")
+                "MANUAL WORKFLOW if ui_file fails:\n" +
+                "1) keyboard_control(action='press', key='s', modifiers='ctrl') — trigger Ctrl+S\n" +
+                "2) window_management(action='get_modal_windows', handle='<parent_handle>') — discover Save As dialog\n" +
+                "3) Use modal window handle with ui_wait, ui_type, ui_click:\n" +
+                "   - ui_wait(windowHandle='<modal_handle>', mode='appear', controlType='Edit')\n" +
+                "   - ui_type(windowHandle='<modal_handle>', controlType='Edit', text='<filename>')\n" +
+                "   - ui_click(windowHandle='<modal_handle>', nameContains='Save')\n" +
+                "\n" +
+                "IMPORTANT: Do NOT use keyboard_control for typing file paths! " +
+                "Use ui_type with the modal window handle to directly interact with the filename field.")
         ];
     }
 

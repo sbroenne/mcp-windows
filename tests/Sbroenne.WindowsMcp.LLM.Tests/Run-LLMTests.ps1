@@ -13,10 +13,6 @@
 
     Command-line parameters override config file settings.
 
-.PARAMETER Model
-    The Azure OpenAI model deployment name to use for testing.
-    Default: gpt-4o (or value from config file)
-
 .PARAMETER Scenario
     Optional. Run only a specific test scenario file. If not specified, runs all scenarios.
     Example: notepad-workflow.yaml
@@ -33,11 +29,11 @@
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -Build
-    Builds the MCP server and runs all tests with gpt-4o.
+    Builds the MCP server and runs all tests.
 
 .EXAMPLE
-    .\Run-LLMTests.ps1 -Model gpt-4.1 -Scenario notepad-workflow.yaml
-    Runs only the notepad-workflow test with gpt-4.1.
+    .\Run-LLMTests.ps1 -Scenario notepad-test.yaml
+    Runs only the notepad-test scenario.
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -AgentBenchmarkPath "..\..\..\..\agent-benchmark\agent-benchmark.exe"
@@ -46,7 +42,6 @@
 
 [CmdletBinding()]
 param(
-    [string]$Model,
     [string]$Scenario = "",
     [switch]$Build,
     [string]$AgentBenchmarkPath
@@ -83,10 +78,6 @@ elseif (Test-Path $ConfigPath) {
 }
 
 # Apply config defaults (command-line parameters override config)
-if (-not $Model) {
-    $Model = if ($Config -and $Config.model) { $Config.model } else { "gpt-4o" }
-}
-
 if (-not $Build -and $Config -and $Config.build) {
     $Build = $Config.build
 }
@@ -219,7 +210,6 @@ if ($ScenarioFiles.Count -eq 0) {
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Windows MCP Server - LLM Integration Tests" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Model: $Model"
 Write-Host "Server: dotnet run --project $ProjectPath"
 Write-Host "Agent-Benchmark: $ResolvedAgentBenchmarkPath ($AgentBenchmarkMode)"
 Write-Host "Scenarios: $($ScenarioFiles.Count) file(s)"
@@ -238,7 +228,6 @@ foreach ($ScenarioFile in $ScenarioFiles) {
     $TempFile = Join-Path $env:TEMP "mcp-test-$($ScenarioFile.BaseName).yaml"
     $Content = Get-Content $ScenarioFile.FullName -Raw
     $Content = $Content -replace '\{\{SERVER_COMMAND\}\}', $ServerCommand
-    $Content = $Content -replace '\{\{MODEL\}\}', $Model
     $ReportsDirForYaml = $ReportsDir -replace '\\', '/'
     $Content = $Content -replace '\{\{TEST_RESULTS_PATH\}\}', $ReportsDirForYaml
     $Content | Set-Content $TempFile -Encoding UTF8

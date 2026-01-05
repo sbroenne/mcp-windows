@@ -1,6 +1,5 @@
 {
   "$schema": "./llm-tests.config.schema.json",
-  "model": "gpt-4o",
   "agentBenchmarkPath": null,
   "verbose": false,
   "build": true

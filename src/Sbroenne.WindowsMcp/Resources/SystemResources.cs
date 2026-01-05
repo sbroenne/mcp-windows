@@ -124,7 +124,8 @@ public sealed class SystemResources
 
             | Tool | Purpose |
             |------|---------|
-            | `window_management` | Find, activate, close, move windows. Get window handles. |
+            | `app` | Launch applications (notepad.exe, chrome.exe, winword.exe). Returns window handle. |
+            | `window_management` | Find, activate, close, move existing windows. Get window handles. |
             | `screenshot_control` | Capture screenshots with element discovery (annotate=true). |
             | `ui_click` | Click buttons, checkboxes, menu items, links. |
             | `ui_type` | Type text into input fields. |
@@ -135,19 +136,20 @@ public sealed class SystemResources
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
             | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
 
-            ## The Standard Workflow: Find Handle First, Then Act
+            ## The Standard Workflow: Launch App, Then Interact
 
-            All window-targeting operations require a window handle. Get it using `window_management`:
+            1. **Launch the application** with `app` - returns a window handle
+            2. **Use the handle** for all subsequent operations
 
             ```
-            window_management(action="find", title="Notepad")
+            app(programPath="notepad.exe")
             → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
 
             ui_click(windowHandle="123456", nameContains="Save")
             screenshot_control(target="window", windowHandle="123456")
             ```
 
-            **This gives you full control over which window to target.**
+            **If the app is already running**, use `window_management(action='find')` to get the handle.
 
             ## Recommended Workflow
 

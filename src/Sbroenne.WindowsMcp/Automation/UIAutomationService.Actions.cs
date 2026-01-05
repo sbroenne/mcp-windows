@@ -298,6 +298,7 @@ public sealed partial class UIAutomationService
                           !string.IsNullOrEmpty(baseQuery.ControlType);
 
         // For plain "type" without selectors, prefer typical text controls first.
+        // Try Document first (modern apps like Win11 Notepad), then Edit (classic apps).
         if (!hasSelector)
         {
             queries.Add(baseQuery with { ControlType = "Document" });

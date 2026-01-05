@@ -27,16 +27,19 @@ public sealed partial class UIFileTool
     }
 
     /// <summary>
-    /// SAVE FILES TO DISK. Use this tool instead of keyboard_control for Ctrl+S. Automatically handles Save As dialogs and filename entry.
+    /// ✅ SAVE FILES - Use this tool to save documents. Handles Ctrl+S, Save As dialogs, filename entry, and Save button automatically.
+    /// ALWAYS use this instead of keyboard_control(key='s', modifiers='ctrl') which does NOT handle Save As dialogs.
     /// </summary>
     /// <remarks>
-    /// BEST WAY to save files in any application. Sends Ctrl+S, waits for Save As dialog, auto-fills filename, clicks Save, handles overwrite prompts. Pass the main APPLICATION window handle (not a dialog). Forward slashes (/) are auto-converted to backslashes (\).
+    /// Pass the APPLICATION window handle (from app or window_management), not a dialog handle.
+    /// Pass filePath with full path (e.g., 'C:/Users/User/doc.txt'). Forward slashes auto-converted.
+    /// Handles: Ctrl+S trigger, Save As dialog detection, filename field entry, Save button click, overwrite prompts.
     /// </remarks>
-    /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED. Pass the app window, not a dialog.</param>
+    /// <param name="windowHandle">Window handle as decimal string (from app or window_management 'find'). REQUIRED. Pass the app window, not a dialog.</param>
     /// <param name="filePath">File path to save to. Both forward slashes and backslashes work (e.g., D:/folder/file.txt or D:\\folder\\file.txt). Required for Save As.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the file operation including success status.</returns>
-    [McpServerTool(Name = "ui_file", Title = "File Operations", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
+    [McpServerTool(Name = "ui_file", Title = "SAVE FILE to Disk", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
     public async Task<UIAutomationResult> ExecuteAsync(
         string windowHandle,
         string? filePath = null,
