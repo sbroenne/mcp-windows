@@ -381,24 +381,66 @@ public sealed partial class UIAutomationService
                 return "Chromium/Electron";
             }
 
-            // If we have Win32 framework but Chrome class, it's Chromium
+            // Check for WinUI 3 / Windows App SDK apps
+            // WinUI 3 apps often have these class name patterns:
+            // - "Microsoft.UI.Content.DesktopChildSiteBridge"
+            // - "Microsoft.UI.Xaml.Controls.*"
+            // - "WinUIDesktopWin32WindowClass"
+            // - "DesktopWindowXamlSource"
+            if (className != null)
+            {
+                if (className.StartsWith("Microsoft.UI.", StringComparison.OrdinalIgnoreCase) ||
+                    className.Contains("WinUI", StringComparison.OrdinalIgnoreCase) ||
+                    className.Contains("DesktopWindowXamlSource", StringComparison.OrdinalIgnoreCase) ||
+                    className.Equals("Windows.UI.Composition.DesktopWindowContentBridge", StringComparison.OrdinalIgnoreCase))
+                {
+                    return "WinUI";
+                }
+            }
+
+            // If we have Win32 framework, check children for more specific framework
             if (frameworkId == "Win32" && className != null)
             {
-                // Also check children for Chrome framework
                 var walker = UIA3Automation.Instance.ControlViewWalker;
                 var child = walker.GetFirstChildElement(element);
-                while (child != null)
+                var maxChildren = 10; // Limit scan depth for performance
+                var childCount = 0;
+
+                while (child != null && childCount < maxChildren)
                 {
                     try
                     {
                         var childClassName = child.GetClassName();
                         var childFramework = child.GetFrameworkId();
+
+                        // Check for Chromium
                         if (childClassName?.StartsWith("Chrome", StringComparison.OrdinalIgnoreCase) == true ||
                             childFramework == "Chrome")
                         {
                             return "Chromium/Electron";
                         }
+
+                        // Check for WinUI 3 patterns in children
+                        if (childClassName != null)
+                        {
+                            if (childClassName.StartsWith("Microsoft.UI.", StringComparison.OrdinalIgnoreCase) ||
+                                childClassName.Contains("WinUI", StringComparison.OrdinalIgnoreCase) ||
+                                childClassName.Contains("DesktopWindowXamlSource", StringComparison.OrdinalIgnoreCase) ||
+                                childClassName.Contains("ContentPresenter", StringComparison.OrdinalIgnoreCase) ||
+                                childClassName.Equals("Windows.UI.Composition.DesktopWindowContentBridge", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return "WinUI";
+                            }
+                        }
+
+                        // Check if child reports XAML framework
+                        if (childFramework == "XAML" || childFramework == "WinUI")
+                        {
+                            return "WinUI";
+                        }
+
                         child = walker.GetNextSiblingElement(child);
+                        childCount++;
                     }
                     catch
                     {
@@ -430,7 +472,7 @@ public sealed partial class UIAutomationService
             "WinForm" or "WindowsForms" => FrameworkStrategy.WinForms,
             "WPF" => FrameworkStrategy.Wpf,
             "Win32" => FrameworkStrategy.Win32,
-            "XAML" or "UWP" or "WinUI" => FrameworkStrategy.Wpf, // Use WPF-like strategy for modern XAML
+            "XAML" or "UWP" or "WinUI" => FrameworkStrategy.Wpf, // Use WPF-like strategy for modern XAML/WinUI
             "Qt" => FrameworkStrategy.Win32, // Qt uses Win32-like shallow trees
             _ => FrameworkStrategy.Unknown // Default to Electron approach for safety
         };

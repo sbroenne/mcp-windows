@@ -507,7 +507,11 @@
         }
 
         // Listen for reset from main process
-        if (window.electronAPI) { window.electronAPI.onReset(() => { resetForm(); updateStatus('Ready'); }); }
+        if (window.electronAPI) {
+            window.electronAPI.onReset(() => { resetForm(); updateStatus('Ready'); });
+            // Listen for status updates from main process (e.g., after save)
+            window.electronAPI.onStatusUpdate((message) => { updateStatus(message); });
+        }
     </script>
 </body>
 </html>
