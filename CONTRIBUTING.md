@@ -158,20 +158,49 @@ public void Click_WithValidCoordinates_SendsClickInput()
 ### LLM Integration Tests
 
 LLM integration tests verify that AI agents can correctly use the MCP tools. These tests use [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) and require:
-- Azure OpenAI API access (set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
+- Azure OpenAI API access (Entra ID auth or set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
 - Windows desktop session (not headless CI)
+- Go 1.21+ for running agent-benchmark
+
+#### Running LLM Tests
 
 ```powershell
 # Run all LLM tests
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
-.\Run-LLMTests.ps1 -Build
+.\Run-LLMTests.ps1
 
 # Run specific scenario
-.\Run-LLMTests.ps1 -Scenario notepad-workflow.yaml
+.\Run-LLMTests.ps1 -Scenario winforms-harness-test.yaml
 
-# Run with different model
-.\Run-LLMTests.ps1 -Model gpt-4.1
+# Run with HTML report output
+.\Run-LLMTests.ps1 -Scenario window-management-test.yaml
 ```
+
+#### Available Test Scenarios
+
+| Test File | Description | Pass Target |
+|-----------|-------------|-------------|
+| `winforms-harness-test.yaml` | UI automation (find, click, type, read, wait) | 90%+ |
+| `window-management-test.yaml` | Window management actions | 100% |
+| `keyboard-mouse-test.yaml` | Keyboard and mouse control | 100% |
+| `screenshot-test.yaml` | Screenshot capture and files | 70%+ |
+| `real-world-workflows-test.yaml` | Multi-step workflow automation | 70%+ |
+| `electron-harness-test.yaml` | Electron app compatibility (VS Code) | 70%+ |
+
+#### Test Design Principles
+
+- **Use well-known apps**: Tests target Notepad, Calculator, VS Code (apps LLMs can discover)
+- **Avoid custom harnesses**: LLMs struggle to find custom apps without explicit paths
+- **Set reasonable success criteria**: Allow 70-90% pass rate to handle rate limiting and transient failures
+- **Both providers**: Each test runs against both GPT-4o and GPT-4.1
+
+#### Adding New LLM Tests
+
+1. Create a new YAML file in `tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/`
+2. Follow the existing test structure with sessions, tests, and assertions
+3. Use `app` tool to launch applications LLMs know (not custom paths)
+4. Include assertions for `tool_called`, `no_hallucinated_tools`, and `max_latency_ms`
+5. Run locally before committing
 
 See [`tests/Sbroenne.WindowsMcp.LLM.Tests/README.md`](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for complete documentation.
 

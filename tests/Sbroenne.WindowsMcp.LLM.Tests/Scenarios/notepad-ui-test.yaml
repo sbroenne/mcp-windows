@@ -1,0 +1,441 @@
+# =============================================================================
+# Notepad UI Test - Core UI Interaction Tools
+# =============================================================================
+#
+# User Story 1: Core UI Interaction Tools (Priority: P1) 🎯 MVP
+#
+# Tests: ui_find, ui_click, ui_type, ui_read, ui_wait against Notepad
+#
+# Tools Covered:
+#   - ui_find: Discover UI elements (menus, text area)
+#   - ui_click: Click on menu items
+#   - ui_type: Type text into document
+#   - ui_read: Read text content
+#   - ui_wait: Wait for element states
+#
+# Prerequisites:
+#   - Windows 10/11
+#   - Windows MCP Server
+#   - Environment: AZURE_OPENAI_ENDPOINT
+#
+# =============================================================================
+
+criteria:
+  success_rate: 1  # 100% required
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    rate_limits:
+      tpm: 150000
+      rpm: 150
+
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    rate_limits:
+      tpm: 150000
+      rpm: 1500
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+      
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5-chat
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+      
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+settings:
+  verbose: true
+  max_iterations: 15
+  test_delay: 60s
+
+sessions:
+  # ==========================================================================
+  # Session 1: UI Discovery - ui_find for menus and text area
+  # ==========================================================================
+  - name: "UI Discovery"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Find the File menu"
+        prompt: |
+          Find the File menu in Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(file|menu|found|element)"
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Find the main text editing area"
+        prompt: |
+          Find the main text editing area in Notepad where you can type.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(edit|text|document|area|found)"
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Find the Edit menu"
+        prompt: |
+          Find the Edit menu in Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(edit|menu|found)"
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving any changes.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 20000
+
+  # ==========================================================================
+  # Session 2: Text Input - ui_type for document editing
+  # ==========================================================================
+  - name: "Text Input"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Type a greeting"
+        prompt: |
+          Type "Hello, this is a UI automation test!" in Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_type
+              - type: tool_called
+                tool: keyboard_control
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Type on a new line"
+        prompt: |
+          Press Enter and type "Second line of text" on the new line.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_type
+              - type: tool_called
+                tool: keyboard_control
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 20000
+
+  # ==========================================================================
+  # Session 3: Text Reading - ui_read for content extraction
+  # ==========================================================================
+  - name: "Text Reading"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Type some text"
+        prompt: |
+          Type "Test content for reading" in Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_type
+              - type: tool_called
+                tool: keyboard_control
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Read the text content"
+        prompt: |
+          Read the text content from the Notepad text area.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_read
+          - type: output_regex
+            pattern: "(?i)(test content|reading|text|content)"
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 20000
+
+  # ==========================================================================
+  # Session 4: Menu Navigation - ui_click for File/Edit/Format menus
+  # ==========================================================================
+  - name: "Menu Navigation"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Click the File menu"
+        prompt: |
+          Click on the File menu to open it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Press Escape to close menu"
+        prompt: |
+          Press Escape to close the menu.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_click
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Click the Edit menu"
+        prompt: |
+          Click on the Edit menu to open it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Press Escape to close menu"
+        prompt: |
+          Press Escape to close the menu.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Click the Format menu"
+        prompt: |
+          Click on the Format menu to open it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 20000
+
+  # ==========================================================================
+  # Session 5: UI Waiting - ui_wait for element states
+  # ==========================================================================
+  - name: "UI Waiting"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: max_latency_ms
+            value: 15000
+
+      - name: "Wait for the text area to be ready"
+        prompt: |
+          Wait for the text editing area to become available and ready for input.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_wait
+              - type: tool_called
+                tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(ready|available|found|success|edit|text)"
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Type some text to confirm it is ready"
+        prompt: |
+          Type "Wait test complete" to confirm the text area is working.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_type
+              - type: tool_called
+                tool: keyboard_control
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Wait for window title change indicator"
+        prompt: |
+          Check if the window title has changed to indicate unsaved changes.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_wait
+              - type: tool_called
+                tool: ui_find
+              - type: tool_called
+                tool: window_management
+          - type: max_latency_ms
+            value: 30000
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: max_latency_ms
+            value: 20000

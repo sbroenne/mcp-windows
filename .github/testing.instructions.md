@@ -1,10 +1,34 @@
 # Testing Instructions for mcp-windows
 
+## Testing Priority Order (SURGICAL TESTING FIRST)
+
+**ALWAYS test in this order - from fastest/cheapest to slowest/most expensive:**
+
+1. **Build first** - Verify code compiles before any tests
+2. **Unit tests for changed code** - Test ONLY the specific functionality you modified
+3. **Related unit tests** - Test closely related functionality
+4. **Full unit test suite** - Only if surgical tests pass
+5. **Integration tests** - EXPENSIVE (take minutes). Only run after unit tests pass
+6. **LLM tests** - VERY EXPENSIVE (cost money, take many minutes). Only when specifically requested
+
+**NEVER run full integration tests as first step after code changes!**
+
 ## Unit Tests
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Unit/`
 
-Run with:
+### Surgical Testing (PREFERRED)
+
+Test ONLY the specific class/feature you modified:
+```powershell
+# Test specific class (e.g., after modifying KeyboardControlTool)
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~KeyboardControl" -v q
+
+# Test specific method
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~ParseSequence" -v q
+```
+
+### Full Unit Tests
 ```powershell
 dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedName~Unit"
 ```
@@ -13,6 +37,8 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedN
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/`
 
+**⚠️ Integration tests are SLOW (minutes). Only run after unit tests pass.**
+
 **ALL integration tests MUST pass. No exceptions.**
 
 - Never dismiss integration test failures as "expected" or "transient"
@@ -20,7 +46,21 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedN
 - Only tests explicitly marked `[Skip]` (e.g., requiring 3+ monitors) are acceptable to skip
 - If tests fail due to timing/window focus issues, that's a BUG to fix, not an acceptable state
 
-Run with:
+### Surgical Integration Testing (PREFERRED)
+
+Run only integration tests related to your changes:
+```powershell
+# Test specific harness (e.g., after modifying keyboard functionality)
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q
+
+# Test WinForms harness only
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinFormsHarness" -v q
+
+# Test Electron harness only  
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~ElectronHarness" -v q
+```
+
+### Full Integration Tests
 ```powershell
 dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedName~Integration"
 ```

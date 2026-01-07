@@ -2,6 +2,13 @@
 
 This project contains integration tests for the Windows MCP Server using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) - a framework for testing AI agents and MCP tool usage.
 
+## Test Applications
+
+Tests use standard Windows applications as test targets (no custom test harnesses):
+
+- **Notepad** (`notepad.exe`) - Text editing, menu navigation, keyboard shortcuts
+- **Microsoft Paint** (`mspaint.exe`) - Tool selection, color palette, canvas drawing
+
 ## Prerequisites
 
 ### 1. Build the Main Project First
@@ -113,9 +120,17 @@ agent-benchmark `
 ```
 Sbroenne.WindowsMcp.LLM.Tests/
 ├── Scenarios/
-│   ├── argument-assertion-test.yaml       # Basic argument validation
-│   ├── handle-based-window-management.yaml # Window lifecycle with handles
-│   └── notepad-workflow.yaml              # Complete Notepad automation
+│   ├── _config-template.yaml              # Reference configuration template
+│   ├── notepad-test.yaml                  # Legacy: Basic Notepad workflow
+│   ├── paint-smiley-test.yaml             # Legacy: Paint drawing test
+│   ├── notepad-ui-test.yaml               # Core UI tools (ui_find, ui_click, ui_type, ui_read, ui_wait)
+│   ├── window-management-test.yaml        # All 10 window_management actions
+│   ├── keyboard-mouse-test.yaml           # keyboard_control and mouse_control tools
+│   ├── screenshot-test.yaml               # screenshot_control actions
+│   ├── file-dialog-test.yaml              # ui_file Save As dialog handling
+│   ├── paint-ui-test.yaml                 # Paint ribbon and canvas operations
+│   └── real-world-workflows-test.yaml     # 8 multi-step workflow scenarios
+├── output/                                # Test artifacts (git-ignored)
 ├── Run-LLMTests.ps1                       # PowerShell test runner
 ├── llm-tests.config.json                  # Shared configuration defaults
 ├── llm-tests.config.local.json            # Personal settings (git-ignored)
@@ -123,6 +138,42 @@ Sbroenne.WindowsMcp.LLM.Tests/
 ├── TestResults/                           # HTML reports (generated)
 └── README.md                              # This file
 ```
+
+## Test Scenarios
+
+### Tool Coverage Tests (New)
+
+| Scenario | Tools Covered | Description |
+|----------|---------------|-------------|
+| `notepad-ui-test.yaml` | ui_find, ui_click, ui_type, ui_read, ui_wait | Core UI interaction against Notepad |
+| `window-management-test.yaml` | app, window_management (10 actions) | All window operations |
+| `keyboard-mouse-test.yaml` | keyboard_control, mouse_control | Typing, hotkeys, clicks, dragging |
+| `screenshot-test.yaml` | screenshot_control | Annotated/plain captures, monitor list |
+| `file-dialog-test.yaml` | ui_file | Save As dialogs for Notepad and Paint |
+| `paint-ui-test.yaml` | ui_find, ui_click, mouse_control | Paint ribbon and canvas |
+| `real-world-workflows-test.yaml` | All tools | 8 end-to-end workflow scenarios |
+
+### Window Management Actions Covered
+
+| Action | Description | Test File |
+|--------|-------------|-----------|
+| `list` | List all open windows | window-management-test.yaml |
+| `find` | Find window by title/process | window-management-test.yaml |
+| `activate` | Bring window to foreground | window-management-test.yaml |
+| `minimize` | Minimize window | window-management-test.yaml |
+| `maximize` | Maximize window | window-management-test.yaml |
+| `restore` | Restore from min/max | window-management-test.yaml |
+| `close` | Close window | window-management-test.yaml |
+| `move` | Move window to position | window-management-test.yaml |
+| `resize` | Resize window dimensions | window-management-test.yaml |
+| `wait_for` | Wait for window state | window-management-test.yaml |
+
+### Legacy Tests
+
+| Scenario | Description |
+|----------|-------------|
+| `notepad-test.yaml` | Basic Notepad workflow (type, save, close) |
+| `paint-smiley-test.yaml` | Paint drawing test |
 
 ## How agent-benchmark Works
 
@@ -169,30 +220,6 @@ scenarios:
           - tool_name: window_management
           - tool_call_contains: '"handle"'
 ```
-
-## Test Scenarios
-
-### argument-assertion-test.yaml
-Tests that function call arguments are correctly passed to MCP tools. Validates launch and close operations with proper handle usage.
-
-### handle-based-window-management.yaml
-Tests the correct handle-based workflow for window management operations. Follows Constitution Principle VI: tools are dumb actuators, LLMs make decisions.
-
-Steps:
-1. Launch Notepad
-2. Find window to get handle
-3. Minimize with handle
-4. Restore with handle
-5. Close with handle
-
-### notepad-workflow.yaml
-Tests a complete Notepad automation workflow:
-1. Open Notepad
-2. Type text (using keyboard_control or ui_automation)
-3. Take screenshot
-4. Check window state
-5. Close without saving
-6. Verify window is closed
 
 ## Writing Good Test Scenarios
 
