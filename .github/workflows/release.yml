@@ -260,45 +260,36 @@ jobs:
         $version = "${{ env.VERSION }}"
         $marketplaceStatus = "Not published"
         if ("${{ steps.publishToMarketplace.outcome }}" -eq "success") {
-          $marketplaceStatus = "✅ Published to VS Code Marketplace"
+          $marketplaceStatus = "[x] Published to VS Code Marketplace"
         } else {
-          $marketplaceStatus = "⚠️ Marketplace publish failed (VSIX available below)"
+          $marketplaceStatus = "[ ] Marketplace publish failed (VSIX available below)"
         }
 
         $notes = @"
-## Windows MCP Server v$version
+        ## Windows MCP Server v$version
 
-Let AI agents control Windows applications. Click buttons, type text, toggle settings — all by name, not coordinates.
+        Let AI agents control Windows applications. Click buttons, type text, toggle settings - all by name, not coordinates.
 
-### Installation Options
+        ### Installation Options
 
-**VS Code Extension (Recommended)**
-$marketplaceStatus
-- Search "Windows MCP" in VS Code Extensions, or
-- Download ``windows-mcp-$version.vsix`` below and install manually
+        **VS Code Extension (Recommended)**
+        $marketplaceStatus
+        - Search 'Windows MCP' in VS Code Extensions, or
+        - Download windows-mcp-$version.vsix below and install manually
 
-**Standalone Binaries** (no .NET required)
-| File | Architecture |
-|------|--------------|
-| ``windows-mcp-server-$version-win-x64.zip`` | x64 (most PCs) |
-| ``windows-mcp-server-$version-win-arm64.zip`` | ARM64 (Surface Pro X, ARM dev kits) |
+        **Standalone Binaries** (no .NET required)
+        - windows-mcp-server-$version-win-x64.zip - x64 (most PCs)
+        - windows-mcp-server-$version-win-arm64.zip - ARM64 (Surface Pro X, ARM dev kits)
 
-### What's Included
+        ### What's Included
 
-| Tool | Description |
-|------|-------------|
-| ui_find, ui_click, ui_type | Semantic UI automation by name |
-| screenshot_control | Annotated screenshots with element data |
-| mouse_control, keyboard_control | Fallback for games/custom UIs |
-| window_management | Find, activate, move, resize windows |
+        - ui_find, ui_click, ui_type: Semantic UI automation by name
+        - screenshot_control: Annotated screenshots with element data
+        - mouse_control, keyboard_control: Fallback for games/custom UIs
+        - window_management: Find, activate, move, resize windows
 
-### Quality
-
-- ✅ 100% LLM test pass rate (GPT-4.1, GPT-5.2)
-- ✅ 60% token reduction vs standard JSON responses
-
-See [README](https://github.com/sbroenne/mcp-windows/blob/main/README.md) for full documentation.
-"@
+        See README for full documentation.
+        "@
 
         $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
         Write-Output "Release notes created"
