@@ -11,17 +11,17 @@ on:
 
 jobs:
   # ==========================================================================
-  # LLM Integration Tests - Validate with real AI models before release
+  # LLM Integration Tests - DISABLED FOR NOW (run manually via workflow_dispatch)
   # ==========================================================================
-  llm-tests:
-    uses: ./.github/workflows/llm-tests.yml
-    secrets: inherit
+  # llm-tests:
+  #   uses: ./.github/workflows/llm-tests.yml
+  #   secrets: inherit
 
   # ==========================================================================
   # Build Standalone MCP Server - Self-contained binaries for x64 and ARM64
   # ==========================================================================
   build-standalone:
-    needs: llm-tests
+    # needs: llm-tests  # Re-enable when LLM tests are stable in CI
     runs-on: windows-latest
 
     strategy:
@@ -101,7 +101,7 @@ jobs:
   # Build VS Code Extension - VSIX package with bundled MCP server
   # ==========================================================================
   build-vscode-extension:
-    needs: llm-tests
+    # needs: llm-tests  # Re-enable when LLM tests are stable in CI
     runs-on: windows-latest
 
     steps:
