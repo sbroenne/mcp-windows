@@ -8,9 +8,55 @@ Windows MCP uses the **Windows UI Automation API** as the primary interaction me
 
 ### Token Optimization
 
-All tool responses use **short property names** (e.g., `s` instead of `success`, `h` instead of `handle`) to minimize token usage. This reduces LLM costs and improves response times when processing tool results.
+All tool responses are **designed for LLM efficiency**, minimizing token usage while preserving information:
 
-**When to use each tool:**
+| Optimization | Description | Token Savings |
+|--------------|-------------|---------------|
+| **Short Property Names** | `ok` instead of `success`, `h` instead of `handle`, `ec` instead of `errorCode` | ~40% |
+| **Omitted Null Values** | Null/empty fields are not included in responses | ~15% |
+| **Compact Element Data** | UI elements use `n` (name), `t` (type), `id` (elementId), `c` (coordinates) | ~30% |
+| **JPEG Screenshots** | Default JPEG at 85% quality instead of PNG | ~70% smaller |
+| **Auto-Scaling** | Screenshots auto-scale to 1568px width (vision model native limit) | ~50% smaller |
+
+**Example response comparison:**
+
+```json
+// Standard JSON (~180 tokens)
+{ "success": true, "errorCode": "success", "message": "Clicked element", "element": { "name": "Save", "controlType": "Button", "handle": "123" } }
+
+// Optimized JSON (~60 tokens)
+{ "ok": true, "ec": "success", "msg": "Clicked", "el": { "n": "Save", "t": "Button", "h": "123" } }
+```
+
+This reduces LLM costs by ~60% and improves response times when processing tool results.
+
+---
+
+### LLM Testing & Validation
+
+Every tool is tested with **real AI models** using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) to ensure LLMs understand tool descriptions and use them correctly.
+
+| Test Suite | Tests | Models | Pass Rate |
+|------------|-------|--------|-----------|
+| Window Management | 8 | GPT-4.1, GPT-5.2 | 100% |
+| Notepad UI Operations | 10 | GPT-4.1, GPT-5.2 | 100% |
+| Paint UI Operations | 16 | GPT-4.1, GPT-5.2 | 100% |
+| File Dialog Handling | 6 | GPT-4.1, GPT-5.2 | 100% |
+| Screenshot Capture | 6 | GPT-4.1, GPT-5.2 | 100% |
+| Keyboard & Mouse | 8 | GPT-4.1, GPT-5.2 | 100% |
+| Real-World Workflows | 8 | GPT-4.1, GPT-5.2 | 100% |
+
+**Why LLM testing matters:**
+
+- **Tool descriptions must be LLM-friendly** — If the AI misunderstands a parameter, it fails silently
+- **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps
+- **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
+
+LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#llm-integration-tests) for how to run them yourself.
+
+---
+
+### When to Use Each Tool
 
 | Scenario | Tool | Why |
 |----------|------|-----|

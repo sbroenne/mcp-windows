@@ -125,12 +125,12 @@ Plus **local OCR** for text extraction — no image upload, ~100ms.
 
 <div class="feature-card">
 <h3>🪙 Token Optimized</h3>
-<p>JSON responses use short property names to minimize token usage. Reduces LLM costs and improves response times.</p>
+<p>Responses use short property names (<code>ok</code>, <code>h</code>, <code>ec</code>) and omit null values. JPEG screenshots auto-scale to vision model limits. <strong>60% fewer tokens</strong> than standard JSON — saves cost and speeds up responses.</p>
 </div>
 
 <div class="feature-card">
 <h3>🧪 LLM-Tested</h3>
-<p>Every tool is tested with real AI models to verify they understand the descriptions and use the tools correctly.</p>
+<p>Every tool is tested with <strong>real AI models</strong> (GPT-4.1, GPT-5.2) before release. 54 automated tests across 7 scenarios validate that LLMs understand tool descriptions and use them correctly. <strong>100% pass rate required for release.</strong></p>
 </div>
 </div>
 

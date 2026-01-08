@@ -1,0 +1,68 @@
+name: LLM Integration Tests
+
+# Reusable workflow for LLM integration tests
+# Can be triggered manually or called from other workflows
+
+on:
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Specific scenario to run (leave empty for all)'
+        required: false
+        type: string
+        default: ''
+
+  # Allow other workflows to call this
+  workflow_call:
+
+jobs:
+  llm-tests:
+    runs-on: windows-latest
+    permissions:
+      id-token: write   # Required for Azure OIDC
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Run LLM Integration Tests
+      env:
+        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      run: |
+        cd tests/Sbroenne.WindowsMcp.LLM.Tests
+
+        $scenario = "${{ inputs.scenario }}"
+        if ($scenario) {
+          Write-Output "Running specific scenario: $scenario"
+          ./Run-LLMTests.ps1 -Build -Scenario $scenario
+        } else {
+          Write-Output "Running all LLM test scenarios"
+          ./Run-LLMTests.ps1 -Build
+        }
+      shell: pwsh
+
+    - name: Upload LLM Test Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: llm-test-reports
+        path: tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults/
+        retention-days: 30

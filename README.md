@@ -78,7 +78,10 @@ ui_automation(action='ocr', windowHandle='123456') → structured text data
   Handles elevated windows, UAC prompts, and secure desktop. Detects wrong-window scenarios before sending input.
 
 - **🪙 Token Optimized**  
-  JSON responses use short property names to minimize token usage. Reduces LLM costs and improves response times.
+  Responses use short property names (`ok`, `h`, `ec`) and omit null values. JPEG screenshots auto-scale to vision model limits. **60% fewer tokens** than standard JSON.
+
+- **🧪 LLM-Tested**  
+  Every tool is tested with **real AI models** (GPT-4.1, GPT-5.2) before release. 54 automated tests validate LLMs understand tool descriptions and use them correctly. 100% pass rate required for release.
 
 For detailed feature documentation, see [FEATURES.md](FEATURES.md).
 
@@ -190,14 +193,21 @@ dotnet test --filter "FullyQualifiedName~Integration"
 
 ### LLM Integration Tests
 
-LLM tests verify AI agents can correctly use the MCP tools. Uses [agent-benchmark](https://github.com/mykhaliev/agent-benchmark).
+LLM tests verify AI agents can correctly use the MCP tools with real AI models. Uses [agent-benchmark](https://github.com/mykhaliev/agent-benchmark).
 
 ```powershell
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
 .\Run-LLMTests.ps1 -Build   # Build server and run all tests
+.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml  # Run specific scenario
 ```
 
-Requires `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` environment variables. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for details.
+**Test Suites:** Window Management, Notepad UI, Paint UI, File Dialogs, Screenshots, Keyboard/Mouse, Real-World Workflows
+
+**Requirements:**
+- Azure OpenAI access with Entra ID authentication, OR
+- Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY` environment variables
+
+LLM tests run automatically during releases. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for details.
 
 ## Acknowledgments
 

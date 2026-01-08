@@ -157,49 +157,58 @@ public void Click_WithValidCoordinates_SendsClickInput()
 
 ### LLM Integration Tests
 
-LLM integration tests verify that AI agents can correctly use the MCP tools. These tests use [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) and require:
+LLM integration tests verify that AI agents can correctly use the MCP tools with **real AI models**. These tests are critical because:
+
+- **Tool descriptions must be LLM-friendly** — If an AI misunderstands a parameter, it fails silently
+- **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps  
+- **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
+
+These tests use [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) and require:
 - Azure OpenAI API access (Entra ID auth or set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
-- Windows desktop session (not headless CI)
+- Windows desktop session with GUI access
 - Go 1.21+ for running agent-benchmark
+
+**LLM tests run automatically during every release** via GitHub Actions with Azure OIDC authentication. A 100% pass rate is required before release. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for Azure and GitHub configuration details.
 
 #### Running LLM Tests
 
 ```powershell
-# Run all LLM tests
+# Run all LLM tests (builds server first)
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
-.\Run-LLMTests.ps1
+.\Run-LLMTests.ps1 -Build
 
 # Run specific scenario
-.\Run-LLMTests.ps1 -Scenario winforms-harness-test.yaml
+.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
 
-# Run with HTML report output
-.\Run-LLMTests.ps1 -Scenario window-management-test.yaml
+# Run with specific report type
+.\Run-LLMTests.ps1 -Scenario window-management-test.yaml -ReportType "html,json"
 ```
 
 #### Available Test Scenarios
 
-| Test File | Description | Pass Target |
-|-----------|-------------|-------------|
-| `winforms-harness-test.yaml` | UI automation (find, click, type, read, wait) | 90%+ |
-| `window-management-test.yaml` | Window management actions | 100% |
-| `keyboard-mouse-test.yaml` | Keyboard and mouse control | 100% |
-| `screenshot-test.yaml` | Screenshot capture and files | 70%+ |
-| `real-world-workflows-test.yaml` | Multi-step workflow automation | 70%+ |
-| `electron-harness-test.yaml` | Electron app compatibility (VS Code) | 70%+ |
+| Test File | Description | Tests | Models |
+|-----------|-------------|-------|--------|
+| `window-management-test.yaml` | Find, activate, move, resize windows | 8 | GPT-4.1, GPT-5.2 |
+| `notepad-ui-test.yaml` | Notepad UI automation (click, type, read) | 10 | GPT-4.1, GPT-5.2 |
+| `paint-ui-test.yaml` | Paint ribbon UI and canvas drawing | 16 | GPT-4.1, GPT-5.2 |
+| `file-dialog-test.yaml` | Save As dialog handling | 6 | GPT-4.1, GPT-5.2 |
+| `screenshot-test.yaml` | Screenshot capture with annotations | 6 | GPT-4.1, GPT-5.2 |
+| `keyboard-mouse-test.yaml` | Keyboard and mouse control | 8 | GPT-4.1, GPT-5.2 |
+| `real-world-workflows-test.yaml` | Multi-step workflow automation | 8 | GPT-4.1, GPT-5.2 |
 
 #### Test Design Principles
 
-- **Use well-known apps**: Tests target Notepad, Calculator, VS Code (apps LLMs can discover)
-- **Avoid custom harnesses**: LLMs struggle to find custom apps without explicit paths
-- **Set reasonable success criteria**: Allow 70-90% pass rate to handle rate limiting and transient failures
-- **Both providers**: Each test runs against both GPT-4o and GPT-4.1
+- **Use well-known apps**: Tests target Notepad, Paint, Calculator (apps LLMs recognize)
+- **100% pass rate required**: All tests must pass before release
+- **Multiple models**: Each test runs against both GPT-4.1 and GPT-5.2-chat
+- **Token tracking**: Tests report token usage to validate optimization
 
 #### Adding New LLM Tests
 
 1. Create a new YAML file in `tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/`
 2. Follow the existing test structure with sessions, tests, and assertions
 3. Use `app` tool to launch applications LLMs know (not custom paths)
-4. Include assertions for `tool_called`, `no_hallucinated_tools`, and `max_latency_ms`
+4. Include assertions for `tool_called`, `no_hallucinated_tools`, and `output_regex`
 5. Run locally before committing
 
 See [`tests/Sbroenne.WindowsMcp.LLM.Tests/README.md`](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) for complete documentation.
