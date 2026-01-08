@@ -34,10 +34,11 @@ public sealed partial class UIClickTool
     }
 
     /// <summary>
-    /// Click a button, link, menu item, or other element. Auto-activates window. Preferred over mouse_control for UI interactions.
+    /// Click a UI element. REQUIRED for all click operations - you must call this tool to click anything. Auto-activates window.
     /// </summary>
     /// <remarks>
     /// Clicks a UI element. Automatically activates the target window before clicking.
+    /// You MUST use this tool for every click operation - each click requires a separate tool call.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, the ARIA label.</param>
