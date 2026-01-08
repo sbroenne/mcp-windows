@@ -27,10 +27,12 @@ public sealed partial class UIFindTool
     }
 
     /// <summary>
-    /// Finds UI elements matching the specified criteria. Returns element IDs and details for use with other ui_* tools.
+    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element IDs for use with ui_click.
     /// </summary>
     /// <remarks>
-    /// Finds UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc. REQUIRED: windowHandle (from window_management tool).
+    /// Finds UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc.
+    /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
+    /// REQUIRED: windowHandle (from window_management tool).
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, this is the ARIA label.</param>

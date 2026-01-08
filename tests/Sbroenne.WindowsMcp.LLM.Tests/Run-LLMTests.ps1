@@ -222,7 +222,7 @@ $Results = @()
 
 foreach ($ScenarioFile in $ScenarioFiles) {
     Write-Host "`nRunning: $($ScenarioFile.Name)" -ForegroundColor Cyan
-    Write-Host ("-" * 40)
+    Write-Host ("-" * 50)
 
     # Create temp file with substituted variables
     $TempFile = Join-Path $env:TEMP "mcp-test-$($ScenarioFile.BaseName).yaml"
@@ -234,11 +234,11 @@ foreach ($ScenarioFile in $ScenarioFiles) {
 
     # Run agent-benchmark
     $ReportFile = Join-Path $ReportsDir "$($ScenarioFile.BaseName)-report"
-    $Timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
 
     $Args = @(
         "-f", $TempFile,
         "-o", $ReportFile,
+        "-reportType", "html,json",
         "-verbose"
     )
 

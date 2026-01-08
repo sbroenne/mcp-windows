@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
@@ -21,26 +22,34 @@ public class ModifierKeyManager
 
         if (modifiers.HasFlag(ModifierKey.Ctrl) && !IsKeyPressed(NativeConstants.VK_CONTROL))
         {
-            SendKeyInput(NativeConstants.VK_CONTROL, keyUp: false);
-            pressedKeys.Add(NativeConstants.VK_CONTROL);
+            if (SendKeyInput(NativeConstants.VK_CONTROL, keyUp: false))
+            {
+                pressedKeys.Add(NativeConstants.VK_CONTROL);
+            }
         }
 
         if (modifiers.HasFlag(ModifierKey.Shift) && !IsKeyPressed(NativeConstants.VK_SHIFT))
         {
-            SendKeyInput(NativeConstants.VK_SHIFT, keyUp: false);
-            pressedKeys.Add(NativeConstants.VK_SHIFT);
+            if (SendKeyInput(NativeConstants.VK_SHIFT, keyUp: false))
+            {
+                pressedKeys.Add(NativeConstants.VK_SHIFT);
+            }
         }
 
         if (modifiers.HasFlag(ModifierKey.Alt) && !IsKeyPressed(NativeConstants.VK_MENU))
         {
-            SendKeyInput(NativeConstants.VK_MENU, keyUp: false);
-            pressedKeys.Add(NativeConstants.VK_MENU);
+            if (SendKeyInput(NativeConstants.VK_MENU, keyUp: false))
+            {
+                pressedKeys.Add(NativeConstants.VK_MENU);
+            }
         }
 
         if (modifiers.HasFlag(ModifierKey.Win) && !IsKeyPressed(NativeConstants.VK_LWIN))
         {
-            SendKeyInput(NativeConstants.VK_LWIN, keyUp: false);
-            pressedKeys.Add(NativeConstants.VK_LWIN);
+            if (SendKeyInput(NativeConstants.VK_LWIN, keyUp: false))
+            {
+                pressedKeys.Add(NativeConstants.VK_LWIN);
+            }
         }
 
         return pressedKeys;
@@ -67,7 +76,7 @@ public class ModifierKeyManager
         return (state & 0x8000) != 0;
     }
 
-    private static void SendKeyInput(int virtualKeyCode, bool keyUp)
+    private static bool SendKeyInput(int virtualKeyCode, bool keyUp)
     {
         var input = new INPUT
         {
@@ -85,6 +94,14 @@ public class ModifierKeyManager
             }
         };
 
-        _ = NativeMethods.SendInput(1, [input], Marshal.SizeOf<INPUT>());
+        var result = NativeMethods.SendInput(1, [input], Marshal.SizeOf<INPUT>());
+        if (result != 1)
+        {
+            // Log warning but don't throw - input may still partially work
+            Debug.WriteLine($"SendInput failed for VK 0x{virtualKeyCode:X2}, keyUp={keyUp}. Expected 1, got {result}");
+            return false;
+        }
+
+        return true;
     }
 }

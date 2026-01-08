@@ -159,7 +159,6 @@ builder.Services
     .WithTools<UIFindTool>()
     .WithTools<UIClickTool>()
     .WithTools<UITypeTool>()
-    .WithTools<UIWaitTool>()
     .WithTools<UIReadTool>()
     .WithTools<UIFileTool>()
     .WithPrompts<WindowsAutomationPrompts>()

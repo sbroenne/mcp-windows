@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Configuration;
@@ -7,47 +8,33 @@ using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
-namespace Sbroenne.WindowsMcp.Tests.Integration;
+namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 
 /// <summary>
-/// Integration tests for UIWaitTool - waiting for UI element state changes.
-/// Tests real UI Automation wait operations against a controlled WinForms application.
+/// Integration tests for UI Automation wait operations against WinUI 3 modern app harness.
+/// Tests verify that waiting for UI element state changes works correctly with modern WinUI 3 controls.
 /// </summary>
-[Collection("UITestHarness")]
-public sealed class UIWaitToolIntegrationTests : IDisposable
+[Collection("ModernTestHarness")]
+public sealed class WinUIWaitTests : IDisposable
 {
-    private readonly UITestHarnessFixture _fixture;
+    private readonly ModernTestHarnessFixture _fixture;
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
-    private readonly WindowEnumerator _windowEnumerator;
-    private readonly WindowService _windowService;
     private readonly string _windowHandle;
 
-    public UIWaitToolIntegrationTests(UITestHarnessFixture fixture)
+    public WinUIWaitTests(ModernTestHarnessFixture fixture)
     {
         _fixture = fixture;
-        _fixture.Reset();
         _fixture.BringToFront();
         Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
-
         _staThread = new UIAutomationThread();
 
         var windowConfiguration = WindowConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
-        var secureDesktopDetector = new SecureDesktopDetector();
         var monitorService = new MonitorService();
-
-        _windowEnumerator = new WindowEnumerator(elevationDetector, windowConfiguration);
         var windowActivator = new WindowActivator(windowConfiguration);
-        _windowService = new WindowService(
-            _windowEnumerator,
-            windowActivator,
-            monitorService,
-            secureDesktopDetector,
-            windowConfiguration);
-
         var mouseService = new MouseInputService();
         var keyboardService = new KeyboardInputService();
 
@@ -70,14 +57,13 @@ public sealed class UIWaitToolIntegrationTests : IDisposable
     [Fact]
     public async Task WaitFor_ExistingElement_ReturnsImmediately()
     {
-        // Act - Wait for the Submit button that already exists
+        // Act - Wait for the navigation that already exists
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         var result = await _automationService.WaitForElementAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
-                Name = "Submit",
-                ControlType = "Button",
+                AutomationId = "MainNavView",
             },
             timeoutMs: 5000);
         stopwatch.Stop();
@@ -97,8 +83,7 @@ public sealed class UIWaitToolIntegrationTests : IDisposable
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
-                Name = "This Button Does Not Exist",
-                ControlType = "Button",
+                AutomationId = "ThisElementDoesNotExist12345",
             },
             timeoutMs: 1000);
 
@@ -108,7 +93,7 @@ public sealed class UIWaitToolIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task WaitFor_MultipleElements_ReturnsFirst()
+    public async Task WaitFor_MultipleButtons_ReturnsFirst()
     {
         // Act - Wait for any button (multiple exist)
         var result = await _automationService.WaitForElementAsync(
@@ -128,16 +113,24 @@ public sealed class UIWaitToolIntegrationTests : IDisposable
     [SkippableFact]
     public async Task Focus_TextBox_SetsFocus()
     {
-        // Find the text box first
+        // Navigate to Form Controls page where text boxes exist
+        await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavFormControls",
+        });
+        await Task.Delay(300);
+
+        // Find a text box - use UsernameInput which is more reliable
         var findResult = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
-            ControlType = "Edit",
+            AutomationId = "UsernameInput",
         });
 
         Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
         Assert.NotNull(findResult.Items);
-        Assert.True(findResult.Items!.Length > 0, "Expected to find at least one Edit control");
+        Assert.True(findResult.Items!.Length > 0, "Expected to find the UsernameInput control");
         var textBoxId = findResult.Items![0].Id;
         Assert.NotNull(textBoxId);
 

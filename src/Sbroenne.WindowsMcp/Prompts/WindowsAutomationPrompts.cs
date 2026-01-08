@@ -24,7 +24,7 @@ public sealed class WindowsAutomationPrompts
             new(ChatRole.System,
                 "You are operating a Windows automation MCP server with focused tools for app launching and UI interaction. " +
                 "WORKFLOW: 1) Launch app with app(programPath='...') OR find existing window with window_management(action='find'), " +
-                "2) Use the returned handle with ui_click, ui_type, ui_read, ui_wait, or ui_file tools. " +
+                "2) Use the returned handle with ui_click, ui_type, ui_read, or ui_file tools. " +
                 "Use mouse_control and keyboard_control only as fallbacks."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
@@ -39,7 +39,7 @@ public sealed class WindowsAutomationPrompts
                 "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
                 "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
                 "• Read: ui_read(windowHandle='<handle>', elementId='...') — get text content\n" +
-                "• Wait: ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') — wait for elements\n" +
+
                 "• Save: ui_file(windowHandle='<handle>', filePath='...') — save files\n" +
                 "\n" +
                 "If you don't know element names:\n" +
@@ -165,7 +165,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Prefer deterministic verification with ui_wait. These block until condition is met or timeout."),
+                "Prefer deterministic verification with ui_find (includes timeout) or ui_read. Window-level waits use window_management(action='wait_for')."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Expected outcome: {expectedOutcome}\n" +
@@ -173,9 +173,8 @@ public sealed class WindowsAutomationPrompts
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
                 "Verification options (choose the most deterministic):\n" +
-                "1) ui_wait(windowHandle='<handle>', mode='disappear', elementId=...) — verify dialog/element closed.\n" +
-                "2) ui_wait(windowHandle='<handle>', mode='enabled'/'disabled', elementId=...) — verify element state.\n" +
-                "3) ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') — wait for element appearing.\n" +
+                "1) window_management(action='wait_for_close', handle=...) — verify window/dialog closed.\n" +
+                "2) ui_find(windowHandle='<handle>', nameContains='...') — verify element exists (has built-in timeout).\n" +
                 "4) ui_read(windowHandle='<handle>', elementId=...) — check text content changed.\n" +
                 "5) screenshot_control(target='window', windowHandle='<handle>', annotate=true) — visual element discovery.\n" +
                 "6) ui_read(windowHandle='<handle>') — for custom-rendered text (uses OCR fallback).")
@@ -215,7 +214,7 @@ public sealed class WindowsAutomationPrompts
                 "ui_click(windowHandle='<handle>', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=...)\n" +
                 "\n" +
                 "The response includes the current toggle state after clicking.\n" +
-                "Verify with ui_wait(mode='enabled'/'disabled', ...) if additional confirmation needed.")
+                "Verify with ui_find to confirm the element state changed.")
         ];
     }
 
@@ -255,8 +254,7 @@ public sealed class WindowsAutomationPrompts
                 "MANUAL WORKFLOW if ui_file fails:\n" +
                 "1) keyboard_control(action='press', key='s', modifiers='ctrl') — trigger Ctrl+S\n" +
                 "2) window_management(action='get_modal_windows', handle='<parent_handle>') — discover Save As dialog\n" +
-                "3) Use modal window handle with ui_wait, ui_type, ui_click:\n" +
-                "   - ui_wait(windowHandle='<modal_handle>', mode='appear', controlType='Edit')\n" +
+                "3) Use modal window handle with ui_type, ui_click:\n" +
                 "   - ui_type(windowHandle='<modal_handle>', controlType='Edit', text='<filename>')\n" +
                 "   - ui_click(windowHandle='<modal_handle>', nameContains='Save')\n" +
                 "\n" +
@@ -279,7 +277,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Use ui_wait tool to block until UI changes complete. This is more reliable than polling or fixed delays."),
+                "Use ui_find with timeoutMs to wait for elements. Use window_management(wait_for) to wait for new windows."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Wait type: {waitType}\n" +
@@ -287,15 +285,12 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
-                "Choose the appropriate wait mode:\n" +
-                "• element_disappear: ui_wait(windowHandle='<handle>', mode='disappear', elementId=..., timeoutMs=5000)\n" +
-                "  Use for: dialogs closing, loading spinners vanishing, popups dismissing.\n" +
+                "Choose the appropriate wait approach:\n" +
+                "• window_disappear: window_management(action='wait_for_close', handle='...')\n" +
+                "  Use for: dialogs closing, popups dismissing.\n" +
                 "\n" +
-                "• element_state: ui_wait(windowHandle='<handle>', mode='enabled'/'disabled'/'visible'/'offscreen', elementId=...)\n" +
-                "  Use for: toggle state changes, button becoming enabled, element becoming visible.\n" +
-                "\n" +
-                "• element_appear: ui_wait(windowHandle='<handle>', mode='appear', nameContains='...', timeoutMs=5000)\n" +
-                "  Use for: waiting for elements to appear.\n" +
+                "• element_appear: ui_find(windowHandle='<handle>', nameContains='...', timeoutMs=5000)\n" +
+                "  Use for: waiting for elements to appear (built-in retry with timeout).\n" +
                 "\n" +
                 "• input_idle: keyboard_control(action='wait_for_idle')\n" +
                 "  Use for: waiting for application to process input before sending more keystrokes.")

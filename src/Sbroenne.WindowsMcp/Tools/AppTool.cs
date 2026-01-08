@@ -21,6 +21,11 @@ public sealed class AppTool
     private readonly WindowConfiguration _configuration;
 
     /// <summary>
+    /// How long to wait to detect if a process is a stub (exits quickly).
+    /// </summary>
+    private const int StubDetectionDelayMs = 300;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="AppTool"/> class.
     /// </summary>
     /// <param name="windowService">The window service.</param>
@@ -140,6 +145,7 @@ public sealed class AppTool
                 startInfo.WorkingDirectory = workingDirectory;
             }
 
+            var launchTime = DateTime.UtcNow;
             var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -148,11 +154,43 @@ public sealed class AppTool
                     $"Failed to start process: '{programPath}'");
             }
 
+            // Extract the program name for window title matching (used if process is a stub)
+            var programName = Path.GetFileNameWithoutExtension(programPath) ?? programPath;
+
             // If we should wait for the window to appear
             if (waitForWindow)
             {
                 var timeout = timeoutMs ?? _configuration.WaitForTimeoutMs;
                 var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
+
+                // First, give the process a brief moment to see if it's a stub
+                // UWP stubs like calc.exe exit almost immediately (< 100ms)
+                await Task.Delay(StubDetectionDelayMs, cancellationToken);
+                process.Refresh();
+
+                // Check early if this is a stub pattern (process exited quickly with success)
+                if (process.HasExited)
+                {
+                    var exitedQuickly = (DateTime.UtcNow - launchTime).TotalMilliseconds < (StubDetectionDelayMs * 2);
+                    var exitedSuccessfully = process.ExitCode == 0;
+
+                    if (exitedQuickly && exitedSuccessfully)
+                    {
+                        // This is likely a stub that launched another process (e.g., UWP app)
+                        // Try to find a window by program name in the title
+                        var stubWindow = await FindWindowByTitleAsync(programName, deadline, cancellationToken);
+                        if (stubWindow != null)
+                        {
+                            return WindowManagementResult.CreateWindowSuccess(
+                                stubWindow,
+                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
+                        }
+                    }
+
+                    return WindowManagementResult.CreateFailure(
+                        WindowManagementErrorCode.SystemError,
+                        $"Process '{programPath}' exited unexpectedly with code {process.ExitCode}");
+                }
 
                 // Wait for the process to have a main window
                 while (!process.HasExited && DateTime.UtcNow < deadline)
@@ -240,5 +278,42 @@ public sealed class AppTool
                 WindowManagementErrorCode.SystemError,
                 $"Failed to launch '{programPath}': {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Finds a window by searching for the program name in window titles.
+    /// This handles cases where the launched process is a stub that redirects to another app
+    /// (e.g., UWP apps like Calculator where calc.exe is a stub for the Store app).
+    /// </summary>
+    private async Task<WindowInfoCompact?> FindWindowByTitleAsync(
+        string programName,
+        DateTime deadline,
+        CancellationToken cancellationToken)
+    {
+        while (DateTime.UtcNow < deadline)
+        {
+            var listResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+            if (listResult.Success && listResult.Windows != null)
+            {
+                // Search for window where title contains the program name
+                // e.g., "calc" matches "Calculator", "notepad" matches "Notepad"
+                var matchingWindow = listResult.Windows.FirstOrDefault(w =>
+                    w.Title?.Contains(programName, StringComparison.OrdinalIgnoreCase) == true);
+
+                if (matchingWindow != null)
+                {
+                    // Focus the window before returning (Handle is stored as decimal string)
+                    if (nint.TryParse(matchingWindow.Handle, out var hwnd))
+                    {
+                        await _windowService.ActivateWindowAsync(hwnd, cancellationToken);
+                    }
+                    return matchingWindow;
+                }
+            }
+
+            await Task.Delay(100, cancellationToken);
+        }
+
+        return null;
     }
 }

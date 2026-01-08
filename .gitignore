@@ -106,5 +106,8 @@ nupkg/
 # LLM Test local configuration (user-specific settings)
 llm-tests.config.local.json
 
+# LLM Test output folder (timestamped test artifacts)
+tests/Sbroenne.WindowsMcp.LLM.Tests/output/
+
 # Agent-benchmark executable (downloaded on demand)
 agent-benchmark.exe

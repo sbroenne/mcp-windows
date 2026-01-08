@@ -9,7 +9,56 @@ on:
       - 'mcp-v*'
 
 jobs:
+  # ==========================================================================
+  # LLM Integration Tests - Validate with real AI models before release
+  # ==========================================================================
+  llm-tests:
+    runs-on: windows-latest
+    permissions:
+      id-token: write   # Required for Azure OIDC
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23'
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Run LLM Integration Tests
+      env:
+        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      run: |
+        cd tests/Sbroenne.WindowsMcp.LLM.Tests
+        ./Run-LLMTests.ps1 -Build
+      shell: pwsh
+
+    - name: Upload LLM Test Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: llm-test-reports
+        path: tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults/
+        retention-days: 30
+
+  # ==========================================================================
+  # Build - Compile for all target platforms
+  # ==========================================================================
   build:
+    needs: llm-tests
     runs-on: windows-latest
 
     strategy:

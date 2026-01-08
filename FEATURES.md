@@ -8,17 +8,63 @@ Windows MCP uses the **Windows UI Automation API** as the primary interaction me
 
 ### Token Optimization
 
-All tool responses use **short property names** (e.g., `s` instead of `success`, `h` instead of `handle`) to minimize token usage. This reduces LLM costs and improves response times when processing tool results.
+All tool responses are **designed for LLM efficiency**, minimizing token usage while preserving information:
 
-**When to use each tool:**
+| Optimization | Description | Token Savings |
+|--------------|-------------|---------------|
+| **Short Property Names** | `ok` instead of `success`, `h` instead of `handle`, `ec` instead of `errorCode` | ~40% |
+| **Omitted Null Values** | Null/empty fields are not included in responses | ~15% |
+| **Compact Element Data** | UI elements use `n` (name), `t` (type), `id` (elementId), `c` (coordinates) | ~30% |
+| **JPEG Screenshots** | Default JPEG at 60% quality instead of PNG | ~70% smaller |
+| **Auto-Scaling** | Screenshots auto-scale to 1568px width (vision model native limit) | ~50% smaller |
+
+**Example response comparison:**
+
+```json
+// Standard JSON (~180 tokens)
+{ "success": true, "errorCode": "success", "message": "Clicked element", "element": { "name": "Save", "controlType": "Button", "handle": "123" } }
+
+// Optimized JSON (~60 tokens)
+{ "ok": true, "ec": "success", "msg": "Clicked", "el": { "n": "Save", "t": "Button", "h": "123" } }
+```
+
+This reduces LLM costs by ~60% and improves response times when processing tool results.
+
+---
+
+### LLM Testing & Validation
+
+Every tool is tested with **real AI models** using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) to ensure LLMs understand tool descriptions and use them correctly.
+
+| Test Suite | Tests | Models | Pass Rate |
+|------------|-------|--------|-----------|
+| Window Management | 8 | GPT-4.1, GPT-5.2 | 100% |
+| Notepad UI Operations | 10 | GPT-4.1, GPT-5.2 | 100% |
+| Paint UI Operations | 16 | GPT-4.1, GPT-5.2 | 100% |
+| File Dialog Handling | 6 | GPT-4.1, GPT-5.2 | 100% |
+| Screenshot Capture | 6 | GPT-4.1, GPT-5.2 | 100% |
+| Keyboard & Mouse | 8 | GPT-4.1, GPT-5.2 | 100% |
+| Real-World Workflows | 8 | GPT-4.1, GPT-5.2 | 100% |
+
+**Why LLM testing matters:**
+
+- **Tool descriptions must be LLM-friendly** — If the AI misunderstands a parameter, it fails silently
+- **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps
+- **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
+
+LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#llm-integration-tests) for how to run them yourself.
+
+---
+
+### When to Use Each Tool
 
 | Scenario | Tool | Why |
 |----------|------|-----|
-| Discover UI elements | `ui_find` | Find elements by name, type, or ID |
+| Discover UI elements | `ui_find` | Find elements by name, type, or ID (with timeout/retry) |
 | Click a button by name | `ui_click` | Semantic, works at any DPI/theme |
 | Type text into a field | `ui_type` | Direct text input with clear option |
 | Read text from elements | `ui_read` | Get text via UIA or OCR |
-| Wait for element state | `ui_wait` | Block until condition is met |
+| Wait for windows | `window_management` | Use `wait_for` action for new windows |
 | Save files | `ui_file` | Handle Save As dialogs automatically |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
@@ -30,11 +76,10 @@ All tool responses use **short property names** (e.g., `s` instead of `success`,
 | Tool | Description |
 |------|-------------|
 | `app` | Launch applications |
-| `ui_find` | Find UI elements by name, type, or ID |
+| `ui_find` | Find UI elements by name, type, or ID (with timeout/retry via `timeoutMs`) |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
 | `ui_read` | Read text from elements (UIA + OCR) |
-| `ui_wait` | Wait for elements to appear/disappear/change state |
 | `ui_file` | File operations (Save As dialog handling, English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
@@ -171,32 +216,6 @@ Read text from elements using UI Automation or OCR.
 - Automatic OCR fallback for custom-rendered text
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
-
----
-
-## ⏳ UI Wait (`ui_wait`)
-
-Wait for elements to appear, disappear, or change state.
-
-### Parameters
-
-| Parameter | Description | Required |
-|-----------|-------------|----------|
-| `windowHandle` | Target window handle | Yes |
-| `mode` | Wait mode: `appear`, `disappear`, `enabled`, `disabled`, `visible`, `offscreen` | No (default: appear) |
-| `name` / `nameContains` | Element name/partial match | No* |
-| `automationId` | Automation ID | No* |
-| `controlType` | Control type filter | No |
-| `timeoutMs` | Timeout in milliseconds | No (default: 5000) |
-
-*At least one search criterion required.
-
-### Capabilities
-
-- Block until element appears (`mode='appear'`)
-- Block until element disappears (`mode='disappear'`)
-- Wait for specific states (`mode='enabled'`, `mode='disabled'`)
-- Configurable timeout (0-60000ms)
 
 ---
 
@@ -387,13 +406,13 @@ Capture screenshots on Windows with LLM-optimized defaults. **By default, screen
 | `annotate` | boolean | `true` | Include numbered element overlays and structured element data |
 | `includeCursor` | boolean | `false` | Include mouse cursor in capture |
 | `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
-| `quality` | integer | `85` | Compression quality for JPEG (1-100) |
+| `quality` | integer | `60` | Compression quality for JPEG (1-100) |
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
 ### Annotated Screenshot Response
 
-When `annotate=true` (default), the response includes both an image and structured element data:
+When `annotate=true` (default), the response includes structured element data. **Image is omitted by default** (`includeImage=false`) to save ~100K+ tokens:
 
 ```json
 {
@@ -402,9 +421,7 @@ When `annotate=true` (default), the response includes both an image and structur
     { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem", "clickable_point": { "x": 50, "y": 30 } },
     { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem", "clickable_point": { "x": 100, "y": 30 } }
   ],
-  "element_count": 25,
-  "image_data": "base64...",
-  "image_format": "jpeg"
+  "element_count": 25
 }
 ```
 
@@ -425,7 +442,7 @@ For simple screenshots without element discovery:
 ### Capabilities
 
 - **Annotated by Default** - Screenshots include numbered element overlays and structured data for UI discovery
-- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
+- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 60 for minimal token usage
 - **Easy targeting** - Use `window_management(action='find', title='...')` to get a handle, then pass to `screenshot_control`
 - **Capture any monitor** - Screenshot any connected display by index
 - **Capture windows** - Screenshot a specific window (even if partially obscured)

@@ -437,6 +437,42 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(stopwatch.ElapsedMilliseconds < 2000, "WaitFor should return quickly for existing elements");
     }
 
+    [Fact]
+    public async Task WaitFor_NonExistentElement_TimesOut()
+    {
+        // Act - Wait for an element that doesn't exist with short timeout
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "This Element Does Not Exist 12345",
+                ControlType = "Button",
+            },
+            timeoutMs: 1000);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Contains("timeout", result.ErrorMessage?.ToLowerInvariant() ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task WaitFor_MultipleElements_ReturnsFirst()
+    {
+        // Act - Wait for any button (multiple exist)
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+            },
+            timeoutMs: 5000);
+
+        // Assert
+        Assert.True(result.Success, $"WaitFor failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+    }
+
     #endregion
 
     #region Combined Workflow Tests

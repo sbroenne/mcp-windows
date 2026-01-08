@@ -21,6 +21,8 @@ Auto-generated from all feature plans. Last updated: 2025-12-07
 - C# 12+ / .NET 8.0 + System.Windows.Automation (UIAutomationClient.dll), Windows.Media.Ocr, Microsoft.Windows.AI.Imaging (optional NPU) (013-ui-automation-ocr)
 - C# 12 / .NET 10.0 + MCP C# SDK, Microsoft.Extensions.Compliance.Redaction, Microsoft.Extensions.Hosting (015-session-control)
 - In-memory (ConcurrentDictionary), no persistence (015-session-control)
+- YAML (agent-benchmark test format), PowerShell (test runner scripts) + agent-benchmark, Azure OpenAI (GPT-4.1, GPT-5.2-chat), Filesystem MCP Server (015-llm-tool-coverage)
+- Timestamped output folders under `tests/Sbroenne.WindowsMcp.LLM.Tests/output/` (gitignored) (015-llm-tool-coverage)
 
 - C# 12+ (latest stable per Constitution XIII) (001-mouse-control)
 
@@ -40,9 +42,9 @@ tests/
 C# 12+ (latest stable per Constitution XIII): Follow standard conventions
 
 ## Recent Changes
+- 015-llm-tool-coverage: Added YAML (agent-benchmark test format), PowerShell (test runner scripts) + agent-benchmark, Azure OpenAI (GPT-4.1, GPT-5.2-chat), Filesystem MCP Server
 - 015-session-control: Added C# 12 / .NET 10.0 + MCP C# SDK, Microsoft.Extensions.Compliance.Redaction, Microsoft.Extensions.Hosting
 - 013-ui-automation-ocr: Added C# 12+ / .NET 8.0 + System.Windows.Automation (UIAutomationClient.dll), Windows.Media.Ocr, Microsoft.Windows.AI.Imaging (optional NPU)
-- 013-ui-automation-ocr: Added C# 12+ / .NET 8.0
 
 
 <!-- MANUAL ADDITIONS START -->

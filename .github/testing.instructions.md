@@ -1,17 +1,86 @@
 # Testing Instructions for mcp-windows
 
-## Unit Tests
+## Testing Priority Order (SURGICAL TESTING FIRST)
 
-**Location:** `tests/Sbroenne.WindowsMcp.Tests/Unit/`
+**For an MCP server, integration tests are the PRIMARY validation - unit tests have limited value.**
 
-Run with:
+**ALWAYS test surgically first - from most targeted to broadest:**
+
+1. **Build first** - Verify code compiles before any tests
+2. **Surgical integration tests** - Test ONLY the specific feature you modified (e.g., `--filter "FullyQualifiedName~Keyboard"`)
+3. **Related integration tests** - Test closely related functionality if surgical tests pass
+4. **Full integration test suite** - EXPENSIVE. Only after surgical tests pass and before committing
+5. **LLM tests** - VERY EXPENSIVE (cost money, take many minutes). Only when specifically requested
+
+**NEVER run the full integration test suite as the first step!** Run targeted tests for your changes first.
+
+**Unit tests are secondary** - they're useful for parsing logic, data transformations, and utilities, but they do NOT validate that the MCP server actually works with Windows.
+
+## Test Harnesses
+
+### WinForms Test Harness (Traditional Win32)
+
+**Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/TestHarness/`
+
+- `TestHarnessForm.cs` - Basic mouse/keyboard testing (clicks, drags, scrolls)
+- `UITestHarnessForm.cs` - Comprehensive UI controls (5 tabs, 20+ control types, dialogs)
+- `UITestHarnessFixture.cs` - xUnit fixture that launches WinForms harness in-process
+
+**Collection:** `[Collection("UITestHarness")]`
+
+### WinUI 3 Test Harness (Modern Windows Apps)
+
+**Location:** `tests/Sbroenne.WindowsMcp.ModernHarness/`
+
+Modern WinUI 3 application that mirrors controls found in modern Windows apps like Notepad, Paint, and Word:
+- NavigationView with multiple pages (Home, Form Controls, List Controls, Editor, Dialogs, Mouse & Keyboard)
+- CommandBar with toolbar buttons (New, Open, Save, Cut, Copy, Paste)
+- Form controls: TextBox, PasswordBox, CheckBox, RadioButton, ComboBox, Slider, ToggleSwitch, ProgressBar
+- List controls: ListView, TreeView
+- Editor page with multiline TextBox (character/word/line counts)
+- Dialog testing: FileSavePicker, FileOpenPicker, FolderPicker, ContentDialog
+- Mouse & Keyboard testing: Click areas, scroll zones, drag detection
+- **State verification TextBlocks** with AutomationId for MCP tool verification
+
+**Building the WinUI 3 Harness:**
 ```powershell
-dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedName~Unit"
+# Build for ARM64
+dotnet build tests\Sbroenne.WindowsMcp.ModernHarness -c Debug -p:Platform=ARM64
+
+# Build for x64
+dotnet build tests\Sbroenne.WindowsMcp.ModernHarness -c Debug -p:Platform=x64
 ```
 
-## Integration Tests
+**Collection:** `[Collection("ModernTestHarness")]`
+
+**Fixture:** `ModernTestHarnessFixture.cs` - Launches harness as separate process, finds window handle
+
+### Verification Pattern
+
+**Use our own MCP tools for verification, NOT FlaUI or direct property access:**
+
+```csharp
+// ✅ Correct: Use MCP tools to verify state
+var readResult = await _automationService.ReadElementAsync(new ElementQuery
+{
+    WindowHandle = _windowHandle,
+    AutomationId = "ButtonClicksDisplay",
+});
+Assert.Equal("3", readResult.Text);
+
+// ❌ Wrong: Direct property access (not available for out-of-process apps)
+// Assert.Equal(3, _fixture.Form.ButtonClickCount);
+```
+
+## Integration Tests (PRIMARY)
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/`
+
+**Integration tests are the REAL tests for an MCP server.** They verify that:
+- Tools actually interact with Windows correctly
+- Keyboard/mouse input is received by real applications
+- UI automation finds and manipulates real elements
+- Window management works with actual windows
 
 **ALL integration tests MUST pass. No exceptions.**
 
@@ -20,12 +89,39 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedN
 - Only tests explicitly marked `[Skip]` (e.g., requiring 3+ monitors) are acceptable to skip
 - If tests fail due to timing/window focus issues, that's a BUG to fix, not an acceptable state
 
-Run with:
+### Surgical Integration Testing (REQUIRED FIRST STEP)
+
+**Always start with surgical tests targeting your specific changes:**
+
+```powershell
+# Test specific feature (e.g., after modifying keyboard functionality)
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q
+
+# Test specific harness
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinFormsHarness" -v q
+
+# Test Electron harness  
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~ElectronHarness" -v q
+
+# Test mouse functionality
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Mouse" -v q
+
+# Test window management
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Window" -v q
+
+# Test UI automation
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~UIAutomation" -v q
+```
+
+### Full Integration Tests (EXPENSIVE - RUN LAST)
+
+**Only run the full suite after surgical tests pass:**
+
 ```powershell
 dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release --filter "FullyQualifiedName~Integration"
 ```
 
-Run all tests:
+Run all tests (integration + unit):
 ```powershell
 dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release
 ```
@@ -34,8 +130,56 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests -c Release
 
 Tests that interact with windows use collections to prevent parallel execution conflicts:
 - `[Collection("WindowManagement")]` - Window-related tests
-- `[Collection("UITestHarness")]` - UI automation tests
+- `[Collection("UITestHarness")]` - UI automation tests using WinForms harness
+- `[Collection("ModernTestHarness")]` - UI automation tests using WinUI 3 harness
 - `[Collection("MouseIntegrationTests")]` - Mouse input tests
+- `[Collection("KeyboardIntegrationTests")]` - Keyboard input tests
+
+### WinUI 3 Integration Tests
+
+**Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/WinUI/`
+
+**Test Files:**
+- `WinUIClickTests.cs` - Click operations on buttons, checkboxes, radio buttons, list items
+- `WinUITypeTests.cs` - Text input into TextBox, editor, keyboard tracking
+- `WinUIReadTests.cs` - Reading element values and state verification
+- `WinUIFindTests.cs` - Finding elements by AutomationId, Name, ControlType
+- `WinUIWorkflowTests.cs` - End-to-end workflows (navigation, form filling, editor usage)
+- `WinUIFileDialogTests.cs` - File dialogs (Save As, Open, Pick Folder) and ContentDialogs
+
+**Running WinUI Tests:**
+```powershell
+# All WinUI tests
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUI"
+
+# Specific categories
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIClick"
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIType"
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIRead"
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIFind"
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIWorkflow"
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinUIFileDialog"
+```
+
+## Unit Tests (SECONDARY)
+
+**Location:** `tests/Sbroenne.WindowsMcp.Tests/Unit/`
+
+**Unit tests are useful for:**
+- Parsing and validation logic (e.g., key name mapping, parameter validation)
+- Data transformations and utilities (e.g., Retry, Wait utilities)
+- Error handling paths that are hard to trigger in integration tests
+
+**Unit tests are NOT useful for:**
+- Verifying Windows input actually works
+- Verifying UI automation finds elements
+- Verifying window management operations
+
+### Running Unit Tests
+```powershell
+# Only when specifically testing parsing/utility logic
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Unit" -v q
+```
 
 ## LLM Tests
 
@@ -43,7 +187,7 @@ Tests that interact with windows use collections to prevent parallel execution c
 
 **IMPORTANT: LLM tests are EXPENSIVE (time and cost). Be surgical:**
 - Only run LLM tests when specifically requested by the user
-- Verify code changes compile and unit tests pass BEFORE running LLM tests
+- Verify code changes compile and integration tests pass BEFORE running LLM tests
 - Never run LLM tests "just to check" - they cost real money
 
 ### Running LLM Tests

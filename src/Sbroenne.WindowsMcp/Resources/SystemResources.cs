@@ -131,7 +131,6 @@ public sealed class SystemResources
             | `ui_type` | Type text into input fields. |
             | `ui_find` | Find elements, get details, inspect properties. |
             | `ui_read` | Read text from elements (with OCR fallback). |
-            | `ui_wait` | Wait for elements to appear/disappear/change state. |
             | `ui_file` | Save files (Office apps via COM, others via dialogs). |
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
             | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
@@ -179,7 +178,7 @@ public sealed class SystemResources
 
             ### 5. Verify Results
             ```
-            ui_wait(windowHandle="<handle>", mode="disappear", nameContains="Save") // wait for dialog to close
+            window_management(action="wait_for_close", handle="<dialog>") // wait for dialog to close
             screenshot_control(target="window", windowHandle="<handle>") // visual check
             ```
 
@@ -199,7 +198,7 @@ public sealed class SystemResources
             | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | - |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
             | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
-            | Wait for element | ui_wait(windowHandle=..., mode='appear') | - |
+            | Wait for new window | window_management(action='wait_for', title='...') | - |
             | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
             | Find visible elements | screenshot_control with annotate=true | ui_find(windowHandle=...) |
 
@@ -208,7 +207,7 @@ public sealed class SystemResources
             1. **Find handle first** - use `window_management(action='find')` to get window handle
             2. **Use explicit handles** - you control which window when multiple match
             3. **Use screenshot_control(annotate=true) when you don't know element names**
-            4. **Use ui_wait for dialogs** - block until dialog closes with mode='disappear'
+            4. **Use window_management(wait_for) for dialogs** - wait for new windows to appear
             5. **Use ui_file for saving** - handles Office COM + Save As dialogs automatically
 
             ## When to Use `ui_find` (Optional)
@@ -245,7 +244,7 @@ public sealed class SystemResources
 
             Quick lookup: error_code → recovery action.
 
-            ## UI Automation Errors (ui_click, ui_type, ui_find, ui_read, ui_wait)
+            ## UI Automation Errors (ui_click, ui_type, ui_find, ui_read)
 
             | Error Code | Recovery Action |
             |------------|-----------------|
@@ -353,7 +352,7 @@ public sealed class SystemResources
             **Key fields:** `h` (handle) - pass verbatim to other tools as `windowHandle`. `ok` = success.
             **Abbreviations:** h=handle, t=title, pn=process_name, pid=process_id, s=state, fg=foreground, b=bounds[x,y,w,h], n=count
 
-            ## ui_find / ui_click / ui_type / ui_read / ui_wait
+            ## ui_find / ui_click / ui_type / ui_read
 
             ```json
             // ui_find returns elements array (ae):

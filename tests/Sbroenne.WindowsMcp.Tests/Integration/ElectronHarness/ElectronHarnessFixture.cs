@@ -58,10 +58,36 @@ public sealed class ElectronHarnessFixture : IDisposable
             ?? throw new InvalidOperationException("Could not determine test assembly location");
 
         // Navigate up to find the ElectronHarness folder
-        // The path is: tests/Sbroenne.WindowsMcp.Tests/bin/Debug/net10.0-windows.../Sbroenne.WindowsMcp.Tests.dll
+        // The path could be:
+        //   tests/Sbroenne.WindowsMcp.Tests/bin/Debug/net10.0-windows.../  (AnyCPU)
+        //   tests/Sbroenne.WindowsMcp.Tests/bin/ARM64/Debug/net10.0-windows.../  (ARM64)
+        //   tests/Sbroenne.WindowsMcp.Tests/bin/x64/Debug/net10.0-windows.../  (x64)
         // We need: tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness
-        // Navigate: assembly dir -> net10.0 (..) -> Debug (..) -> bin (..) -> Sbroenne.WindowsMcp.Tests (project root)
-        var projectDir = Path.GetFullPath(Path.Combine(testAssemblyDir, "..", "..", ".."));
+        // Navigate up until we find the project directory containing Integration folder
+        var currentDir = testAssemblyDir;
+        string? projectDir = null;
+
+        for (int i = 0; i < 6; i++)
+        {
+            currentDir = Path.GetDirectoryName(currentDir);
+            if (currentDir == null)
+            {
+                break;
+            }
+
+            var integrationPath = Path.Combine(currentDir, "Integration", "ElectronHarness");
+            if (Directory.Exists(integrationPath))
+            {
+                projectDir = currentDir;
+                break;
+            }
+        }
+
+        if (projectDir == null)
+        {
+            throw new InvalidOperationException($"Could not find Integration/ElectronHarness folder starting from: {testAssemblyDir}");
+        }
+
         _electronHarnessPath = Path.Combine(projectDir, "Integration", "ElectronHarness");
 
         if (!Directory.Exists(_electronHarnessPath))

@@ -8,12 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- **6 Focused UI Tools** - Split `ui_automation` into specialized tools for better LLM understanding:
-  - `ui_find` — Find elements by name, type, or ID
+- **5 Focused UI Tools** - Split `ui_automation` into specialized tools for better LLM understanding:
+  - `ui_find` — Find elements by name, type, or ID (with timeout/retry via `timeoutMs`)
   - `ui_click` — Click buttons, tabs, checkboxes
   - `ui_type` — Type text into edit controls
   - `ui_read` — Read text from elements (UIA + OCR fallback)
-  - `ui_wait` — Wait for elements (mode: appear, disappear, enabled, disabled)
   - `ui_file` — File operations (Save As dialog handling, English Windows only)
 - **Dedicated `app` tool** - Launch applications with `app(programPath='notepad.exe')`
   - Separated from window_management for clearer intent

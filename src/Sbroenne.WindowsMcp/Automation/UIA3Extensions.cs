@@ -854,5 +854,76 @@ public static class UIA3Extensions
         }
     }
 
+    /// <summary>
+    /// Tries to get a clickable point for the element.
+    /// Uses the same fallback pattern as FlaUI:
+    /// 1. Try COM GetClickablePoint method
+    /// 2. Fall back to center of bounding rectangle
+    /// </summary>
+    /// <param name="element">The UI Automation element.</param>
+    /// <param name="x">The x-coordinate of the clickable point.</param>
+    /// <param name="y">The y-coordinate of the clickable point.</param>
+    /// <returns>True if a clickable point was found; false otherwise.</returns>
+    public static bool TryGetClickablePoint(this UIA.IUIAutomationElement element, out int x, out int y)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+
+        x = 0;
+        y = 0;
+
+        try
+        {
+            // Variant 1: Try the COM GetClickablePoint method
+            var tagPoint = new UIA.tagPOINT { x = 0, y = 0 };
+            var result = element.GetClickablePoint(out tagPoint);
+            if (result != 0) // Non-zero means success
+            {
+                x = tagPoint.x;
+                y = tagPoint.y;
+                return true;
+            }
+
+            // Variant 2: Fall back to center of bounding rectangle
+            var bounds = element.GetBoundingRectangle();
+            if (bounds.Width > 0 && bounds.Height > 0)
+            {
+                x = (int)(bounds.X + bounds.Width / 2);
+                y = (int)(bounds.Y + bounds.Height / 2);
+                return true;
+            }
+        }
+        catch (COMException)
+        {
+            // Element may be stale or offscreen
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gets the center point of the element's bounding rectangle.
+    /// </summary>
+    /// <param name="element">The UI Automation element.</param>
+    /// <returns>A tuple containing the center point coordinates, or (0, 0) if unavailable.</returns>
+    public static (int X, int Y) GetCenterPoint(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+
+        try
+        {
+            var bounds = element.GetBoundingRectangle();
+            if (bounds.Width > 0 && bounds.Height > 0)
+            {
+                return ((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2));
+            }
+        }
+        catch (COMException)
+        {
+            // Element may be stale or offscreen
+        }
+
+        return (0, 0);
+    }
+
     #endregion
 }

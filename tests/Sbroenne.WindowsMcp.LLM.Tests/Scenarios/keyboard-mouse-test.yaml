@@ -1,0 +1,361 @@
+# =============================================================================
+# Keyboard and Mouse Control Test
+# =============================================================================
+#
+# User Story 3: Keyboard and Mouse Control (Priority: P2)
+#
+# Tests: keyboard_control and mouse_control tools
+#
+# Tools Covered:
+#   - keyboard_control(type): Type text
+#   - keyboard_control(press): Press key combinations (hotkeys)
+#   - mouse_control(click): Click at coordinates
+#   - mouse_control(drag): Drag from one point to another
+#   - mouse_control(get_position): Get current mouse position
+#
+# Test Applications:
+#   - Notepad: For keyboard tests
+#   - Paint: For mouse tests (canvas drawing)
+#
+# Prerequisites:
+#   - Windows 10/11
+#   - Windows MCP Server
+#   - Environment: AZURE_OPENAI_ENDPOINT
+#
+# =============================================================================
+
+criteria:
+  success_rate: 1  # 100% required
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+      
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5-chat
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+      
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+settings:
+  verbose: true
+  max_iterations: 15
+
+
+sessions:
+  # ==========================================================================
+  # Session 1: Typing - keyboard_control(type) with text in Notepad
+  # ==========================================================================
+  - name: "Typing"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Type a sentence using keyboard"
+        prompt: |
+          Type "Hello World from keyboard control!" using the keyboard.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_type
+
+      - name: "Type on a new line"
+        prompt: |
+          Press Enter and type "This is a second line of text" on the new line.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_type
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 2: Hotkeys - keyboard_control(press) with Ctrl+A, Ctrl+C, Ctrl+V
+  # ==========================================================================
+  - name: "Hotkeys"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Type some text"
+        prompt: |
+          Type "Text to select and copy" in Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: keyboard_control
+              - type: tool_called
+                tool: ui_type
+
+      - name: "Select all text with Ctrl+A"
+        prompt: |
+          Select all the text in Notepad using the keyboard shortcut.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+          - type: tool_param_matches_regex
+            tool: keyboard_control
+            params:
+              key: "(?i)a"
+
+      - name: "Copy with Ctrl+C"
+        prompt: |
+          Copy the selected text to the clipboard using the keyboard shortcut.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+          - type: tool_param_matches_regex
+            tool: keyboard_control
+            params:
+              key: "(?i)c"
+
+      - name: "Go to end and add new line"
+        prompt: |
+          Press End to go to the end of the document, then press Enter for a new line.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+
+      - name: "Paste with Ctrl+V"
+        prompt: |
+          Paste the text from clipboard using the keyboard shortcut.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+          - type: tool_param_matches_regex
+            tool: keyboard_control
+            params:
+              key: "(?i)v"
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 3: Mouse Click - mouse_control(click) at coordinates in Paint
+  # ==========================================================================
+  - name: "Mouse Click"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: tool_param_equals
+            tool: app
+            params:
+              programPath: "mspaint.exe"
+
+      - name: "Click in the canvas area"
+        prompt: |
+          Use mouse_control to click at coordinates (900, 600) in the Paint window to make a mark on the canvas.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "click"
+
+      - name: "Click in another location"
+        prompt: |
+          Use mouse_control to click at coordinates (1100, 500) in the Paint window to make another mark.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "click"
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "close"
+
+  # ==========================================================================
+  # Session 4: Mouse Drag - mouse_control(drag) for drawing a line in Paint
+  # ==========================================================================
+  - name: "Mouse Drag"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Draw a line by dragging"
+        prompt: |
+          Use mouse_control with action drag to draw a line from (700, 500) to (1200, 700) in the Paint window.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
+
+      - name: "Draw another line"
+        prompt: |
+          Use mouse_control with action drag to draw a horizontal line from (700, 600) to (1200, 600) in the Paint window.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "close"
+
+  # ==========================================================================
+  # Session 5: Mouse Position - mouse_control(get_position)
+  # ==========================================================================
+  - name: "Mouse Position"
+    tests:
+      - name: "Get current mouse position"
+        prompt: |
+          Get the current position of the mouse cursor on the screen.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "get_position"
+          - type: output_regex
+            pattern: "(?i)(x|y|position|coordinate|\\d+)"
+
+      - name: "Move mouse and get position again"
+        prompt: |
+          Move the mouse to position 500, 400 and then report the current mouse position.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+

@@ -1,163 +1,210 @@
+using Sbroenne.WindowsMcp.Models;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for keyboard press action.
-/// Tests validate single key presses via virtual key codes.
+/// Tests validate single key presses via virtual key codes against the test harness.
 /// These tests interact with the actual Windows input system.
 /// </summary>
-/// <remarks>
-/// Note: These tests send actual keyboard input to the system.
-/// They should be run with caution and ideally with a test window focused.
-/// Tests use a short delay pattern to avoid overwhelming the input queue.
-/// </remarks>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardPressTests
+public class KeyboardPressTests : IDisposable
 {
-    // Constants for test delays - give Windows time to process input
-    private const int ShortDelay = 50;
+    private readonly KeyboardTestFixture _fixture;
 
-    // Static readonly arrays for CA1861 compliance
-    private static readonly string[] ArrowKeys = ["up", "down", "left", "right"];
-
-    #region T033 - Enter Key Tests
-
-    /// <summary>
-    /// Tests that Enter key press is handled correctly.
-    /// Enter is one of the most commonly used keys for form submission.
-    /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_Enter_ReturnsSuccess()
+    public KeyboardPressTests(KeyboardTestFixture fixture)
     {
-        // Arrange
-        var key = "enter";
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert - Placeholder until press action is fully wired
-        // The service should return Success for a valid key name
-        Assert.Equal("enter", key);
+        _fixture = fixture;
+        _fixture.Reset();
+        _fixture.EnsureTestWindowFocused();
     }
 
-    /// <summary>
-    /// Tests that Return key (alias for Enter) works correctly.
-    /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_Return_ReturnsSuccess()
+    public void Dispose()
     {
-        // Arrange - "return" should be an alias for "enter"
-        var key = "return";
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.Equal("return", key);
+        GC.SuppressFinalize(this);
     }
 
-    #endregion
-
-    #region T034 - Tab Key Tests
+    #region Letter Key Tests - Verified by Harness
 
     /// <summary>
-    /// Tests that Tab key press works for navigation between fields.
-    /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_Tab_ReturnsSuccess()
-    {
-        // Arrange
-        var key = "tab";
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.Equal("tab", key);
-    }
-
-    /// <summary>
-    /// Tests that Tab key with repeat count presses multiple times.
+    /// Tests letter key presses are received by the harness.
     /// </summary>
     [Theory]
-    [InlineData(1)]
-    [InlineData(3)]
-    [InlineData(5)]
-    public async Task PressKeyAsync_TabWithRepeat_PressesMultipleTimes(int repeatCount)
+    [InlineData("a", "a")]
+    [InlineData("z", "z")]
+    [InlineData("m", "m")]
+    public async Task PressKeyAsync_LetterKeys_VerifiedByHarness(string key, string expectedText)
     {
         // Arrange
-        var key = "tab";
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay * repeatCount);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.True(repeatCount >= 1);
-        Assert.Equal("tab", key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for key '{key}', got: {result.Error}");
+
+        // Assert - harness received the key
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Test harness did not receive expected text '{expectedText}', got '{_fixture.GetInputText()}'");
+    }
+
+    /// <summary>
+    /// Tests uppercase letter keys via shift modifier.
+    /// </summary>
+    [Theory]
+    [InlineData("a", "A")]
+    [InlineData("z", "Z")]
+    public async Task PressKeyAsync_LetterWithShift_ProducesUppercase(string key, string expectedText)
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key, ModifierKey.Shift);
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for shift+'{key}', got: {result.Error}");
+
+        // Assert - harness received uppercase
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Test harness did not receive expected text '{expectedText}', got '{_fixture.GetInputText()}'");
     }
 
     #endregion
 
-    #region T035 - Escape Key Tests
+    #region Number Key Tests - Verified by Harness
 
     /// <summary>
-    /// Tests that Escape key press works for canceling operations.
+    /// Tests number key presses are received by the harness.
     /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_Escape_ReturnsSuccess()
+    [Theory]
+    [InlineData("0", "0")]
+    [InlineData("1", "1")]
+    [InlineData("5", "5")]
+    [InlineData("9", "9")]
+    public async Task PressKeyAsync_NumberKeys_VerifiedByHarness(string key, string expectedText)
     {
         // Arrange
-        var key = "escape";
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.Equal("escape", key);
-    }
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for key '{key}', got: {result.Error}");
 
-    /// <summary>
-    /// Tests that Esc key (alias for Escape) works correctly.
-    /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_Esc_ReturnsSuccess()
-    {
-        // Arrange - "esc" should be an alias for "escape"
-        var key = "esc";
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.Equal("esc", key);
+        // Assert - harness received the number
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Test harness did not receive expected text '{expectedText}', got '{_fixture.GetInputText()}'");
     }
 
     #endregion
 
-    #region T036 - Arrow Key Tests
+    #region Space Key Tests - Verified by Harness
 
     /// <summary>
-    /// Tests that arrow keys are handled with extended key flag.
-    /// Arrow keys require KEYEVENTF_EXTENDEDKEY for proper operation.
+    /// Tests that space key press produces a space character.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_Space_VerifiedByHarness()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("space");
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for space, got: {result.Error}");
+
+        // Assert - harness received a space
+        var textReceived = await _fixture.WaitForInputTextAsync(" ");
+        Assert.True(textReceived, $"Test harness did not receive space, got '{_fixture.GetInputText()}'");
+    }
+
+    #endregion
+
+    #region Backspace Key Tests - Verified by Harness
+
+    /// <summary>
+    /// Tests that backspace deletes the previous character.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_Backspace_DeletesPreviousCharacter()
+    {
+        // Arrange - first type some text
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.TypeTextAsync("abc");
+        await _fixture.WaitForInputTextAsync("abc");
+
+        // Act - press backspace
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("backspace");
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for backspace, got: {result.Error}");
+
+        // Assert - one character was deleted
+        var textReceived = await _fixture.WaitForInputTextAsync("ab");
+        Assert.True(textReceived, $"Expected 'ab' after backspace, got '{_fixture.GetInputText()}'");
+    }
+
+    /// <summary>
+    /// Tests that backspace with repeat count deletes multiple characters.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_BackspaceWithRepeat_DeletesMultipleCharacters()
+    {
+        // Arrange - first type some text
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.TypeTextAsync("abcde");
+        await _fixture.WaitForInputTextAsync("abcde");
+
+        // Act - press backspace 3 times
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("backspace", repeat: 3);
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for backspace x3, got: {result.Error}");
+
+        // Assert - three characters were deleted
+        var textReceived = await _fixture.WaitForInputTextAsync("ab");
+        Assert.True(textReceived, $"Expected 'ab' after 3 backspaces, got '{_fixture.GetInputText()}'");
+    }
+
+    #endregion
+
+    #region Arrow Keys - API Response Tests
+
+    /// <summary>
+    /// Tests that arrow keys return success.
+    /// Note: Arrow keys don't produce visible text, but API should return success.
     /// </summary>
     [Theory]
     [InlineData("up")]
     [InlineData("down")]
     [InlineData("left")]
     [InlineData("right")]
-    public async Task PressKeyAsync_ArrowKeys_ReturnsSuccessWithExtendedFlag(string key)
+    public async Task PressKeyAsync_ArrowKeys_ReturnsSuccess(string key)
     {
-        // Arrange - Arrow keys require extended key flag
-        ArgumentNullException.ThrowIfNull(key);
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.Contains(key, ArrowKeys);
+        // Assert - API returns success for valid arrow keys
+        Assert.True(result.Success, $"Expected success for arrow key '{key}', got: {result.Error}");
     }
 
     /// <summary>
-    /// Tests arrow key aliases (arrowup, arrowdown, etc.).
+    /// Tests arrow key aliases work correctly.
     /// </summary>
     [Theory]
     [InlineData("arrowup")]
@@ -166,18 +213,23 @@ public class KeyboardPressTests
     [InlineData("arrowright")]
     public async Task PressKeyAsync_ArrowKeyAliases_ReturnsSuccess(string key)
     {
-        // Arrange - Arrow key aliases should work
-        ArgumentNullException.ThrowIfNull(key);
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.StartsWith("arrow", key);
+        // Assert - API returns success for arrow key aliases
+        Assert.True(result.Success, $"Expected success for arrow alias '{key}', got: {result.Error}");
     }
 
+    #endregion
+
+    #region Navigation Keys - API Response Tests
+
     /// <summary>
-    /// Tests navigation keys that also require extended key flag.
+    /// Tests navigation keys return success.
     /// </summary>
     [Theory]
     [InlineData("home")]
@@ -186,24 +238,71 @@ public class KeyboardPressTests
     [InlineData("pagedown")]
     [InlineData("insert")]
     [InlineData("delete")]
-    public async Task PressKeyAsync_NavigationKeys_ReturnsSuccessWithExtendedFlag(string key)
+    public async Task PressKeyAsync_NavigationKeys_ReturnsSuccess(string key)
     {
-        // Arrange - Navigation keys require extended key flag
-        ArgumentNullException.ThrowIfNull(key);
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
         // Assert
-        Assert.NotNull(key);
+        Assert.True(result.Success, $"Expected success for navigation key '{key}', got: {result.Error}");
+    }
+
+    /// <summary>
+    /// Tests that Home/End keys move cursor within text.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_HomeAndEnd_MovesCursor()
+    {
+        // Arrange - type some text
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.TypeTextAsync("Hello");
+        await _fixture.WaitForInputTextAsync("Hello");
+
+        // Act - press Home, then type 'X'
+        await _fixture.KeyboardInputService.PressKeyAsync("home");
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.PressKeyAsync("x");
+
+        // Assert - X should be at the beginning
+        var textReceived = await _fixture.WaitForInputTextAsync("xHello");
+        Assert.True(textReceived, $"Expected 'xHello', got '{_fixture.GetInputText()}'");
+    }
+
+    /// <summary>
+    /// Tests that Delete key removes character at cursor.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_Delete_RemovesCharacterAtCursor()
+    {
+        // Arrange - type text and move cursor to beginning
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.TypeTextAsync("Hello");
+        await _fixture.WaitForInputTextAsync("Hello");
+        await _fixture.KeyboardInputService.PressKeyAsync("home");
+        await Task.Delay(50);
+
+        // Act - press Delete to remove 'H'
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("delete");
+
+        // Assert
+        Assert.True(result.Success, $"Expected success for delete, got: {result.Error}");
+        var textReceived = await _fixture.WaitForInputTextAsync("ello");
+        Assert.True(textReceived, $"Expected 'ello' after delete, got '{_fixture.GetInputText()}'");
     }
 
     #endregion
 
-    #region T037 - Function Key Tests
+    #region Function Keys - API Response Tests
 
     /// <summary>
-    /// Tests that F1-F12 function keys are handled correctly.
+    /// Tests that F1-F12 function keys return success.
+    /// Note: Function keys trigger system actions, so we only verify API response.
     /// </summary>
     [Theory]
     [InlineData("f1")]
@@ -221,17 +320,18 @@ public class KeyboardPressTests
     public async Task PressKeyAsync_FunctionKeys_ReturnsSuccess(string key)
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.StartsWith("f", key);
+        // Assert - API returns success for valid function keys
+        Assert.True(result.Success, $"Expected success for function key '{key}', got: {result.Error}");
     }
 
     /// <summary>
-    /// Tests extended function keys F13-F24 (if supported).
+    /// Tests extended function keys F13-F24.
     /// </summary>
     [Theory]
     [InlineData("f13")]
@@ -248,282 +348,271 @@ public class KeyboardPressTests
     [InlineData("f24")]
     public async Task PressKeyAsync_ExtendedFunctionKeys_ReturnsSuccess(string key)
     {
-        // Arrange - Extended function keys F13-F24
-        ArgumentNullException.ThrowIfNull(key);
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
         // Assert
-        Assert.StartsWith("f", key);
+        Assert.True(result.Success, $"Expected success for extended function key '{key}', got: {result.Error}");
     }
 
     #endregion
 
-    #region T038 - Copilot Key Tests
+    #region Tab Key Tests - Verified by Harness
 
     /// <summary>
-    /// Tests that Copilot key (VK_COPILOT 0xE6) is handled on Windows 11.
-    /// This is a new key introduced with Windows 11 Copilot+ PCs.
+    /// Tests that Tab key produces a tab character in text input.
     /// </summary>
     [Fact]
-    public async Task PressKeyAsync_CopilotKey_ReturnsSuccess()
+    public async Task PressKeyAsync_Tab_VerifiedByHarness()
     {
-        // Arrange - Copilot key (VK_COPILOT = 0xE6) for Windows 11
-        var key = "copilot";
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("tab");
 
-        // Assert
-        Assert.Equal("copilot", key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for tab, got: {result.Error}");
+
+        // Note: In a textbox, Tab might either insert a tab character or move focus.
+        // The test harness textbox should accept tab characters.
+        // If this fails, the test harness may need AcceptsTab=true
     }
 
     /// <summary>
-    /// Tests Windows key (similar to Copilot for launching features).
+    /// Tests Tab with repeat count.
     /// </summary>
     [Theory]
-    [InlineData("win")]
-    [InlineData("windows")]
-    [InlineData("lwin")]
-    [InlineData("rwin")]
-    public async Task PressKeyAsync_WindowsKey_ReturnsSuccess(string key)
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task PressKeyAsync_TabWithRepeat_ReturnsSuccess(int repeatCount)
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("tab", repeat: repeatCount);
 
         // Assert
-        Assert.NotNull(key);
+        Assert.True(result.Success, $"Expected success for tab x{repeatCount}, got: {result.Error}");
     }
 
     #endregion
 
-    #region T039 - Media Key Tests
+    #region Escape Key Tests - API Response
 
     /// <summary>
-    /// Tests that volume control keys are handled correctly.
-    /// </summary>
-    [Theory]
-    [InlineData("volumemute")]
-    [InlineData("volumedown")]
-    [InlineData("volumeup")]
-    public async Task PressKeyAsync_VolumeKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.StartsWith("volume", key);
-    }
-
-    /// <summary>
-    /// Tests that media playback keys are handled correctly.
-    /// </summary>
-    [Theory]
-    [InlineData("playpause")]
-    [InlineData("stop")]
-    [InlineData("nexttrack")]
-    [InlineData("prevtrack")]
-    public async Task PressKeyAsync_MediaPlaybackKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.NotNull(key);
-    }
-
-    /// <summary>
-    /// Tests browser navigation keys.
-    /// </summary>
-    [Theory]
-    [InlineData("browserback")]
-    [InlineData("browserforward")]
-    [InlineData("browserrefresh")]
-    [InlineData("browserstop")]
-    [InlineData("browsersearch")]
-    [InlineData("browserfavorites")]
-    [InlineData("browserhome")]
-    public async Task PressKeyAsync_BrowserKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.StartsWith("browser", key);
-    }
-
-    #endregion
-
-    #region Additional Key Tests
-
-    /// <summary>
-    /// Tests that space key press works correctly.
+    /// Tests that Escape key returns success.
     /// </summary>
     [Fact]
-    public async Task PressKeyAsync_Space_ReturnsSuccess()
+    public async Task PressKeyAsync_Escape_ReturnsSuccess()
     {
         // Arrange
-        var key = "space";
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("escape");
 
         // Assert
-        Assert.Equal("space", key);
+        Assert.True(result.Success, $"Expected success for escape, got: {result.Error}");
     }
 
     /// <summary>
-    /// Tests that backspace key press works correctly.
+    /// Tests Esc alias.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_EscAlias_ReturnsSuccess()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("esc");
+
+        // Assert
+        Assert.True(result.Success, $"Expected success for esc alias, got: {result.Error}");
+    }
+
+    #endregion
+
+    #region Enter Key Tests - API Response
+
+    /// <summary>
+    /// Tests that Enter key returns success.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_Enter_ReturnsSuccess()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("enter");
+
+        // Assert
+        Assert.True(result.Success, $"Expected success for enter, got: {result.Error}");
+    }
+
+    /// <summary>
+    /// Tests Return alias for Enter.
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_ReturnAlias_ReturnsSuccess()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("return");
+
+        // Assert
+        Assert.True(result.Success, $"Expected success for return alias, got: {result.Error}");
+    }
+
+    #endregion
+
+    #region Numpad Keys - Verified by Harness
+
+    /// <summary>
+    /// Tests numpad number keys produce correct digits.
     /// </summary>
     [Theory]
-    [InlineData("backspace")]
-    [InlineData("back")]
-    public async Task PressKeyAsync_Backspace_ReturnsSuccess(string key)
+    [InlineData("numpad0", "0")]
+    [InlineData("numpad1", "1")]
+    [InlineData("numpad5", "5")]
+    [InlineData("numpad9", "9")]
+    public async Task PressKeyAsync_NumpadNumbers_VerifiedByHarness(string key, string expectedText)
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.NotNull(key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for numpad key '{key}', got: {result.Error}");
+
+        // Assert - harness received the digit
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Test harness did not receive expected '{expectedText}', got '{_fixture.GetInputText()}'");
     }
 
     /// <summary>
-    /// Tests that caps lock and num lock toggle keys work.
+    /// Tests numpad operator keys.
     /// </summary>
     [Theory]
-    [InlineData("capslock")]
-    [InlineData("numlock")]
-    [InlineData("scrolllock")]
-    public async Task PressKeyAsync_LockKeys_ReturnsSuccess(string key)
+    [InlineData("numpadmultiply", "*")]
+    [InlineData("numpadadd", "+")]
+    [InlineData("numpadsubtract", "-")]
+    [InlineData("numpaddivide", "/")]
+    public async Task PressKeyAsync_NumpadOperators_VerifiedByHarness(string key, string expectedText)
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert
-        Assert.EndsWith("lock", key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for numpad key '{key}', got: {result.Error}");
+
+        // Assert - harness received the operator
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Test harness did not receive expected '{expectedText}', got '{_fixture.GetInputText()}'");
     }
 
     /// <summary>
-    /// Tests that Print Screen key works.
+    /// Tests numpad decimal key - locale-dependent (may be . or , depending on keyboard layout).
+    /// </summary>
+    [Fact]
+    public async Task PressKeyAsync_NumpadDecimal_ReturnsSuccessAndProducesDecimalSeparator()
+    {
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+
+        // Act
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("numpaddecimal");
+
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for numpaddecimal, got: {result.Error}");
+
+        // Wait for input to appear
+        await Task.Delay(100);
+        var inputText = _fixture.GetInputText();
+
+        // Assert - harness received either . or , (locale-dependent)
+        Assert.True(inputText == "." || inputText == ",",
+            $"Expected '.' or ',' for numpaddecimal (locale-dependent), got '{inputText}'");
+    }
+
+    #endregion
+
+    #region Repeat Count Tests - Verified by Harness
+
+    /// <summary>
+    /// Tests that repeat count works correctly.
     /// </summary>
     [Theory]
-    [InlineData("printscreen")]
-    [InlineData("prtsc")]
-    [InlineData("snapshot")]
-    public async Task PressKeyAsync_PrintScreen_ReturnsSuccess(string key)
+    [InlineData(1, "a")]
+    [InlineData(3, "aaa")]
+    [InlineData(5, "aaaaa")]
+    public async Task PressKeyAsync_WithRepeatCount_PressesMultipleTimes(int repeatCount, string expectedText)
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("a", repeat: repeatCount);
 
-        // Assert
-        Assert.NotNull(key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success for 'a' x{repeatCount}, got: {result.Error}");
+
+        // Assert - harness received repeated characters
+        var textReceived = await _fixture.WaitForInputTextAsync(expectedText);
+        Assert.True(textReceived, $"Expected '{expectedText}', got '{_fixture.GetInputText()}'");
     }
 
     /// <summary>
-    /// Tests that pause/break key works.
+    /// Tests that repeat=0 or negative is handled (implementation clamps to 1).
     /// </summary>
-    [Theory]
-    [InlineData("pause")]
-    [InlineData("break")]
-    public async Task PressKeyAsync_PauseBreak_ReturnsSuccess(string key)
+    [Fact]
+    public async Task PressKeyAsync_RepeatZeroOrNegative_ClampsToOne()
     {
         // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
-        // Act
-        await Task.Delay(ShortDelay);
+        // Act - repeat=0 should be clamped to 1
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("a", repeat: 0);
 
-        // Assert
-        Assert.NotNull(key);
+        // Assert - API returns success
+        Assert.True(result.Success, $"Expected success, got: {result.Error}");
+
+        // Assert - should have typed exactly one 'a'
+        var textReceived = await _fixture.WaitForInputTextAsync("a");
+        Assert.True(textReceived, $"Expected 'a', got '{_fixture.GetInputText()}'");
     }
 
-    /// <summary>
-    /// Tests letter keys (a-z).
-    /// </summary>
-    [Theory]
-    [InlineData("a")]
-    [InlineData("z")]
-    [InlineData("m")]
-    public async Task PressKeyAsync_LetterKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
+    #endregion
 
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.Single(key);
-    }
+    #region Invalid Key Name Tests
 
     /// <summary>
-    /// Tests number keys (0-9).
-    /// </summary>
-    [Theory]
-    [InlineData("0")]
-    [InlineData("1")]
-    [InlineData("5")]
-    [InlineData("9")]
-    public async Task PressKeyAsync_NumberKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.True(char.IsDigit(key[0]));
-    }
-
-    /// <summary>
-    /// Tests numpad keys.
-    /// </summary>
-    [Theory]
-    [InlineData("numpad0")]
-    [InlineData("numpad1")]
-    [InlineData("numpad9")]
-    [InlineData("numpadmultiply")]
-    [InlineData("numpadadd")]
-    [InlineData("numpadsubtract")]
-    [InlineData("numpaddecimal")]
-    [InlineData("numpaddivide")]
-    public async Task PressKeyAsync_NumpadKeys_ReturnsSuccess(string key)
-    {
-        // Arrange
-        ArgumentNullException.ThrowIfNull(key);
-
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert
-        Assert.StartsWith("numpad", key);
-    }
-
-    /// <summary>
-    /// Tests that invalid key names return appropriate error.
+    /// Tests that invalid key names return InvalidKey error.
     /// </summary>
     [Theory]
     [InlineData("invalidkey")]
@@ -531,82 +620,86 @@ public class KeyboardPressTests
     [InlineData("xyz123")]
     public async Task PressKeyAsync_InvalidKeyName_ReturnsInvalidKeyError(string key)
     {
-        // Arrange - Invalid key names should return InvalidKey error code
-        ArgumentNullException.ThrowIfNull(key);
+        // Arrange
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert - The service should return InvalidKey error
-        Assert.NotNull(key);
+        // Assert - should return failure with InvalidKey error code
+        Assert.False(result.Success, "Expected failure for invalid key name");
+        Assert.Equal(KeyboardControlErrorCode.InvalidKey, result.ErrorCode);
+        Assert.Contains("Unknown key", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
-    /// Tests that empty key name returns appropriate error.
+    /// Tests that empty key name returns InvalidKey error.
     /// </summary>
     [Fact]
     public async Task PressKeyAsync_EmptyKeyName_ReturnsInvalidKeyError()
     {
         // Arrange
-        var key = "";
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("");
 
-        // Assert - Empty key should be rejected
-        Assert.Equal("", key);
+        // Assert
+        Assert.False(result.Success, "Expected failure for empty key name");
+        Assert.Equal(KeyboardControlErrorCode.InvalidKey, result.ErrorCode);
     }
 
     /// <summary>
-    /// Tests that null key name returns appropriate error.
+    /// Tests that shortcut-style key names give helpful error message.
     /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_NullKeyName_ReturnsInvalidKeyError()
+    [Theory]
+    [InlineData("Ctrl+S")]
+    [InlineData("Alt+Tab")]
+    [InlineData("Ctrl+Shift+N")]
+    public async Task PressKeyAsync_ShortcutSyntax_ReturnsHelpfulError(string key)
     {
         // Arrange
-        string? key = null;
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
 
         // Act
-        await Task.Delay(ShortDelay);
+        var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
 
-        // Assert - Null key should be rejected
-        Assert.Null(key);
+        // Assert - should return helpful error about using modifiers parameter
+        Assert.False(result.Success, "Expected failure for shortcut syntax");
+        Assert.Equal(KeyboardControlErrorCode.InvalidKey, result.ErrorCode);
+        Assert.Contains("modifiers", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Tests that key press with repeat=0 does nothing but returns success.
-    /// </summary>
-    [Fact]
-    public async Task PressKeyAsync_RepeatZero_ReturnsSuccessWithNoAction()
-    {
-        // Arrange
-        var key = "enter";
-        var repeat = 0;
+    #endregion
 
-        // Act
-        await Task.Delay(ShortDelay);
-
-        // Assert - Repeat 0 should be a no-op but return success
-        Assert.Equal(0, repeat);
-        Assert.Equal("enter", key);
-    }
+    #region Modifier Key Tests
 
     /// <summary>
-    /// Tests that key press with negative repeat returns error.
+    /// Tests Ctrl+A selects all (verifiable via the harness).
     /// </summary>
     [Fact]
-    public async Task PressKeyAsync_NegativeRepeat_ReturnsInvalidRequestError()
+    public async Task PressKeyAsync_CtrlA_SelectsAll()
     {
-        // Arrange
-        var key = "enter";
-        var repeat = -1;
+        // Arrange - type some text first
+        _fixture.EnsureTestWindowFocused();
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.TypeTextAsync("Hello");
+        await _fixture.WaitForInputTextAsync("Hello");
 
-        // Act
-        await Task.Delay(ShortDelay);
+        // Act - Ctrl+A to select all, then type to replace
+        var result = await _fixture.KeyboardInputService.PressKeyAsync("a", ModifierKey.Ctrl);
+        Assert.True(result.Success, $"Expected success for Ctrl+A, got: {result.Error}");
 
-        // Assert - Negative repeat should be rejected
-        Assert.True(repeat < 0);
-        Assert.Equal("enter", key);
+        // Now type 'X' to replace selected text
+        await Task.Delay(50);
+        await _fixture.KeyboardInputService.PressKeyAsync("x");
+
+        // Assert - text should be replaced
+        var textReceived = await _fixture.WaitForInputTextAsync("x");
+        Assert.True(textReceived, $"Expected 'x' after Ctrl+A and typing, got '{_fixture.GetInputText()}'");
     }
 
     #endregion

@@ -256,11 +256,29 @@ public sealed record UIAutomationResult
             Action = action,
             Items = compactElements,
             ElementCount = elements.Length,
-            UsageHint = elements.Length == 1
-                ? $"Use elementId='{elements[0].ElementId}' for subsequent actions. For full details: ui_automation(action='get_element_details', elementId='...')"
-                : $"Found {elements.Length} elements. Use elementId from Items for actions. For full details: ui_automation(action='get_element_details', elementId='...')",
+            UsageHint = GetActionHint(action, elements),
             Diagnostics = diagnostics
         };
+    }
+
+    /// <summary>
+    /// Gets an action-specific hint that reinforces tool usage for subsequent operations.
+    /// </summary>
+    private static string GetActionHint(string action, UIElementInfo[] elements)
+    {
+        // For click actions, remind that all UI interactions require tools
+        if (action == "click")
+        {
+            return "Click completed. Continue using ui_click or ui_find for all UI interactions - never skip tool calls.";
+        }
+
+        // For find actions, provide element usage guidance
+        if (elements.Length == 1)
+        {
+            return $"Use elementId='{elements[0].ElementId}' for subsequent actions. Always use ui_click/ui_find for UI operations.";
+        }
+
+        return $"Found {elements.Length} elements. Use elementId from Items for actions. Always use ui_click/ui_find for UI operations.";
     }
 
     /// <summary>
