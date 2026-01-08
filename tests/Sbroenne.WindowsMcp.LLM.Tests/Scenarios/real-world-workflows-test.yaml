@@ -62,7 +62,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -81,7 +81,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -113,8 +113,8 @@ sessions:
 
       - name: "Complete text editing workflow"
         prompt: |
-          Open Notepad, type "This is a test paragraph for the text editing workflow.", 
-          then select all the text, copy it to clipboard, go to the end of the document, 
+          Open Notepad, type "This is a test paragraph for the text editing workflow.",
+          then select all the text, copy it to clipboard, go to the end of the document,
           add a new line, and paste the copied text. Finally, close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
@@ -172,7 +172,7 @@ sessions:
 
       - name: "Complete save dialog workflow"
         prompt: |
-          Open Notepad, type "Save workflow test content", and save the document 
+          Open Notepad, type "Save workflow test content", and save the document
           to the desktop with a filename that includes today's date and time.
           Then close Notepad.
         assertions:
@@ -203,7 +203,7 @@ sessions:
 
       - name: "Complete state discovery workflow"
         prompt: |
-          Open Microsoft Paint and discover all the available drawing tools 
+          Open Microsoft Paint and discover all the available drawing tools
           in the toolbar. List what tools you find, then close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
@@ -231,8 +231,8 @@ sessions:
 
       - name: "Complete keyboard shortcuts workflow"
         prompt: |
-          Open Notepad, type "Original text to duplicate", then use keyboard shortcuts 
-          to select all text (Ctrl+A), copy it (Ctrl+C), move to the end (End key), 
+          Open Notepad, type "Original text to duplicate", then use keyboard shortcuts
+          to select all text (Ctrl+A), copy it (Ctrl+C), move to the end (End key),
           add a new line (Enter), and paste (Ctrl+V). Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
@@ -257,7 +257,7 @@ sessions:
 
       - name: "Complete drawing workflow"
         prompt: |
-          Open Microsoft Paint, select the brush tool, choose the blue color 
+          Open Microsoft Paint, select the brush tool, choose the blue color
           from the color palette, and draw a curved line across the canvas.
           Then close Paint without saving.
         assertions:
@@ -288,7 +288,7 @@ sessions:
 
       - name: "Complete window lifecycle workflow"
         prompt: |
-          Open Notepad, minimize the window, wait 2 seconds, restore the window 
+          Open Notepad, minimize the window, wait 2 seconds, restore the window
           to its normal state, then close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools

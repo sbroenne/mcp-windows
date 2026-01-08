@@ -1,21 +1,18 @@
 # =============================================================================
-# Keyboard and Mouse Control Test
+# Paint UI Test - Paint Canvas and Tool Operations
 # =============================================================================
 #
-# User Story 3: Keyboard and Mouse Control (Priority: P2)
+# User Story 5: Paint Canvas and Tool Operations (Priority: P2)
 #
-# Tests: keyboard_control and mouse_control tools
+# Tests: Paint ribbon UI and canvas drawing operations
 #
 # Tools Covered:
-#   - keyboard_control(type): Type text
-#   - keyboard_control(press): Press key combinations (hotkeys)
-#   - mouse_control(click): Click at coordinates
-#   - mouse_control(drag): Drag from one point to another
-#   - mouse_control(get_position): Get current mouse position
+#   - ui_find: Discover ribbon toolbar elements
+#   - ui_click: Select tools and colors
+#   - mouse_control(drag): Draw on canvas
+#   - screenshot_control(annotate=true): Verify element discovery
 #
-# Test Applications:
-#   - Notepad: For keyboard tests
-#   - Paint: For mouse tests (canvas drawing)
+# Test Application: Microsoft Paint (mspaint.exe)
 #
 # Prerequisites:
 #   - Windows 10/11
@@ -34,12 +31,19 @@ providers:
     model: gpt-4.1
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
+
   - name: azure-openai-gpt5-chat
     type: AZURE
     auth_type: entra_id
     model: gpt-5.2-chat
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
 servers:
   - name: windows-mcp
     type: stdio
@@ -92,195 +96,9 @@ settings:
 
 sessions:
   # ==========================================================================
-  # Session 1: Typing - keyboard_control(type) with text in Notepad
+  # Session 1: Tool Discovery - ui_find for ribbon toolbar elements
   # ==========================================================================
-  - name: "Typing"
-    tests:
-      - name: "Cleanup - Close existing Notepad windows"
-        prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Type a sentence using keyboard"
-        prompt: |
-          Type "Hello World from keyboard control!" using the keyboard.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_type
-
-      - name: "Type on a new line"
-        prompt: |
-          Press Enter and type "This is a second line of text" on the new line.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_type
-
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
-          - type: no_hallucinated_tools
-
-  # ==========================================================================
-  # Session 2: Hotkeys - keyboard_control(press) with Ctrl+A, Ctrl+C, Ctrl+V
-  # ==========================================================================
-  - name: "Hotkeys"
-    tests:
-      - name: "Cleanup - Close existing Notepad windows"
-        prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Type some text"
-        prompt: |
-          Type "Text to select and copy" in Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_type
-
-      - name: "Select all text with Ctrl+A"
-        prompt: |
-          Select all the text in Notepad using the keyboard shortcut.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-          - type: tool_param_matches_regex
-            tool: keyboard_control
-            params:
-              key: "(?i)a"
-
-      - name: "Copy with Ctrl+C"
-        prompt: |
-          Copy the selected text to the clipboard using the keyboard shortcut.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-          - type: tool_param_matches_regex
-            tool: keyboard_control
-            params:
-              key: "(?i)c"
-
-      - name: "Go to end and add new line"
-        prompt: |
-          Press End to go to the end of the document, then press Enter for a new line.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-
-      - name: "Paste with Ctrl+V"
-        prompt: |
-          Paste the text from clipboard using the keyboard shortcut.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-          - type: tool_param_matches_regex
-            tool: keyboard_control
-            params:
-              key: "(?i)v"
-
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
-          - type: no_hallucinated_tools
-
-  # ==========================================================================
-  # Session 3: Mouse Click - mouse_control(click) at coordinates in Paint
-  # ==========================================================================
-  - name: "Mouse Click"
-    tests:
-      - name: "Cleanup - Close existing Paint windows"
-        prompt: |
-          Close all Paint windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Paint"
-        prompt: |
-          Open Microsoft Paint.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-          - type: tool_param_equals
-            tool: app
-            params:
-              programPath: "mspaint.exe"
-
-      - name: "Click in the canvas area"
-        prompt: |
-          Use mouse_control to click at coordinates (900, 600) in the Paint window to make a mark on the canvas.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: mouse_control
-          - type: tool_param_equals
-            tool: mouse_control
-            params:
-              action: "click"
-
-      - name: "Click in another location"
-        prompt: |
-          Use mouse_control to click at coordinates (1100, 500) in the Paint window to make another mark.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: mouse_control
-          - type: tool_param_equals
-            tool: mouse_control
-            params:
-              action: "click"
-
-      - name: "Close Paint"
-        prompt: |
-          Close Paint without saving.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: window_management
-          - type: tool_param_equals
-            tool: window_management
-            params:
-              action: "close"
-
-  # ==========================================================================
-  # Session 4: Mouse Drag - mouse_control(drag) for drawing a line in Paint
-  # ==========================================================================
-  - name: "Mouse Drag"
+  - name: "Tool Discovery"
     tests:
       - name: "Cleanup - Close existing Paint windows"
         prompt: |
@@ -296,66 +114,243 @@ sessions:
           - type: tool_called
             tool: app
 
-      - name: "Draw a line by dragging"
+      - name: "Find the pencil tool"
         prompt: |
-          Use mouse_control with action drag to draw a line from (700, 500) to (1200, 700) in the Paint window.
+          Find the pencil tool in the Paint toolbar.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
-            tool: mouse_control
-          - type: tool_param_equals
-            tool: mouse_control
-            params:
-              action: "drag"
-
-      - name: "Draw another line"
-        prompt: |
-          Use mouse_control with action drag to draw a horizontal line from (700, 600) to (1200, 600) in the Paint window.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: mouse_control
-          - type: tool_param_equals
-            tool: mouse_control
-            params:
-              action: "drag"
-
-      - name: "Close Paint"
-        prompt: |
-          Close Paint without saving.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: window_management
-          - type: tool_param_equals
-            tool: window_management
-            params:
-              action: "close"
-
-  # ==========================================================================
-  # Session 5: Mouse Position - mouse_control(get_position)
-  # ==========================================================================
-  - name: "Mouse Position"
-    tests:
-      - name: "Get current mouse position"
-        prompt: |
-          Get the current position of the mouse cursor on the screen.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: mouse_control
-          - type: tool_param_equals
-            tool: mouse_control
-            params:
-              action: "get_position"
+            tool: ui_find
           - type: output_regex
-            pattern: "(?i)(x|y|position|coordinate|\\d+)"
+            pattern: "(?i)(pencil|tool|found|element)"
 
-      - name: "Move mouse and get position again"
+      - name: "Find the brush tools"
         prompt: |
-          Move the mouse to position 500, 400 and then report the current mouse position.
+          Find the brush or brushes tool in the Paint toolbar.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(brush|tool|found|element)"
+
+      - name: "Find the shapes tools"
+        prompt: |
+          Find the shapes or shape tools in the Paint toolbar.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: ui_find
+          - type: output_regex
+            pattern: "(?i)(shape|tool|found|element)"
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 2: Tool Selection - ui_click for tool buttons
+  # ==========================================================================
+  - name: "Tool Selection"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Click on the pencil tool"
+        prompt: |
+          Click on the pencil tool to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Click on the brush tool"
+        prompt: |
+          Click on the brush tool to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Click on the eraser tool"
+        prompt: |
+          Click on the eraser tool to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 3: Color Selection - ui_click for color palette
+  # ==========================================================================
+  - name: "Color Selection"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Select red color"
+        prompt: |
+          Click on the red color in the color palette to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Select blue color"
+        prompt: |
+          Click on the blue color in the color palette to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Select green color"
+        prompt: |
+          Click on the green color in the color palette to select it.
+        assertions:
+          - type: no_hallucinated_tools
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 4: Canvas Drawing - mouse_control(drag) for drawing
+  # ==========================================================================
+  - name: "Canvas Drawing"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Draw a diagonal line"
+        prompt: |
+          Draw a diagonal line from the top-left area of the canvas to the bottom-right area.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
+
+      - name: "Draw a horizontal line"
+        prompt: |
+          Draw a horizontal line across the middle of the canvas.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "drag"
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 5: State Discovery - screenshot_control(annotate=true)
+  # ==========================================================================
+  - name: "State Discovery"
+    tests:
+      - name: "Cleanup - Close existing Paint windows"
+        prompt: |
+          Close all Paint windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Paint"
+        prompt: |
+          Open Microsoft Paint.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Take an annotated screenshot to discover UI elements"
+        prompt: |
+          Take a screenshot of Paint with element labels to discover all available UI elements and tools.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: screenshot_control
+          - type: tool_param_equals
+            tool: screenshot_control
+            params:
+              annotate: true
+          - type: output_regex
+            pattern: "(?i)(element|label|annotation|tool|canvas|color)"
+
+      - name: "Close Paint"
+        prompt: |
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
 

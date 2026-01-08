@@ -28,37 +28,11 @@ canonical_url: "https://windowsmcpserver.dev/"
 
 <div class="container content-section" markdown="1">
 
-## The Problem with Screenshot-Based Automation
+## Let AI Control Windows Apps — By Name, Not Pixels
 
-Most Windows automation tools work like this: take a screenshot, send it to a vision model, parse the pixels to find buttons, guess where to click.
+Windows MCP Server gives your AI assistant direct access to Windows applications through the **Windows UI Automation API**. The same API screen readers use to read buttons, menus, and text fields.
 
-**It doesn't work reliably.**
-
-- Vision models guess wrong — you get retry loops
-- Coordinates break when windows move
-- DPI changes break everything
-- Theme changes confuse the model
-- Each attempt burns thousands of tokens on image data
-
-We tried this approach. It failed too often to be useful.
-
----
-
-## How This Works Instead
-
-Windows MCP Server uses the **Windows UI Automation API** — the same API screen readers use. Instead of parsing pixels, it asks Windows directly: "What buttons exist in this window?"
-
-Windows knows. It's deterministic. Same command works every time.
-
----
-
-## Tested with Real AI Models
-
-Tool descriptions that seem clear to humans confuse AI. Parameters get misunderstood. Actions get skipped.
-
-We test every tool with **real AI models** (GPT-4.1, GPT-5.2) using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark). 54 automated tests. **100% pass rate required for release.**
-
-If the AI can't use it correctly, we fix the tool — not the prompt.
+Your AI says "click Save" and the server finds the Save button by name. No screenshots. No pixel parsing. No coordinate guessing.
 
 ---
 
@@ -73,6 +47,24 @@ Ask your AI assistant to control any Windows application:
 - "Read the error message from that dialog"
 
 Works with **GitHub Copilot**, **Claude Desktop**, **Cursor**, and any MCP client.
+
+---
+
+## Why This Approach
+
+Most automation tools take screenshots and ask vision models to find buttons in the pixels. That approach is slow, expensive, and breaks when windows move or themes change.
+
+Windows MCP Server asks Windows directly: "What buttons exist?" Windows knows. It's deterministic. Same command works every time, regardless of DPI, theme, or resolution.
+
+---
+
+## Tested with Real AI Models
+
+Tool descriptions that seem clear to humans often confuse AI. Parameters get misunderstood. Actions get skipped.
+
+We test every tool with **real AI models** (GPT-4.1, GPT-5.2) using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark). 54 automated tests. **100% pass rate required for release.**
+
+If the AI can't use it correctly, we fix the tool — not the prompt.
 
 ---
 

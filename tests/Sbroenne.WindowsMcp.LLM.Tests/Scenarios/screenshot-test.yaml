@@ -1,23 +1,25 @@
 # =============================================================================
-# File Dialog Test - UI File Tools
+# Screenshot Test - Screenshot Control Tools
 # =============================================================================
 #
-# User Story 4: Screenshot and File Tools (Priority: P2) - Part 2
+# User Story 4: Screenshot and File Tools (Priority: P2) - Part 1
 #
-# Tests: ui_file tool for Save As dialog handling
+# Tests: screenshot_control tool actions
 #
 # Tools Covered:
-#   - ui_file: Handle Save As dialogs in Notepad and Paint
+#   - screenshot_control(capture, annotate=true): Capture with element labels
+#   - screenshot_control(capture, annotate=false): Plain screenshot
+#   - screenshot_control(list_monitors): List available displays
+#   - screenshot_control with windowHandle: Capture specific window
 #
 # Test Applications:
-#   - Notepad: Save text file
-#   - Paint: Save image as PNG
+#   - Notepad: For annotated screenshots
+#   - Paint: For plain screenshots
 #
 # Prerequisites:
 #   - Windows 10/11
 #   - Windows MCP Server
-#   - Filesystem MCP Server (for verification)
-#   - Environment: AZURE_OPENAI_ENDPOINT, TEST_RESULTS_PATH
+#   - Environment: AZURE_OPENAI_ENDPOINT
 #
 # =============================================================================
 
@@ -49,16 +51,10 @@ servers:
     command: "{{SERVER_COMMAND}}"
     server_delay: 10s
 
-  - name: filesystem
-    type: stdio
-    command: "npx -y @modelcontextprotocol/server-filesystem {{TEST_RESULTS_PATH}}"
-    server_delay: 10s
-
 agents:
   - name: gpt41-agent
     servers:
       - name: windows-mcp
-      - name: filesystem
     provider: azure-openai-gpt41
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
@@ -78,7 +74,6 @@ agents:
   - name: gpt5-chat-agent
     servers:
       - name: windows-mcp
-      - name: filesystem
     provider: azure-openai-gpt5-chat
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
@@ -102,9 +97,9 @@ settings:
 
 sessions:
   # ==========================================================================
-  # Session 1: Notepad Save - save text file via ui_file
+  # Session 1: Annotated Screenshot - capture with element labels
   # ==========================================================================
-  - name: "Notepad Save"
+  - name: "Annotated Screenshot"
     tests:
       - name: "Cleanup - Close existing Notepad windows"
         prompt: |
@@ -120,45 +115,30 @@ sessions:
           - type: tool_called
             tool: app
 
-      - name: "Type some text"
+      - name: "Take an annotated screenshot of Notepad"
         prompt: |
-          Type "File dialog test content - this text will be saved to a file." in Notepad.
+          Take a screenshot of the Notepad window with element labels showing all UI elements.
         assertions:
           - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_type
-              - type: tool_called
-                tool: keyboard_control
-
-      - name: "Save the file"
-        prompt: |
-          Save the document to {{TEST_RESULTS_PATH}}\notepad-file-test-{{randomValue type='UUID'}}.txt
-        assertions:
-          - type: no_hallucinated_tools
-          # Can use ui_file to handle save dialog, or keyboard shortcuts + manual dialog navigation
-          - anyOf:
-              - type: tool_called
-                tool: ui_file
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_click
-          - type: output_not_contains
-            value: "failed"
-          - type: output_not_contains
-            value: "SecureDesktop"
+          - type: tool_called
+            tool: screenshot_control
+          - type: tool_param_equals
+            tool: screenshot_control
+            params:
+              annotate: true
+          - type: output_regex
+            pattern: "(?i)(element|label|annotation|ui|menu|edit|file)"
 
       - name: "Close Notepad"
         prompt: |
-          Close Notepad.
+          Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
 
   # ==========================================================================
-  # Session 2: Paint Save - save image as PNG via ui_file
+  # Session 2: Plain Screenshot - capture without annotations
   # ==========================================================================
-  - name: "Paint Save"
+  - name: "Plain Screenshot"
     tests:
       - name: "Cleanup - Close existing Paint windows"
         prompt: |
@@ -174,35 +154,83 @@ sessions:
           - type: tool_called
             tool: app
 
-      - name: "Draw something simple"
+      - name: "Take a plain screenshot of Paint"
         prompt: |
-          Draw a simple diagonal line across the canvas so there is something to save.
+          Take a screenshot of the Paint window without any annotations or labels.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
-            tool: mouse_control
-
-      - name: "Save the image as PNG"
-        prompt: |
-          Save the image as a PNG file to {{TEST_RESULTS_PATH}}\paint-file-test-{{randomValue type='UUID'}}.png
-        assertions:
-          - type: no_hallucinated_tools
-          # Can use ui_file to handle save dialog, or keyboard shortcuts + manual dialog navigation
-          - anyOf:
-              - type: tool_called
-                tool: ui_file
-              - type: tool_called
-                tool: keyboard_control
-              - type: tool_called
-                tool: ui_click
-          - type: output_not_contains
-            value: "failed"
-          - type: output_not_contains
-            value: "SecureDesktop"
+            tool: screenshot_control
+          - type: tool_param_equals
+            tool: screenshot_control
+            params:
+              annotate: false
 
       - name: "Close Paint"
         prompt: |
-          Close Paint.
+          Close Paint without saving.
+        assertions:
+          - type: no_hallucinated_tools
+
+  # ==========================================================================
+  # Session 3: Monitor List - enumerate available displays
+  # ==========================================================================
+  - name: "Monitor List"
+    tests:
+      - name: "List all monitors"
+        prompt: |
+          List all available monitors and displays on this computer.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: screenshot_control
+          - type: tool_param_equals
+            tool: screenshot_control
+            params:
+              action: "list_monitors"
+          - type: output_regex
+            pattern: "(?i)(monitor|display|screen|primary|\\d+x\\d+)"
+
+  # ==========================================================================
+  # Session 4: Window Screenshot - capture specific window by handle
+  # ==========================================================================
+  - name: "Window Screenshot"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Notepad"
+        prompt: |
+          Open Notepad.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+
+      - name: "Find the Notepad window"
+        prompt: |
+          Find the Notepad window and get its handle.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: output_regex
+            pattern: "(?i)(handle|notepad|found|window)"
+
+      - name: "Take a screenshot of just the Notepad window"
+        prompt: |
+          Take a screenshot of only the Notepad window, not the entire screen.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: screenshot_control
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
 
