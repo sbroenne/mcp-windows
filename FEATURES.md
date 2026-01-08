@@ -15,7 +15,7 @@ All tool responses are **designed for LLM efficiency**, minimizing token usage w
 | **Short Property Names** | `ok` instead of `success`, `h` instead of `handle`, `ec` instead of `errorCode` | ~40% |
 | **Omitted Null Values** | Null/empty fields are not included in responses | ~15% |
 | **Compact Element Data** | UI elements use `n` (name), `t` (type), `id` (elementId), `c` (coordinates) | ~30% |
-| **JPEG Screenshots** | Default JPEG at 85% quality instead of PNG | ~70% smaller |
+| **JPEG Screenshots** | Default JPEG at 60% quality instead of PNG | ~70% smaller |
 | **Auto-Scaling** | Screenshots auto-scale to 1568px width (vision model native limit) | ~50% smaller |
 
 **Example response comparison:**
@@ -433,13 +433,13 @@ Capture screenshots on Windows with LLM-optimized defaults. **By default, screen
 | `annotate` | boolean | `true` | Include numbered element overlays and structured element data |
 | `includeCursor` | boolean | `false` | Include mouse cursor in capture |
 | `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
-| `quality` | integer | `85` | Compression quality for JPEG (1-100) |
+| `quality` | integer | `60` | Compression quality for JPEG (1-100) |
 | `outputMode` | string | `"inline"` | "inline" (base64) or "file" (save to disk) |
 | `outputPath` | string | `null` | Custom file path when using file output mode |
 
 ### Annotated Screenshot Response
 
-When `annotate=true` (default), the response includes both an image and structured element data:
+When `annotate=true` (default), the response includes structured element data. **Image is omitted by default** (`includeImage=false`) to save ~100K+ tokens:
 
 ```json
 {
@@ -448,9 +448,7 @@ When `annotate=true` (default), the response includes both an image and structur
     { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem", "clickable_point": { "x": 50, "y": 30 } },
     { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem", "clickable_point": { "x": 100, "y": 30 } }
   ],
-  "element_count": 25,
-  "image_data": "base64...",
-  "image_format": "jpeg"
+  "element_count": 25
 }
 ```
 
@@ -471,7 +469,7 @@ For simple screenshots without element discovery:
 ### Capabilities
 
 - **Annotated by Default** - Screenshots include numbered element overlays and structured data for UI discovery
-- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 85 for minimal token usage
+- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 60 for minimal token usage
 - **Easy targeting** - Use `window_management(action='find', title='...')` to get a handle, then pass to `screenshot_control`
 - **Capture any monitor** - Screenshot any connected display by index
 - **Capture windows** - Screenshot a specific window (even if partially obscured)
