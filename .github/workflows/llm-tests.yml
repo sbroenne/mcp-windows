@@ -1,9 +1,15 @@
 name: LLM Integration Tests
 
 # Reusable workflow for LLM integration tests
-# Can be triggered manually or called from other workflows
+# Can be triggered manually, on PR, or called from other workflows
 
 on:
+  # Run on pull requests that modify test scenarios or the workflow itself
+  pull_request:
+    paths:
+      - 'tests/Sbroenne.WindowsMcp.LLM.Tests/**'
+      - '.github/workflows/llm-tests.yml'
+
   # Manual trigger for testing
   workflow_dispatch:
     inputs:
