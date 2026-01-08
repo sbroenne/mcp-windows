@@ -1,0 +1,174 @@
+# =============================================================================
+# Run Dialog Test - Launch Apps via Windows Run (Win+R)
+# =============================================================================
+#
+# Tests launching applications using the Windows Run dialog (Win+R)
+# instead of the app tool. This validates keyboard_control for hotkeys
+# and ui_type for dialog input.
+#
+# Tools Covered:
+#   - keyboard_control: Press Win+R to open Run dialog
+#   - window_management: Find/wait for Run dialog
+#   - ui_type: Type program name in Run dialog
+#   - keyboard_control: Press Enter to launch
+#
+# Prerequisites:
+#   - Windows 10/11
+#   - Windows MCP Server
+#   - Environment: AZURE_OPENAI_ENDPOINT
+#
+# =============================================================================
+
+criteria:
+  success_rate: 1  # 100% required
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+  - name: azure-openai-gpt5-chat
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+  - name: gpt5-chat-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt5-chat
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      use_builtin_patterns: true
+
+settings:
+  verbose: true
+  max_iterations: 15
+
+sessions:
+  # ==========================================================================
+  # Session 1: Launch Notepad via Run Dialog
+  # ==========================================================================
+  - name: "Run Dialog Launch"
+    tests:
+      - name: "Cleanup - Close existing Notepad windows"
+        prompt: |
+          Close all Notepad windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Open Windows Run dialog"
+        prompt: |
+          Open the Windows Run dialog using the keyboard shortcut Win+R.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+          # Don't assert exact params - models may use different casing or action types
+          # The Run dialog opening is verified by subsequent tests succeeding
+          - type: output_regex
+            pattern: "(?i)(run|dialog|win.*r|opened)"
+
+      - name: "Type notepad in Run dialog and launch"
+        prompt: |
+          Type "notepad" in the Run dialog and press Enter to launch it.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+
+      - name: "Verify Notepad launched"
+        prompt: |
+          Verify that Notepad is now open by finding its window.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: output_regex
+            pattern: "(?i)(notepad|found|open|visible)"
+
+      - name: "Close Notepad"
+        prompt: |
+          Close Notepad without saving.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+
+  # ==========================================================================
+  # Session 2: Launch Calculator via Run Dialog
+  # ==========================================================================
+  - name: "Run Dialog Calculator"
+    tests:
+      - name: "Cleanup - Close existing Calculator windows"
+        prompt: |
+          Close all Calculator windows if any are open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Calculator via Run dialog"
+        prompt: |
+          Open the Windows Run dialog with Win+R, type "calc", and press Enter to launch Calculator.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: keyboard_control
+
+      - name: "Verify Calculator launched"
+        prompt: |
+          Verify that Calculator is now open.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: output_regex
+            pattern: "(?i)(calculator|calc|found|open)"
+
+      - name: "Close Calculator"
+        prompt: |
+          Close Calculator.
+        assertions:
+          - type: no_hallucinated_tools
+          # Model may skip tool call if Calculator wasn't open (from previous session state)
+          - type: output_regex
+            pattern: "(?i)(calculator|closed|not open|no.*windows)"

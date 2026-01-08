@@ -49,7 +49,7 @@
 
 ## Phase 3: User Story 1 - Core UI Interaction Tools (Priority: P1) 🎯 MVP
 
-**Goal**: LLM tests for ui_find, ui_click, ui_type, ui_read, ui_wait against Notepad
+**Goal**: LLM tests for ui_find, ui_click, ui_type, ui_read against Notepad
 
 **Independent Test**: Run `.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml` and verify all tests pass on both providers
 
@@ -58,18 +58,17 @@
 - [X] T004 [US1] Create `tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/notepad-ui-test.yaml` with:
   - Providers: azure-openai-gpt41, azure-openai-gpt5-chat (Entra ID auth, rate_limits per research.md)
   - Agents: gpt41-agent, gpt5-chat-agent with system_prompt and clarification_detection
-  - Session 1: "UI Discovery" - ui_find for menus and text area
+  - Session 1: "UI Discovery" - ui_find for menus and text area (with timeoutMs for retry)
   - Session 2: "Text Input" - ui_type for document editing
   - Session 3: "Text Reading" - ui_read for content extraction
   - Session 4: "Menu Navigation" - ui_click for File/Edit/Format menus
-  - Session 5: "UI Waiting" - ui_wait for element states
   - Include cleanup step at start of each session
   - Plain English prompts only (FR-022-025)
   - Assertions: tool_called, no_hallucinated_tools, max_latency_ms: 30000, no_error_messages
 
 - [ ] T005 [US1] Validate notepad-ui-test.yaml passes with `.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml -Build`
 
-**Checkpoint**: User Story 1 complete - 5 UI tools verified against Notepad
+**Checkpoint**: User Story 1 complete - 4 UI tools verified against Notepad
 
 ---
 
@@ -298,7 +297,7 @@ Priority 2: T008, T010, T011, T014, T016 (Remaining tools + Workflows)
 3. Complete Phase 3: User Story 1 (T004, T005) - notepad-ui-test.yaml
 4. Complete Phase 4: User Story 2 (T006, T007) - window-management-test.yaml
 5. **STOP and VALIDATE**: All 11 tools have basic coverage (app, window_management, 5 UI tools, keyboard, mouse, screenshot, ui_file)
-6. Verify 100% pass rate on both GPT-4.1 and GPT-5.2-chat
+6. Verify 100% pass rate on bot0 tools have basic coverage (app, window_management, 4
 
 **MVP delivers**: 7 tasks, ~50% of test coverage, validates core tool functionality
 
@@ -341,9 +340,9 @@ Priority 2: T008, T010, T011, T014, T016 (Remaining tools + Workflows)
 
 | ID | Criterion | Verified By |
 |----|-----------|-------------|
-| SC-001 | 100% tool coverage (11 tools) | T004 (5 UI), T006 (app, window_mgmt), T008 (keyboard, mouse), T010 (screenshot), T011 (ui_file) |
+| SC-001 | 100% tool coverage (10 tools) | T004 (4 UI), T006 (app, window_mgmt), T008 (keyboard, mouse), T010 (screenshot), T011 (ui_file) |
 | SC-002 | All 10 window_management actions | T006 - window-management-test.yaml |
-| SC-003 | All 6 UI tools covered | T004 (ui_find, ui_click, ui_type, ui_read, ui_wait) + T011 (ui_file) |
+| SC-003 | All 5 UI tools covered | T004 (ui_find, ui_click, ui_type, ui_read) + T011 (ui_file) |
 | SC-004 | All providers pass | T019 (GPT-4.1) + T020 (GPT-5.2-chat) |
 | SC-005 | <30s per step | max_latency_ms: 30000 assertion in all YAML files |
 | SC-006 | Zero hallucinated tools | no_hallucinated_tools assertion in all YAML files |

@@ -4,14 +4,13 @@
 #
 # User Story 1: Core UI Interaction Tools (Priority: P1) 🎯 MVP
 #
-# Tests: ui_find, ui_click, ui_type, ui_read, ui_wait against Notepad
+# Tests: ui_find, ui_click, ui_type, ui_read against Notepad
 #
 # Tools Covered:
-#   - ui_find: Discover UI elements (menus, text area)
+#   - ui_find: Discover UI elements (menus, text area) with timeout/retry via timeoutMs
 #   - ui_click: Click on menu items
 #   - ui_type: Type text into document
 #   - ui_read: Read text content
-#   - ui_wait: Wait for element states
 #
 # Prerequisites:
 #   - Windows 10/11
@@ -50,7 +49,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -69,7 +68,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -303,68 +302,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
-          - type: no_hallucinated_tools
-
-  # ==========================================================================
-  # Session 5: UI Waiting - ui_wait for element states
-  # ==========================================================================
-  - name: "UI Waiting"
-    tests:
-      - name: "Cleanup - Close existing Notepad windows"
-        prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Wait for the text area to be ready"
-        prompt: |
-          Wait for the text editing area to become available and ready for input.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_wait
-              - type: tool_called
-                tool: ui_find
-          - type: output_regex
-            pattern: "(?i)(ready|available|found|success|edit|text)"
-
-      - name: "Type some text to confirm it is ready"
-        prompt: |
-          Type "Wait test complete" to confirm the text area is working.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_type
-              - type: tool_called
-                tool: keyboard_control
-
-      - name: "Wait for window title change indicator"
-        prompt: |
-          Check if the window title has changed to indicate unsaved changes.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_wait
-              - type: tool_called
-                tool: ui_find
-              - type: tool_called
-                tool: window_management
 
       - name: "Close Notepad"
         prompt: |

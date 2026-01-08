@@ -60,11 +60,11 @@ LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#ll
 
 | Scenario | Tool | Why |
 |----------|------|-----|
-| Discover UI elements | `ui_find` | Find elements by name, type, or ID |
+| Discover UI elements | `ui_find` | Find elements by name, type, or ID (with timeout/retry) |
 | Click a button by name | `ui_click` | Semantic, works at any DPI/theme |
 | Type text into a field | `ui_type` | Direct text input with clear option |
 | Read text from elements | `ui_read` | Get text via UIA or OCR |
-| Wait for element state | `ui_wait` | Block until condition is met |
+| Wait for windows | `window_management` | Use `wait_for` action for new windows |
 | Save files | `ui_file` | Handle Save As dialogs automatically |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
@@ -76,11 +76,10 @@ LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#ll
 | Tool | Description |
 |------|-------------|
 | `app` | Launch applications |
-| `ui_find` | Find UI elements by name, type, or ID |
+| `ui_find` | Find UI elements by name, type, or ID (with timeout/retry via `timeoutMs`) |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
 | `ui_read` | Read text from elements (UIA + OCR) |
-| `ui_wait` | Wait for elements to appear/disappear/change state |
 | `ui_file` | File operations (Save As dialog handling, English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
@@ -217,32 +216,6 @@ Read text from elements using UI Automation or OCR.
 - Automatic OCR fallback for custom-rendered text
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
-
----
-
-## ⏳ UI Wait (`ui_wait`)
-
-Wait for elements to appear, disappear, or change state.
-
-### Parameters
-
-| Parameter | Description | Required |
-|-----------|-------------|----------|
-| `windowHandle` | Target window handle | Yes |
-| `mode` | Wait mode: `appear`, `disappear`, `enabled`, `disabled`, `visible`, `offscreen` | No (default: appear) |
-| `name` / `nameContains` | Element name/partial match | No* |
-| `automationId` | Automation ID | No* |
-| `controlType` | Control type filter | No |
-| `timeoutMs` | Timeout in milliseconds | No (default: 5000) |
-
-*At least one search criterion required.
-
-### Capabilities
-
-- Block until element appears (`mode='appear'`)
-- Block until element disappears (`mode='disappear'`)
-- Wait for specific states (`mode='enabled'`, `mode='disabled'`)
-- Configurable timeout (0-60000ms)
 
 ---
 

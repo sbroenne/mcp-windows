@@ -11,17 +11,16 @@ This document defines the test file structure, tool-to-test mapping, and asserti
 
 ## 1. Tool Coverage Matrix
 
-### All 11 MCP Tools
+### All 10 MCP Tools
 
 | Tool | Actions/Modes | Test File | Priority |
 |------|---------------|-----------|----------|
 | `app` | launch | `window-management-test.yaml` | P1 |
 | `window_management` | list, find, activate, minimize, maximize, restore, close, move, resize, wait_for | `window-management-test.yaml` | P1 |
-| `ui_find` | search by name, nameContains, automationId, controlType | `notepad-ui-test.yaml` | P1 |
+| `ui_find` | search by name, nameContains, automationId, controlType (with timeoutMs for retry) | `notepad-ui-test.yaml` | P1 |
 | `ui_click` | button, menu, checkbox, tab | `notepad-ui-test.yaml`, `paint-ui-test.yaml` | P1 |
 | `ui_type` | text input, clearFirst | `notepad-ui-test.yaml` | P1 |
 | `ui_read` | text extraction | `notepad-ui-test.yaml` | P1 |
-| `ui_wait` | appear, enabled, disabled | `notepad-ui-test.yaml` | P1 |
 | `ui_file` | Save As dialog | `file-dialog-test.yaml` | P2 |
 | `keyboard_control` | type, press (with modifiers) | `keyboard-mouse-test.yaml` | P2 |
 | `mouse_control` | click, drag, scroll, get_position | `keyboard-mouse-test.yaml`, `paint-ui-test.yaml` | P2 |
@@ -36,15 +35,14 @@ This document defines the test file structure, tool-to-test mapping, and asserti
 **Purpose**: Core UI interaction tools against Notepad
 
 **Sessions**:
-1. **UI Discovery** - `ui_find` for menus, text area
+1. **UI Discovery** - `ui_find` for menus, text area (with timeoutMs for retry)
 2. **Text Input** - `ui_type` for document editing
 3. **Text Reading** - `ui_read` for content extraction
 4. **Menu Navigation** - `ui_click` for File/Edit/Format menus
-5. **UI Waiting** - `ui_wait` for element states
 
-**Tool Coverage**: `app`, `ui_find`, `ui_click`, `ui_type`, `ui_read`, `ui_wait`, `window_management`
+**Tool Coverage**: `app`, `ui_find`, `ui_click`, `ui_type`, `ui_read`, `window_management`
 
-**Test Count**: ~8 tests across 3-4 sessions
+**Test Count**: ~6 tests across 3-4 sessions
 
 ---
 
@@ -537,9 +535,9 @@ prompt: |
 
 | Success Criterion | Verification Method |
 |-------------------|---------------------|
-| SC-001: 100% tool coverage (11 tools) | Each tool appears in at least one `tool_called` assertion |
+| SC-001: 100% tool coverage (10 tools) | Each tool appears in at least one `tool_called` assertion |
 | SC-002: 10 window_management actions | `window-management-test.yaml` has all 10 actions |
-| SC-003: 6 UI tools covered | `notepad-ui-test.yaml` + `file-dialog-test.yaml` |
+| SC-003: 5 UI tools covered | `notepad-ui-test.yaml` + `file-dialog-test.yaml` |
 | SC-004: All providers pass | `criteria.success_rate: 1` with both agents |
 | SC-005: <30s per step | `max_latency_ms: 30000` on all steps |
 | SC-006: Zero hallucinated tools | `no_hallucinated_tools` on all steps |

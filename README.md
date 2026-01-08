@@ -56,9 +56,8 @@ Same command works every time. Any machine. Any DPI. Any theme.
 |------|---------|
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
-| `ui_find` | Discover elements in a window |
+| `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_read` | Read text from elements (with OCR fallback) |
-| `ui_wait` | Wait for elements to appear/disappear/change |
 | `ui_file` | Handle Save dialogs |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |

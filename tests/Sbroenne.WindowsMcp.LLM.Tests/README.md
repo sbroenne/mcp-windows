@@ -90,15 +90,20 @@ This runs `go run .` in the specified directory, which is useful for development
 
 ### Using PowerShell Runner (Recommended)
 
+Tests run sequentially by default (one model at a time) to avoid conflicts when multiple agents try to control the same Windows desktop simultaneously.
+
 ```powershell
-# Run all tests with gpt-4o (default)
+# Run all tests with all models sequentially
 .\Run-LLMTests.ps1 -Build
 
-# Run with a specific model
+# Run with a specific model only
 .\Run-LLMTests.ps1 -Model gpt-4.1
 
-# Run a specific scenario
-.\Run-LLMTests.ps1 -Scenario notepad-workflow.yaml
+# Run a specific scenario with all models
+.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
+
+# Run a specific scenario with a specific model
+.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml -Model gpt-5.2-chat
 ```
 
 ### Using agent-benchmark Directly
@@ -109,11 +114,13 @@ dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release
 
 # Run a scenario
 agent-benchmark `
-    -test tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/notepad-workflow.yaml `
-    -endpoint $env:AZURE_OPENAI_ENDPOINT `
-    -key $env:AZURE_OPENAI_API_KEY `
-    -report report.html
+    -f tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/notepad-ui-test.yaml `
+    -o report `
+    -reportType html,json `
+    -verbose
 ```
+
+**Note:** When running agent-benchmark directly, tests with multiple agents will run in parallel. This can cause conflicts if both agents try to control the same windows. Use the PowerShell runner for sequential execution.
 
 ## Project Structure
 
@@ -123,7 +130,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 │   ├── _config-template.yaml              # Reference configuration template
 │   ├── notepad-test.yaml                  # Legacy: Basic Notepad workflow
 │   ├── paint-smiley-test.yaml             # Legacy: Paint drawing test
-│   ├── notepad-ui-test.yaml               # Core UI tools (ui_find, ui_click, ui_type, ui_read, ui_wait)
+│   ├── notepad-ui-test.yaml               # Core UI tools (ui_find, ui_click, ui_type, ui_read)
 │   ├── window-management-test.yaml        # All 10 window_management actions
 │   ├── keyboard-mouse-test.yaml           # keyboard_control and mouse_control tools
 │   ├── screenshot-test.yaml               # screenshot_control actions
@@ -145,7 +152,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 
 | Scenario | Tools Covered | Description |
 |----------|---------------|-------------|
-| `notepad-ui-test.yaml` | ui_find, ui_click, ui_type, ui_read, ui_wait | Core UI interaction against Notepad |
+| `notepad-ui-test.yaml` | ui_find, ui_click, ui_type, ui_read | Core UI interaction against Notepad |
 | `window-management-test.yaml` | app, window_management (10 actions) | All window operations |
 | `keyboard-mouse-test.yaml` | keyboard_control, mouse_control | Typing, hotkeys, clicks, dragging |
 | `screenshot-test.yaml` | screenshot_control | Annotated/plain captures, monitor list |

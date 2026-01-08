@@ -79,7 +79,7 @@ Create `llm-tests.config.local.json`:
 
 | File | Description | Duration |
 |------|-------------|----------|
-| `notepad-ui-test.yaml` | Core UI tools (ui_find, ui_click, ui_type, ui_read, ui_wait) | ~3 min |
+| `notepad-ui-test.yaml` | Core UI tools (ui_find, ui_click, ui_type, ui_read) | ~3 min |
 | `paint-ui-test.yaml` | Paint toolbar, canvas, mouse operations | ~3 min |
 | `window-management-test.yaml` | All 10 window_management actions | ~5 min |
 | `keyboard-mouse-test.yaml` | keyboard_control, mouse_control | ~3 min |

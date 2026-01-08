@@ -98,9 +98,8 @@ Download from [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases
 |------|--------------|
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
-| `ui_find` | Discover elements in a window |
+| `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_read` | Read text (with OCR fallback) |
-| `ui_wait` | Wait for elements to appear or change |
 | `ui_file` | Handle Save dialogs |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |

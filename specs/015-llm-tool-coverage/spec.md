@@ -9,7 +9,7 @@
 
 ### User Story 1 - Core UI Interaction Tools Coverage (Priority: P1)
 
-As a developer maintaining mcp-windows, I want LLM tests for all UI interaction tools (`ui_find`, `ui_click`, `ui_type`, `ui_read`, `ui_wait`) so that I can verify that LLMs correctly use these tools against real applications.
+As a developer maintaining mcp-windows, I want LLM tests for all UI interaction tools (`ui_find`, `ui_click`, `ui_type`, `ui_read`) so that I can verify that LLMs correctly use these tools against real applications.
 
 **Why this priority**: These are the primary tools for UI automation. If LLMs cannot correctly use these tools, the entire UI Automation First approach fails.
 
@@ -24,8 +24,6 @@ As a developer maintaining mcp-windows, I want LLM tests for all UI interaction 
 3. **Given** Notepad is running, **When** the LLM is asked to type "Hello World" in the text area, **Then** it uses `ui_type` or `keyboard_control` and the text appears in the document.
 
 4. **Given** Notepad has text content, **When** the LLM is asked to read the document content, **Then** it uses `ui_read` and correctly returns the text content.
-
-5. **Given** Paint is running, **When** the LLM is asked to wait for the canvas to be ready, **Then** it uses `ui_wait` and the operation completes successfully.
 
 ---
 
@@ -178,7 +176,6 @@ As a developer, I want LLM tests that validate multi-step real-world workflows s
 - **FR-003**: System MUST have LLM tests for `ui_click` verifying button clicks, checkbox toggles, and tab selection.
 - **FR-004**: System MUST have LLM tests for `ui_type` verifying text input with `clearFirst` option.
 - **FR-005**: System MUST have LLM tests for `ui_read` verifying text extraction from various control types.
-- **FR-006**: System MUST have LLM tests for `ui_wait` with modes (`appear`, `enabled`, `disabled`).
 - **FR-007**: System MUST have LLM tests for `ui_file` verifying Save As dialog handling.
 - **FR-008**: System MUST have LLM tests for `window_management` with key actions (`list`, `find`, `activate`, `minimize`, `maximize`, `restore`, `close`, `move`, `resize`, `wait_for`).
 - **FR-009**: System MUST have LLM tests for `keyboard_control` with key actions (`type`, `press` with modifiers).
@@ -230,9 +227,9 @@ As a developer, I want LLM tests that validate multi-step real-world workflows s
 
 ### Measurable Outcomes
 
-- **SC-001**: 100% of tools (11 tools) have at least one LLM test covering basic functionality.
+- **SC-001**: 100% of tools (10 tools) have at least one LLM test covering basic functionality.
 - **SC-002**: All 10 key `window_management` actions have LLM test coverage (`list`, `find`, `activate`, `minimize`, `maximize`, `restore`, `close`, `move`, `resize`, `wait_for`).
-- **SC-003**: All 6 UI tools (`ui_find`, `ui_click`, `ui_type`, `ui_read`, `ui_wait`, `ui_file`) have LLM test coverage.
+- **SC-003**: All 5 UI tools (`ui_find`, `ui_click`, `ui_type`, `ui_read`, `ui_file`) have LLM test coverage.
 - **SC-004**: All LLM tests pass with 100% success rate on all configured providers (Azure OpenAI GPT-4.1 and GPT-5.2-chat).
 - **SC-005**: Each test step completes within 30 seconds.
 - **SC-006**: Zero hallucinated tools across all test sessions.
