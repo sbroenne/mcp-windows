@@ -159,17 +159,40 @@ if ($AgentBenchmarkMode -eq "executable") {
         # Only attempt download if using default location
         $DefaultDownloadPath = Join-Path $TestDir "agent-benchmark.exe"
         if ($ResolvedAgentBenchmarkPath -eq $DefaultDownloadPath) {
-            Write-Host "Downloading agent-benchmark..." -ForegroundColor Cyan
-            $AgentBenchmarkVersion = "v1.1.0"
-            $DownloadUrl = "https://github.com/mykhaliev/agent-benchmark/releases/download/$AgentBenchmarkVersion/agent-benchmark-windows-amd64.exe"
-
+            Write-Host "Downloading agent-benchmark (latest release)..." -ForegroundColor Cyan
+            
             try {
-                Invoke-WebRequest -Uri $DownloadUrl -OutFile $ResolvedAgentBenchmarkPath
-                Write-Host "Downloaded agent-benchmark to: $ResolvedAgentBenchmarkPath" -ForegroundColor Green
+                # Get latest release info from GitHub API
+                $ReleaseInfo = Invoke-RestMethod "https://api.github.com/repos/mykhaliev/agent-benchmark/releases/latest"
+                $LatestVersion = $ReleaseInfo.tag_name
+                Write-Host "Latest version: $LatestVersion" -ForegroundColor DarkGray
+                
+                # Find the Windows amd64 zip asset
+                $Asset = $ReleaseInfo.assets | Where-Object { $_.name -match "windows_amd64\.zip$" -and $_.name -notmatch "upx" } | Select-Object -First 1
+                if (-not $Asset) {
+                    throw "Could not find Windows amd64 zip asset in release $LatestVersion"
+                }
+                
+                $ZipPath = Join-Path $TestDir "agent-benchmark.zip"
+                Write-Host "Downloading: $($Asset.name)" -ForegroundColor DarkGray
+                Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $ZipPath
+                
+                # Extract the zip
+                Write-Host "Extracting..." -ForegroundColor DarkGray
+                Expand-Archive -Path $ZipPath -DestinationPath $TestDir -Force
+                Remove-Item $ZipPath -Force
+                
+                # The zip contains agent-benchmark.exe directly
+                if (Test-Path $ResolvedAgentBenchmarkPath) {
+                    Write-Host "Downloaded agent-benchmark $LatestVersion to: $ResolvedAgentBenchmarkPath" -ForegroundColor Green
+                }
+                else {
+                    throw "agent-benchmark.exe not found after extraction"
+                }
             }
             catch {
-                Write-Warning "Could not download agent-benchmark. Please download manually or build from source."
-                Write-Host "Download URL: $DownloadUrl"
+                Write-Warning "Could not download agent-benchmark: $_"
+                Write-Host "Please download manually from: https://github.com/mykhaliev/agent-benchmark/releases"
                 Write-Host "Or clone and build: https://github.com/mykhaliev/agent-benchmark"
                 exit 1
             }
