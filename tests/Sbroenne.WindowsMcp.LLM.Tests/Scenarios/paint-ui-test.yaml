@@ -31,9 +31,6 @@ providers:
     model: gpt-4.1
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
-    rate_limits:
-      tpm: 150000
-      rpm: 1000
     retry:
       retry_on_429: true
       max_retries: 5
@@ -44,10 +41,6 @@ providers:
     model: gpt-5.2-chat
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
-    rate_limits:
-      tpm: 150000
-      rpm: 1500
-
 servers:
   - name: windows-mcp
     type: stdio
