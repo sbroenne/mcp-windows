@@ -55,7 +55,6 @@ Create `llm-tests.config.local.json` for your personal settings:
 ```json
 {
   "$schema": "./llm-tests.config.schema.json",
-  "model": "gpt-4o",
   "agentBenchmarkPath": "../../../../agent-benchmark",
   "agentBenchmarkMode": "go-run",
   "verbose": false,
@@ -67,7 +66,6 @@ Create `llm-tests.config.local.json` for your personal settings:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `model` | string | `"gpt-4o"` | Azure OpenAI model deployment name |
 | `agentBenchmarkPath` | string | `null` | Path to agent-benchmark (absolute or relative to test dir) |
 | `agentBenchmarkMode` | string | `"executable"` | `"executable"` for .exe, `"go-run"` for Go project |
 | `verbose` | boolean | `false` | Show detailed output |
@@ -90,20 +88,12 @@ This runs `go run .` in the specified directory, which is useful for development
 
 ### Using PowerShell Runner (Recommended)
 
-Tests run sequentially by default (one model at a time) to avoid conflicts when multiple agents try to control the same Windows desktop simultaneously.
-
 ```powershell
-# Run all tests with all models sequentially
+# Run all tests
 .\Run-LLMTests.ps1 -Build
 
-# Run with a specific model only
-.\Run-LLMTests.ps1 -Model gpt-4.1
-
-# Run a specific scenario with all models
+# Run a specific scenario
 .\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
-
-# Run a specific scenario with a specific model
-.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml -Model gpt-5.2-chat
 ```
 
 ### Using agent-benchmark Directly
@@ -119,8 +109,6 @@ agent-benchmark `
     -reportType html,json `
     -verbose
 ```
-
-**Note:** When running agent-benchmark directly, tests with multiple agents will run in parallel. This can cause conflicts if both agents try to control the same windows. Use the PowerShell runner for sequential execution.
 
 ## Project Structure
 

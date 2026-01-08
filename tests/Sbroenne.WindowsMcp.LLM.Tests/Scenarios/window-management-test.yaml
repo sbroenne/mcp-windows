@@ -37,12 +37,18 @@ providers:
     model: gpt-4.1
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
   - name: azure-openai-gpt5-chat
     type: AZURE
     auth_type: entra_id
     model: gpt-5.2-chat
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
 servers:
   - name: windows-mcp
     type: stdio

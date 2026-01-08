@@ -1,20 +1,20 @@
 # =============================================================================
-# Run Dialog Test - Launch Apps via Windows Run (Win+R)
+# App Tool UWP Test - Tests launching UWP/Windows Store apps via the app() tool
 # =============================================================================
 #
-# Tests launching applications using the Windows Run dialog (Win+R)
-# instead of the app tool. This validates keyboard_control for hotkeys
-# and ui_type for dialog input.
+# This validates the dynamic stub detection for apps like Calculator that exit
+# immediately and spawn a separate UWP process under ApplicationFrameHost.
+#
+# The app() tool must detect when a process exits quickly with exit code 0
+# (indicating a UWP stub) and then search for windows by title instead of PID.
 #
 # Tools Covered:
-#   - keyboard_control: Press Win+R to open Run dialog
-#   - window_management: Find/wait for Run dialog
-#   - ui_type: Type program name in Run dialog
-#   - keyboard_control: Press Enter to launch
+#   - app: Launch applications (primary focus - UWP stub detection)
+#   - window_management: Verify windows exist and close them
 #
 # Prerequisites:
 #   - Windows 10/11
-#   - Windows MCP Server
+#   - Windows MCP Server with dynamic stub detection
 #   - Environment: AZURE_OPENAI_ENDPOINT
 #
 # =============================================================================
@@ -93,39 +93,70 @@ settings:
 
 sessions:
   # ==========================================================================
-  # Session 1: Launch Notepad via Run Dialog
+  # Session 1: Launch Calculator via App Tool (UWP Stub Test)
   # ==========================================================================
-  - name: "Run Dialog Launch"
+  - name: "Calculator via App Tool"
+    tests:
+      - name: "Cleanup - Close existing Calculator windows"
+        prompt: |
+          Close any existing Calculator windows that may be open.
+        assertions:
+          - type: no_hallucinated_tools
+
+      - name: "Launch Calculator using app tool"
+        prompt: |
+          Launch Calculator using the app tool with programPath set to "calc.exe".
+          Report whether the launch was successful and what window handle was returned.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: app
+          - type: output_regex
+            pattern: "(?i)(calculator|launched|success|handle|window)"
+
+      - name: "Verify Calculator window exists"
+        prompt: |
+          Verify that Calculator is now open by finding its window using window_management.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: output_regex
+            pattern: "(?i)(calculator|found|open|visible)"
+
+      - name: "Close Calculator"
+        prompt: |
+          Close the Calculator window.
+        assertions:
+          - type: no_hallucinated_tools
+          - type: output_regex
+            pattern: "(?i)(calculator|closed|success)"
+
+  # ==========================================================================
+  # Session 2: Launch Notepad via App Tool (Control - Win32 App)
+  # ==========================================================================
+  - name: "Notepad via App Tool (Control)"
     tests:
       - name: "Cleanup - Close existing Notepad windows"
         prompt: |
-          Close all Notepad windows if any are open.
+          Close any existing Notepad windows that may be open.
         assertions:
           - type: no_hallucinated_tools
 
-      - name: "Open Windows Run dialog"
+      - name: "Launch Notepad using app tool"
         prompt: |
-          Open the Windows Run dialog using the keyboard shortcut Win+R.
+          Launch Notepad using the app tool with programPath set to "notepad.exe".
+          Report whether the launch was successful and what window handle was returned.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
-            tool: keyboard_control
-          # Don't assert exact params - models may use different casing or action types
-          # The Run dialog opening is verified by subsequent tests succeeding
+            tool: app
           - type: output_regex
-            pattern: "(?i)(run|dialog|win.*r|opened)"
+            pattern: "(?i)(notepad|launched|success|handle|window)"
 
-      - name: "Type notepad in Run dialog and launch"
+      - name: "Verify Notepad window exists"
         prompt: |
-          Type "notepad" in the Run dialog and press Enter to launch it.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-
-      - name: "Verify Notepad launched"
-        prompt: |
-          Verify that Notepad is now open by finding its window.
+          Verify that Notepad is now open by finding its window using window_management.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
@@ -135,46 +166,8 @@ sessions:
 
       - name: "Close Notepad"
         prompt: |
-          Close Notepad without saving.
+          Close the Notepad window without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: tool_called
-            tool: window_management
-
-  # ==========================================================================
-  # Session 2: Launch Calculator via Run Dialog
-  # ==========================================================================
-  - name: "Run Dialog Calculator"
-    tests:
-      - name: "Cleanup - Close existing Calculator windows"
-        prompt: |
-          Close all Calculator windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Calculator via Run dialog"
-        prompt: |
-          Open the Windows Run dialog with Win+R, type "calc", and press Enter to launch Calculator.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: keyboard_control
-
-      - name: "Verify Calculator launched"
-        prompt: |
-          Verify that Calculator is now open.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: window_management
           - type: output_regex
-            pattern: "(?i)(calculator|calc|found|open)"
-
-      - name: "Close Calculator"
-        prompt: |
-          Close Calculator.
-        assertions:
-          - type: no_hallucinated_tools
-          # Model may skip tool call if Calculator wasn't open (from previous session state)
-          - type: output_regex
-            pattern: "(?i)(calculator|closed|not open|no.*windows)"
+            pattern: "(?i)(notepad|closed|success)"

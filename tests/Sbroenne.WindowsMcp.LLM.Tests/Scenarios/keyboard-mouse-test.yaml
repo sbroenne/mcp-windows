@@ -243,31 +243,39 @@ sessions:
 
       - name: "Click in the canvas area"
         prompt: |
-          Click somewhere in the middle of the Paint canvas area to make a mark.
+          Use mouse_control to click at coordinates (900, 600) in the Paint window to make a mark on the canvas.
         assertions:
           - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: mouse_control
-              - type: tool_called
-                tool: ui_click
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "click"
 
       - name: "Click in another location"
         prompt: |
-          Click at a different location in the canvas to make another mark.
+          Use mouse_control to click at coordinates (1100, 500) in the Paint window to make another mark.
         assertions:
           - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: mouse_control
-              - type: tool_called
-                tool: ui_click
+          - type: tool_called
+            tool: mouse_control
+          - type: tool_param_equals
+            tool: mouse_control
+            params:
+              action: "click"
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "close"
 
   # ==========================================================================
   # Session 4: Mouse Drag - mouse_control(drag) for drawing a line in Paint
@@ -290,7 +298,7 @@ sessions:
 
       - name: "Draw a line by dragging"
         prompt: |
-          Draw a diagonal line across the Paint canvas by dragging from one corner to another.
+          Use mouse_control with action drag to draw a line from (700, 500) to (1200, 700) in the Paint window.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
@@ -302,7 +310,7 @@ sessions:
 
       - name: "Draw another line"
         prompt: |
-          Draw a horizontal line across the middle of the canvas.
+          Use mouse_control with action drag to draw a horizontal line from (700, 600) to (1200, 600) in the Paint window.
         assertions:
           - type: no_hallucinated_tools
           - type: tool_called
@@ -317,6 +325,12 @@ sessions:
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
+          - type: tool_called
+            tool: window_management
+          - type: tool_param_equals
+            tool: window_management
+            params:
+              action: "close"
 
   # ==========================================================================
   # Session 5: Mouse Position - mouse_control(get_position)
