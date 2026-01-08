@@ -160,7 +160,7 @@ if ($AgentBenchmarkMode -eq "executable") {
         $DefaultDownloadPath = Join-Path $TestDir "agent-benchmark.exe"
         if ($ResolvedAgentBenchmarkPath -eq $DefaultDownloadPath) {
             Write-Host "Downloading agent-benchmark..." -ForegroundColor Cyan
-            $AgentBenchmarkVersion = "v0.1.0"
+            $AgentBenchmarkVersion = "v1.1.0"
             $DownloadUrl = "https://github.com/mykhaliev/agent-benchmark/releases/download/$AgentBenchmarkVersion/agent-benchmark-windows-amd64.exe"
 
             try {
