@@ -91,6 +91,14 @@ public sealed record KeyboardControlResult
     public string? Message { get; init; }
 
     /// <summary>
+    /// Gets or sets a hint suggesting a better tool for the operation.
+    /// Used to guide LLMs toward more appropriate tools (e.g., ui_file for saving).
+    /// </summary>
+    [JsonPropertyName("hint")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Hint { get; init; }
+
+    /// <summary>
     /// Creates a successful result for a type operation.
     /// </summary>
     /// <param name="charactersTyped">Number of characters typed.</param>

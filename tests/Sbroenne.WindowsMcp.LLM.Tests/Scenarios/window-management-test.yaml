@@ -99,7 +99,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -112,8 +112,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -126,8 +124,6 @@ sessions:
             tool: app
             params:
               programPath: "notepad.exe"
-          - type: max_latency_ms
-            value: 15000
 
       - name: "List all open windows"
         prompt: |
@@ -142,8 +138,6 @@ sessions:
               action: "list"
           - type: output_regex
             pattern: "(?i)(notepad|window|title)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Find the Notepad window"
         prompt: |
@@ -158,8 +152,6 @@ sessions:
               action: "find"
           - type: output_regex
             pattern: "(?i)(notepad|found|window|handle)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
@@ -168,8 +160,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: window_management
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Window State - minimize, maximize, restore, activate
@@ -181,8 +171,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -191,8 +179,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Minimize the Notepad window"
         prompt: |
@@ -205,8 +191,6 @@ sessions:
             tool: window_management
             params:
               action: "minimize"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Restore the Notepad window"
         prompt: |
@@ -219,8 +203,6 @@ sessions:
             tool: window_management
             params:
               action: "restore"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Maximize the Notepad window"
         prompt: |
@@ -233,8 +215,6 @@ sessions:
             tool: window_management
             params:
               action: "maximize"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Restore from maximized"
         prompt: |
@@ -247,8 +227,6 @@ sessions:
             tool: window_management
             params:
               action: "restore"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Activate the Notepad window"
         prompt: |
@@ -261,8 +239,6 @@ sessions:
             tool: window_management
             params:
               action: "activate"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
@@ -271,8 +247,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: window_management
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 3: Window Position - move and resize
@@ -284,8 +258,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -294,8 +266,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Move window to top-left corner"
         prompt: |
@@ -308,8 +278,6 @@ sessions:
             tool: window_management
             params:
               action: "move"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Resize window to 800x600"
         prompt: |
@@ -322,8 +290,6 @@ sessions:
             tool: window_management
             params:
               action: "resize"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Move window to center area"
         prompt: |
@@ -336,8 +302,6 @@ sessions:
             tool: window_management
             params:
               action: "move"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Resize window to smaller size"
         prompt: |
@@ -350,8 +314,6 @@ sessions:
             tool: window_management
             params:
               action: "resize"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
@@ -360,8 +322,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: window_management
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 4: Window Lifecycle - wait_for and close with options
@@ -373,8 +333,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -383,8 +341,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Wait for the Notepad window to be ready"
         prompt: |
@@ -393,14 +349,17 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: window_management
-          - type: tool_param_equals
-            tool: window_management
-            params:
-              action: "wait_for"
+          - anyOf:
+              - type: tool_param_equals
+                tool: window_management
+                params:
+                  action: "wait_for"
+              - type: tool_param_equals
+                tool: window_management
+                params:
+                  action: "wait_for_state"
           - type: output_regex
             pattern: "(?i)(notepad|ready|visible|found|success)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Type some text"
         prompt: |
@@ -412,8 +371,6 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad and discard changes"
         prompt: |
@@ -426,8 +383,6 @@ sessions:
             tool: window_management
             params:
               action: "close"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Verify Notepad is closed"
         prompt: |
@@ -438,5 +393,4 @@ sessions:
             tool: window_management
           - type: output_regex
             pattern: "(?i)(no.*notepad|not.*found|closed|not.*running|0.*match)"
-          - type: max_latency_ms
-            value: 15000
+

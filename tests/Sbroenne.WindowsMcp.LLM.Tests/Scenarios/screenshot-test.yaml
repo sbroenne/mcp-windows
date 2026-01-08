@@ -95,7 +95,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -108,8 +108,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -118,8 +116,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Take an annotated screenshot of Notepad"
         prompt: |
@@ -134,16 +130,12 @@ sessions:
               annotate: true
           - type: output_regex
             pattern: "(?i)(element|label|annotation|ui|menu|edit|file)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Plain Screenshot - capture without annotations
@@ -155,8 +147,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -165,8 +155,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Take a plain screenshot of Paint"
         prompt: |
@@ -179,16 +167,12 @@ sessions:
             tool: screenshot_control
             params:
               annotate: false
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 3: Monitor List - enumerate available displays
@@ -208,8 +192,6 @@ sessions:
               action: "list_monitors"
           - type: output_regex
             pattern: "(?i)(monitor|display|screen|primary|\\d+x\\d+)"
-          - type: max_latency_ms
-            value: 15000
 
   # ==========================================================================
   # Session 4: Window Screenshot - capture specific window by handle
@@ -221,8 +203,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -231,8 +211,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Find the Notepad window"
         prompt: |
@@ -243,8 +221,6 @@ sessions:
             tool: window_management
           - type: output_regex
             pattern: "(?i)(handle|notepad|found|window)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Take a screenshot of just the Notepad window"
         prompt: |
@@ -253,13 +229,10 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: screenshot_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
+

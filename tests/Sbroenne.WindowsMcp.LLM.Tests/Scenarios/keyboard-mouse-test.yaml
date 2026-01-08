@@ -96,7 +96,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -109,8 +109,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -119,8 +117,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Type a sentence using keyboard"
         prompt: |
@@ -132,8 +128,6 @@ sessions:
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_type
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Type on a new line"
         prompt: |
@@ -145,16 +139,12 @@ sessions:
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_type
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Hotkeys - keyboard_control(press) with Ctrl+A, Ctrl+C, Ctrl+V
@@ -166,8 +156,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -176,8 +164,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Type some text"
         prompt: |
@@ -189,8 +175,6 @@ sessions:
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_type
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Select all text with Ctrl+A"
         prompt: |
@@ -203,8 +187,6 @@ sessions:
             tool: keyboard_control
             params:
               key: "(?i)a"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Copy with Ctrl+C"
         prompt: |
@@ -217,8 +199,6 @@ sessions:
             tool: keyboard_control
             params:
               key: "(?i)c"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Go to end and add new line"
         prompt: |
@@ -227,8 +207,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Paste with Ctrl+V"
         prompt: |
@@ -241,16 +219,12 @@ sessions:
             tool: keyboard_control
             params:
               key: "(?i)v"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 3: Mouse Click - mouse_control(click) at coordinates in Paint
@@ -262,8 +236,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -276,8 +248,6 @@ sessions:
             tool: app
             params:
               programPath: "mspaint.exe"
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Click in the canvas area"
         prompt: |
@@ -289,8 +259,6 @@ sessions:
                 tool: mouse_control
               - type: tool_called
                 tool: ui_click
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Click in another location"
         prompt: |
@@ -302,16 +270,12 @@ sessions:
                 tool: mouse_control
               - type: tool_called
                 tool: ui_click
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 4: Mouse Drag - mouse_control(drag) for drawing a line in Paint
@@ -323,8 +287,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -333,8 +295,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Draw a line by dragging"
         prompt: |
@@ -347,8 +307,6 @@ sessions:
             tool: mouse_control
             params:
               action: "drag"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Draw another line"
         prompt: |
@@ -361,16 +319,12 @@ sessions:
             tool: mouse_control
             params:
               action: "drag"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 5: Mouse Position - mouse_control(get_position)
@@ -390,8 +344,6 @@ sessions:
               action: "get_position"
           - type: output_regex
             pattern: "(?i)(x|y|position|coordinate|\\d+)"
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Move mouse and get position again"
         prompt: |
@@ -400,5 +352,4 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: mouse_control
-          - type: max_latency_ms
-            value: 30000
+

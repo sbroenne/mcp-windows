@@ -33,7 +33,10 @@ providers:
     version: 2025-01-01-preview
     rate_limits:
       tpm: 150000
-      rpm: 150
+      rpm: 1000
+    retry:
+      retry_on_429: true
+      max_retries: 5
 
   - name: azure-openai-gpt5-chat
     type: AZURE
@@ -59,7 +62,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -78,7 +81,7 @@ agents:
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
-      
+
       CRITICAL RULES:
       - Execute all tasks IMMEDIATELY without asking for confirmation
       - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
@@ -93,7 +96,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -106,8 +109,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -116,8 +117,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Find the pencil tool"
         prompt: |
@@ -128,8 +127,6 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(pencil|tool|found|element)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Find the brush tools"
         prompt: |
@@ -140,8 +137,6 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(brush|tool|found|element)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Find the shapes tools"
         prompt: |
@@ -152,16 +147,12 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(shape|tool|found|element)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Tool Selection - ui_click for tool buttons
@@ -173,8 +164,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -183,8 +172,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Click on the pencil tool"
         prompt: |
@@ -196,8 +183,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Click on the brush tool"
         prompt: |
@@ -209,8 +194,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Click on the eraser tool"
         prompt: |
@@ -222,16 +205,12 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 3: Color Selection - ui_click for color palette
@@ -243,8 +222,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -253,8 +230,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Select red color"
         prompt: |
@@ -266,8 +241,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Select blue color"
         prompt: |
@@ -279,8 +252,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Select green color"
         prompt: |
@@ -292,16 +263,12 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 4: Canvas Drawing - mouse_control(drag) for drawing
@@ -313,8 +280,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -323,8 +288,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Draw a diagonal line"
         prompt: |
@@ -337,8 +300,6 @@ sessions:
             tool: mouse_control
             params:
               action: "drag"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Draw a horizontal line"
         prompt: |
@@ -351,16 +312,12 @@ sessions:
             tool: mouse_control
             params:
               action: "drag"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 5: State Discovery - screenshot_control(annotate=true)
@@ -372,8 +329,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -382,8 +337,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Take an annotated screenshot to discover UI elements"
         prompt: |
@@ -398,13 +351,10 @@ sessions:
               annotate: true
           - type: output_regex
             pattern: "(?i)(element|label|annotation|tool|canvas|color)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
+

@@ -100,7 +100,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15    # Enough for complex multi-step workflows
-  test_delay: 60s       # Delay between tests to avoid rate limits
+
 
 # =============================================================================
 # Standard Assertion Patterns
@@ -163,3 +163,4 @@ settings:
 #             value: 30000
 #
 # =============================================================================
+

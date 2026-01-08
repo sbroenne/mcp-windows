@@ -239,6 +239,7 @@ foreach ($ScenarioFile in $ScenarioFiles) {
     $Args = @(
         "-f", $TempFile,
         "-o", $ReportFile,
+        "-reportType", "html,json",
         "-verbose"
     )
 

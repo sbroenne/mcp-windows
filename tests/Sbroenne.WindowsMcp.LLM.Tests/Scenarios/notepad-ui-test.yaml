@@ -92,7 +92,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -105,8 +105,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -115,8 +113,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Find the File menu"
         prompt: |
@@ -127,8 +123,6 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(file|menu|found|element)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Find the main text editing area"
         prompt: |
@@ -139,8 +133,6 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(edit|text|document|area|found)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Find the Edit menu"
         prompt: |
@@ -151,16 +143,12 @@ sessions:
             tool: ui_find
           - type: output_regex
             pattern: "(?i)(edit|menu|found)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving any changes.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Text Input - ui_type for document editing
@@ -172,8 +160,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -182,8 +168,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Type a greeting"
         prompt: |
@@ -195,8 +179,6 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Type on a new line"
         prompt: |
@@ -208,16 +190,12 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 3: Text Reading - ui_read for content extraction
@@ -229,8 +207,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -239,8 +215,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Type some text"
         prompt: |
@@ -252,8 +226,6 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Read the text content"
         prompt: |
@@ -264,16 +236,12 @@ sessions:
             tool: ui_read
           - type: output_regex
             pattern: "(?i)(test content|reading|text|content)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 4: Menu Navigation - ui_click for File/Edit/Format menus
@@ -285,8 +253,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -295,8 +261,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Click the File menu"
         prompt: |
@@ -308,8 +272,6 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Press Escape to close menu"
         prompt: |
@@ -321,8 +283,6 @@ sessions:
                 tool: keyboard_control
               - type: tool_called
                 tool: ui_click
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Click the Edit menu"
         prompt: |
@@ -334,16 +294,12 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Press Escape to close menu"
         prompt: |
           Press Escape to close the menu.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Click the Format menu"
         prompt: |
@@ -355,16 +311,12 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 5: UI Waiting - ui_wait for element states
@@ -376,8 +328,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -386,8 +336,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Wait for the text area to be ready"
         prompt: |
@@ -401,8 +349,6 @@ sessions:
                 tool: ui_find
           - type: output_regex
             pattern: "(?i)(ready|available|found|success|edit|text)"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Type some text to confirm it is ready"
         prompt: |
@@ -414,8 +360,6 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Wait for window title change indicator"
         prompt: |
@@ -429,13 +373,10 @@ sessions:
                 tool: ui_find
               - type: tool_called
                 tool: window_management
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad without saving.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
+

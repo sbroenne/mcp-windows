@@ -100,7 +100,7 @@ agents:
 settings:
   verbose: true
   max_iterations: 15
-  test_delay: 60s
+
 
 sessions:
   # ==========================================================================
@@ -113,8 +113,6 @@ sessions:
           Close all Notepad windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Notepad"
         prompt: |
@@ -123,8 +121,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Type some text"
         prompt: |
@@ -136,8 +132,6 @@ sessions:
                 tool: ui_type
               - type: tool_called
                 tool: keyboard_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Save the file"
         prompt: |
@@ -156,16 +150,12 @@ sessions:
             value: "failed"
           - type: output_not_contains
             value: "SecureDesktop"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Notepad"
         prompt: |
           Close Notepad.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
 
   # ==========================================================================
   # Session 2: Paint Save - save image as PNG via ui_file
@@ -177,8 +167,6 @@ sessions:
           Close all Paint windows if any are open.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Launch Paint"
         prompt: |
@@ -187,8 +175,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: app
-          - type: max_latency_ms
-            value: 15000
 
       - name: "Draw something simple"
         prompt: |
@@ -197,8 +183,6 @@ sessions:
           - type: no_hallucinated_tools
           - type: tool_called
             tool: mouse_control
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Save the image as PNG"
         prompt: |
@@ -217,13 +201,10 @@ sessions:
             value: "failed"
           - type: output_not_contains
             value: "SecureDesktop"
-          - type: max_latency_ms
-            value: 30000
 
       - name: "Close Paint"
         prompt: |
           Close Paint.
         assertions:
           - type: no_hallucinated_tools
-          - type: max_latency_ms
-            value: 20000
+

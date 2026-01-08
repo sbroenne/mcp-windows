@@ -59,14 +59,15 @@ public sealed partial class KeyboardControlTool : IDisposable
 
     /// <summary>
     /// ⚠️ TO SAVE FILES: STOP! Use ui_file(windowHandle, filePath) instead. keyboard_control does NOT handle Save As dialogs.
-    /// Keyboard input to the FOREGROUND window. After app(programPath='notepad.exe'), the window is already focused - just call keyboard_control directly.
+    /// Sends keyboard input to a specific window. The window is activated before input is sent.
     /// Best for: typing text, hotkeys (key='s', modifiers='ctrl'), special keys.
-    /// For typing into a specific UI element by handle, use ui_type instead.
+    /// For typing into a specific UI element by name/automationId, use ui_type instead.
     /// </summary>
     /// <remarks>
     /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. FOR SAVE: Use ui_file tool.
     /// </remarks>
     /// <param name="context">The MCP request context for logging and server access.</param>
+    /// <param name="windowHandle">Window handle as decimal string (from app() or window_management 'find'). REQUIRED - ensures input goes to the correct window.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
     /// <param name="text">Text to type (required for type action).</param>
     /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
@@ -74,14 +75,13 @@ public sealed partial class KeyboardControlTool : IDisposable
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
     /// <param name="sequence">JSON array for sequence action. Format: [{"key":"f","modifiers":"alt"},{"key":"s"}] for Alt+F then S. Modifiers: "ctrl", "shift", "alt", "win" (or numbers: 1,2,4,8).</param>
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
-    /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
-    /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="clearFirst">For type action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
     public async Task<KeyboardControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
+        string windowHandle,
         KeyboardAction action,
         string? text = null,
         string? key = null,
@@ -89,12 +89,28 @@ public sealed partial class KeyboardControlTool : IDisposable
         int repeat = 1,
         string? sequence = null,
         int? interKeyDelayMs = null,
-        string? expectedWindowTitle = null,
-        string? expectedProcessName = null,
         bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
+
+        // Validate windowHandle is provided
+        if (string.IsNullOrWhiteSpace(windowHandle))
+        {
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.MissingRequiredParameter,
+                "windowHandle is required. Get it from app() or window_management(action='find').");
+        }
+
+        // Parse windowHandle
+        if (!long.TryParse(windowHandle, out var handleValue) || handleValue == 0)
+        {
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.InvalidAction,
+                $"Invalid windowHandle '{windowHandle}'. Must be a non-zero decimal number from app() or window_management.");
+        }
+
+        var handle = new IntPtr(handleValue);
 
         var correlationId = KeyboardOperationLogger.GenerateCorrelationId();
         var stopwatch = Stopwatch.StartNew();
@@ -112,16 +128,18 @@ public sealed partial class KeyboardControlTool : IDisposable
 
         try
         {
-            // Pre-flight check: verify target window if expected values are specified
-            if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
+            // Activate the target window before sending keyboard input
+            var activationResult = await _windowService.ActivateWindowAsync(handle, linkedToken);
+            if (!activationResult.Success)
             {
-                var targetCheckResult = await VerifyTargetWindowAsync(expectedWindowTitle, expectedProcessName, linkedToken);
-                if (!targetCheckResult.Success)
-                {
-                    _logger.LogOperationFailure(correlationId, action.ToString(), targetCheckResult.ErrorCode.ToString(), targetCheckResult.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
-                    return targetCheckResult;
-                }
+                _logger.LogOperationFailure(correlationId, action.ToString(), "WindowActivationFailed", activationResult.Error ?? "Failed to activate window", stopwatch.ElapsedMilliseconds);
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    $"Failed to activate window {windowHandle}: {activationResult.Error}");
             }
+
+            // Small delay to let the window settle after activation
+            await Task.Delay(50, linkedToken);
 
             KeyboardControlResult operationResult;
 
@@ -285,7 +303,44 @@ public sealed partial class KeyboardControlTool : IDisposable
         }
 
         var modifierKey = ParseModifiers(modifiers);
-        return await _keyboardInputService.PressKeyAsync(key, modifierKey, repeat, cancellationToken);
+        var result = await _keyboardInputService.PressKeyAsync(key, modifierKey, repeat, cancellationToken);
+
+        // Add hints for common save/file operations to guide LLMs toward dedicated tools
+        if (result.Success)
+        {
+            result = AddFileSaveHintIfNeeded(key, modifierKey, result);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Adds a hint to the result if the key combination is a file save operation.
+    /// This guides LLMs to use the dedicated ui_file tool for reliable file operations.
+    /// </summary>
+    private static KeyboardControlResult AddFileSaveHintIfNeeded(string key, ModifierKey modifiers, KeyboardControlResult result)
+    {
+        var keyLower = key.ToLowerInvariant();
+        var isCtrlS = keyLower == "s" && modifiers.HasFlag(ModifierKey.Ctrl);
+        var isAltF = keyLower == "f" && modifiers.HasFlag(ModifierKey.Alt);
+
+        if (isCtrlS)
+        {
+            return result with
+            {
+                Hint = "TIP: For more reliable file saving, use ui_file(action='save', windowHandle, filePath) which handles Save dialogs automatically. Keyboard shortcuts may not work in all applications or may open dialogs that need additional handling."
+            };
+        }
+
+        if (isAltF)
+        {
+            return result with
+            {
+                Hint = "TIP: For file operations, use ui_file tool instead of menu navigation. ui_file(action='save', windowHandle, filePath) handles Save/SaveAs dialogs automatically and works across different application UI styles."
+            };
+        }
+
+        return result;
     }
 
     private async Task<KeyboardControlResult> HandleKeyDownAsync(string? key, CancellationToken cancellationToken)
@@ -376,7 +431,60 @@ public sealed partial class KeyboardControlTool : IDisposable
                 "TIP: For saving files, use ui_file tool instead.");
         }
 
-        return await _keyboardInputService.ExecuteSequenceAsync(sequence, interKeyDelayMs, cancellationToken);
+        var result = await _keyboardInputService.ExecuteSequenceAsync(sequence, interKeyDelayMs, cancellationToken);
+
+        // Add hints for common save/file operations to guide LLMs toward dedicated tools
+        if (result.Success)
+        {
+            result = AddSequenceFileSaveHintIfNeeded(sequence, result);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Adds a hint to the result if the key sequence appears to be a file save operation.
+    /// This guides LLMs to use the dedicated ui_file tool for reliable file operations.
+    /// </summary>
+    private static KeyboardControlResult AddSequenceFileSaveHintIfNeeded(IReadOnlyList<KeySequenceItem> sequence, KeyboardControlResult result)
+    {
+        // Check for Alt+F (File menu) pattern at the start of the sequence
+        var hasFileMenuPattern = sequence.Count > 0 &&
+            sequence[0].Key.Equals("f", StringComparison.OrdinalIgnoreCase) &&
+            sequence[0].Modifiers.HasFlag(ModifierKey.Alt);
+
+        // Check for Ctrl+S anywhere in the sequence
+        var hasCtrlS = sequence.Any(item =>
+            item.Key.Equals("s", StringComparison.OrdinalIgnoreCase) &&
+            item.Modifiers.HasFlag(ModifierKey.Ctrl));
+
+        // Check for Alt+F, A pattern (legacy Save As)
+        var hasLegacySaveAs = sequence.Count >= 2 &&
+            hasFileMenuPattern &&
+            sequence.Any(item => item.Key.Equals("a", StringComparison.OrdinalIgnoreCase));
+
+        // Check for Alt+F, S pattern (legacy Save)
+        var hasLegacySave = sequence.Count >= 2 &&
+            hasFileMenuPattern &&
+            sequence.Skip(1).Any(item => item.Key.Equals("s", StringComparison.OrdinalIgnoreCase));
+
+        if (hasCtrlS || hasLegacySaveAs || hasLegacySave)
+        {
+            return result with
+            {
+                Hint = "TIP: For more reliable file saving, use ui_file(action='save', windowHandle, filePath) which handles Save dialogs automatically. Keyboard shortcuts and menu navigation may not work reliably in modern applications with ribbon UIs."
+            };
+        }
+
+        if (hasFileMenuPattern)
+        {
+            return result with
+            {
+                Hint = "TIP: For file operations like Save, SaveAs, or Open, use the ui_file tool instead of menu navigation. It handles dialogs automatically and works across different application UI styles."
+            };
+        }
+
+        return result;
     }
 
     private async Task<KeyboardControlResult> HandleReleaseAllAsync(CancellationToken cancellationToken)
@@ -456,71 +564,6 @@ public sealed partial class KeyboardControlTool : IDisposable
         // Get current cursor position to check elevation
         NativeMethods.GetCursorPos(out var cursorPos);
         return _elevationDetector.IsTargetElevated(cursorPos.X, cursorPos.Y);
-    }
-
-    /// <summary>
-    /// Verifies that the foreground window matches the expected target before sending input.
-    /// This prevents input from being sent to the wrong application.
-    /// </summary>
-    /// <param name="expectedTitle">Expected window title (partial match, case-insensitive).</param>
-    /// <param name="expectedProcessName">Expected process name (case-insensitive).</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Success result if window matches, failure result with WrongTargetWindow error if not.</returns>
-    private async Task<KeyboardControlResult> VerifyTargetWindowAsync(string? expectedTitle, string? expectedProcessName, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var foregroundHandle = NativeMethods.GetForegroundWindow();
-            if (foregroundHandle == IntPtr.Zero)
-            {
-                return KeyboardControlResult.CreateFailure(
-                    KeyboardControlErrorCode.WrongTargetWindow,
-                    "No foreground window found. Cannot verify target window.");
-            }
-
-            var windowInfo = await _windowEnumerator.GetWindowInfoAsync(foregroundHandle, cancellationToken);
-            if (windowInfo == null)
-            {
-                return KeyboardControlResult.CreateFailure(
-                    KeyboardControlErrorCode.WrongTargetWindow,
-                    "Could not retrieve foreground window information.");
-            }
-
-            // Check expected title (partial, case-insensitive match)
-            if (!string.IsNullOrEmpty(expectedTitle))
-            {
-                if (string.IsNullOrEmpty(windowInfo.Title) ||
-                    !windowInfo.Title.Contains(expectedTitle, StringComparison.OrdinalIgnoreCase))
-                {
-                    var result = KeyboardControlResult.CreateFailure(
-                        KeyboardControlErrorCode.WrongTargetWindow,
-                        $"Foreground window title '{windowInfo.Title}' does not contain expected text '{expectedTitle}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
-                }
-            }
-
-            // Check expected process name (case-insensitive match)
-            if (!string.IsNullOrEmpty(expectedProcessName))
-            {
-                if (string.IsNullOrEmpty(windowInfo.ProcessName) ||
-                    !windowInfo.ProcessName.Equals(expectedProcessName, StringComparison.OrdinalIgnoreCase))
-                {
-                    var result = KeyboardControlResult.CreateFailure(
-                        KeyboardControlErrorCode.WrongTargetWindow,
-                        $"Foreground window process '{windowInfo.ProcessName}' does not match expected process '{expectedProcessName}'. Aborting to prevent input to wrong window.");
-                    return result with { TargetWindow = TargetWindowInfo.FromFullWindowInfo(windowInfo) };
-                }
-            }
-
-            // Window matches expectations
-            return KeyboardControlResult.CreateSuccess();
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return KeyboardControlResult.CreateFailure(
-                KeyboardControlErrorCode.WrongTargetWindow,
-                $"Failed to verify target window: {ex.Message}");
-        }
     }
 
     /// <summary>
