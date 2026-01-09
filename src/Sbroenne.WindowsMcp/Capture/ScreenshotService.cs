@@ -58,13 +58,19 @@ public sealed class ScreenshotService
                 return HandleListMonitors();
             }
 
-            // Check for secure desktop before any capture operation
+            // Check for secure desktop before any capture/record operation
             if (_secureDesktopDetector.IsSecureDesktopActive())
             {
                 _logger.LogSecureDesktopBlocked();
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.SecureDesktopActive,
                     "Cannot capture screenshot while secure desktop (UAC/lock screen) is active");
+            }
+
+            // Handle Record action
+            if (request.Action == ScreenshotAction.Record)
+            {
+                return await HandleRecordAsync(request, cancellationToken);
             }
 
             // Route to appropriate capture method
@@ -604,6 +610,205 @@ public sealed class ScreenshotService
 
         // It's a full file path - use it directly
         return outputPath;
+    }
+
+    /// <summary>
+    /// Handles the record action.
+    /// </summary>
+    private async Task<ScreenshotControlResult> HandleRecordAsync(
+        ScreenshotControlRequest request,
+        CancellationToken cancellationToken)
+    {
+        // 1. Resolve initial region
+        var (region, error) = await ResolveCaptureRegionAsync(request);
+        if (error != null || region is null)
+        {
+            return error ?? ScreenshotControlResult.Error(
+                ScreenshotErrorCode.InvalidRequest,
+                "Could not resolve capture region");
+        }
+
+        // 2. Validate size
+        if (region.TotalPixels > _configuration.MaxPixels)
+        {
+            _logger.LogOperationError(
+                nameof(ScreenshotErrorCode.ImageTooLarge),
+                $"Capture area ({region.Width}x{region.Height} = {region.TotalPixels:N0} pixels) exceeds maximum allowed ({_configuration.MaxPixels:N0} pixels)");
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.ImageTooLarge,
+                $"Capture area ({region.Width}x{region.Height} = {region.TotalPixels:N0} pixels) exceeds maximum allowed ({_configuration.MaxPixels:N0} pixels)");
+        }
+
+        // 3. Record loop
+        var frames = new List<string>();
+        var durationMs = (int)(request.Duration * 1000);
+        var fps = request.Fps > 0 ? request.Fps : 10;
+        var intervalMs = (int)(1000 / fps);
+        var stopwatch = Stopwatch.StartNew();
+
+        // Ensure at least one frame if duration is very small
+        if (durationMs <= 0)
+        {
+            durationMs = intervalMs;
+        }
+
+        try
+        {
+            while (stopwatch.ElapsedMilliseconds < durationMs && !cancellationToken.IsCancellationRequested)
+            {
+                var frameStart = stopwatch.ElapsedMilliseconds;
+
+                // Capture frame
+                using (var bitmap = new Bitmap(region.Width, region.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb))
+                {
+                    using (var graphics = Graphics.FromImage(bitmap))
+                    {
+                        // Update window position if tracking a window?
+                        // For now, use fixed region resolved at start to ensure stability.
+                        // Future improvement: poll GetWindowRect if Target types is Window.
+
+                        graphics.CopyFromScreen(
+                            region.X,
+                            region.Y,
+                            0,
+                            0,
+                            new Size(region.Width, region.Height),
+                            CopyPixelOperation.SourceCopy);
+
+                        if (request.IncludeCursor)
+                        {
+                            DrawCursor(graphics, region.X, region.Y);
+                        }
+
+                        var processed = _imageProcessor.Process(
+                            bitmap,
+                            request.ImageFormat,
+                            request.Quality);
+
+                        // For recording, we force inline base64 for now as file output for sequence is complex
+                        // (unless we ZIP it, which is out of scope).
+                        frames.Add(Convert.ToBase64String(processed.Data));
+                    }
+                }
+
+                // Wait for next frame
+                var frameEnd = stopwatch.ElapsedMilliseconds;
+                var elapsed = frameEnd - frameStart;
+                var delay = intervalMs - (int)elapsed;
+
+                if (delay > 0)
+                {
+                    await Task.Delay(delay, cancellationToken);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogOperationError("RecordingError", ex.Message);
+            return ScreenshotControlResult.Error(
+                ScreenshotErrorCode.CaptureError,
+                $"Recording failed: {ex.Message}");
+        }
+
+        return ScreenshotControlResult.RecordingSuccess(
+            frames,
+            region.Width,
+            region.Height,
+            request.ImageFormat.ToString().ToLowerInvariant(),
+            stopwatch.Elapsed.TotalSeconds,
+            frames.Count);
+    }
+
+    /// <summary>
+    /// Resolves the capture region based on the request target.
+    /// </summary>
+    private Task<(CaptureRegion? Region, ScreenshotControlResult? Error)> ResolveCaptureRegionAsync(ScreenshotControlRequest request)
+    {
+        switch (request.Target)
+        {
+            case CaptureTarget.PrimaryScreen:
+                var primary = _monitorService.GetPrimaryMonitor();
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                    new CaptureRegion(primary.X, primary.Y, primary.Width, primary.Height),
+                    null));
+
+            case CaptureTarget.SecondaryScreen:
+                if (_monitorService.MonitorCount < 2)
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                         ScreenshotErrorCode.NoSecondaryScreen,
+                         "Cannot use 'secondary_screen' target: only one monitor detected. Use 'primary_screen' instead.")));
+                }
+                var secondary = _monitorService.GetSecondaryMonitor();
+                if (secondary == null)
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                        null,
+                        ScreenshotControlResult.Error(ScreenshotErrorCode.InvalidRequest, "Secondary monitor not found")));
+                }
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                    new CaptureRegion(secondary.X, secondary.Y, secondary.Width, secondary.Height),
+                    null));
+
+            case CaptureTarget.Monitor:
+                var idx = request.MonitorIndex ?? 0;
+                var monitor = _monitorService.GetMonitor(idx);
+                if (monitor == null)
+                {
+                    var available = _monitorService.GetMonitors();
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.ErrorWithMonitors(
+                        ScreenshotErrorCode.InvalidMonitorIndex,
+                        $"Monitor index {idx} not found.",
+                        available)));
+                }
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                    new CaptureRegion(monitor.X, monitor.Y, monitor.Width, monitor.Height),
+                    null));
+
+            case CaptureTarget.Window:
+                if (!WindowHandleParser.TryParse(request.WindowHandle, out nint hwnd))
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                        ScreenshotErrorCode.InvalidWindowHandle,
+                        "Valid window_handle is required")));
+                }
+                if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd))
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                        ScreenshotErrorCode.InvalidWindowHandle,
+                        "Window does not exist or is hidden")));
+                }
+                if (NativeMethods.IsIconic(hwnd))
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                        ScreenshotErrorCode.WindowMinimized,
+                        "Window is minimized")));
+                }
+                NativeMethods.GetWindowRect(hwnd, out var rect);
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                    new CaptureRegion(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top),
+                    null));
+
+            case CaptureTarget.Region:
+                if (request.Region == null || !request.Region.IsValid())
+                {
+                    return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                        ScreenshotErrorCode.InvalidRegion,
+                        "Invalid region coordinates")));
+                }
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((request.Region, null));
+
+            case CaptureTarget.AllMonitors:
+                var vs = SystemInformation.VirtualScreen;
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((
+                    new CaptureRegion(vs.X, vs.Y, vs.Width, vs.Height),
+                    null));
+
+            default:
+                return Task.FromResult<(CaptureRegion?, ScreenshotControlResult?)>((null, ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.InvalidRequest,
+                    $"Unsupported target for recording: {request.Target}")));
+        }
     }
 
     /// <summary>

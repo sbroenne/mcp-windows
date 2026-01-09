@@ -18,5 +18,11 @@ public enum ScreenshotAction
     /// List available monitors with metadata.
     /// </summary>
     [JsonStringEnumMemberName("list_monitors")]
-    ListMonitors = 1
+    ListMonitors = 1,
+
+    /// <summary>
+    /// Record a sequence of screenshots.
+    /// </summary>
+    [JsonStringEnumMemberName("record")]
+    Record = 2
 }

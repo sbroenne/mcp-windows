@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
@@ -81,34 +82,42 @@ public sealed partial class ScreenshotControlTool
     /// <param name="quality">Image compression quality 1-100. Default: 60 (LLM-optimized). Only affects JPEG format.</param>
     /// <param name="outputMode">How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.</param>
     /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
+    /// <param name="duration">Duration in seconds for recording (default 3.0). Only used when action='record'.</param>
+    /// <param name="fps">Frames per second for recording (default 5). Only used when action='record'.</param>
     /// <param name="includeImage">Include the image in the response. Default: false for annotated screenshots (element metadata is sufficient). Set true to see the actual screenshot pixels.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
+    [Description("Capture screenshots or recordings. Default: annotated screenshot. For recording: action='record', duration=3.0, fps=5. WINDOW CAPTURE: First call window_management(action='find') to get handle, then screenshot_control(target='window', windowHandle='123456'). Targets: primary_screen (default), secondary_screen, monitor, window (requires windowHandle), region, all_monitors.")]
+    [return: Description("The result of the screenshot operation including success status, base64-encoded image data or file path, annotated elements (if annotate=true), and error details if failed.")]
     public async Task<ScreenshotControlResult> ExecuteAsync(
         RequestContext<CallToolRequestParams> context,
-        string? action = null,
-        bool annotate = true,
-        string? target = null,
-        int monitorIndex = UnspecifiedInt,
-        string? windowHandle = null,
-        int regionX = UnspecifiedInt,
-        int regionY = UnspecifiedInt,
-        int regionWidth = UnspecifiedInt,
-        int regionHeight = UnspecifiedInt,
-        bool includeCursor = false,
-        string? imageFormat = null,
-        int quality = UnspecifiedInt,
-        string? outputMode = null,
-        string? outputPath = null,
-        bool? includeImage = null,
+        [Description("The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays), 'record' (record frames). Default: 'capture'.")] string? action = null,
+        [Description("Overlay numbered labels on interactive UI elements and return element list (default: true). Set false for plain screenshot without element discovery.")] bool annotate = true,
+        [Description("Capture target. Valid values: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor, only for 2-monitor setups), 'monitor' (by index), 'window' (by handle), 'region' (by coordinates), 'all_monitors' (composite of all displays). Default: 'primary_screen'.")] string? target = null,
+        [Description("Monitor index for 'monitor' target (0-based). Use 'list_monitors' to get available indices.")] int monitorIndex = UnspecifiedInt,
+        [Description("Window handle (HWND) as a decimal string for 'window' target. Get from window_management output and pass it through verbatim.")] string? windowHandle = null,
+        [Description("X coordinate (left) for 'region' target. Can be negative for multi-monitor setups.")] int regionX = UnspecifiedInt,
+        [Description("Y coordinate (top) for 'region' target. Can be negative for multi-monitor setups.")] int regionY = UnspecifiedInt,
+        [Description("Width in pixels for 'region' target. Must be positive.")] int regionWidth = UnspecifiedInt,
+        [Description("Height in pixels for 'region' target. Must be positive.")] int regionHeight = UnspecifiedInt,
+        [Description("Include mouse cursor in capture. Default: false")] bool includeCursor = false,
+        [Description("Screenshot format: 'jpeg'/'jpg' or 'png'. Default: 'jpeg' (LLM-optimized).")] string? imageFormat = null,
+        [Description("Image compression quality 1-100. Default: 60 (LLM-optimized). Only affects JPEG format.")] int quality = UnspecifiedInt,
+        [Description("How to return the screenshot. 'inline' returns base64 data, 'file' saves to disk and returns path. Default: 'inline'.")] string? outputMode = null,
+        [Description("Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.")] string? outputPath = null,
+        [Description("Duration in seconds for recording (default 3.0). Only used when action='record'.")] double duration = 3.0,
+        [Description("Frames per second for recording (default 5). Only used when action='record'.")] double fps = 5.0,
+        [Description("Include the image in the response. Default: false for annotated screenshots. Set true to see the actual screenshot pixels.")] bool? includeImage = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         // Create MCP client logger for observability
         var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("ScreenshotControl");
-        clientLogger?.LogScreenshotOperationStarted(action ?? "capture", target ?? "primary_screen");
+        var actionForLog = string.IsNullOrWhiteSpace(action) ? "capture" : action;
+        var targetForLog = string.IsNullOrWhiteSpace(target) ? "primary_screen" : target;
+        clientLogger?.LogScreenshotOperationStarted(actionForLog, targetForLog);
 
         // Parse action
         var screenshotAction = ParseAction(action);
@@ -116,12 +125,12 @@ public sealed partial class ScreenshotControlTool
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
-                $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'");
+                $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors', 'record'");
         }
 
         // Parse target
         var captureTarget = ParseTarget(target);
-        if (captureTarget == null && screenshotAction == ScreenshotAction.Capture)
+        if (captureTarget == null && (screenshotAction == ScreenshotAction.Capture || screenshotAction == ScreenshotAction.Record))
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
@@ -130,7 +139,7 @@ public sealed partial class ScreenshotControlTool
 
         // Parse and validate image format
         var parsedImageFormat = ParseImageFormat(imageFormat);
-        if (parsedImageFormat == null && imageFormat != null)
+        if (parsedImageFormat == null && !string.IsNullOrWhiteSpace(imageFormat))
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
@@ -148,7 +157,7 @@ public sealed partial class ScreenshotControlTool
 
         // Parse and validate output mode
         var parsedOutputMode = ParseOutputMode(outputMode);
-        if (parsedOutputMode == null && outputMode != null)
+        if (parsedOutputMode == null && !string.IsNullOrWhiteSpace(outputMode))
         {
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidRequest,
@@ -156,7 +165,7 @@ public sealed partial class ScreenshotControlTool
         }
 
         // Validate output path if provided
-        if (outputPath != null)
+        if (!string.IsNullOrWhiteSpace(outputPath))
         {
             var directory = Path.GetDirectoryName(outputPath);
             if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
@@ -164,6 +173,24 @@ public sealed partial class ScreenshotControlTool
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.InvalidRequest,
                     $"Output directory does not exist: '{directory}'");
+            }
+        }
+
+        // Validate recording parameters
+        if (screenshotAction == ScreenshotAction.Record)
+        {
+            if (duration <= 0)
+            {
+                return ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.InvalidRequest,
+                    $"Duration must be > 0 seconds for recording, got: {duration}");
+            }
+
+            if (fps <= 0)
+            {
+                return ScreenshotControlResult.Error(
+                    ScreenshotErrorCode.InvalidRequest,
+                    $"Fps must be > 0 for recording, got: {fps}");
             }
         }
 
@@ -181,13 +208,16 @@ public sealed partial class ScreenshotControlTool
             region = new CaptureRegion(regionX, regionY, regionWidth, regionHeight);
         }
 
+        var normalizedWindowHandle = string.IsNullOrWhiteSpace(windowHandle) ? null : windowHandle;
+        var normalizedOutputPath = string.IsNullOrWhiteSpace(outputPath) ? null : outputPath;
+
         // Handle annotated screenshot mode
         if (annotate && screenshotAction == ScreenshotAction.Capture)
         {
             // Default: don't include image for annotated screenshots (element metadata is sufficient)
             // This saves ~100K+ tokens per screenshot
             var shouldIncludeImage = includeImage ?? false;
-            return await CaptureAnnotatedAsync(windowHandle, parsedImageFormat, parsedQuality, parsedOutputMode, outputPath, shouldIncludeImage, cancellationToken);
+            return await CaptureAnnotatedAsync(normalizedWindowHandle, parsedImageFormat, parsedQuality, parsedOutputMode, normalizedOutputPath, shouldIncludeImage, cancellationToken);
         }
 
         // Build request with all parameters
@@ -196,13 +226,15 @@ public sealed partial class ScreenshotControlTool
             Action = screenshotAction.Value,
             Target = captureTarget ?? CaptureTarget.PrimaryScreen,
             MonitorIndex = monitorIndex == UnspecifiedInt ? null : monitorIndex,
-            WindowHandle = windowHandle,
+            WindowHandle = normalizedWindowHandle,
             Region = region,
             IncludeCursor = includeCursor,
             ImageFormat = parsedImageFormat ?? ScreenshotConfiguration.DefaultImageFormat,
             Quality = parsedQuality,
             OutputMode = parsedOutputMode ?? ScreenshotConfiguration.DefaultOutputMode,
-            OutputPath = outputPath
+            OutputPath = normalizedOutputPath,
+            Duration = duration,
+            Fps = fps
         };
 
         // Execute and return result
@@ -224,6 +256,7 @@ public sealed partial class ScreenshotControlTool
         {
             "capture" => ScreenshotAction.Capture,
             "list_monitors" => ScreenshotAction.ListMonitors,
+            "record" => ScreenshotAction.Record,
             _ => null
         };
     }
