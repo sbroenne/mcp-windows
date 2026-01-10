@@ -19,6 +19,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [SupportedOSPlatform("windows")]
 public sealed partial class WindowManagementTool
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly WindowService _windowService;
     private readonly MonitorService _monitorService;
     private readonly WindowOperationLogger? _logger;
@@ -90,13 +92,13 @@ public sealed partial class WindowManagementTool
         string? filter = null,
         bool regex = false,
         bool includeAllDesktops = false,
-        int? x = null,
-        int? y = null,
-        int? width = null,
-        int? height = null,
-        int? timeoutMs = null,
+        int x = UnspecifiedInt,
+        int y = UnspecifiedInt,
+        int width = UnspecifiedInt,
+        int height = UnspecifiedInt,
+        int timeoutMs = UnspecifiedInt,
         string? target = null,
-        int? monitorIndex = null,
+        int monitorIndex = UnspecifiedInt,
         string? state = null,
         string? excludeTitle = null,
         bool discardChanges = false,
@@ -152,23 +154,45 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Move:
-                    operationResult = await HandleMoveAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAsync(
+                        resolvedHandle,
+                        x == UnspecifiedInt ? null : x,
+                        y == UnspecifiedInt ? null : y,
+                        cancellationToken);
                     break;
 
                 case WindowAction.Resize:
-                    operationResult = await HandleResizeAsync(resolvedHandle, width, height, cancellationToken);
+                    operationResult = await HandleResizeAsync(
+                        resolvedHandle,
+                        width == UnspecifiedInt ? null : width,
+                        height == UnspecifiedInt ? null : height,
+                        cancellationToken);
                     break;
 
                 case WindowAction.SetBounds:
-                    operationResult = await HandleSetBoundsAsync(resolvedHandle, x, y, width, height, cancellationToken);
+                    operationResult = await HandleSetBoundsAsync(
+                        resolvedHandle,
+                        x == UnspecifiedInt ? null : x,
+                        y == UnspecifiedInt ? null : y,
+                        width == UnspecifiedInt ? null : width,
+                        height == UnspecifiedInt ? null : height,
+                        cancellationToken);
                     break;
 
                 case WindowAction.WaitFor:
-                    operationResult = await HandleWaitForAsync(title, regex, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForAsync(
+                        title,
+                        regex,
+                        timeoutMs == UnspecifiedInt ? null : timeoutMs,
+                        cancellationToken);
                     break;
 
                 case WindowAction.MoveToMonitor:
-                    operationResult = await HandleMoveToMonitorAsync(resolvedHandle, target, monitorIndex, cancellationToken);
+                    operationResult = await HandleMoveToMonitorAsync(
+                        resolvedHandle,
+                        target,
+                        monitorIndex == UnspecifiedInt ? null : monitorIndex,
+                        cancellationToken);
                     break;
 
                 case WindowAction.GetState:
@@ -176,11 +200,19 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.WaitForState:
-                    operationResult = await HandleWaitForStateAsync(resolvedHandle, state, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForStateAsync(
+                        resolvedHandle,
+                        state,
+                        timeoutMs == UnspecifiedInt ? null : timeoutMs,
+                        cancellationToken);
                     break;
 
                 case WindowAction.MoveAndActivate:
-                    operationResult = await HandleMoveAndActivateAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAndActivateAsync(
+                        resolvedHandle,
+                        x == UnspecifiedInt ? null : x,
+                        y == UnspecifiedInt ? null : y,
+                        cancellationToken);
                     break;
 
                 case WindowAction.EnsureVisible:

@@ -18,6 +18,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class MouseControlTool
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
 
     private readonly MouseInputService _mouseInputService;
@@ -103,15 +105,15 @@ public sealed partial class MouseControlTool
         RequestContext<CallToolRequestParams> context,
         MouseAction action,
         string? target = null,
-        int? x = null,
-        int? y = null,
-        int? endX = null,
-        int? endY = null,
+        int x = UnspecifiedInt,
+        int y = UnspecifiedInt,
+        int endX = UnspecifiedInt,
+        int endY = UnspecifiedInt,
         string? direction = null,
         int amount = 1,
         string? modifiers = null,
         string? button = null,
-        int? monitorIndex = null,
+        int monitorIndex = UnspecifiedInt,
         string? expectedWindowTitle = null,
         string? expectedProcessName = null,
         string? windowHandle = null,
@@ -146,8 +148,10 @@ public sealed partial class MouseControlTool
                 }
             }
 
+            static bool IsSpecified(int value) => value != UnspecifiedInt;
+
             // NEW VALIDATION: Check if coordinates are provided
-            var hasCoordinates = (x.HasValue && y.HasValue) || (endX.HasValue && endY.HasValue);
+            var hasCoordinates = (IsSpecified(x) && IsSpecified(y)) || (IsSpecified(endX) && IsSpecified(endY));
 
             // Window-relative coordinate mode: if windowHandle is provided, coordinates are relative to window
             bool isWindowRelativeMode = !string.IsNullOrEmpty(windowHandle) && hasCoordinates;
@@ -199,7 +203,7 @@ public sealed partial class MouseControlTool
             }
 
             // Resolve target to monitorIndex if provided
-            int? resolvedMonitorIndex = monitorIndex;
+            int? resolvedMonitorIndex = monitorIndex == UnspecifiedInt ? null : monitorIndex;
             if (!string.IsNullOrWhiteSpace(target))
             {
                 var parsedTarget = ParseTarget(target);
@@ -282,13 +286,16 @@ public sealed partial class MouseControlTool
             // Translate coordinates to absolute screen coordinates
             // - If windowHandle provided: coordinates are relative to window's top-left corner
             // - If target/monitorIndex provided: coordinates are relative to monitor's top-left corner
-            int? absoluteX = x, absoluteY = y, absoluteEndX = endX, absoluteEndY = endY;
+            int? absoluteX = IsSpecified(x) ? x : null;
+            int? absoluteY = IsSpecified(y) ? y : null;
+            int? absoluteEndX = IsSpecified(endX) ? endX : null;
+            int? absoluteEndY = IsSpecified(endY) ? endY : null;
             var monitor = _monitorService.GetMonitor(targetMonitorIndex);
             if (monitor == null)
             {
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.InvalidCoordinates,
-                    $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
+                    $"Invalid monitor index: {targetMonitorIndex}. Available monitors: 0-{_monitorService.MonitorCount - 1}");
                 _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                 return result;
             }
@@ -296,47 +303,47 @@ public sealed partial class MouseControlTool
             if (isWindowRelativeMode)
             {
                 // Translate coordinates relative to window origin
-                if (x.HasValue)
+                if (IsSpecified(x))
                 {
-                    absoluteX = windowLeft + x.Value;
+                    absoluteX = windowLeft + x;
                 }
 
-                if (y.HasValue)
+                if (IsSpecified(y))
                 {
-                    absoluteY = windowTop + y.Value;
+                    absoluteY = windowTop + y;
                 }
 
-                if (endX.HasValue)
+                if (IsSpecified(endX))
                 {
-                    absoluteEndX = windowLeft + endX.Value;
+                    absoluteEndX = windowLeft + endX;
                 }
 
-                if (endY.HasValue)
+                if (IsSpecified(endY))
                 {
-                    absoluteEndY = windowTop + endY.Value;
+                    absoluteEndY = windowTop + endY;
                 }
             }
             else
             {
                 // Translate coordinates relative to monitor origin
-                if (x.HasValue)
+                if (IsSpecified(x))
                 {
-                    absoluteX = monitor.X + x.Value;
+                    absoluteX = monitor.X + x;
                 }
 
-                if (y.HasValue)
+                if (IsSpecified(y))
                 {
-                    absoluteY = monitor.Y + y.Value;
+                    absoluteY = monitor.Y + y;
                 }
 
-                if (endX.HasValue)
+                if (IsSpecified(endX))
                 {
-                    absoluteEndX = monitor.X + endX.Value;
+                    absoluteEndX = monitor.X + endX;
                 }
 
-                if (endY.HasValue)
+                if (IsSpecified(endY))
                 {
-                    absoluteEndY = monitor.Y + endY.Value;
+                    absoluteEndY = monitor.Y + endY;
                 }
             }
 
@@ -344,13 +351,13 @@ public sealed partial class MouseControlTool
             if (hasCoordinates && resolvedMonitorIndex.HasValue)
             {
                 // Validate start coordinates (x, y) if provided
-                if (x.HasValue && y.HasValue)
+                if (IsSpecified(x) && IsSpecified(y))
                 {
-                    if (x.Value < 0 || x.Value >= monitor.Width || y.Value < 0 || y.Value >= monitor.Height)
+                    if (x < 0 || x >= monitor.Width || y < 0 || y >= monitor.Height)
                     {
                         var result = MouseControlResult.CreateFailure(
                             MouseControlErrorCode.CoordinatesOutOfBounds,
-                            $"Coordinates ({x.Value}, {y.Value}) out of bounds for monitor {targetMonitorIndex}",
+                            $"Coordinates ({x}, {y}) out of bounds for monitor {targetMonitorIndex}",
                             errorDetails: new Dictionary<string, object>
                             {
                                 { "valid_bounds", new
@@ -361,7 +368,7 @@ public sealed partial class MouseControlTool
                                         bottom = monitor.Y + monitor.Height
                                     }
                                 },
-                                { "provided_coordinates", new { x = x.Value, y = y.Value } }
+                                { "provided_coordinates", new { x, y } }
                             });
                         _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                         return result;
@@ -369,13 +376,13 @@ public sealed partial class MouseControlTool
                 }
 
                 // Validate end coordinates (endX, endY) for drag if provided
-                if (endX.HasValue && endY.HasValue)
+                if (IsSpecified(endX) && IsSpecified(endY))
                 {
-                    if (endX.Value < 0 || endX.Value >= monitor.Width || endY.Value < 0 || endY.Value >= monitor.Height)
+                    if (endX < 0 || endX >= monitor.Width || endY < 0 || endY >= monitor.Height)
                     {
                         var result = MouseControlResult.CreateFailure(
                             MouseControlErrorCode.CoordinatesOutOfBounds,
-                            $"End coordinates ({endX.Value}, {endY.Value}) out of bounds for monitor {targetMonitorIndex}",
+                            $"End coordinates ({endX}, {endY}) out of bounds for monitor {targetMonitorIndex}",
                             errorDetails: new Dictionary<string, object>
                             {
                                 { "valid_bounds", new
@@ -386,7 +393,7 @@ public sealed partial class MouseControlTool
                                         bottom = monitor.Y + monitor.Height
                                     }
                                 },
-                                { "provided_coordinates", new { x = endX.Value, y = endY.Value } }
+                                { "provided_coordinates", new { x = endX, y = endY } }
                             });
                         _logger.LogOperationFailure(correlationId, action.ToString(), result.ErrorCode.ToString(), result.Error ?? "Unknown error", stopwatch.ElapsedMilliseconds);
                         return result;

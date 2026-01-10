@@ -16,6 +16,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [SupportedOSPlatform("windows")]
 public sealed class AppTool
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly WindowService _windowService;
     private readonly WindowOperationLogger? _logger;
     private readonly WindowConfiguration _configuration;
@@ -67,7 +69,7 @@ public sealed class AppTool
         string? arguments = null,
         string? workingDirectory = null,
         bool waitForWindow = true,
-        int? timeoutMs = null,
+        int timeoutMs = UnspecifiedInt,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
@@ -80,7 +82,13 @@ public sealed class AppTool
 
         try
         {
-            var result = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
+            var result = await HandleLaunchAsync(
+                programPath,
+                arguments,
+                workingDirectory,
+                waitForWindow,
+                timeoutMs == UnspecifiedInt ? null : timeoutMs,
+                cancellationToken);
 
             stopwatch.Stop();
 

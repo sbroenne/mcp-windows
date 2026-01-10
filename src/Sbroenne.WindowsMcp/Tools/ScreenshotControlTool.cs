@@ -14,6 +14,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class ScreenshotControlTool
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly ScreenshotService _screenshotService;
     private readonly AnnotatedScreenshotService _annotatedScreenshotService;
     private readonly WindowService _windowService;
@@ -88,15 +90,15 @@ public sealed partial class ScreenshotControlTool
         string? action = null,
         bool annotate = true,
         string? target = null,
-        int? monitorIndex = null,
+        int monitorIndex = UnspecifiedInt,
         string? windowHandle = null,
-        int? regionX = null,
-        int? regionY = null,
-        int? regionWidth = null,
-        int? regionHeight = null,
+        int regionX = UnspecifiedInt,
+        int regionY = UnspecifiedInt,
+        int regionWidth = UnspecifiedInt,
+        int regionHeight = UnspecifiedInt,
         bool includeCursor = false,
         string? imageFormat = null,
-        int? quality = null,
+        int quality = UnspecifiedInt,
         string? outputMode = null,
         string? outputPath = null,
         bool? includeImage = null,
@@ -136,7 +138,7 @@ public sealed partial class ScreenshotControlTool
         }
 
         // Validate quality
-        var parsedQuality = quality ?? ScreenshotConfiguration.DefaultQuality;
+        var parsedQuality = quality == UnspecifiedInt ? ScreenshotConfiguration.DefaultQuality : quality;
         if (parsedQuality < 1 || parsedQuality > 100)
         {
             return ScreenshotControlResult.Error(
@@ -169,14 +171,14 @@ public sealed partial class ScreenshotControlTool
         CaptureRegion? region = null;
         if (captureTarget == CaptureTarget.Region)
         {
-            if (regionX == null || regionY == null || regionWidth == null || regionHeight == null)
+            if (regionX == UnspecifiedInt || regionY == UnspecifiedInt || regionWidth == UnspecifiedInt || regionHeight == UnspecifiedInt)
             {
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.InvalidRegion,
                     "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters");
             }
 
-            region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
+            region = new CaptureRegion(regionX, regionY, regionWidth, regionHeight);
         }
 
         // Handle annotated screenshot mode
@@ -193,7 +195,7 @@ public sealed partial class ScreenshotControlTool
         {
             Action = screenshotAction.Value,
             Target = captureTarget ?? CaptureTarget.PrimaryScreen,
-            MonitorIndex = monitorIndex,
+            MonitorIndex = monitorIndex == UnspecifiedInt ? null : monitorIndex,
             WindowHandle = windowHandle,
             Region = region,
             IncludeCursor = includeCursor,
