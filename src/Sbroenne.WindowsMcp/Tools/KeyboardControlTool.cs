@@ -20,6 +20,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 [McpServerToolType]
 public sealed partial class KeyboardControlTool : IDisposable
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly KeyboardInputService _keyboardInputService;
     private readonly WindowEnumerator _windowEnumerator;
     private readonly WindowService _windowService;
@@ -88,7 +90,7 @@ public sealed partial class KeyboardControlTool : IDisposable
         string? modifiers = null,
         int repeat = 1,
         string? sequence = null,
-        int? interKeyDelayMs = null,
+        int interKeyDelayMs = UnspecifiedInt,
         bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
@@ -162,7 +164,10 @@ public sealed partial class KeyboardControlTool : IDisposable
                     break;
 
                 case KeyboardAction.Sequence:
-                    operationResult = await HandleSequenceAsync(sequence, interKeyDelayMs, linkedToken);
+                    operationResult = await HandleSequenceAsync(
+                        sequence,
+                        interKeyDelayMs == UnspecifiedInt ? null : interKeyDelayMs,
+                        linkedToken);
                     break;
 
                 case KeyboardAction.ReleaseAll:

@@ -11,6 +11,8 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [SupportedOSPlatform("windows")]
 public sealed partial class UIFindTool
 {
+    private const int UnspecifiedInt = int.MinValue;
+
     private readonly UIAutomationService _automationService;
     private readonly ILogger<UIFindTool> _logger;
 
@@ -59,7 +61,7 @@ public sealed partial class UIFindTool
         string? controlType = null,
         string? automationId = null,
         string? className = null,
-        int? exactDepth = null,
+        int exactDepth = UnspecifiedInt,
         int foundIndex = 1,
         bool includeChildren = false,
         bool sortByProminence = false,
@@ -86,7 +88,7 @@ public sealed partial class UIFindTool
             ControlType = controlType,
             AutomationId = automationId,
             ClassName = className,
-            ExactDepth = exactDepth,
+            ExactDepth = exactDepth == UnspecifiedInt ? null : exactDepth,
             FoundIndex = Math.Max(1, foundIndex),
             IncludeChildren = includeChildren,
             SortByProminence = sortByProminence,

@@ -68,4 +68,16 @@ public sealed record ScreenshotControlRequest
     /// </summary>
     [JsonPropertyName("output_path")]
     public string? OutputPath { get; init; }
+
+    /// <summary>
+    /// Gets the recording duration in seconds. Default is 3.0.
+    /// </summary>
+    [JsonPropertyName("duration")]
+    public double Duration { get; init; } = 3.0;
+
+    /// <summary>
+    /// Gets the recording frames per second. Default is 5.
+    /// </summary>
+    [JsonPropertyName("fps")]
+    public double Fps { get; init; } = 5.0;
 }

@@ -141,6 +141,13 @@ public sealed record ScreenshotControlResult
     public IReadOnlyList<AnnotatedElement>? AnnotatedElements { get; init; }
 
     /// <summary>
+    /// Gets the list of base64-encoded frames for a recording.
+    /// </summary>
+    [JsonPropertyName("frames")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<string>? Frames { get; init; }
+
+    /// <summary>
     /// Gets the count of annotated elements. Present when annotate=true.
     /// </summary>
     [JsonPropertyName("n")]
@@ -322,6 +329,27 @@ public sealed record ScreenshotControlResult
             UsageHint = usageHint
         };
     }
+
+    /// <summary>
+    /// Creates a successful recording result.
+    /// </summary>
+    public static ScreenshotControlResult RecordingSuccess(
+        IReadOnlyList<string> frames,
+        int width,
+        int height,
+        string format,
+        double duration,
+        int frameCount) =>
+        new()
+        {
+            Success = true,
+            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            Message = $"Recorded {duration}s ({frameCount} frames) at {width}x{height} {format}",
+            Frames = frames,
+            Width = width,
+            Height = height,
+            Format = format
+        };
 
     /// <summary>
     /// Creates an error result.
