@@ -18,6 +18,21 @@
 
 ## Test Harnesses
 
+### Electron Test Harness (Chromium/CEF Apps)
+
+**Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/`
+
+Tests UI automation against Electron/Chromium-based applications (like VS Code, Discord, Slack, etc.):
+- Button, checkbox, link, and input interactions
+- Text reading and element finding
+- Chromium accessibility tree navigation
+
+**Collection:** `[Collection("ElectronHarness")]`
+
+**Fixture:** `ElectronHarnessFixture.cs` - Launches Electron harness with `UseShellExecute = true` (required for Chromium to properly expose its accessibility tree)
+
+**IMPORTANT:** The Electron fixture uses `UseShellExecute = true` instead of redirecting output. This is intentional - Chromium requires a proper shell environment to initialize its accessibility support. Using `UseShellExecute = false` with output redirection causes the Document element to not be exposed to UI Automation.
+
 ### WinForms Test Harness (Traditional Win32)
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/TestHarness/`
@@ -100,8 +115,8 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboar
 # Test specific harness
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~WinFormsHarness" -v q
 
-# Test Electron harness  
-dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~ElectronHarness" -v q
+# Test Electron harness (Chromium accessibility)
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~UIAutomationElectronTests" -v q
 
 # Test mouse functionality
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Mouse" -v q

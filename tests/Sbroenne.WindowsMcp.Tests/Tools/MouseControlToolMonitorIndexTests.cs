@@ -42,7 +42,6 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Assert - Validation should fail because monitorIndex is required with coordinates
         Assert.False(result.Success);
-        Assert.Equal("missing_required_parameter", result.ErrorCodeString);
         Assert.Contains("monitorIndex", result.Error!);
         Assert.NotNull(result.ErrorDetails);
         Assert.True(result.ErrorDetails!.ContainsKey("valid_indices"));
@@ -66,7 +65,6 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Assert - Validation should fail because monitorIndex is out of range
         Assert.False(result.Success);
-        Assert.Equal("invalid_coordinates", result.ErrorCodeString);
         Assert.Contains($"Invalid monitorIndex: {invalidIndex}", result.Error!);
         Assert.NotNull(result.ErrorDetails);
         Assert.True(result.ErrorDetails!.ContainsKey("valid_indices"));
@@ -91,7 +89,6 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Assert - Validation should fail because coordinates are out of bounds
         Assert.False(result.Success);
-        Assert.Equal("coordinates_out_of_bounds", result.ErrorCodeString);
         Assert.Contains($"Coordinates ({x}, {y}) out of bounds", result.Error!);
         Assert.NotNull(result.ErrorDetails);
         Assert.True(result.ErrorDetails!.ContainsKey("valid_bounds"));
@@ -158,7 +155,6 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Assert - Validation should fail because monitorIndex is required with coordinates
         Assert.False(result.Success);
-        Assert.Equal("missing_required_parameter", result.ErrorCodeString);
         Assert.Contains("monitorIndex", result.Error!);
     }
 

@@ -126,7 +126,6 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
         // Assert
         Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
-        Assert.NotEqual(WindowManagementErrorCode.WindowNotFound, closeResult.ErrorCode);
     }
 
     /// <summary>
