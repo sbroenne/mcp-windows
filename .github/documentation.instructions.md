@@ -127,7 +127,7 @@ Always use the actual tool names:
 | `ui_click(windowHandle='...', nameContains='Save')` | `ui_automation(action='click'...)` |
 | `ui_type(windowHandle='...', text='...')` | `ui_automation(action='type'...)` |
 | `ui_read(windowHandle='...', ...)` | `ui_automation(action='ocr'...)` |
-| `ui_find`, `ui_file` | `ui_automation(action='...')` |
+| `ui_find`, `file_save` | `ui_automation(action='...')` |
 
 ## Related Projects
 

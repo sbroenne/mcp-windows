@@ -52,9 +52,9 @@ $ErrorActionPreference = "Stop"
 # Paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
-$SrcDir = Join-Path $RepoRoot "src\ExcelMcp.McpServer"
-$ProjectPath = Join-Path $SrcDir "ExcelMcp.McpServer.csproj"
-$TestDir = Join-Path $RepoRoot "tests\ExcelMcp.McpServer.LLM.Tests"
+$SrcDir = Join-Path $RepoRoot "src\Sbroenne.WindowsMcp"
+$ProjectPath = Join-Path $SrcDir "Sbroenne.WindowsMcp.csproj"
+$TestDir = Join-Path $RepoRoot "tests\Sbroenne.WindowsMcp.LLM.Tests"
 $ScenariosDir = Join-Path $TestDir "Scenarios"
 $ReportsDir = Join-Path $TestDir "TestResults"
 

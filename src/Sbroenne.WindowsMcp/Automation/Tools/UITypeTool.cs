@@ -16,11 +16,11 @@ public static partial class UITypeTool
 {
     /// <summary>
     /// Types text into a text field or other input element. Automatically activates the target window.
-    /// WARNING: Do NOT use for Save As dialogs - use ui_file(windowHandle, filePath) instead. It handles path entry and Save button automatically.
+    /// WARNING: Do NOT use for Save As dialogs - use file_save(windowHandle, filePath) instead. It handles path entry and Save button automatically.
     /// </summary>
     /// <remarks>
     /// Type text into Edit, Document, TextBox, or search fields. Auto-activates window, optionally clears existing text first.
-    /// TO SAVE FILES: Use ui_file(windowHandle='...', filePath='C:/path/file.txt') - it handles the full Save As workflow automatically.
+    /// TO SAVE FILES: Use file_save(windowHandle='...', filePath='C:/path/file.txt') - it handles the full Save As workflow automatically.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="text">Text to type. Required.</param>

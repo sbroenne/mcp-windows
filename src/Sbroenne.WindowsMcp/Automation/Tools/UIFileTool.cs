@@ -7,28 +7,27 @@ using Sbroenne.WindowsMcp.Tools;
 namespace Sbroenne.WindowsMcp.Automation.Tools;
 
 /// <summary>
-/// MCP tool for file operations (save, open dialogs).
+/// MCP tool for saving files to disk. Handles Save As dialogs automatically.
 /// </summary>
 [SupportedOSPlatform("windows")]
 [McpServerToolType]
 public static partial class UIFileTool
 {
     /// <summary>
-    /// ✅ SAVE FILES - Use this tool to save documents. Handles Ctrl+S, Save As dialogs, filename entry, and Save button automatically.
-    /// ALWAYS use this instead of keyboard_control(key='s', modifiers='ctrl') which does NOT handle Save As dialogs.
-    /// NOTE: Only works on English Windows (detects 'Save As' dialog titles and 'Yes'/'Replace' button text).
+    /// 💾 SAVE FILE TO DISK - The ONLY tool for saving documents. Automatically handles: Ctrl+S, Save As dialogs, filename entry, and overwrite prompts.
+    /// ⚠️ DO NOT use keyboard_control(key='s', modifiers='ctrl') for saving - it CANNOT handle Save As dialogs and will get stuck!
+    /// NOTE: English Windows only (detects 'Save As' dialog titles).
     /// </summary>
     /// <remarks>
-    /// Pass the APPLICATION window handle (from app or window_management), not a dialog handle.
-    /// Pass filePath with full path (e.g., 'C:/Users/User/doc.txt'). Forward slashes auto-converted.
-    /// Handles: Ctrl+S trigger, Save As dialog detection, filename field entry, Save button click, overwrite prompts.
-    /// English Windows only: detects dialogs by English titles like 'Save As' and buttons like 'Yes'/'Replace'.
+    /// WHEN TO USE: Any time you need to save a file in ANY application (Notepad, Word, VS Code, etc.).
+    /// WHAT IT DOES: Sends Ctrl+S, waits for Save As dialog, enters filename, clicks Save, handles overwrite confirmation.
+    /// WHY NOT KEYBOARD: keyboard_control sends Ctrl+S but CANNOT detect or interact with the Save As dialog that appears.
     /// </remarks>
-    /// <param name="windowHandle">Window handle as decimal string (from app or window_management 'find'). REQUIRED. Pass the app window, not a dialog.</param>
-    /// <param name="filePath">File path to save to. Both forward slashes and backslashes work (e.g., D:/folder/file.txt or D:\\folder\\file.txt). Required for Save As.</param>
+    /// <param name="windowHandle">Window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window handle, not a dialog.</param>
+    /// <param name="filePath">Full path to save to (e.g., C:/Users/User/doc.txt). REQUIRED for new files. Forward/back slashes both work.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the file operation including success status.</returns>
-    [McpServerTool(Name = "ui_file", Title = "SAVE FILE to Disk", Destructive = true, OpenWorld = false)]
+    /// <returns>Success status with diagnostics.</returns>
+    [McpServerTool(Name = "file_save", Title = "💾 SAVE FILE (handles Save As dialogs)", Destructive = true, OpenWorld = false)]
     public static async Task<string> ExecuteAsync(
         string windowHandle,
         [DefaultValue(null)] string? filePath = null,

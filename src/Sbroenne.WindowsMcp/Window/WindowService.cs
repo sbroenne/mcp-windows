@@ -83,13 +83,14 @@ public sealed class WindowService
 
     /// <inheritdoc/>
     public async Task<WindowManagementResult> FindWindowAsync(
-        string title,
+        string? title,
+        string? processName = null,
         bool useRegex = false,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var windows = await _enumerator.FindWindowsAsync(title, useRegex, cancellationToken);
+            var windows = await _enumerator.FindWindowsAsync(title, processName, useRegex, cancellationToken);
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (System.Text.RegularExpressions.RegexParseException ex)
@@ -530,7 +531,7 @@ public sealed class WindowService
 
             try
             {
-                var windows = await _enumerator.FindWindowsAsync(title, useRegex, cancellationToken);
+                var windows = await _enumerator.FindWindowsAsync(title, null, useRegex, cancellationToken);
                 if (windows.Count > 0)
                 {
                     return WindowManagementResult.CreateWindowSuccess(windows[0]);

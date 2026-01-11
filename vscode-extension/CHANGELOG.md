@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `ui_click` — Click buttons, tabs, checkboxes
   - `ui_type` — Type text into edit controls
   - `ui_read` — Read text from elements (UIA + OCR fallback)
-  - `ui_file` — File operations (Save As dialog handling, English Windows only)
+  - `file_save` — Save files via Save As dialog (English Windows only)
 - **Dedicated `app` tool** - Launch applications with `app(programPath='notepad.exe')`
   - Separated from window_management for clearer intent
   - Automatic window detection after launch

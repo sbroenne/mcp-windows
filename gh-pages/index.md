@@ -92,7 +92,7 @@ Download from [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases
 | `ui_type` | Type into text fields |
 | `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_read` | Read text (with OCR fallback) |
-| `ui_file` | Handle Save dialogs |
+| `file_save` | Save files via Save As dialog |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |
 | `mouse_control` | Coordinate-based clicks (fallback for games) |

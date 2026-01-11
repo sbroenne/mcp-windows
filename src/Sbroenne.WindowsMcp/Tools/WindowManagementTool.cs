@@ -31,7 +31,8 @@ public static partial class WindowManagementTool
     /// </remarks>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
     /// <param name="handle">Window handle for actions that target a specific window. Get the handle from the list or find action.</param>
-    /// <param name="title">Window title to search for (required for find and wait_for).</param>
+    /// <param name="title">Window title to search for (for find and wait_for). Uses substring match unless regex=true.</param>
+    /// <param name="processName">Process name to search for (for find action). More reliable than title - matches 'Notepad', 'chrome', etc. Case-insensitive.</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
     /// <param name="includeAllDesktops">Include windows on other virtual desktops (default: false).</param>
@@ -52,6 +53,7 @@ public static partial class WindowManagementTool
         WindowAction action,
         [DefaultValue(null)] string? handle = null,
         [DefaultValue(null)] string? title = null,
+        [DefaultValue(null)] string? processName = null,
         [DefaultValue(null)] string? filter = null,
         [DefaultValue(false)] bool regex = false,
         [DefaultValue(false)] bool includeAllDesktops = false,
@@ -78,7 +80,7 @@ public static partial class WindowManagementTool
                     break;
 
                 case WindowAction.Find:
-                    operationResult = await HandleFindAsync(title, regex, cancellationToken);
+                    operationResult = await HandleFindAsync(title, processName, regex, cancellationToken);
                     break;
 
                 case WindowAction.Activate:
@@ -187,17 +189,18 @@ public static partial class WindowManagementTool
 
     private static async Task<WindowManagementResult> HandleFindAsync(
         string? title,
+        string? processName,
         bool useRegex,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(title))
+        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(processName))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "'title' is required for find action. Example: find(title='Notepad')");
+                "'title' or 'processName' is required for find action. Use processName for exact app matching (e.g., processName='Notepad').");
         }
 
-        return await WindowsToolsBase.WindowService.FindWindowAsync(title, useRegex, cancellationToken);
+        return await WindowsToolsBase.WindowService.FindWindowAsync(title, processName, useRegex, cancellationToken);
     }
 
     private static async Task<WindowManagementResult> HandleActivateAsync(

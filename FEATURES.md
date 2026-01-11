@@ -65,7 +65,7 @@ LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#ll
 | Type text into a field | `ui_type` | Direct text input with clear option |
 | Read text from elements | `ui_read` | Get text via UIA or OCR |
 | Wait for windows | `window_management` | Use `wait_for` action for new windows |
-| Save files | `ui_file` | Handle Save As dialogs automatically |
+| Save files | `file_save` | Handle Save As dialogs automatically |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
@@ -80,7 +80,7 @@ LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#ll
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
 | `ui_read` | Read text from elements (UIA + OCR) |
-| `ui_file` | File operations (Save As dialog handling, English Windows only) |
+| `file_save` | Save files via Save As dialog (English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
@@ -219,9 +219,9 @@ Read text from elements using UI Automation or OCR.
 
 ---
 
-## 💾 UI File (`ui_file`)
+## 💾 File Save (`file_save`)
 
-Handle file save operations and Save As dialogs. **English Windows only** (detects English dialog titles and button text).
+Save files via Save As dialog. Handles the entire save workflow: triggers save, waits for dialog, fills path, confirms. **English Windows only** (detects English dialog titles and button text).
 
 ### Parameters
 
@@ -333,7 +333,7 @@ Control windows on the Windows desktop. Use `app` tool to launch applications, t
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
 | `list` | List all visible windows | none |
-| `find` | Find windows by title | `title` |
+| `find` | Find windows by title or process name | `title` or `processName` |
 | `activate` | Bring window to foreground | `handle` |
 | `get_foreground` | Get current foreground window | none |
 | `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` |

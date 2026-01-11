@@ -24,7 +24,7 @@ public sealed class WindowsAutomationPrompts
             new(ChatRole.System,
                 "You are operating a Windows automation MCP server with focused tools for app launching and UI interaction. " +
                 "WORKFLOW: 1) Launch app with app(programPath='...') OR find existing window with window_management(action='find'), " +
-                "2) Use the returned handle with ui_click, ui_type, ui_read, or ui_file tools. " +
+                "2) Use the returned handle with ui_click, ui_type, ui_read, or file_save tools. " +
                 "Use mouse_control and keyboard_control only as fallbacks."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
@@ -40,7 +40,7 @@ public sealed class WindowsAutomationPrompts
                 "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
                 "• Read: ui_read(windowHandle='<handle>', elementId='...') — get text content\n" +
 
-                "• Save: ui_file(windowHandle='<handle>', filePath='...') — save files\n" +
+                "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "\n" +
                 "If you don't know element names:\n" +
                 "• screenshot_control(target='window', windowHandle='<handle>') — see all interactive elements with numbered labels\n" +
@@ -218,7 +218,7 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>Save a file using ui_file tool. Handles Save As dialog automatically if filePath provided.</summary>
+    /// <summary>Save a file using file_save tool. Handles Save As dialog automatically if filePath provided.</summary>
     /// <param name="windowTitle">Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.</param>
     /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.</param>
     /// <returns>A multi-message prompt template.</returns>
@@ -230,7 +230,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Use ui_file for saving files. It handles Save As dialogs automatically. " +
+                "Use file_save for saving files. It handles Save As dialogs automatically. " +
                 "Works universally across all Windows apps including Office, Notepad, and Electron apps. " +
                 "Pattern based on FlaUI and pywinauto modal window handling."),
             new(ChatRole.User,
@@ -242,8 +242,8 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 "Step 2: Save the file (using handle from step 1):\n" +
                 (string.IsNullOrWhiteSpace(filePath)
-                    ? "ui_file(windowHandle='<handle>') — triggers Ctrl+S\n"
-                    : $"ui_file(windowHandle='<handle>', filePath='{filePath}')\n") +
+                    ? "file_save(windowHandle='<handle>') — triggers Ctrl+S\n"
+                    : $"file_save(windowHandle='<handle>', filePath='{filePath}')\n") +
                 "\n" +
                 "What happens:\n" +
                 "• Sends Ctrl+S to the focused window\n" +
@@ -251,7 +251,7 @@ public sealed class WindowsAutomationPrompts
                 "• If dialog appears AND filePath provided: auto-fills filename and confirms\n" +
                 "• Handles overwrite confirmation dialogs automatically\n" +
                 "\n" +
-                "MANUAL WORKFLOW if ui_file fails:\n" +
+                "MANUAL WORKFLOW if file_save fails:\n" +
                 "1) keyboard_control(action='press', key='s', modifiers='ctrl') — trigger Ctrl+S\n" +
                 "2) window_management(action='get_modal_windows', handle='<parent_handle>') — discover Save As dialog\n" +
                 "3) Use modal window handle with ui_type, ui_click:\n" +

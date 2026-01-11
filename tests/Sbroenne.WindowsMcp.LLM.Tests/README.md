@@ -122,7 +122,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 │   ├── window-management-test.yaml        # All 10 window_management actions
 │   ├── keyboard-mouse-test.yaml           # keyboard_control and mouse_control tools
 │   ├── screenshot-test.yaml               # screenshot_control actions
-│   ├── file-dialog-test.yaml              # ui_file Save As dialog handling
+│   ├── file-dialog-test.yaml              # file_save Save As dialog handling
 │   ├── paint-ui-test.yaml                 # Paint ribbon and canvas operations
 │   └── real-world-workflows-test.yaml     # 8 multi-step workflow scenarios
 ├── output/                                # Test artifacts (git-ignored)
@@ -144,7 +144,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 | `window-management-test.yaml` | app, window_management (10 actions) | All window operations |
 | `keyboard-mouse-test.yaml` | keyboard_control, mouse_control | Typing, hotkeys, clicks, dragging |
 | `screenshot-test.yaml` | screenshot_control | Annotated/plain captures, monitor list |
-| `file-dialog-test.yaml` | ui_file | Save As dialogs for Notepad and Paint |
+| `file-dialog-test.yaml` | file_save | Save As dialogs for Notepad and Paint |
 | `paint-ui-test.yaml` | ui_find, ui_click, mouse_control | Paint ribbon and canvas |
 | `real-world-workflows-test.yaml` | All tools | 8 end-to-end workflow scenarios |
 
