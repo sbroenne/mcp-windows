@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Sbroenne.WindowsMcp.Configuration;
 
 namespace Sbroenne.WindowsMcp.Models;
 
@@ -48,19 +47,19 @@ public sealed record ScreenshotControlRequest
     /// Gets the output image format. Default is JPEG (optimized for LLM consumption).
     /// </summary>
     [JsonPropertyName("image_format")]
-    public ImageFormat ImageFormat { get; init; } = ScreenshotConfiguration.DefaultImageFormat;
+    public ImageFormat ImageFormat { get; init; } = ImageFormat.Jpeg;
 
     /// <summary>
-    /// Gets the JPEG quality (1-100). Only applies when ImageFormat is Jpeg. Default is 85.
+    /// Gets the JPEG quality (1-100). Only applies when ImageFormat is Jpeg. Default is 60.
     /// </summary>
     [JsonPropertyName("quality")]
-    public int Quality { get; init; } = ScreenshotConfiguration.DefaultQuality;
+    public int Quality { get; init; } = 60;
 
     /// <summary>
     /// Gets the output mode. Default is inline (base64 in response).
     /// </summary>
     [JsonPropertyName("output_mode")]
-    public OutputMode OutputMode { get; init; } = ScreenshotConfiguration.DefaultOutputMode;
+    public OutputMode OutputMode { get; init; } = OutputMode.Inline;
 
     /// <summary>
     /// Gets the custom output file path. Only used when OutputMode is File.

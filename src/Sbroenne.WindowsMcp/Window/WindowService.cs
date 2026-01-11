@@ -1,8 +1,6 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -18,9 +16,12 @@ public sealed class WindowService
     private readonly WindowActivator _activator;
     private readonly MonitorService _monitorService;
     private readonly SecureDesktopDetector _secureDesktopDetector;
-    private readonly WindowConfiguration _configuration;
-    private readonly WindowOperationLogger? _logger;
     private readonly UIAutomationService? _automationService;
+
+    /// <summary>
+    /// Default timeout for wait_for action in milliseconds.
+    /// </summary>
+    private const int DefaultWaitForTimeoutMs = 30000;
 
     /// <summary>
     /// Timeout for waiting for save dialogs to appear after WM_CLOSE.
@@ -39,31 +40,24 @@ public sealed class WindowService
     /// <param name="activator">Window activator service.</param>
     /// <param name="monitorService">Monitor service for multi-monitor support.</param>
     /// <param name="secureDesktopDetector">Secure desktop detector.</param>
-    /// <param name="configuration">Window configuration.</param>
     /// <param name="automationService">UI automation service for dialog dismissal.</param>
-    /// <param name="logger">Optional operation logger.</param>
     public WindowService(
         WindowEnumerator enumerator,
         WindowActivator activator,
         MonitorService monitorService,
         SecureDesktopDetector secureDesktopDetector,
-        WindowConfiguration configuration,
-        UIAutomationService? automationService = null,
-        WindowOperationLogger? logger = null)
+        UIAutomationService? automationService = null)
     {
         ArgumentNullException.ThrowIfNull(enumerator);
         ArgumentNullException.ThrowIfNull(activator);
         ArgumentNullException.ThrowIfNull(monitorService);
         ArgumentNullException.ThrowIfNull(secureDesktopDetector);
-        ArgumentNullException.ThrowIfNull(configuration);
 
         _enumerator = enumerator;
         _activator = activator;
         _monitorService = monitorService;
         _secureDesktopDetector = secureDesktopDetector;
-        _configuration = configuration;
         _automationService = automationService;
-        _logger = logger;
     }
 
     /// <inheritdoc/>
@@ -77,14 +71,10 @@ public sealed class WindowService
         {
             var windows = await _enumerator.EnumerateWindowsAsync(
                 filter, useRegex, includeAllDesktops, cancellationToken);
-
-            _logger?.LogWindowOperation("list", success: true, windowCount: windows.Count);
-
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger?.LogWindowOperation("list", success: false, errorMessage: ex.Message);
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.EnumerationFailed,
                 $"Failed to enumerate windows: {ex.Message}");
@@ -93,28 +83,24 @@ public sealed class WindowService
 
     /// <inheritdoc/>
     public async Task<WindowManagementResult> FindWindowAsync(
-        string title,
+        string? title,
+        string? processName = null,
         bool useRegex = false,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var windows = await _enumerator.FindWindowsAsync(title, useRegex, cancellationToken);
-
-            _logger?.LogWindowOperation("find", success: true, windowCount: windows.Count, filter: title);
-
+            var windows = await _enumerator.FindWindowsAsync(title, processName, useRegex, cancellationToken);
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (System.Text.RegularExpressions.RegexParseException ex)
         {
-            _logger?.LogWindowOperation("find", success: false, errorMessage: ex.Message);
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.InvalidRegexPattern,
                 $"Invalid regex pattern: {ex.Message}");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger?.LogWindowOperation("find", success: false, errorMessage: ex.Message);
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.EnumerationFailed,
                 $"Failed to find windows: {ex.Message}");
@@ -136,7 +122,6 @@ public sealed class WindowService
         // Check for secure desktop
         if (_secureDesktopDetector.IsSecureDesktopActive())
         {
-            _logger?.LogWindowOperation("activate", success: false, errorMessage: "Secure desktop active");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SecureDesktopActive,
                 "Cannot activate window while secure desktop (UAC prompt or lock screen) is active");
@@ -153,7 +138,6 @@ public sealed class WindowService
 
         if (windowInfo.IsElevated)
         {
-            _logger?.LogWindowOperation("activate", success: false, errorMessage: "Elevated window");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.ElevatedWindowActive,
                 "Cannot activate elevated (admin) window from non-elevated process");
@@ -164,7 +148,6 @@ public sealed class WindowService
 
         if (!success)
         {
-            _logger?.LogWindowOperation("activate", success: false, handle: handle);
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.ActivationFailed,
                 "Failed to activate window after trying all strategies");
@@ -172,9 +155,6 @@ public sealed class WindowService
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
-
-        _logger?.LogWindowOperation("activate", success: true, handle: handle, windowTitle: updatedInfo?.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -185,7 +165,6 @@ public sealed class WindowService
         // Check for secure desktop
         if (_secureDesktopDetector.IsSecureDesktopActive())
         {
-            _logger?.LogWindowOperation("get_foreground", success: false, errorMessage: "Secure desktop active");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SecureDesktopActive,
                 "Secure desktop (UAC prompt or lock screen) is active");
@@ -206,9 +185,6 @@ public sealed class WindowService
                 WindowManagementErrorCode.WindowNotFound,
                 "Foreground window info not available");
         }
-
-        _logger?.LogWindowOperation("get_foreground", success: true, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
     }
 
@@ -269,7 +245,6 @@ public sealed class WindowService
 
         if (!posted)
         {
-            _logger?.LogWindowOperation("close", success: false, handle: handle, errorMessage: "PostMessage failed");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.CloseFailed,
                 "Failed to send close message to window");
@@ -279,11 +254,7 @@ public sealed class WindowService
         if (discardChanges && _automationService != null)
         {
             await DismissSaveDialogAsync(handle, cancellationToken);
-        }
-
-        _logger?.LogWindowOperation("close", success: true, handle: handle, windowTitle: windowInfo.Title);
-
-        // Note: We return the window info before close. The window may prompt for save, etc.
+        }// Note: We return the window info before close. The window may prompt for save, etc.
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
     }
 
@@ -295,8 +266,6 @@ public sealed class WindowService
         // If automation service is not available, we can't dismiss dialogs
         if (_automationService == null)
         {
-            _logger?.LogWindowOperation("close_dialog_dismiss", success: false, handle: parentHandle,
-                errorMessage: "UIAutomationService not available for dialog dismissal");
             return;
         }
 
@@ -310,8 +279,6 @@ public sealed class WindowService
             // Check if the parent window is still valid (it may have closed without a dialog)
             if (!NativeMethods.IsWindow(parentHandle))
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Window closed without save dialog");
                 return;
             }
 
@@ -336,8 +303,6 @@ public sealed class WindowService
 
             if (result.Success)
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Dismissed dialog using SecondaryButton");
                 return;
             }
 
@@ -351,8 +316,6 @@ public sealed class WindowService
 
             if (result.Success)
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Dismissed dialog using CommandButton_7");
                 return;
             }
 
@@ -367,8 +330,6 @@ public sealed class WindowService
 
             if (result.Success)
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Dismissed dialog using Don't Save button");
                 return;
             }
 
@@ -383,8 +344,6 @@ public sealed class WindowService
 
             if (result.Success)
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Dismissed dialog using &No button");
                 return;
             }
 
@@ -398,8 +357,6 @@ public sealed class WindowService
 
             if (result.Success)
             {
-                _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-                    errorMessage: "Dismissed dialog using No button");
                 return;
             }
 
@@ -407,8 +364,6 @@ public sealed class WindowService
         }
 
         // If we reach here, no dialog was found or dismissed - that's okay, the window may have closed normally
-        _logger?.LogWindowOperation("close_dialog_dismiss", success: true, handle: parentHandle,
-            errorMessage: "No save dialog found within timeout");
     }
 
     /// <inheritdoc/>
@@ -443,7 +398,6 @@ public sealed class WindowService
 
         if (!success)
         {
-            _logger?.LogWindowOperation("move", success: false, handle: handle, errorMessage: "SetWindowPos failed");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MoveFailed,
                 "Failed to move window");
@@ -451,9 +405,6 @@ public sealed class WindowService
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
-
-        _logger?.LogWindowOperation("move", success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -496,7 +447,6 @@ public sealed class WindowService
 
         if (!success)
         {
-            _logger?.LogWindowOperation("resize", success: false, handle: handle, errorMessage: "SetWindowPos failed");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.ResizeFailed,
                 "Failed to resize window");
@@ -504,9 +454,6 @@ public sealed class WindowService
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
-
-        _logger?.LogWindowOperation("resize", success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -550,7 +497,6 @@ public sealed class WindowService
 
         if (!success)
         {
-            _logger?.LogWindowOperation("set_bounds", success: false, handle: handle, errorMessage: "SetWindowPos failed");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MoveFailed,
                 "Failed to set window bounds");
@@ -558,9 +504,6 @@ public sealed class WindowService
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
-
-        _logger?.LogWindowOperation("set_bounds", success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -578,7 +521,7 @@ public sealed class WindowService
                 "Title is required for wait_for operation");
         }
 
-        int timeout = timeoutMs ?? _configuration.WaitForTimeoutMs;
+        int timeout = timeoutMs ?? DefaultWaitForTimeoutMs;
         int pollInterval = 250; // Poll every 250ms
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
@@ -588,10 +531,9 @@ public sealed class WindowService
 
             try
             {
-                var windows = await _enumerator.FindWindowsAsync(title, useRegex, cancellationToken);
+                var windows = await _enumerator.FindWindowsAsync(title, null, useRegex, cancellationToken);
                 if (windows.Count > 0)
                 {
-                    _logger?.LogWindowOperation("wait_for", success: true, windowTitle: windows[0].Title, filter: title);
                     return WindowManagementResult.CreateWindowSuccess(windows[0]);
                 }
             }
@@ -604,9 +546,6 @@ public sealed class WindowService
 
             await Task.Delay(pollInterval, cancellationToken);
         }
-
-        _logger?.LogWindowOperation("wait_for", success: false, filter: title, errorMessage: "Timeout");
-
         return WindowManagementResult.CreateFailure(
             WindowManagementErrorCode.Timeout,
             $"Timeout waiting for window matching '{title}' after {timeout}ms");
@@ -642,8 +581,6 @@ public sealed class WindowService
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
 
         string actionName = action.ToString().ToLowerInvariant();
-        _logger?.LogWindowOperation(actionName, success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -716,7 +653,6 @@ public sealed class WindowService
 
         if (!success)
         {
-            _logger?.LogWindowOperation("move_to_monitor", success: false, handle: handle, errorMessage: "SetWindowPos failed");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MoveFailed,
                 "Failed to move window to target monitor");
@@ -724,9 +660,6 @@ public sealed class WindowService
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
-
-        _logger?.LogWindowOperation("move_to_monitor", success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(updatedInfo ?? windowInfo);
     }
 
@@ -745,7 +678,6 @@ public sealed class WindowService
         // Check for secure desktop
         if (_secureDesktopDetector.IsSecureDesktopActive())
         {
-            _logger?.LogWindowOperation("get_state", success: false, errorMessage: "Secure desktop active");
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.SecureDesktopActive,
                 "Secure desktop (UAC prompt or lock screen) is active");
@@ -758,9 +690,6 @@ public sealed class WindowService
                 WindowManagementErrorCode.WindowNotFound,
                 $"Window with handle {handle} not found");
         }
-
-        _logger?.LogWindowOperation("get_state", success: true, handle: handle, windowTitle: windowInfo.Title);
-
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
     }
 
@@ -796,7 +725,6 @@ public sealed class WindowService
 
             if (windowInfo.State == targetState)
             {
-                _logger?.LogWindowOperation("wait_for_state", success: true, handle: handle, windowTitle: windowInfo.Title);
                 return WindowManagementResult.CreateWindowSuccess(windowInfo);
             }
 
@@ -806,9 +734,6 @@ public sealed class WindowService
         // Timeout - get final state for error message
         var finalInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);
         var currentState = finalInfo?.State.ToString() ?? "unknown";
-
-        _logger?.LogWindowOperation("wait_for_state", success: false, handle: handle, errorMessage: $"Timeout waiting for state {targetState}");
-
         return WindowManagementResult.CreateFailure(
             WindowManagementErrorCode.Timeout,
             $"Timeout after {timeout}ms waiting for window to reach state '{targetState}'. Current state: '{currentState}'");

@@ -1,57 +1,68 @@
-# =============================================================================
-# Notepad UI Test - Core UI Interaction Tools
-# =============================================================================
+# Windows based test
+# Tests a UI Automation scenario with Windows MCP Server
+# https://windowsmcpserver.dev/
+# https://github.com/sbroenne/mcp-windows
 #
-# User Story 1: Core UI Interaction Tools (Priority: P1) 🎯 MVP
+# Testing framework: Agent Benchmark
+# https://github.com/mykhaliev/agent-benchmark
 #
-# Tests: ui_find, ui_click, ui_type, ui_read against Notepad
-#
-# Tools Covered:
-#   - ui_find: Discover UI elements (menus, text area) with timeout/retry via timeoutMs
-#   - ui_click: Click on menu items
-#   - ui_type: Type text into document
-#   - ui_read: Read text content
+# Test: Complete Notepad workflow with proof
+# Success = proof provided + Notepad closed
 #
 # Prerequisites:
-#   - Windows 10/11
-#   - Windows MCP Server
-#   - Environment: AZURE_OPENAI_ENDPOINT
+# - Windows 10/11
+# - Windows MCP Server executable in examples folder
+# - Azure OpenAI resource with Entra ID authentication configured
+# - One of the following authentication methods:
+#   * Azure CLI logged in (az login)
+#   * Environment variables: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_CLIENT_SECRET
+#   * Managed Identity (when running in Azure)
+#   * Visual Studio Code Azure Account extension
+# - Google Cloud Application Default Credentials (gcloud auth application-default login)
+# - Environment variables set:
+#   - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint
+#   - GCP_PROJECT_ID: Google Cloud project ID
+#   - GCP_LOCATION: Google Cloud region (e.g., us-central1)
 #
-# =============================================================================
+# Run command:
+#   agent-benchmark -f examples/windows-mcp-notepad.yaml -reportType html,json
 
 criteria:
-  success_rate: 1  # 100% required
+  success_rate: 1 # 100%
 
-providers:
-  - name: azure-openai-gpt41
-    type: AZURE
-    auth_type: entra_id
-    model: gpt-4.1
-    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
-    version: 2025-01-01-preview
-    retry:
-      retry_on_429: true
-      max_retries: 5
-  - name: azure-openai-gpt5-chat
-    type: AZURE
-    auth_type: entra_id
-    model: gpt-5.2-chat
-    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
-    version: 2025-01-01-preview
-    retry:
-      retry_on_429: true
-      max_retries: 5
 servers:
   - name: windows-mcp
     type: stdio
     command: "{{SERVER_COMMAND}}"
     server_delay: 10s
 
+providers:
+  - name: azure-gpt52
+    type: AZURE
+    auth_type: entra_id  # Used as judge for clarification detection
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: azure-gpt41
+    type: AZURE
+    auth_type: entra_id  # Uses DefaultAzureCredential - no API key needed
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+
+  - name: vertex-gemini25pro
+    type: VERTEX
+    project_id: "{{GCP_PROJECT_ID}}"
+    location: "{{GCP_LOCATION}}"
+    model: gemini-2.5-pro
+    # Uses Application Default Credentials (gcloud auth application-default login)
+
 agents:
-  - name: gpt41-agent
+  - name: azure-gpt41-agent
     servers:
       - name: windows-mcp
-    provider: azure-openai-gpt41
+    provider: azure-gpt41
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
@@ -64,13 +75,12 @@ agents:
       - Report results after completion, not before starting
     clarification_detection:
       enabled: true
-      level: warning
-      use_builtin_patterns: true
+      judge_provider: azure-gpt52
 
-  - name: gpt5-chat-agent
+  - name: vertex-gemini25pro-agent
     servers:
       - name: windows-mcp
-    provider: azure-openai-gpt5-chat
+    provider: vertex-gemini25pro
     system_prompt: |
       You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
       Session: {{SESSION_NAME}}
@@ -83,235 +93,129 @@ agents:
       - Report results after completion, not before starting
     clarification_detection:
       enabled: true
-      level: warning
-      use_builtin_patterns: true
+      judge_provider: azure-gpt52
 
 settings:
   verbose: true
-  max_iterations: 15
-
-
+  max_iterations: 10      # launch + type + close + dialog + verify + buffer
 sessions:
-  # ==========================================================================
-  # Session 1: UI Discovery - ui_find for menus and text area
-  # ==========================================================================
-  - name: "UI Discovery"
+  - name: Notepad Workflow - Discard
     tests:
-      - name: "Cleanup - Close existing Notepad windows"
+      - name: "Complete Notepad automation (discard)"
+        description: "Open Notepad, type text, close without saving"
         prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
+          1. Launch Notepad
+          2. Type "Hello World"
+          3. Record proof that this worked (no screenshots, just text)
+          4. Close Notepad and click "Don't Save" if prompted
+          5. Verify no Notepad window is open (search for it)
 
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
+          Report "VERIFIED: No Notepad window open" if closed successfully.
         assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Find the File menu"
-        prompt: |
-          Find the File menu in Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: ui_find
-          - type: output_regex
-            pattern: "(?i)(file|menu|found|element)"
-
-      - name: "Find the main text editing area"
-        prompt: |
-          Find the main text editing area in Notepad where you can type.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: ui_find
-          - type: output_regex
-            pattern: "(?i)(edit|text|document|area|found)"
-
-      - name: "Find the Edit menu"
-        prompt: |
-          Find the Edit menu in Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: ui_find
-          - type: output_regex
-            pattern: "(?i)(edit|menu|found)"
-
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving any changes.
-        assertions:
-          - type: no_hallucinated_tools
-
-  # ==========================================================================
-  # Session 2: Text Input - ui_type for document editing
-  # ==========================================================================
-  - name: "Text Input"
-    tests:
-      - name: "Cleanup - Close existing Notepad windows"
-        prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Type a greeting"
-        prompt: |
-          Type "Hello, this is a UI automation test!" in Notepad.
-        assertions:
-          - type: no_hallucinated_tools
+          # REQUIRED: Must launch Notepad first, then type text
           - anyOf:
-              - type: tool_called
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - keyboard_control
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - ui_type
+
+          # OUTCOME: Proof that "Hello World" was typed
+          - anyOf:
+              - type: output_regex
+                pattern: "(?i)hello\\s*world"
+              - type: tool_param_matches_regex
+                tool: keyboard_control
+                params:
+                  text: "(?i)hello.*world"
+              - type: tool_param_matches_regex
                 tool: ui_type
-              - type: tool_called
-                tool: keyboard_control
+                params:
+                  text: "(?i)hello.*world"
 
-      - name: "Type on a new line"
-        prompt: |
-          Press Enter and type "Second line of text" on the new line.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_type
-              - type: tool_called
-                tool: keyboard_control
-
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
-          - type: no_hallucinated_tools
-
-  # ==========================================================================
-  # Session 3: Text Reading - ui_read for content extraction
-  # ==========================================================================
-  - name: "Text Reading"
-    tests:
-      - name: "Cleanup - Close existing Notepad windows"
-        prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
-
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Type some text"
-        prompt: |
-          Type "Test content for reading" in Notepad.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_type
-              - type: tool_called
-                tool: keyboard_control
-
-      - name: "Read the text content"
-        prompt: |
-          Read the text content from the Notepad text area.
-        assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: ui_read
+          # OUTCOME: LLM verified Notepad was closed
           - type: output_regex
-            pattern: "(?i)(test content|reading|text|content)"
+            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
 
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "failed"
+
+          # QUALITY: Only used real tools
           - type: no_hallucinated_tools
 
-  # ==========================================================================
-  # Session 4: Menu Navigation - ui_click for File/Edit/Format menus
-  # ==========================================================================
-  - name: "Menu Navigation"
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # QUALITY: Agent executed directly without asking for confirmation
+          - type: no_clarification_questions
+
+          # QUALITY: No rate limit errors encountered
+          - type: no_rate_limit_errors
+
+  - name: Notepad Workflow - Save
     tests:
-      - name: "Cleanup - Close existing Notepad windows"
+      - name: "Complete Notepad automation (save file)"
+        description: "Open Notepad, type text, save to temp directory, close"
         prompt: |
-          Close all Notepad windows if any are open.
-        assertions:
-          - type: no_hallucinated_tools
+          1. Launch Notepad
+          2. Type "Hello World from Agent Benchmark"
+          3. Save the file to {{TEMP_DIR}}/agent-benchmark-{{RUN_ID}}.txt
+          4. Record proof that this worked (confirm the file was saved)
+          5. Close Notepad
+          6. Verify no Notepad window is open (search for it)
 
-      - name: "Launch Notepad"
-        prompt: |
-          Open Notepad.
+          Report "VERIFIED: File saved and Notepad closed" if successful.
         assertions:
-          - type: no_hallucinated_tools
-          - type: tool_called
-            tool: app
-
-      - name: "Click the File menu"
-        prompt: |
-          Click on the File menu to open it.
-        assertions:
-          - type: no_hallucinated_tools
+          # REQUIRED: Must launch Notepad first, then type text
           - anyOf:
-              - type: tool_called
-                tool: ui_click
-              - type: tool_called
-                tool: ui_find
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - keyboard_control
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - ui_type
 
-      - name: "Press Escape to close menu"
-        prompt: |
-          Press Escape to close the menu.
-        assertions:
-          - type: no_hallucinated_tools
+          # OUTCOME: Proof that text was typed
           - anyOf:
-              - type: tool_called
+              - type: output_regex
+                pattern: "(?i)hello\\s*world"
+              - type: tool_param_matches_regex
                 tool: keyboard_control
-              - type: tool_called
-                tool: ui_click
+                params:
+                  text: "(?i)hello.*world"
+              - type: tool_param_matches_regex
+                tool: ui_type
+                params:
+                  text: "(?i)hello.*world"
 
-      - name: "Click the Edit menu"
-        prompt: |
-          Click on the Edit menu to open it.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_click
-              - type: tool_called
-                tool: ui_find
+          # OUTCOME: File was saved (agent mentions save/saved)
+          - type: output_regex
+            pattern: "(?i)(saved|file.*created|wrote.*file|save.*successful)"
 
-      - name: "Press Escape to close menu"
-        prompt: |
-          Press Escape to close the menu.
-        assertions:
+          # OUTCOME: LLM verified Notepad was closed
+          - type: output_regex
+            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+
+          # SAFETY: No failure indicators
+          - type: output_not_contains
+            value: "failed"
+
+          # QUALITY: Only used real tools
           - type: no_hallucinated_tools
 
-      - name: "Click the Format menu"
-        prompt: |
-          Click on the Format menu to open it.
-        assertions:
-          - type: no_hallucinated_tools
-          - anyOf:
-              - type: tool_called
-                tool: ui_click
-              - type: tool_called
-                tool: ui_find
+          # QUALITY: No errors during execution
+          - type: no_error_messages
 
-      - name: "Close Notepad"
-        prompt: |
-          Close Notepad without saving.
-        assertions:
-          - type: no_hallucinated_tools
+          # QUALITY: Agent executed directly without asking for confirmation
+          - type: no_clarification_questions
+
+          # QUALITY: No rate limit errors encountered
+          - type: no_rate_limit_errors
+
 

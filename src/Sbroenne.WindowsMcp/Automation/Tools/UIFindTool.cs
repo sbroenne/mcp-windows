@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Runtime.Versioning;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Automation.Tools;
 
@@ -9,23 +11,9 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for finding UI elements in Windows applications.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed partial class UIFindTool
+[McpServerToolType]
+public static partial class UIFindTool
 {
-    private readonly UIAutomationService _automationService;
-    private readonly ILogger<UIFindTool> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="UIFindTool"/> class.
-    /// </summary>
-    public UIFindTool(UIAutomationService automationService, ILogger<UIFindTool> logger)
-    {
-        ArgumentNullException.ThrowIfNull(automationService);
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _automationService = automationService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element IDs for use with ui_click.
     /// </summary>
@@ -50,51 +38,58 @@ public sealed partial class UIFindTool
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing list of found elements with their properties and element IDs.</returns>
-    [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    public async Task<UIAutomationResult> ExecuteAsync(
+    [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false)]
+    public static async Task<string> ExecuteAsync(
         string windowHandle,
-        string? name = null,
-        string? nameContains = null,
-        string? namePattern = null,
-        string? controlType = null,
-        string? automationId = null,
-        string? className = null,
-        int? exactDepth = null,
-        int foundIndex = 1,
-        bool includeChildren = false,
-        bool sortByProminence = false,
-        string? inRegion = null,
-        string? nearElement = null,
-        int timeoutMs = 5000,
+        [DefaultValue(null)] string? name = null,
+        [DefaultValue(null)] string? nameContains = null,
+        [DefaultValue(null)] string? namePattern = null,
+        [DefaultValue(null)] string? controlType = null,
+        [DefaultValue(null)] string? automationId = null,
+        [DefaultValue(null)] string? className = null,
+        [DefaultValue(null)] int? exactDepth = null,
+        [DefaultValue(1)] int foundIndex = 1,
+        [DefaultValue(false)] bool includeChildren = false,
+        [DefaultValue(false)] bool sortByProminence = false,
+        [DefaultValue(null)] string? inRegion = null,
+        [DefaultValue(null)] string? nearElement = null,
+        [DefaultValue(5000)] int timeoutMs = 5000,
         CancellationToken cancellationToken = default)
     {
+        const string actionName = "find";
+
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return UIAutomationResult.CreateFailure(
-                "ui_find",
-                UIAutomationErrorType.InvalidParameter,
-                "windowHandle is required. Get it from window_management(action='find').",
-                null);
+            return WindowsToolsBase.Fail(
+                "windowHandle is required. Get it from window_management(action='find').");
         }
 
-        var query = new ElementQuery
+        try
         {
-            WindowHandle = windowHandle,
-            Name = name,
-            NameContains = nameContains,
-            NamePattern = namePattern,
-            ControlType = controlType,
-            AutomationId = automationId,
-            ClassName = className,
-            ExactDepth = exactDepth,
-            FoundIndex = Math.Max(1, foundIndex),
-            IncludeChildren = includeChildren,
-            SortByProminence = sortByProminence,
-            InRegion = inRegion,
-            NearElement = nearElement,
-            TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
-        };
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                ExactDepth = exactDepth,
+                FoundIndex = Math.Max(1, foundIndex),
+                IncludeChildren = includeChildren,
+                SortByProminence = sortByProminence,
+                InRegion = inRegion,
+                NearElement = nearElement,
+                TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
+            };
 
-        return await _automationService.FindElementsAsync(query, cancellationToken);
+            var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(query, cancellationToken);
+            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return WindowsToolsBase.SerializeToolError(actionName, ex);
+        }
     }
 }

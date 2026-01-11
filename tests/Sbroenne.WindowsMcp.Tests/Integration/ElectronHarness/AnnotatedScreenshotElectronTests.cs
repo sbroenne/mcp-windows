@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Window;
 
@@ -36,20 +34,17 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
         // Create real services for integration testing
         _staThread = new UIAutomationThread();
 
-        var windowConfiguration = WindowConfiguration.FromEnvironment();
-        var screenshotConfiguration = ScreenshotConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
         var secureDesktopDetector = new SecureDesktopDetector();
         var monitorService = new MonitorService();
 
-        var windowEnumerator = new WindowEnumerator(elevationDetector, windowConfiguration);
-        var windowActivator = new WindowActivator(windowConfiguration);
+        var windowEnumerator = new WindowEnumerator(elevationDetector);
+        var windowActivator = new WindowActivator();
         var windowService = new WindowService(
             windowEnumerator,
             windowActivator,
             monitorService,
-            secureDesktopDetector,
-            windowConfiguration);
+            secureDesktopDetector);
 
         var mouseService = new MouseInputService();
         var keyboardService = new KeyboardInputService();
@@ -64,19 +59,12 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
             NullLogger<UIAutomationService>.Instance);
 
         var imageProcessor = new ImageProcessor();
-        _screenshotService = new ScreenshotService(
-            monitorService,
-            secureDesktopDetector,
-            imageProcessor,
-            screenshotConfiguration,
-            new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance));
+        _screenshotService = new ScreenshotService(monitorService, secureDesktopDetector, imageProcessor);
 
-        var annotatedLogger = new AnnotatedScreenshotLogger(NullLogger<AnnotatedScreenshotLogger>.Instance);
         _annotatedScreenshotService = new AnnotatedScreenshotService(
             _automationService,
             _screenshotService,
-            imageProcessor,
-            annotatedLogger);
+            imageProcessor);
 
         // OCR service for verifying annotation labels
         _ocrService = new LegacyOcrService(NullLogger<LegacyOcrService>.Instance);

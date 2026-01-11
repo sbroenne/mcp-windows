@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -16,20 +15,20 @@ namespace Sbroenne.WindowsMcp.Window;
 public sealed class WindowEnumerator
 {
     private readonly ElevationDetector _elevationDetector;
-    private readonly WindowConfiguration _configuration;
+
+    /// <summary>
+    /// Default timeout for querying window properties (hung detection) in milliseconds.
+    /// </summary>
+    private const int PropertyQueryTimeoutMs = 100;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowEnumerator"/> class.
     /// </summary>
     /// <param name="elevationDetector">Elevation detector for checking window elevation status.</param>
-    /// <param name="configuration">Window configuration.</param>
-    public WindowEnumerator(ElevationDetector elevationDetector, WindowConfiguration configuration)
+    public WindowEnumerator(ElevationDetector elevationDetector)
     {
         ArgumentNullException.ThrowIfNull(elevationDetector);
-        ArgumentNullException.ThrowIfNull(configuration);
-
         _elevationDetector = elevationDetector;
-        _configuration = configuration;
     }
 
     /// <inheritdoc/>
@@ -39,14 +38,32 @@ public sealed class WindowEnumerator
         bool includeAllDesktops = false,
         CancellationToken cancellationToken = default)
     {
+        return EnumerateWindowsCoreAsync(filter, null, useRegex, includeAllDesktops, cancellationToken);
+    }
+
+    /// <summary>
+    /// Core enumeration with separate title and processName filters.
+    /// </summary>
+    private Task<IReadOnlyList<WindowInfo>> EnumerateWindowsCoreAsync(
+        string? titleFilter,
+        string? processNameFilter,
+        bool useRegex,
+        bool includeAllDesktops,
+        CancellationToken cancellationToken)
+    {
         return Task.Run(() =>
         {
             var windows = new List<WindowInfo>();
-            Regex? filterRegex = null;
+            Regex? titleRegex = null;
+            Regex? processRegex = null;
 
-            if (!string.IsNullOrEmpty(filter) && useRegex)
+            if (!string.IsNullOrEmpty(titleFilter) && useRegex)
             {
-                filterRegex = new Regex(filter, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+                titleRegex = new Regex(titleFilter, RegexOptions.IgnoreCase | RegexOptions.Compiled);
+            }
+            if (!string.IsNullOrEmpty(processNameFilter) && useRegex)
+            {
+                processRegex = new Regex(processNameFilter, RegexOptions.IgnoreCase | RegexOptions.Compiled);
             }
 
             // EnumWindows callback
@@ -64,15 +81,27 @@ public sealed class WindowEnumerator
                     return true; // Continue enumeration
                 }
 
-                // Apply filter if specified
-                if (!string.IsNullOrEmpty(filter))
+                // Apply title filter if specified
+                if (!string.IsNullOrEmpty(titleFilter))
                 {
-                    bool matches = filterRegex is not null
-                        ? filterRegex.IsMatch(info.Title) || filterRegex.IsMatch(info.ProcessName ?? "")
-                        : (info.Title.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
-                           (info.ProcessName?.Contains(filter, StringComparison.OrdinalIgnoreCase) ?? false));
+                    bool titleMatches = titleRegex is not null
+                        ? titleRegex.IsMatch(info.Title)
+                        : info.Title.Contains(titleFilter, StringComparison.OrdinalIgnoreCase);
 
-                    if (!matches)
+                    if (!titleMatches)
+                    {
+                        return true; // Continue but don't add
+                    }
+                }
+
+                // Apply processName filter if specified (exact match, case-insensitive)
+                if (!string.IsNullOrEmpty(processNameFilter))
+                {
+                    bool processMatches = processRegex is not null
+                        ? processRegex.IsMatch(info.ProcessName ?? "")
+                        : string.Equals(info.ProcessName, processNameFilter, StringComparison.OrdinalIgnoreCase);
+
+                    if (!processMatches)
                     {
                         return true; // Continue but don't add
                     }
@@ -96,11 +125,12 @@ public sealed class WindowEnumerator
 
     /// <inheritdoc/>
     public Task<IReadOnlyList<WindowInfo>> FindWindowsAsync(
-        string title,
+        string? title,
+        string? processName = null,
         bool useRegex = false,
         CancellationToken cancellationToken = default)
     {
-        return EnumerateWindowsAsync(title, useRegex, includeAllDesktops: false, cancellationToken);
+        return EnumerateWindowsCoreAsync(title, processName, useRegex, includeAllDesktops: false, cancellationToken);
     }
 
     private WindowInfo? GetWindowInfoCore(nint hwnd, bool includeAllDesktops)
@@ -350,7 +380,7 @@ public sealed class WindowEnumerator
             IntPtr.Zero,
             [],
             NativeConstants.SMTO_ABORTIFHUNG,
-            (uint)_configuration.PropertyQueryTimeoutMs,
+            PropertyQueryTimeoutMs,
             out result);
 
         return returnValue != IntPtr.Zero;

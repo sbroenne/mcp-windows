@@ -1,9 +1,10 @@
+using System.ComponentModel;
 using System.Runtime.Versioning;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Automation.Tools;
 
@@ -11,33 +12,9 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for reading text from UI elements with automatic OCR fallback.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed partial class UIReadTool
+[McpServerToolType]
+public static partial class UIReadTool
 {
-    private readonly UIAutomationService _automationService;
-    private readonly LegacyOcrService _ocrService;
-    private readonly ScreenshotService _screenshotService;
-    private readonly ILogger<UIReadTool> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="UIReadTool"/> class.
-    /// </summary>
-    public UIReadTool(
-        UIAutomationService automationService,
-        LegacyOcrService ocrService,
-        ScreenshotService screenshotService,
-        ILogger<UIReadTool> logger)
-    {
-        ArgumentNullException.ThrowIfNull(automationService);
-        ArgumentNullException.ThrowIfNull(ocrService);
-        ArgumentNullException.ThrowIfNull(screenshotService);
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _automationService = automationService;
-        _ocrService = ocrService;
-        _screenshotService = screenshotService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Reads text from a UI element. If UIA text extraction fails, automatically tries OCR.
     /// </summary>
@@ -56,96 +33,105 @@ public sealed partial class UIReadTool
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The extracted text content from the element or screen region.</returns>
-    [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false, UseStructuredContent = true)]
-    public async Task<UIAutomationResult> ExecuteAsync(
+    [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false)]
+    public static async Task<string> ExecuteAsync(
         string windowHandle,
-        string? name = null,
-        string? nameContains = null,
-        string? namePattern = null,
-        string? controlType = null,
-        string? automationId = null,
-        string? className = null,
-        int foundIndex = 1,
-        bool includeChildren = false,
-        string? language = null,
+        [DefaultValue(null)] string? name = null,
+        [DefaultValue(null)] string? nameContains = null,
+        [DefaultValue(null)] string? namePattern = null,
+        [DefaultValue(null)] string? controlType = null,
+        [DefaultValue(null)] string? automationId = null,
+        [DefaultValue(null)] string? className = null,
+        [DefaultValue(1)] int foundIndex = 1,
+        [DefaultValue(false)] bool includeChildren = false,
+        [DefaultValue(null)] string? language = null,
         CancellationToken cancellationToken = default)
     {
+        const string actionName = "read";
+
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return UIAutomationResult.CreateFailure(
-                "ui_read",
-                UIAutomationErrorType.InvalidParameter,
-                "windowHandle is required. Get it from window_management(action='find').",
-                null);
+            return WindowsToolsBase.Fail(
+                "windowHandle is required. Get it from window_management(action='find').");
         }
 
-        var query = new ElementQuery
-        {
-            WindowHandle = windowHandle,
-            Name = name,
-            NameContains = nameContains,
-            NamePattern = namePattern,
-            ControlType = controlType,
-            AutomationId = automationId,
-            ClassName = className,
-            FoundIndex = Math.Max(1, foundIndex)
-        };
-
-        // Try normal text extraction first
-        // If no specific element criteria, just read from the window
-        string? elementIdToRead = null;
-        if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) || !string.IsNullOrEmpty(namePattern) ||
-            !string.IsNullOrEmpty(controlType) || !string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(className))
-        {
-            // Find the element first
-            var findResult = await _automationService.FindElementsAsync(query, cancellationToken);
-            if (findResult.Success && findResult.Items?.Length > 0)
-            {
-                elementIdToRead = findResult.Items[0].Id;
-            }
-        }
-
-        var result = await _automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, cancellationToken);
-        if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
-        {
-            return result;
-        }
-
-        // Fallback: try OCR on the window region
         try
         {
-            if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
+            var query = new ElementQuery
             {
-                return result; // Return original result if window handle invalid
-            }
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = Math.Max(1, foundIndex)
+            };
 
-            if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+            var automationService = WindowsToolsBase.UIAutomationService;
+
+            // Try normal text extraction first
+            // If no specific element criteria, just read from the window
+            string? elementIdToRead = null;
+            if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) || !string.IsNullOrEmpty(namePattern) ||
+                !string.IsNullOrEmpty(controlType) || !string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(className))
             {
-                return result; // Return original result if can't get bounds
-            }
-
-            var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
-
-            using var bitmap = new System.Drawing.Bitmap(captureRect.Width, captureRect.Height);
-            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
-            {
-                graphics.CopyFromScreen(captureRect.Left, captureRect.Top, 0, 0, bitmap.Size);
-            }
-
-            var ocrResult = await _ocrService.RecognizeAsync(bitmap, language, cancellationToken);
-            if (ocrResult.Success && !string.IsNullOrWhiteSpace(ocrResult.Text))
-            {
-                return UIAutomationResult.CreateSuccessWithText("ui_read", ocrResult.Text, null) with
+                // Find the element first
+                var findResult = await automationService.FindElementsAsync(query, cancellationToken);
+                if (findResult.Success && findResult.Items?.Length > 0)
                 {
-                    UsageHint = $"Text extracted via OCR (fallback). Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
-                };
+                    elementIdToRead = findResult.Items[0].Id;
+                }
             }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // OCR fallback failed - ignore and return original result
-        }
 
-        return result;
+            var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, cancellationToken);
+            if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
+            {
+                return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            }
+
+            // Fallback: try OCR on the window region
+            try
+            {
+                if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
+                {
+                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                }
+
+                if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+                {
+                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                }
+
+                var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
+
+                using var bitmap = new System.Drawing.Bitmap(captureRect.Width, captureRect.Height);
+                using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+                {
+                    graphics.CopyFromScreen(captureRect.Left, captureRect.Top, 0, 0, bitmap.Size);
+                }
+
+                var ocrResult = await WindowsToolsBase.LegacyOcrService.RecognizeAsync(bitmap, language, cancellationToken);
+                if (ocrResult.Success && !string.IsNullOrWhiteSpace(ocrResult.Text))
+                {
+                    var ocrSuccessResult = UIAutomationResult.CreateSuccessWithText("ui_read", ocrResult.Text, null) with
+                    {
+                        UsageHint = $"Text extracted via OCR (fallback). Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
+                    };
+                    return JsonSerializer.Serialize(ocrSuccessResult, WindowsToolsBase.JsonOptions);
+                }
+            }
+            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            {
+                // OCR fallback failed - ignore and return original result
+            }
+
+            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return WindowsToolsBase.SerializeToolError(actionName, ex);
+        }
     }
 }

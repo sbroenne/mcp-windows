@@ -207,19 +207,13 @@ public sealed class ElectronHarnessFixture : IDisposable
                 FileName = electronExePath,
                 Arguments = ".",
                 WorkingDirectory = _electronHarnessPath,
-                UseShellExecute = false, // Need false to redirect output
+                UseShellExecute = true, // Use shell execute for proper accessibility tree initialization
                 CreateNoWindow = false, // Allow window to be created
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
             }
         };
 
-        // Set environment variable for Electron logging
-        _electronProcess.StartInfo.EnvironmentVariables["ELECTRON_ENABLE_LOGGING"] = "1";
-
-        // CRITICAL: Unset ELECTRON_RUN_AS_NODE which causes Electron to run as plain Node.js
-        // VS Code and other Electron-based IDEs may set this in the environment
-        _electronProcess.StartInfo.EnvironmentVariables.Remove("ELECTRON_RUN_AS_NODE");
+        // Note: With UseShellExecute = true, we cannot redirect output or set environment variables
+        // This is intentional - Chromium needs proper shell environment for accessibility support
 
         _electronProcess.Start();
     }
@@ -234,16 +228,15 @@ public sealed class ElectronHarnessFixture : IDisposable
             if (_windowHandle != nint.Zero)
             {
                 // Give the window time to fully initialize (Chromium UIA tree needs extra time)
-                Thread.Sleep(1000);
+                // Increased from 1000ms to 3000ms due to Chromium accessibility tree initialization timing
+                Thread.Sleep(3000);
                 return;
             }
 
             // Check if process exited unexpectedly
             if (_electronProcess?.HasExited == true)
             {
-                var error = _electronProcess.StandardError.ReadToEnd();
-                var output = _electronProcess.StandardOutput.ReadToEnd();
-                throw new InvalidOperationException($"Electron process exited unexpectedly (exit code {_electronProcess.ExitCode}):\nStderr: {error}\nStdout: {output}");
+                throw new InvalidOperationException($"Electron process exited unexpectedly (exit code {_electronProcess.ExitCode})");
             }
 
             Thread.Sleep(100);

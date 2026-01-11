@@ -131,7 +131,7 @@ public sealed class SystemResources
             | `ui_type` | Type text into input fields. |
             | `ui_find` | Find elements, get details, inspect properties. |
             | `ui_read` | Read text from elements (with OCR fallback). |
-            | `ui_file` | Save files (Office apps via COM, others via dialogs). |
+            | `file_save` | 💾 Save files to disk (handles Save As dialogs automatically!). |
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
             | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
 
@@ -184,9 +184,9 @@ public sealed class SystemResources
 
             ### 6. Save Files
             ```
-            ui_file(windowHandle="<handle>", filePath="C:\\Users\\User\\document.docx")
+            file_save(windowHandle="<handle>", filePath="C:\\Users\\User\\document.docx")
             ```
-            Works with Office apps (Word, Excel, PowerPoint) via COM and standard apps via Save As dialogs.
+            Handles Save As dialogs automatically - enters filename, clicks Save, handles overwrite prompts.
 
             ## When to Use Each Tool
 
@@ -194,7 +194,7 @@ public sealed class SystemResources
             |------|-------------|----------|
             | Click button/checkbox | ui_click(windowHandle=..., nameContains=...) | mouse_control(windowHandle=...) |
             | Type in text field | ui_type(windowHandle=..., text=...) | keyboard_control with window activated |
-            | Save a file | ui_file(windowHandle=..., filePath=...) | keyboard_control(key='s', modifiers='ctrl') |
+            | Save a file | file_save(windowHandle=..., filePath=...) | ⚠️ keyboard_control CANNOT handle Save As dialogs! |
             | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | - |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
             | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
@@ -208,7 +208,7 @@ public sealed class SystemResources
             2. **Use explicit handles** - you control which window when multiple match
             3. **Use screenshot_control(annotate=true) when you don't know element names**
             4. **Use window_management(wait_for) for dialogs** - wait for new windows to appear
-            5. **Use ui_file for saving** - handles Office COM + Save As dialogs automatically
+            5. **Use file_save for saving** - handles Save As dialogs automatically (⚠️ NOT keyboard_control!)
 
             ## When to Use `ui_find` (Optional)
 
@@ -254,7 +254,7 @@ public sealed class SystemResources
             | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `screenshot_control(annotate=true)`. |
             | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
 
-            ## File Operation Errors (ui_file)
+            ## File Operation Errors (file_save)
 
             | Error Code | Recovery Action |
             |------------|-----------------|
@@ -397,7 +397,7 @@ public sealed class SystemResources
 
             **Abbreviations:** id=element_id, n=name/count, t=type, cp=clickable_point, br=bounding_rect, en=enabled, pat=patterns, fw=framework, tw=target_window, ts=toggle_state, txt=text
 
-            ## ui_file
+            ## file_save
 
             ```json
             // Save successful:

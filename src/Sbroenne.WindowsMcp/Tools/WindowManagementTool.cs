@@ -1,14 +1,9 @@
-using System.Diagnostics;
+using System.ComponentModel;
 using System.Runtime.Versioning;
-using ModelContextProtocol.Protocol;
+using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
-using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -17,36 +12,8 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// </summary>
 [McpServerToolType]
 [SupportedOSPlatform("windows")]
-public sealed partial class WindowManagementTool
+public static partial class WindowManagementTool
 {
-    private readonly WindowService _windowService;
-    private readonly MonitorService _monitorService;
-    private readonly WindowOperationLogger? _logger;
-    private readonly WindowConfiguration _configuration;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="WindowManagementTool"/> class.
-    /// </summary>
-    /// <param name="windowService">The window service.</param>
-    /// <param name="monitorService">The monitor service.</param>
-    /// <param name="configuration">The window configuration.</param>
-    /// <param name="logger">Optional operation logger.</param>
-    public WindowManagementTool(
-        WindowService windowService,
-        MonitorService monitorService,
-        WindowConfiguration configuration,
-        WindowOperationLogger? logger = null)
-    {
-        ArgumentNullException.ThrowIfNull(windowService);
-        ArgumentNullException.ThrowIfNull(monitorService);
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        _windowService = windowService;
-        _monitorService = monitorService;
-        _configuration = configuration;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Manage existing windows. Use app tool to launch applications first, then use this tool to manage the windows.
     /// Supports: list, find, activate, minimize, maximize, restore, close, move, resize, and more.
@@ -62,10 +29,10 @@ public sealed partial class WindowManagementTool
     /// - Use target='primary_screen' or target='secondary_screen' for easy targeting
     /// - Use monitorIndex for 3+ monitor setups (use screenshot_control action='list_monitors' to find indices)
     /// </remarks>
-    /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="action">The window action to perform: list, find, activate, get_foreground, get_state, wait_for_state, minimize, maximize, restore, close, move, resize, set_bounds, wait_for, move_to_monitor, move_and_activate, or ensure_visible.</param>
     /// <param name="handle">Window handle for actions that target a specific window. Get the handle from the list or find action.</param>
-    /// <param name="title">Window title to search for (required for find and wait_for).</param>
+    /// <param name="title">Window title to search for (for find and wait_for). Uses substring match unless regex=true.</param>
+    /// <param name="processName">Process name to search for (for find action). More reliable than title - matches 'Notepad', 'chrome', etc. Case-insensitive.</param>
     /// <param name="filter">Filter windows by title or process name (for list action).</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
     /// <param name="includeAllDesktops">Include windows on other virtual desktops (default: false).</param>
@@ -81,40 +48,29 @@ public sealed partial class WindowManagementTool
     /// <param name="discardChanges">For close action: if true, automatically dismisses 'Save?' dialogs by clicking 'Don't Save'. Only works on English Windows. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
-    [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    public async Task<WindowManagementResult> ExecuteAsync(
-        RequestContext<CallToolRequestParams> context,
+    [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false)]
+    public static async Task<string> ExecuteAsync(
         WindowAction action,
-        string? handle = null,
-        string? title = null,
-        string? filter = null,
-        bool regex = false,
-        bool includeAllDesktops = false,
-        int? x = null,
-        int? y = null,
-        int? width = null,
-        int? height = null,
-        int? timeoutMs = null,
-        string? target = null,
-        int? monitorIndex = null,
-        string? state = null,
-        string? excludeTitle = null,
-        bool discardChanges = false,
+        [DefaultValue(null)] string? handle = null,
+        [DefaultValue(null)] string? title = null,
+        [DefaultValue(null)] string? processName = null,
+        [DefaultValue(null)] string? filter = null,
+        [DefaultValue(false)] bool regex = false,
+        [DefaultValue(false)] bool includeAllDesktops = false,
+        [DefaultValue(null)] int? x = null,
+        [DefaultValue(null)] int? y = null,
+        [DefaultValue(null)] int? width = null,
+        [DefaultValue(null)] int? height = null,
+        [DefaultValue(null)] int? timeoutMs = null,
+        [DefaultValue(null)] string? target = null,
+        [DefaultValue(null)] int? monitorIndex = null,
+        [DefaultValue(null)] string? state = null,
+        [DefaultValue(null)] string? excludeTitle = null,
+        [DefaultValue(false)] bool discardChanges = false,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(context);
-
-        var stopwatch = Stopwatch.StartNew();
-
-        // Create MCP client logger for observability
-        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("WindowManagement");
-        clientLogger?.LogWindowOperationStarted(action.ToString());
-
         try
         {
-            // Use handle directly - no app resolution (LLMs should call list/find first)
-            string? resolvedHandle = handle;
-
             WindowManagementResult operationResult;
 
             switch (action)
@@ -124,11 +80,11 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Find:
-                    operationResult = await HandleFindAsync(title, regex, cancellationToken);
+                    operationResult = await HandleFindAsync(title, processName, regex, cancellationToken);
                     break;
 
                 case WindowAction.Activate:
-                    operationResult = await HandleActivateAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleActivateAsync(handle, cancellationToken);
                     break;
 
                 case WindowAction.GetForeground:
@@ -136,31 +92,31 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.Minimize:
-                    operationResult = await HandleMinimizeAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleMinimizeAsync(handle, cancellationToken);
                     break;
 
                 case WindowAction.Maximize:
-                    operationResult = await HandleMaximizeAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleMaximizeAsync(handle, cancellationToken);
                     break;
 
                 case WindowAction.Restore:
-                    operationResult = await HandleRestoreAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleRestoreAsync(handle, cancellationToken);
                     break;
 
                 case WindowAction.Close:
-                    operationResult = await HandleCloseAsync(resolvedHandle, discardChanges, cancellationToken);
+                    operationResult = await HandleCloseAsync(handle, discardChanges, cancellationToken);
                     break;
 
                 case WindowAction.Move:
-                    operationResult = await HandleMoveAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAsync(handle, x, y, cancellationToken);
                     break;
 
                 case WindowAction.Resize:
-                    operationResult = await HandleResizeAsync(resolvedHandle, width, height, cancellationToken);
+                    operationResult = await HandleResizeAsync(handle, width, height, cancellationToken);
                     break;
 
                 case WindowAction.SetBounds:
-                    operationResult = await HandleSetBoundsAsync(resolvedHandle, x, y, width, height, cancellationToken);
+                    operationResult = await HandleSetBoundsAsync(handle, x, y, width, height, cancellationToken);
                     break;
 
                 case WindowAction.WaitFor:
@@ -168,23 +124,23 @@ public sealed partial class WindowManagementTool
                     break;
 
                 case WindowAction.MoveToMonitor:
-                    operationResult = await HandleMoveToMonitorAsync(resolvedHandle, target, monitorIndex, cancellationToken);
+                    operationResult = await HandleMoveToMonitorAsync(handle, target, monitorIndex, cancellationToken);
                     break;
 
                 case WindowAction.GetState:
-                    operationResult = await HandleGetStateAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleGetStateAsync(handle, cancellationToken);
                     break;
 
                 case WindowAction.WaitForState:
-                    operationResult = await HandleWaitForStateAsync(resolvedHandle, state, timeoutMs, cancellationToken);
+                    operationResult = await HandleWaitForStateAsync(handle, state, timeoutMs, cancellationToken);
                     break;
 
                 case WindowAction.MoveAndActivate:
-                    operationResult = await HandleMoveAndActivateAsync(resolvedHandle, x, y, cancellationToken);
+                    operationResult = await HandleMoveAndActivateAsync(handle, x, y, cancellationToken);
                     break;
 
                 case WindowAction.EnsureVisible:
-                    operationResult = await HandleEnsureVisibleAsync(resolvedHandle, cancellationToken);
+                    operationResult = await HandleEnsureVisibleAsync(handle, cancellationToken);
                     break;
 
                 default:
@@ -194,47 +150,31 @@ public sealed partial class WindowManagementTool
                     break;
             }
 
-            stopwatch.Stop();
-
-            _logger?.LogWindowOperation(
-                action.ToString(),
-                success: operationResult.Success,
-                windowCount: operationResult.Windows?.Count,
-                windowTitle: operationResult.Window?.Title,
-                errorMessage: operationResult.Error);
-
-            return operationResult;
+            return JsonSerializer.Serialize(operationResult, WindowsToolsBase.JsonOptions);
         }
         catch (OperationCanceledException)
         {
-            stopwatch.Stop();
-            var errorResult = WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.Timeout,
-                "Operation was cancelled");
-            _logger?.LogWindowOperation(action.ToString(), success: false, errorMessage: errorResult.Error);
-            return errorResult;
+            return JsonSerializer.Serialize(
+                WindowManagementResult.CreateFailure(
+                    WindowManagementErrorCode.Timeout,
+                    "Operation was cancelled"),
+                WindowsToolsBase.JsonOptions);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            stopwatch.Stop();
-            _logger?.LogError(action.ToString(), ex);
-            var errorResult = WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.SystemError,
-                $"An unexpected error occurred: {ex.Message}");
-            return errorResult;
+            return WindowsToolsBase.SerializeToolError("window_management", ex);
         }
     }
 
-    private async Task<WindowManagementResult> HandleListAsync(
+    private static async Task<WindowManagementResult> HandleListAsync(
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
         string? excludeTitle,
         CancellationToken cancellationToken)
     {
-        var result = await _windowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
+        var result = await WindowsToolsBase.WindowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
 
-        // Apply excludeTitle filter if specified
         if (result.Success && !string.IsNullOrEmpty(excludeTitle) && result.Windows is not null)
         {
             var filteredWindows = result.Windows
@@ -247,22 +187,23 @@ public sealed partial class WindowManagementTool
         return result;
     }
 
-    private async Task<WindowManagementResult> HandleFindAsync(
+    private static async Task<WindowManagementResult> HandleFindAsync(
         string? title,
+        string? processName,
         bool useRegex,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(title))
+        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(processName))
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "'title' is required for find action. Example: find(title='Notepad')");
+                "'title' or 'processName' is required for find action. Use processName for exact app matching (e.g., processName='Notepad').");
         }
 
-        return await _windowService.FindWindowAsync(title, useRegex, cancellationToken);
+        return await WindowsToolsBase.WindowService.FindWindowAsync(title, processName, useRegex, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleActivateAsync(
+    private static async Task<WindowManagementResult> HandleActivateAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -273,15 +214,15 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for activate action");
         }
 
-        return await _windowService.ActivateWindowAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.ActivateWindowAsync(handle, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleGetForegroundAsync(CancellationToken cancellationToken)
+    private static async Task<WindowManagementResult> HandleGetForegroundAsync(CancellationToken cancellationToken)
     {
-        return await _windowService.GetForegroundWindowAsync(cancellationToken);
+        return await WindowsToolsBase.WindowService.GetForegroundWindowAsync(cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleMinimizeAsync(
+    private static async Task<WindowManagementResult> HandleMinimizeAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -292,10 +233,10 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for minimize action");
         }
 
-        return await _windowService.MinimizeWindowAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.MinimizeWindowAsync(handle, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleMaximizeAsync(
+    private static async Task<WindowManagementResult> HandleMaximizeAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -306,10 +247,10 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for maximize action");
         }
 
-        return await _windowService.MaximizeWindowAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.MaximizeWindowAsync(handle, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleRestoreAsync(
+    private static async Task<WindowManagementResult> HandleRestoreAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -320,10 +261,10 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for restore action");
         }
 
-        return await _windowService.RestoreWindowAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.RestoreWindowAsync(handle, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleCloseAsync(
+    private static async Task<WindowManagementResult> HandleCloseAsync(
         string? handleString,
         bool discardChanges,
         CancellationToken cancellationToken)
@@ -335,10 +276,10 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for close action");
         }
 
-        return await _windowService.CloseWindowAsync(handle, discardChanges, cancellationToken);
+        return await WindowsToolsBase.WindowService.CloseWindowAsync(handle, discardChanges, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleMoveAsync(
+    private static async Task<WindowManagementResult> HandleMoveAsync(
         string? handleString,
         int? x,
         int? y,
@@ -358,10 +299,10 @@ public sealed partial class WindowManagementTool
                 "Both x and y coordinates are required for move action");
         }
 
-        return await _windowService.MoveWindowAsync(handle, x.Value, y.Value, cancellationToken);
+        return await WindowsToolsBase.WindowService.MoveWindowAsync(handle, x.Value, y.Value, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleResizeAsync(
+    private static async Task<WindowManagementResult> HandleResizeAsync(
         string? handleString,
         int? width,
         int? height,
@@ -381,10 +322,10 @@ public sealed partial class WindowManagementTool
                 "Both width and height are required for resize action");
         }
 
-        return await _windowService.ResizeWindowAsync(handle, width.Value, height.Value, cancellationToken);
+        return await WindowsToolsBase.WindowService.ResizeWindowAsync(handle, width.Value, height.Value, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleSetBoundsAsync(
+    private static async Task<WindowManagementResult> HandleSetBoundsAsync(
         string? handleString,
         int? x,
         int? y,
@@ -414,10 +355,10 @@ public sealed partial class WindowManagementTool
             Height = height.Value
         };
 
-        return await _windowService.SetBoundsAsync(handle, bounds, cancellationToken);
+        return await WindowsToolsBase.WindowService.SetBoundsAsync(handle, bounds, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleWaitForAsync(
+    private static async Task<WindowManagementResult> HandleWaitForAsync(
         string? title,
         bool useRegex,
         int? timeoutMs,
@@ -430,10 +371,10 @@ public sealed partial class WindowManagementTool
                 "'title' is required for wait_for action. Example: wait_for(title='Notepad')");
         }
 
-        return await _windowService.WaitForWindowAsync(title, useRegex, timeoutMs, cancellationToken);
+        return await WindowsToolsBase.WindowService.WaitForWindowAsync(title, useRegex, timeoutMs, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleMoveToMonitorAsync(
+    private static async Task<WindowManagementResult> HandleMoveToMonitorAsync(
         string? handleString,
         string? target,
         int? monitorIndex,
@@ -446,7 +387,6 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for move_to_monitor action");
         }
 
-        // Resolve target to monitorIndex if provided
         int? resolvedMonitorIndex = monitorIndex;
         if (!string.IsNullOrWhiteSpace(target))
         {
@@ -458,11 +398,10 @@ public sealed partial class WindowManagementTool
                     $"Invalid target: '{target}'. Valid values are: 'primary_screen', 'secondary_screen'");
             }
 
-            // Resolve target to monitor
-            MonitorInfo? targetMonitor = parsedTarget.Value switch
+            var targetMonitor = parsedTarget.Value switch
             {
-                MonitorTarget.PrimaryScreen => _monitorService.GetPrimaryMonitor(),
-                MonitorTarget.SecondaryScreen => _monitorService.GetSecondaryMonitor(),
+                MonitorTarget.PrimaryScreen => WindowsToolsBase.MonitorService.GetPrimaryMonitor(),
+                MonitorTarget.SecondaryScreen => WindowsToolsBase.MonitorService.GetSecondaryMonitor(),
                 _ => null
             };
 
@@ -476,8 +415,7 @@ public sealed partial class WindowManagementTool
                     errorMessage);
             }
 
-            // Find the index of this monitor
-            var monitors = _monitorService.GetMonitors();
+            var monitors = WindowsToolsBase.MonitorService.GetMonitors();
             for (int i = 0; i < monitors.Count; i++)
             {
                 if (monitors[i].X == targetMonitor.X && monitors[i].Y == targetMonitor.Y)
@@ -495,10 +433,10 @@ public sealed partial class WindowManagementTool
                 "Either 'target' or 'monitorIndex' is required for move_to_monitor action. Use target='primary_screen' or target='secondary_screen'.");
         }
 
-        return await _windowService.MoveToMonitorAsync(handle, resolvedMonitorIndex.Value, cancellationToken);
+        return await WindowsToolsBase.WindowService.MoveToMonitorAsync(handle, resolvedMonitorIndex.Value, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleGetStateAsync(
+    private static async Task<WindowManagementResult> HandleGetStateAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -509,10 +447,10 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for get_state action");
         }
 
-        return await _windowService.GetWindowStateAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.GetWindowStateAsync(handle, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleWaitForStateAsync(
+    private static async Task<WindowManagementResult> HandleWaitForStateAsync(
         string? handleString,
         string? stateString,
         int? timeoutMs,
@@ -533,10 +471,10 @@ public sealed partial class WindowManagementTool
                 $"Invalid state: '{stateString}'. Valid states are: normal, minimized, maximized, hidden");
         }
 
-        return await _windowService.WaitForStateAsync(handle, targetState.Value, timeoutMs, cancellationToken);
+        return await WindowsToolsBase.WindowService.WaitForStateAsync(handle, targetState.Value, timeoutMs, cancellationToken);
     }
 
-    private async Task<WindowManagementResult> HandleMoveAndActivateAsync(
+    private static async Task<WindowManagementResult> HandleMoveAndActivateAsync(
         string? handleString,
         int? x,
         int? y,
@@ -556,27 +494,24 @@ public sealed partial class WindowManagementTool
                 "Both x and y coordinates are required for move_and_activate action");
         }
 
-        // Move the window first
-        var moveResult = await _windowService.MoveWindowAsync(handle, x.Value, y.Value, cancellationToken);
+        var moveResult = await WindowsToolsBase.WindowService.MoveWindowAsync(handle, x.Value, y.Value, cancellationToken);
         if (!moveResult.Success)
         {
             return moveResult;
         }
 
-        // Then activate it
-        var activateResult = await _windowService.ActivateWindowAsync(handle, cancellationToken);
+        var activateResult = await WindowsToolsBase.WindowService.ActivateWindowAsync(handle, cancellationToken);
         if (!activateResult.Success)
         {
             return activateResult;
         }
 
-        // Return combined success result with window info from the activate result
         return WindowManagementResult.CreateWindowSuccess(
             activateResult.Window!,
             "Window moved and activated successfully");
     }
 
-    private async Task<WindowManagementResult> HandleEnsureVisibleAsync(
+    private static async Task<WindowManagementResult> HandleEnsureVisibleAsync(
         string? handleString,
         CancellationToken cancellationToken)
     {
@@ -587,18 +522,16 @@ public sealed partial class WindowManagementTool
                 "Valid handle is required for ensure_visible action");
         }
 
-        // Check if window is minimized and restore it if needed
         if (NativeMethods.IsIconic(handle))
         {
-            var restoreResult = await _windowService.RestoreWindowAsync(handle, cancellationToken);
+            var restoreResult = await WindowsToolsBase.WindowService.RestoreWindowAsync(handle, cancellationToken);
             if (!restoreResult.Success)
             {
                 return restoreResult;
             }
         }
 
-        // Then activate it to bring to foreground
-        return await _windowService.ActivateWindowAsync(handle, cancellationToken);
+        return await WindowsToolsBase.WindowService.ActivateWindowAsync(handle, cancellationToken);
     }
 
     private static WindowState? ParseWindowState(string? state)
@@ -633,14 +566,9 @@ public sealed partial class WindowManagementTool
         };
     }
 
-    /// <summary>
-    /// Monitor target for window operations.
-    /// </summary>
     private enum MonitorTarget
     {
-        /// <summary>Primary screen (main display with taskbar).</summary>
         PrimaryScreen,
-        /// <summary>Secondary screen (other monitor in 2-monitor setups).</summary>
         SecondaryScreen
     }
 }

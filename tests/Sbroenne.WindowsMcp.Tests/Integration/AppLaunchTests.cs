@@ -3,46 +3,40 @@
 
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Configuration;
+using System.Text.Json;
+using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for the app tool (application launching).
-/// Uses the existing WindowTestFixture to avoid launching external applications.
 /// </summary>
 [Collection("WindowManagement")]
 [SupportedOSPlatform("windows")]
 public class AppLaunchTests : IClassFixture<WindowTestFixture>
 {
-    private readonly AppTool _tool;
     private readonly WindowTestFixture _fixture;
 
     public AppLaunchTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
         _fixture = fixture;
+    }
 
-        var configuration = WindowConfiguration.FromEnvironment();
-
-        _tool = new AppTool(
-            fixture.WindowService,
-            configuration);
+    private static WindowManagementResult DeserializeResult(string json)
+    {
+        return JsonSerializer.Deserialize<WindowManagementResult>(json, WindowsToolsBase.JsonOptions)!;
     }
 
     [Fact]
     public async Task App_NullProgramPath_ReturnsError()
     {
-        // Arrange
-        var context = CreateMockContext();
-
         // Act
-        var result = await _tool.ExecuteAsync(
-            context,
+        var resultJson = await AppTool.ExecuteAsync(
             programPath: null!);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert
         Assert.False(result.Success);
@@ -53,13 +47,11 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task App_EmptyProgramPath_ReturnsError()
     {
-        // Arrange
-        var context = CreateMockContext();
-
         // Act
-        var result = await _tool.ExecuteAsync(
-            context,
+        var resultJson = await AppTool.ExecuteAsync(
             programPath: "");
+
+        var result = DeserializeResult(resultJson);
 
         // Assert
         Assert.False(result.Success);
@@ -70,13 +62,11 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task App_WhitespaceProgramPath_ReturnsError()
     {
-        // Arrange
-        var context = CreateMockContext();
-
         // Act
-        var result = await _tool.ExecuteAsync(
-            context,
+        var resultJson = await AppTool.ExecuteAsync(
             programPath: "   ");
+
+        var result = DeserializeResult(resultJson);
 
         // Assert
         Assert.False(result.Success);
@@ -87,13 +77,11 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     [Fact]
     public async Task App_InvalidProgram_ReturnsNotFoundError()
     {
-        // Arrange
-        var context = CreateMockContext();
-
         // Act
-        var result = await _tool.ExecuteAsync(
-            context,
+        var resultJson = await AppTool.ExecuteAsync(
             programPath: "nonexistent_program_xyz_12345.exe");
+
+        var result = DeserializeResult(resultJson);
 
         // Assert
         Assert.False(result.Success);
@@ -106,18 +94,18 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     public async Task App_TestHarness_StartsAndReturnsWindowInfo()
     {
         // Arrange - use the test harness executable path
-        var context = CreateMockContext();
         var testHarnessPath = GetTestHarnessPath();
 
         // Skip if test harness not available as standalone exe
         if (testHarnessPath == null)
         {
             // For now, test with a simple built-in Windows utility that starts quickly
-            var result = await _tool.ExecuteAsync(
-                context,
+            var resultJson = await AppTool.ExecuteAsync(
                 programPath: "cmd.exe",
                 arguments: "/c echo test",
                 waitForWindow: false);
+
+            var result = DeserializeResult(resultJson);
 
             // Just verify the call completes without error for non-GUI apps
             Assert.NotNull(result);
@@ -125,9 +113,10 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
         }
 
         // Act
-        var launchResult = await _tool.ExecuteAsync(
-            context,
+        var launchResultJson = await AppTool.ExecuteAsync(
             programPath: testHarnessPath);
+
+        var launchResult = DeserializeResult(launchResultJson);
 
         // Assert
         Assert.True(launchResult.Success, $"Launch failed: {launchResult.Error}");
@@ -138,17 +127,17 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     public async Task App_WithWaitForWindowFalse_ReturnsQuicklyWithPid()
     {
         // Arrange
-        var context = CreateMockContext();
         var stopwatch = Stopwatch.StartNew();
 
         // Act - launch cmd with echo, don't wait for window
-        var result = await _tool.ExecuteAsync(
-            context,
+        var resultJson = await AppTool.ExecuteAsync(
             programPath: "cmd.exe",
             arguments: "/c timeout /t 5",
             waitForWindow: false);
 
         stopwatch.Stop();
+
+        var result = DeserializeResult(resultJson);
 
         // Assert
         Assert.True(result.Success, $"Launch failed: {result.Error}");
@@ -169,33 +158,4 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
 
         return possiblePaths.FirstOrDefault(File.Exists);
     }
-
-    /// <summary>
-    /// Helper to create a RequestContext for testing.
-    /// Uses unsafe FormatterServices to bypass constructor and set required fields.
-    /// </summary>
-#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete but necessary for struct instantiation without constructor
-    private static RequestContext<CallToolRequestParams> CreateMockContext()
-    {
-        var contextType = typeof(RequestContext<CallToolRequestParams>);
-        var context = (RequestContext<CallToolRequestParams>)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(contextType);
-
-        var serverProp = contextType.GetProperty("Server");
-        if (serverProp != null)
-        {
-            var backingField = contextType.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .FirstOrDefault(f => f.Name.Contains("Server"));
-
-            if (backingField != null)
-            {
-                var mockServer = new object();
-                var boxed = (object)context;
-                backingField.SetValue(boxed, mockServer);
-                context = (RequestContext<CallToolRequestParams>)boxed;
-            }
-        }
-
-        return context;
-    }
-#pragma warning restore SYSLIB0050
 }

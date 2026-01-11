@@ -1,65 +1,28 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Automation.Tools;
-using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Input;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
-using Sbroenne.WindowsMcp.Window;
 
 // Handle --version/-v flag for startup testing
 if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
 {
     Console.WriteLine("sbroenne.windows-mcp version 1.0.0");
-    Console.WriteLine("Testing DI container initialization...");
+    Console.WriteLine("Testing service initialization...");
 
     try
     {
-        var testBuilder = Host.CreateApplicationBuilder([]);
-        testBuilder.Logging.ClearProviders();
-
-        // Register all services (same as production)
-        testBuilder.Services.AddSingleton(_ => MouseConfiguration.FromEnvironment());
-        testBuilder.Services.AddSingleton(_ => KeyboardConfiguration.FromEnvironment());
-        testBuilder.Services.AddSingleton(_ => WindowConfiguration.FromEnvironment());
-        testBuilder.Services.AddSingleton(_ => ScreenshotConfiguration.FromEnvironment());
-        testBuilder.Services.AddSingleton<MouseInputService>();
-        testBuilder.Services.AddSingleton<KeyboardInputService>();
-        testBuilder.Services.AddSingleton<ElevationDetector>();
-        testBuilder.Services.AddSingleton<SecureDesktopDetector>();
-        testBuilder.Services.AddSingleton<MouseOperationLogger>();
-        testBuilder.Services.AddSingleton<KeyboardOperationLogger>();
-        testBuilder.Services.AddSingleton<WindowOperationLogger>();
-        testBuilder.Services.AddSingleton<ScreenshotOperationLogger>();
-        testBuilder.Services.AddSingleton<WindowEnumerator>();
-        testBuilder.Services.AddSingleton<WindowActivator>();
-        testBuilder.Services.AddSingleton<WindowService>();
-        testBuilder.Services.AddSingleton<MonitorService>();
-        testBuilder.Services.AddSingleton<ImageProcessor>();
-        testBuilder.Services.AddSingleton<ScreenshotService>();
-        testBuilder.Services.AddSingleton<LegacyOcrService>();
-        testBuilder.Services.AddSingleton<UIAutomationThread>();
-        testBuilder.Services.AddSingleton<UIAutomationService>();
-        testBuilder.Services.AddSingleton<AnnotatedScreenshotLogger>();
-        testBuilder.Services.AddSingleton<AnnotatedScreenshotService>();
-
-        var testHost = testBuilder.Build();
-
-        // Try to resolve key services to verify DI
-        Console.WriteLine("  WindowService: " + (testHost.Services.GetService<WindowService>() != null ? "OK" : "FAILED"));
-        Console.WriteLine("  UIAutomationService: " + (testHost.Services.GetService<UIAutomationService>() != null ? "OK" : "FAILED"));
-        Console.WriteLine("  ScreenshotService: " + (testHost.Services.GetService<ScreenshotService>() != null ? "OK" : "FAILED"));
-        Console.WriteLine("  KeyboardInputService: " + (testHost.Services.GetService<KeyboardInputService>() != null ? "OK" : "FAILED"));
-        Console.WriteLine("DI container initialization: OK");
+        // Verify key services can be created via WindowsToolsBase lazy singletons
+        Console.WriteLine("  WindowService: " + (WindowsToolsBase.WindowService != null ? "OK" : "FAILED"));
+        Console.WriteLine("  UIAutomationService: " + (WindowsToolsBase.UIAutomationService != null ? "OK" : "FAILED"));
+        Console.WriteLine("  ScreenshotService: " + (WindowsToolsBase.ScreenshotService != null ? "OK" : "FAILED"));
+        Console.WriteLine("  KeyboardInputService: " + (WindowsToolsBase.KeyboardInputService != null ? "OK" : "FAILED"));
+        Console.WriteLine("Service initialization: OK");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"DI container initialization FAILED: {ex.Message}");
+        Console.WriteLine($"Service initialization FAILED: {ex.Message}");
         Console.WriteLine(ex.ToString());
         return 1;
     }
@@ -78,40 +41,8 @@ builder.Logging.AddConsole(options =>
 });
 builder.Logging.SetMinimumLevel(LogLevel.Warning);
 
-// Register configuration from environment variables
-builder.Services.AddSingleton(_ => MouseConfiguration.FromEnvironment());
-builder.Services.AddSingleton(_ => KeyboardConfiguration.FromEnvironment());
-builder.Services.AddSingleton(_ => WindowConfiguration.FromEnvironment());
-builder.Services.AddSingleton(_ => ScreenshotConfiguration.FromEnvironment());
-
-// Register application services
-builder.Services.AddSingleton<MouseInputService>();
-builder.Services.AddSingleton<KeyboardInputService>();
-builder.Services.AddSingleton<ElevationDetector>();
-builder.Services.AddSingleton<SecureDesktopDetector>();
-builder.Services.AddSingleton<MouseOperationLogger>();
-builder.Services.AddSingleton<KeyboardOperationLogger>();
-builder.Services.AddSingleton<WindowOperationLogger>();
-builder.Services.AddSingleton<ScreenshotOperationLogger>();
-
-// Register window management services
-builder.Services.AddSingleton<WindowEnumerator>();
-builder.Services.AddSingleton<WindowActivator>();
-builder.Services.AddSingleton<WindowService>();
-
-// Register screenshot capture services
-builder.Services.AddSingleton<MonitorService>();
-builder.Services.AddSingleton<ImageProcessor>();
-builder.Services.AddSingleton<ScreenshotService>();
-
-// Register OCR services (Windows.Media.Ocr legacy engine)
-builder.Services.AddSingleton<LegacyOcrService>();
-
-// Register UI Automation services
-builder.Services.AddSingleton<UIAutomationThread>();
-builder.Services.AddSingleton<UIAutomationService>();
-builder.Services.AddSingleton<AnnotatedScreenshotLogger>();
-builder.Services.AddSingleton<AnnotatedScreenshotService>();
+// NOTE: Services are NOT registered via DI - tools use WindowsToolsBase lazy singletons instead.
+// This simplifies the architecture and matches the mcp-server-excel pattern.
 
 // Configure MCP server with stdio transport
 builder.Services
@@ -151,24 +82,14 @@ builder.Services
             "ui_automation(action='wait_for_disappear'/'wait_for_state') - wait for UI changes";
     })
     .WithStdioServerTransport()
-    .WithTools<AppTool>()
-    .WithTools<MouseControlTool>()
-    .WithTools<KeyboardControlTool>()
-    .WithTools<WindowManagementTool>()
-    .WithTools<ScreenshotControlTool>()
-    .WithTools<UIFindTool>()
-    .WithTools<UIClickTool>()
-    .WithTools<UITypeTool>()
-    .WithTools<UIReadTool>()
-    .WithTools<UIFileTool>()
+    .WithToolsFromAssembly()  // Discovers static tools marked with [McpServerToolType]
     .WithPrompts<WindowsAutomationPrompts>()
     .WithResources<SystemResources>();
 
 var host = builder.Build();
 
-// Force OCR service initialization to trigger startup logging (FR-044)
-// The NpuOcrService and LegacyOcrService log their availability status during construction
-_ = host.Services.GetRequiredService<LegacyOcrService>();
+// Services are lazy-initialized via WindowsToolsBase when first accessed by tools.
+// No need for explicit service resolution here.
 
 await host.RunAsync();
 

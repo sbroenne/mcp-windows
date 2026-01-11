@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
@@ -31,10 +30,9 @@ public sealed class WinUIClickTests : IDisposable
         _windowHandle = _fixture.TestWindowHandleString;
         _staThread = new UIAutomationThread();
 
-        var windowConfiguration = WindowConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
         var monitorService = new MonitorService();
-        var windowActivator = new WindowActivator(windowConfiguration);
+        var windowActivator = new WindowActivator();
         var mouseService = new MouseInputService();
         var keyboardService = new KeyboardInputService();
 

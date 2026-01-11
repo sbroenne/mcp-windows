@@ -4,10 +4,10 @@
 #
 # User Story 4: Screenshot and File Tools (Priority: P2) - Part 2
 #
-# Tests: ui_file tool for Save As dialog handling
+# Tests: file_save tool for Save As dialog handling
 #
 # Tools Covered:
-#   - ui_file: Handle Save As dialogs in Notepad and Paint
+#   - file_save: Handle Save As dialogs in Notepad and Paint
 #
 # Test Applications:
 #   - Notepad: Save text file
@@ -102,7 +102,7 @@ settings:
 
 sessions:
   # ==========================================================================
-  # Session 1: Notepad Save - save text file via ui_file
+  # Session 1: Notepad Save - save text file via file_save
   # ==========================================================================
   - name: "Notepad Save"
     tests:
@@ -156,7 +156,7 @@ sessions:
           - type: no_hallucinated_tools
 
   # ==========================================================================
-  # Session 2: Paint Save - save image as PNG via ui_file
+  # Session 2: Paint Save - save image as PNG via file_save
   # ==========================================================================
   - name: "Paint Save"
     tests:
@@ -187,10 +187,10 @@ sessions:
           Save the image as a PNG file to {{TEST_RESULTS_PATH}}\paint-file-test-{{randomValue type='UUID'}}.png
         assertions:
           - type: no_hallucinated_tools
-          # Can use ui_file to handle save dialog, or keyboard shortcuts + manual dialog navigation
+          # Can use file_save to handle save dialog, or keyboard shortcuts + manual dialog navigation
           - anyOf:
               - type: tool_called
-                tool: ui_file
+                tool: file_save
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called

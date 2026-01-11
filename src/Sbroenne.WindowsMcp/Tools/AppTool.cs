@@ -1,11 +1,9 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
-using ModelContextProtocol.Protocol;
+using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
-using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -14,35 +12,12 @@ namespace Sbroenne.WindowsMcp.Tools;
 /// </summary>
 [McpServerToolType]
 [SupportedOSPlatform("windows")]
-public sealed class AppTool
+public static partial class AppTool
 {
-    private readonly WindowService _windowService;
-    private readonly WindowOperationLogger? _logger;
-    private readonly WindowConfiguration _configuration;
-
     /// <summary>
     /// How long to wait to detect if a process is a stub (exits quickly).
     /// </summary>
     private const int StubDetectionDelayMs = 300;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="AppTool"/> class.
-    /// </summary>
-    /// <param name="windowService">The window service.</param>
-    /// <param name="configuration">The window configuration.</param>
-    /// <param name="logger">Optional operation logger.</param>
-    public AppTool(
-        WindowService windowService,
-        WindowConfiguration configuration,
-        WindowOperationLogger? logger = null)
-    {
-        ArgumentNullException.ThrowIfNull(windowService);
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        _windowService = windowService;
-        _configuration = configuration;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Launch applications. Use this to start programs like notepad.exe, calc.exe, chrome.exe, winword.exe, excel.exe, etc.
@@ -52,7 +27,6 @@ public sealed class AppTool
     /// Examples: app(programPath='notepad.exe'), app(programPath='chrome.exe', arguments='https://example.com').
     /// After launch, the window is focused and ready for input. Use the returned handle for subsequent operations.
     /// </remarks>
-    /// <param name="context">The MCP request context for logging and server access.</param>
     /// <param name="programPath">Program to launch. Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'chrome.exe') or full path (e.g., 'C:\\Program Files\\App\\app.exe').</param>
     /// <param name="arguments">Command-line arguments for the program (optional). Example: '--new-window' for browsers.</param>
     /// <param name="workingDirectory">Working directory for the launched program (optional).</param>
@@ -60,59 +34,36 @@ public sealed class AppTool
     /// <param name="timeoutMs">Timeout in milliseconds to wait for the window to appear (default: 5000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the launch operation including the window handle for subsequent operations.</returns>
-    [McpServerTool(Name = "app", Title = "Launch Application", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    public async Task<WindowManagementResult> ExecuteAsync(
-        RequestContext<CallToolRequestParams> context,
+    [McpServerTool(Name = "app", Title = "Launch Application", Destructive = true, OpenWorld = false)]
+    public static async Task<string> ExecuteAsync(
         string programPath,
-        string? arguments = null,
-        string? workingDirectory = null,
-        bool waitForWindow = true,
-        int? timeoutMs = null,
+        [DefaultValue(null)] string? arguments = null,
+        [DefaultValue(null)] string? workingDirectory = null,
+        [DefaultValue(true)] bool waitForWindow = true,
+        [DefaultValue(null)] int? timeoutMs = null,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(context);
-
-        var stopwatch = Stopwatch.StartNew();
-
-        // Create MCP client logger for observability
-        var clientLogger = context.Server?.AsClientLoggerProvider().CreateLogger("App");
-        clientLogger?.LogWindowOperationStarted("launch");
+        const string actionName = "launch";
 
         try
         {
             var result = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
-
-            stopwatch.Stop();
-
-            _logger?.LogWindowOperation(
-                "launch",
-                success: result.Success,
-                windowTitle: result.Window?.Title,
-                errorMessage: result.Error);
-
-            return result;
+            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
         }
         catch (OperationCanceledException)
         {
-            stopwatch.Stop();
             var errorResult = WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.Timeout,
                 "Operation was cancelled");
-            _logger?.LogWindowOperation("launch", success: false, errorMessage: errorResult.Error);
-            return errorResult;
+            return JsonSerializer.Serialize(errorResult, WindowsToolsBase.JsonOptions);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex)
         {
-            stopwatch.Stop();
-            _logger?.LogError("launch", ex);
-            var errorResult = WindowManagementResult.CreateFailure(
-                WindowManagementErrorCode.SystemError,
-                $"An unexpected error occurred: {ex.Message}");
-            return errorResult;
+            return WindowsToolsBase.SerializeToolError(actionName, ex);
         }
     }
 
-    private async Task<WindowManagementResult> HandleLaunchAsync(
+    private static async Task<WindowManagementResult> HandleLaunchAsync(
         string? programPath,
         string? arguments,
         string? workingDirectory,
@@ -160,7 +111,8 @@ public sealed class AppTool
             // If we should wait for the window to appear
             if (waitForWindow)
             {
-                var timeout = timeoutMs ?? _configuration.WaitForTimeoutMs;
+                var windowService = WindowsToolsBase.WindowService;
+                var timeout = timeoutMs ?? WindowsToolsBase.TimeoutMs;
                 var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
 
                 // First, give the process a brief moment to see if it's a stub
@@ -178,7 +130,7 @@ public sealed class AppTool
                     {
                         // This is likely a stub that launched another process (e.g., UWP app)
                         // Try to find a window by program name in the title
-                        var stubWindow = await FindWindowByTitleAsync(programName, deadline, cancellationToken);
+                        var stubWindow = await FindWindowByTitleAsync(windowService, programName, deadline, cancellationToken);
                         if (stubWindow != null)
                         {
                             return WindowManagementResult.CreateWindowSuccess(
@@ -201,7 +153,7 @@ public sealed class AppTool
                     // First try MainWindowHandle (works for most apps)
                     if (process.MainWindowHandle != IntPtr.Zero)
                     {
-                        var windowInfo = await _windowService.GetWindowInfoAsync(process.MainWindowHandle, cancellationToken);
+                        var windowInfo = await windowService.GetWindowInfoAsync(process.MainWindowHandle, cancellationToken);
                         if (windowInfo != null)
                         {
                             return WindowManagementResult.CreateWindowSuccess(
@@ -213,7 +165,7 @@ public sealed class AppTool
                     }
 
                     // Fallback: Search for any visible window owned by this process
-                    var listResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+                    var listResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
                     if (listResult.Success && listResult.Windows != null)
                     {
                         var processWindow = listResult.Windows.FirstOrDefault(w =>
@@ -237,7 +189,7 @@ public sealed class AppTool
                 }
 
                 // Timeout waiting for window - make one final attempt
-                var finalListResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+                var finalListResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
                 if (finalListResult.Success && finalListResult.Windows != null)
                 {
                     var processWindow = finalListResult.Windows.FirstOrDefault(w =>
@@ -285,14 +237,15 @@ public sealed class AppTool
     /// This handles cases where the launched process is a stub that redirects to another app
     /// (e.g., UWP apps like Calculator where calc.exe is a stub for the Store app).
     /// </summary>
-    private async Task<WindowInfoCompact?> FindWindowByTitleAsync(
+    private static async Task<WindowInfoCompact?> FindWindowByTitleAsync(
+        Window.WindowService windowService,
         string programName,
         DateTime deadline,
         CancellationToken cancellationToken)
     {
         while (DateTime.UtcNow < deadline)
         {
-            var listResult = await _windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+            var listResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
             if (listResult.Success && listResult.Windows != null)
             {
                 // Search for window where title contains the program name
@@ -305,7 +258,7 @@ public sealed class AppTool
                     // Focus the window before returning (Handle is stored as decimal string)
                     if (nint.TryParse(matchingWindow.Handle, out var hwnd))
                     {
-                        await _windowService.ActivateWindowAsync(hwnd, cancellationToken);
+                        await windowService.ActivateWindowAsync(hwnd, cancellationToken);
                     }
                     return matchingWindow;
                 }

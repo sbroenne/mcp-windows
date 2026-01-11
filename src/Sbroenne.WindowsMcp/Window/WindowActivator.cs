@@ -1,5 +1,4 @@
 using System.Runtime.Versioning;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Window;
@@ -10,16 +9,11 @@ namespace Sbroenne.WindowsMcp.Window;
 [SupportedOSPlatform("windows")]
 public sealed class WindowActivator
 {
-    private readonly WindowConfiguration _configuration;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowActivator"/> class.
     /// </summary>
-    /// <param name="configuration">Window configuration.</param>
-    public WindowActivator(WindowConfiguration configuration)
+    public WindowActivator()
     {
-        ArgumentNullException.ThrowIfNull(configuration);
-        _configuration = configuration;
     }
 
     /// <inheritdoc/>
