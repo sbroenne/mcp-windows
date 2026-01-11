@@ -2,14 +2,9 @@
 // Licensed under the MIT License.
 
 using System.Runtime.Versioning;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
-using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -21,8 +16,6 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 {
-    private readonly WindowManagementTool _tool;
-    private readonly WindowService _windowService;
     private SacrificialWindowForm? _sacrificialWindow;
     private Thread? _uiThread;
     private readonly ManualResetEventSlim _formReady = new(false);
@@ -30,26 +23,9 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
     private const string SacrificialWindowTitle = "MCP Close Test Window";
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="WindowCloseActionTests"/> class.
-    /// </summary>
-    public WindowCloseActionTests()
+    private static WindowManagementResult DeserializeResult(string json)
     {
-        var configuration = WindowConfiguration.FromEnvironment();
-        var elevationDetector = new ElevationDetector();
-        var secureDesktopDetector = new SecureDesktopDetector();
-        var monitorService = new MonitorService();
-
-        var windowEnumerator = new WindowEnumerator(elevationDetector, configuration);
-        var windowActivator = new WindowActivator(configuration);
-        _windowService = new WindowService(
-            windowEnumerator,
-            windowActivator,
-            monitorService,
-            secureDesktopDetector,
-            configuration);
-
-        _tool = new WindowManagementTool(_windowService, monitorService, configuration);
+        return JsonSerializer.Deserialize<WindowManagementResult>(json, WindowsToolsBase.JsonOptions)!;
     }
 
     /// <inheritdoc/>
@@ -119,33 +95,6 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// Helper to create a RequestContext for testing.
-    /// </summary>
-#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete but necessary
-    private static RequestContext<CallToolRequestParams> CreateMockContext()
-    {
-        var contextType = typeof(RequestContext<CallToolRequestParams>);
-        var context = (RequestContext<CallToolRequestParams>)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(contextType);
-
-        var serverProp = contextType.GetProperty("Server");
-        if (serverProp != null)
-        {
-            var backingField = contextType.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .FirstOrDefault(f => f.Name.Contains("Server"));
-
-            if (backingField != null)
-            {
-                var boxed = (object)context;
-                backingField.SetValue(boxed, new object());
-                context = (RequestContext<CallToolRequestParams>)boxed;
-            }
-        }
-
-        return context;
-    }
-#pragma warning restore SYSLIB0050
-
-    /// <summary>
     /// Tests find → close workflow using explicit handle.
     /// This is the correct pattern: LLM finds window, gets handle, then uses handle for close.
     /// </summary>
@@ -154,13 +103,13 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
     public async Task ExecuteAsync_CloseWithHandle_FindThenClose()
     {
         // Arrange
-        var context = CreateMockContext();
 
         // Step 1: Find the window (LLM would do this)
-        var findResult = await _tool.ExecuteAsync(
-            context,
+        var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
             title: SacrificialWindowTitle);
+
+        var findResult = DeserializeResult(findResultJson);
 
         Assert.True(findResult.Success, $"Find should locate sacrificial window. Error: {findResult.Error}");
         Assert.NotNull(findResult.Windows);
@@ -169,10 +118,11 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         var windowHandle = findResult.Windows[0].Handle;
 
         // Step 2: Close using the handle (LLM would use the handle from step 1)
-        var closeResult = await _tool.ExecuteAsync(
-            context,
+        var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle);
+
+        var closeResult = DeserializeResult(closeResultJson);
 
         // Assert
         Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
@@ -187,13 +137,13 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
     public async Task ExecuteAsync_CloseWithHandle_WindowDisappears()
     {
         // Arrange
-        var context = CreateMockContext();
 
         // Find and close
-        var findResult = await _tool.ExecuteAsync(
-            context,
+        var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
             title: SacrificialWindowTitle);
+
+        var findResult = DeserializeResult(findResultJson);
 
         Assert.True(findResult.Success);
         Assert.NotNull(findResult.Windows);
@@ -201,10 +151,11 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
         var windowHandle = findResult.Windows[0].Handle;
 
-        var closeResult = await _tool.ExecuteAsync(
-            context,
+        var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle);
+
+        var closeResult = DeserializeResult(closeResultJson);
 
         Assert.True(closeResult.Success, $"Close with handle should succeed but got: {closeResult.Error}");
 
@@ -212,10 +163,11 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         await Task.Delay(500);
 
         // Verify window is gone
-        var listResult = await _tool.ExecuteAsync(
-            context,
+        var listResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.List,
             filter: SacrificialWindowTitle);
+
+        var listResult = DeserializeResult(listResultJson);
 
         Assert.True(listResult.Success);
         Assert.True(

@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Runtime.Versioning;
-using Microsoft.Extensions.Logging;
+using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Automation.Tools;
 
@@ -9,23 +11,9 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 /// MCP tool for typing text into UI elements.
 /// </summary>
 [SupportedOSPlatform("windows")]
-public sealed partial class UITypeTool
+[McpServerToolType]
+public static partial class UITypeTool
 {
-    private readonly UIAutomationService _automationService;
-    private readonly ILogger<UITypeTool> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="UITypeTool"/> class.
-    /// </summary>
-    public UITypeTool(UIAutomationService automationService, ILogger<UITypeTool> logger)
-    {
-        ArgumentNullException.ThrowIfNull(automationService);
-        ArgumentNullException.ThrowIfNull(logger);
-
-        _automationService = automationService;
-        _logger = logger;
-    }
-
     /// <summary>
     /// Types text into a text field or other input element. Automatically activates the target window.
     /// WARNING: Do NOT use for Save As dialogs - use ui_file(windowHandle, filePath) instead. It handles path entry and Save button automatically.
@@ -46,50 +34,53 @@ public sealed partial class UITypeTool
     /// <param name="clearFirst">Clear existing text before typing (default: false).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the type operation including success status and element information.</returns>
-    [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false, UseStructuredContent = true)]
-    public async Task<UIAutomationResult> ExecuteAsync(
+    [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false)]
+    public static async Task<string> ExecuteAsync(
         string windowHandle,
         string text,
-        string? name = null,
-        string? nameContains = null,
-        string? namePattern = null,
-        string? controlType = null,
-        string? automationId = null,
-        string? className = null,
-        int foundIndex = 1,
-        bool clearFirst = false,
+        [DefaultValue(null)] string? name = null,
+        [DefaultValue(null)] string? nameContains = null,
+        [DefaultValue(null)] string? namePattern = null,
+        [DefaultValue(null)] string? controlType = null,
+        [DefaultValue(null)] string? automationId = null,
+        [DefaultValue(null)] string? className = null,
+        [DefaultValue(1)] int foundIndex = 1,
+        [DefaultValue(false)] bool clearFirst = false,
         CancellationToken cancellationToken = default)
     {
+        const string actionName = "type";
+
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return UIAutomationResult.CreateFailure(
-                "ui_type",
-                UIAutomationErrorType.InvalidParameter,
-                "windowHandle is required. Get it from window_management(action='find').",
-                null);
+            return WindowsToolsBase.Fail(
+                "windowHandle is required. Get it from window_management(action='find').");
         }
 
         if (string.IsNullOrEmpty(text))
         {
-            return UIAutomationResult.CreateFailure(
-                "ui_type",
-                UIAutomationErrorType.InvalidParameter,
-                "text is required.",
-                null);
+            return WindowsToolsBase.Fail("text is required.");
         }
 
-        var query = new ElementQuery
+        try
         {
-            WindowHandle = windowHandle,
-            Name = name,
-            NameContains = nameContains,
-            NamePattern = namePattern,
-            ControlType = controlType,
-            AutomationId = automationId,
-            ClassName = className,
-            FoundIndex = Math.Max(1, foundIndex)
-        };
+            var query = new ElementQuery
+            {
+                WindowHandle = windowHandle,
+                Name = name,
+                NameContains = nameContains,
+                NamePattern = namePattern,
+                ControlType = controlType,
+                AutomationId = automationId,
+                ClassName = className,
+                FoundIndex = Math.Max(1, foundIndex)
+            };
 
-        return await _automationService.FindAndTypeAsync(query, text, clearFirst, cancellationToken);
+            var result = await WindowsToolsBase.UIAutomationService.FindAndTypeAsync(query, text, clearFirst, cancellationToken);
+            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return WindowsToolsBase.SerializeToolError(actionName, ex);
+        }
     }
 }

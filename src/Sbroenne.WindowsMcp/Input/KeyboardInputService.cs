@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -11,7 +10,17 @@ namespace Sbroenne.WindowsMcp.Input;
 /// </summary>
 public sealed class KeyboardInputService : IDisposable
 {
-    private readonly KeyboardConfiguration _configuration;
+    /// <summary>Default inter-key delay in milliseconds for sequence operations.</summary>
+    private const int DefaultInterKeyDelayMs = 10;
+
+    /// <summary>Default delay between text chunks in milliseconds.</summary>
+    private const int DefaultChunkDelayMs = 50;
+
+    /// <summary>Maximum number of characters to type in a single chunk.</summary>
+    private const int TextChunkSize = 1000;
+
+    private readonly int _interKeyDelayMs;
+    private readonly int _chunkDelayMs;
     private readonly HeldKeyTracker _heldKeyTracker;
     private readonly ModifierKeyManager _modifierKeyManager;
     private bool _disposed;
@@ -20,7 +29,7 @@ public sealed class KeyboardInputService : IDisposable
     /// Initializes a new instance of the <see cref="KeyboardInputService"/> class.
     /// </summary>
     public KeyboardInputService()
-        : this(KeyboardConfiguration.FromEnvironment())
+        : this(DefaultInterKeyDelayMs, DefaultChunkDelayMs)
     {
     }
 
@@ -28,10 +37,12 @@ public sealed class KeyboardInputService : IDisposable
     /// Initializes a new instance of the <see cref="KeyboardInputService"/> class
     /// with the specified configuration.
     /// </summary>
-    /// <param name="configuration">The keyboard configuration.</param>
-    public KeyboardInputService(KeyboardConfiguration configuration)
+    /// <param name="interKeyDelayMs">Inter-key delay in milliseconds.</param>
+    /// <param name="chunkDelayMs">Delay between text chunks in milliseconds.</param>
+    public KeyboardInputService(int interKeyDelayMs, int chunkDelayMs)
     {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _interKeyDelayMs = interKeyDelayMs;
+        _chunkDelayMs = chunkDelayMs;
         _heldKeyTracker = new HeldKeyTracker();
         _modifierKeyManager = new ModifierKeyManager();
     }
@@ -46,16 +57,15 @@ public sealed class KeyboardInputService : IDisposable
         }
 
         var totalCharacters = 0;
-        var chunkSize = KeyboardConfiguration.TextChunkSize;
 
         // Process text in chunks to prevent overwhelming the input queue
-        for (var offset = 0; offset < text.Length; offset += chunkSize)
+        for (var offset = 0; offset < text.Length; offset += TextChunkSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             // Get the current chunk
             var remainingLength = text.Length - offset;
-            var currentChunkSize = Math.Min(chunkSize, remainingLength);
+            var currentChunkSize = Math.Min(TextChunkSize, remainingLength);
             var chunk = text.Substring(offset, currentChunkSize);
 
             // Type the chunk
@@ -68,9 +78,9 @@ public sealed class KeyboardInputService : IDisposable
             totalCharacters += chunkResult.CharactersTyped ?? 0;
 
             // Add delay between chunks if there are more chunks to process
-            if (offset + chunkSize < text.Length)
+            if (offset + TextChunkSize < text.Length)
             {
-                await Task.Delay(_configuration.ChunkDelayMs, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(_chunkDelayMs, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -418,7 +428,7 @@ public sealed class KeyboardInputService : IDisposable
             return KeyboardControlResult.CreateSequenceSuccess(0);
         }
 
-        var delay = interKeyDelayMs ?? _configuration.InterKeyDelayMs;
+        var delay = interKeyDelayMs ?? _interKeyDelayMs;
         var executedCount = 0;
 
         foreach (var item in sequence)

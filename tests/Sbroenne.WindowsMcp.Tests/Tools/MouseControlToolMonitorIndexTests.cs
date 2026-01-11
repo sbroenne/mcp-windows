@@ -1,15 +1,8 @@
-using Microsoft.Extensions.Logging.Abstractions;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Input;
-using Sbroenne.WindowsMcp.Logging;
+using System.Runtime.Versioning;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Fixtures;
 using Sbroenne.WindowsMcp.Tools;
-using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Tools;
 
@@ -18,76 +11,20 @@ namespace Sbroenne.WindowsMcp.Tests.Tools;
 /// Tests User Story 1 (Explicit Monitor Targeting), User Story 2 (Monitor Info in Responses),
 /// and User Story 3 (Query Current Position) using real services without mocking.
 /// </summary>
+[SupportedOSPlatform("windows")]
 public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonitorFixture>
 {
     private readonly MultiMonitorFixture _fixture;
-    private readonly MouseControlTool _tool;
 
     public MouseControlToolMonitorIndexTests(MultiMonitorFixture fixture)
     {
         _fixture = fixture;
-
-        // Create real services for integration testing
-        var mouseService = new MouseInputService();
-        var monitorService = new MonitorService();
-        var elevationDetector = new ElevationDetector();
-        var windowConfig = WindowConfiguration.FromEnvironment();
-        var windowEnumerator = new WindowEnumerator(elevationDetector, windowConfig);
-        var windowActivator = new WindowActivator(windowConfig);
-        var secureDesktopDetector = new SecureDesktopDetector();
-        var windowService = new WindowService(
-            windowEnumerator,
-            windowActivator,
-            monitorService,
-            secureDesktopDetector,
-            windowConfig);
-        var logger = new MouseOperationLogger(NullLogger<MouseOperationLogger>.Instance);
-        var config = MouseConfiguration.FromEnvironment();
-
-        _tool = new MouseControlTool(
-            mouseService,
-            monitorService,
-            windowEnumerator,
-            windowService,
-            elevationDetector,
-            secureDesktopDetector,
-            logger,
-            config);
     }
 
-    /// <summary>
-    /// Helper to create a RequestContext for testing.
-    /// Uses unsafe FormatterServices to bypass constructor and set required fields.
-    /// </summary>
-#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete but necessary for struct instantiation without constructor
-    private static RequestContext<CallToolRequestParams> CreateMockContext()
+    private static MouseControlResult DeserializeResult(string json)
     {
-        // RequestContext is a struct with required Server property
-        // For unit testing validation logic that doesn't need the context internals,
-        // we use FormatterServices to create an instance without calling constructor
-        var contextType = typeof(RequestContext<CallToolRequestParams>);
-        var context = (RequestContext<CallToolRequestParams>)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(contextType);
-
-        // Set the Server property to satisfy ArgumentNullException.ThrowIfNull
-        // Find and set the backing field
-        var serverProp = contextType.GetProperty("Server");
-        if (serverProp != null)
-        {
-            var backingField = contextType.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .FirstOrDefault(f => f.Name.Contains("Server"));
-
-            if (backingField != null)
-            {
-                var mockServer = new object(); // Minimal non-null object to pass ThrowIfNull check
-                var boxed = (object)context;
-                backingField.SetValue(boxed, mockServer);
-                context = (RequestContext<CallToolRequestParams>)boxed;
-            }
-        }
-
-        return context;
+        return JsonSerializer.Deserialize<MouseControlResult>(json, WindowsToolsBase.JsonOptions)!;
     }
-#pragma warning restore SYSLIB0050
 
     [Fact]
     public async Task ExecuteAsync_ClickWithCoordinatesNoMonitorIndex_ReturnsMissingParameterError()
@@ -95,15 +32,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Arrange
         var (x, y) = _fixture.GetMonitorCenter(0);
 
-        // Act - monitorIndex parameter defaults to 0, but we're testing the new validation
-        // Note: The current implementation has monitorIndex with default=0, so this test
-        // will initially PASS (wrong behavior). After T007 implementation, behavior depends
-        // on whether we can make monitorIndex nullable or detect if it was explicitly provided.
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        // Act - monitorIndex not provided, should fail validation
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
             x: x,
             y: y);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Validation should fail because monitorIndex is required with coordinates
         Assert.False(result.Success);
@@ -121,12 +56,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var invalidIndex = _fixture.MonitorCount + 10; // Way beyond valid range
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
             x: x,
             y: y,
             monitorIndex: invalidIndex);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Validation should fail because monitorIndex is out of range
         Assert.False(result.Success);
@@ -145,12 +81,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var (x, y) = _fixture.GetOutOfBoundsCoordinates(monitorIndex);
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
             x: x,
             y: y,
             monitorIndex: monitorIndex);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Validation should fail because coordinates are out of bounds
         Assert.False(result.Success);
@@ -168,10 +105,10 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Arrange - click at current cursor position (no x/y provided)
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click);
-        // Note: monitorIndex parameter omitted - should use default (0)
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - coordinate-less actions should work without explicit monitorIndex
         Assert.True(result.Success);
@@ -187,12 +124,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var (x, y) = _fixture.GetSafeCoordinates(monitorIndex);
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Move,
             x: x,
             y: y,
             monitorIndex: monitorIndex);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Real integration test, cursor actually moved
         Assert.True(result.Success);
@@ -209,14 +147,14 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var (endX, endY) = _fixture.GetMonitorCenter(0);
 
         // Act - Attempt drag without monitorIndex (should fail validation)
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Drag,
             x: startX,  // Note: drag uses x/y for start position
             y: startY,
             endX: endX,
             endY: endY);
-        // monitorIndex omitted - defaults to 0
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Validation should fail because monitorIndex is required with coordinates
         Assert.False(result.Success);
@@ -233,12 +171,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var monitor = _fixture.GetMonitor(monitorIndex)!;
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Move,
             x: x,
             y: y,
             monitorIndex: monitorIndex);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Success response should include monitor context
         Assert.True(result.Success);
@@ -260,12 +199,13 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         var monitor = _fixture.GetMonitor(monitorIndex)!;
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
             x: x,
             y: y,
             monitorIndex: monitorIndex);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Success response should include monitor context
         Assert.True(result.Success);
@@ -284,9 +224,10 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Arrange - click at current position (no coordinates, no monitorIndex)
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Coordinate-less operations don't have explicit monitor context
         Assert.True(result.Success);
@@ -303,12 +244,12 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     public async Task ExecuteAsync_GetPosition_ReturnsCurrentPositionWithMonitorInfo()
     {
         // Arrange - get_position should return current cursor position with monitor context
-        var monitor = _fixture.GetMonitor(0);
 
         // Act
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.GetPosition);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Should return success with coordinates and monitor context
         Assert.True(result.Success, $"get_position should succeed. Error: {result.Error}");
@@ -325,9 +266,10 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     public async Task ExecuteAsync_GetPosition_DeterminesCorrectMonitor()
     {
         // Act - get_position should determine which monitor contains the cursor
-        var result = await _tool.ExecuteAsync(
-            context: CreateMockContext(),
+        var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.GetPosition);
+
+        var result = DeserializeResult(resultJson);
 
         // Assert - Should identify a valid monitor and return its dimensions
         Assert.True(result.Success);

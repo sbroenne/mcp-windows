@@ -1,28 +1,23 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 2.7.0 → 3.0.0
+Version change: 3.0.0 → 3.1.0
 Modified principles:
-  - IV. Windows 11 Target Platform → IV. Windows 10/11 Target Platform (expanded to Windows 10)
-  - VI. Updated tool examples (OCR IS now implemented via Windows.Media.Ocr)
-Added sections:
-  - XXIII. LLM Integration Testing with agent-benchmark
-  - XXIV. Token Optimization for LLM Efficiency
-  - XXV. UI Automation First (Primary Approach)
+  - III. MCP Protocol Compliance: Simplified to static tool pattern (removed DI requirement)
+  - XXI. Updated to reflect static architecture (tools are static partial classes)
+Added sections: None
+Removed requirements:
+  - Dependency injection for tools (tools are now static)
+  - Service registration via IServiceCollection for tools
+  - Constructor injection for tools
 Technology Stack changes:
-  - Runtime: .NET 8.0 → .NET 10.0
-  - Language: C# 12 → C# 13
-  - Test Framework: Added agent-benchmark for LLM tests
-  - MCP SDK: Now version 0.5.0-preview.1
-  - Added: 11 specialized tools (5 base + 6 UI automation)
-Removed sections: None
-Templates requiring updates: ✅ No updates required (constitution referenced in copilot-instructions.md)
-Follow-up TODOs: None
-Rationale: MAJOR version bump - significant expansion of tool surface area (11 tools), 
-           .NET 10 runtime, addition of UI Automation tools (ui_find, ui_click, ui_type, 
-           ui_read, ui_wait, ui_file), new principles for LLM testing and token optimization,
-           expanded platform support to Windows 10. Breaking change: tool architecture 
-           fundamentally redesigned with semantic UI automation as primary approach.
+  - Tool architecture: Instance-based DI → Static partial classes with lazy singletons
+  - Service access: Constructor injection → WindowsToolsBase lazy singleton pattern
+  - MCP SDK registration: WithTools<T>() → WithToolsFromAssembly()
+Rationale: MINOR version bump - architectural simplification to match mcp-server-excel pattern.
+           Tools are now static partial classes that return Task<string> (serialized JSON).
+           Services accessed via WindowsToolsBase lazy singletons. Simpler, fewer abstractions,
+           easier to maintain. No functional changes to tool behavior.
 -->
 
 # mcp-windows Constitution
@@ -69,9 +64,10 @@ This project serves as a **reference implementation** for the MCP C# SDK:
 - Server MUST use MCP client logging (`AsClientLoggerProvider()`) for operational logs sent to clients
 - Server MUST expose MCP Resources for discoverable system information (monitors, keyboard layout)
 - Server MUST implement Completions handler for parameter autocomplete (actions, keys)
-- All tool parameters MUST have XML `<param>` documentation AND explicit `[Description]` attributes
-
-**SDK Limitation Note**: The MCP SDK's `XmlToDescriptionGenerator` source generator requires `partial` methods to convert XML docs to `[Description]` attributes, but it has a bug where generated files only include `using System.ComponentModel;` and `using ModelContextProtocol.Server;`. This causes compile errors when tool methods use custom types (e.g., `WindowManagementResult`). Until fixed, use manual `[Description]` attributes on parameters.
+- Tool methods MUST be `partial` with XML `<summary>` and `<param>` documentation; the SDK's `XmlToDescriptionGenerator` auto-generates `[Description]` attributes from XML docs
+- Tools MUST be static partial classes with `[McpServerToolType]` attribute
+- Tool methods MUST return `Task<string>` (serialized JSON) for consistent MCP responses
+- Services MUST be accessed via `WindowsToolsBase` lazy singletons (no constructor injection)
 
 ### IV. Windows 10/11 Target Platform
 
@@ -242,12 +238,12 @@ Before planning ANY feature implementation:
 
 ### XXI. Modern .NET CLI Application Architecture (NON-NEGOTIABLE)
 
-- Use `Host.CreateApplicationBuilder()` as application foundation
-- Register ALL services via `IServiceCollection` at startup; avoid service locator anti-pattern
+- Use `Host.CreateApplicationBuilder()` as application foundation for server hosting
+- Tools are static partial classes - NO dependency injection required
+- Services accessed via `WindowsToolsBase` lazy singleton pattern for simplicity
 - Use `IConfiguration` with layered providers: appsettings.json → environment variables → CLI args
-- Validate options at startup with `ValidateOnStart()`
-- Use `ILogger<T>` injected via constructor for logging
 - Handle `IHostApplicationLifetime.ApplicationStopping` for cleanup; set `HostOptions.ShutdownTimeout`
+- Tool registration via `.WithToolsFromAssembly()` - automatic discovery of `[McpServerToolType]` classes
 
 ### XXII. Open Source Dependencies Only (NON-NEGOTIABLE)
 
@@ -405,4 +401,4 @@ This server uses **Windows UI Automation API as the primary interaction method**
 
 ---
 
-**Version**: 3.0.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2026-01-05
+**Version**: 3.1.0 | **Ratified**: 2025-12-07 | **Last Amended**: 2026-01-11

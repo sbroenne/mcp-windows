@@ -2,7 +2,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -289,19 +288,17 @@ public class WindowTestFixture : IAsyncLifetime, IDisposable
     /// </summary>
     public WindowTestFixture()
     {
-        var configuration = WindowConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
         var secureDesktopDetector = new SecureDesktopDetector();
         var monitorService = new MonitorService();
 
-        WindowEnumerator = new WindowEnumerator(elevationDetector, configuration);
-        WindowActivator = new WindowActivator(configuration);
+        WindowEnumerator = new WindowEnumerator(elevationDetector);
+        WindowActivator = new WindowActivator();
         WindowService = new WindowService(
             WindowEnumerator,
             WindowActivator,
             monitorService,
-            secureDesktopDetector,
-            configuration);
+            secureDesktopDetector);
     }
 
     /// <inheritdoc />

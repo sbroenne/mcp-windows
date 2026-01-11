@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -14,8 +12,6 @@ public sealed class ScreenshotService
     private readonly MonitorService _monitorService;
     private readonly Automation.SecureDesktopDetector _secureDesktopDetector;
     private readonly ImageProcessor _imageProcessor;
-    private readonly ScreenshotConfiguration _configuration;
-    private readonly ScreenshotOperationLogger _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ScreenshotService"/> class.
@@ -23,20 +19,14 @@ public sealed class ScreenshotService
     /// <param name="monitorService">The monitor enumeration service.</param>
     /// <param name="secureDesktopDetector">The secure desktop detector.</param>
     /// <param name="imageProcessor">The image processor for scaling and encoding.</param>
-    /// <param name="configuration">The screenshot configuration.</param>
-    /// <param name="logger">The operation logger.</param>
     public ScreenshotService(
         MonitorService monitorService,
         Automation.SecureDesktopDetector secureDesktopDetector,
-        ImageProcessor imageProcessor,
-        ScreenshotConfiguration configuration,
-        ScreenshotOperationLogger logger)
+        ImageProcessor imageProcessor)
     {
         _monitorService = monitorService;
         _secureDesktopDetector = secureDesktopDetector;
         _imageProcessor = imageProcessor;
-        _configuration = configuration;
-        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -49,10 +39,7 @@ public sealed class ScreenshotService
         var stopwatch = Stopwatch.StartNew();
 
         try
-        {
-            _logger.LogOperationStarted(request.Action, request.Target);
-
-            // Handle ListMonitors action
+        {// Handle ListMonitors action
             if (request.Action == ScreenshotAction.ListMonitors)
             {
                 return HandleListMonitors();
@@ -61,7 +48,6 @@ public sealed class ScreenshotService
             // Check for secure desktop before any capture operation
             if (_secureDesktopDetector.IsSecureDesktopActive())
             {
-                _logger.LogSecureDesktopBlocked();
                 return ScreenshotControlResult.Error(
                     ScreenshotErrorCode.SecureDesktopActive,
                     "Cannot capture screenshot while secure desktop (UAC/lock screen) is active");
@@ -82,8 +68,6 @@ public sealed class ScreenshotService
             };
 
             stopwatch.Stop();
-            _logger.LogCaptureDuration(stopwatch.ElapsedMilliseconds);
-
             return result;
         }
         catch (OperationCanceledException)
@@ -94,7 +78,6 @@ public sealed class ScreenshotService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogOperationError("CaptureError", ex.Message);
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.CaptureError,
                 $"Screenshot capture failed: {ex.Message}");
@@ -137,8 +120,6 @@ public sealed class ScreenshotService
                 $"For other monitors, use target='monitor' with monitorIndex (0-{monitors.Count - 1}). " +
                 $"Note: display_number matches Windows Settings, is_primary indicates the main display.";
         }
-
-        _logger.LogMonitorListSuccess(monitors.Count);
         return ScreenshotControlResult.MonitorListSuccess(monitors, virtualScreen, message);
     }
 
@@ -208,7 +189,6 @@ public sealed class ScreenshotService
         if (monitor is null)
         {
             var availableMonitors = _monitorService.GetMonitors();
-            _logger.LogInvalidMonitorIndex(monitorIndex, availableMonitors.Count - 1);
             return Task.FromResult(ScreenshotControlResult.ErrorWithMonitors(
                 ScreenshotErrorCode.InvalidMonitorIndex,
                 $"Monitor index {monitorIndex} not found. Available monitors: 0-{availableMonitors.Count - 1}",
@@ -239,7 +219,6 @@ public sealed class ScreenshotService
         // Check if window exists
         if (!NativeMethods.IsWindow(windowHandle))
         {
-            _logger.LogOperationError("InvalidWindowHandle", $"Window handle {windowHandle} does not exist");
             return Task.FromResult(ScreenshotControlResult.Error(
                 ScreenshotErrorCode.InvalidWindowHandle,
                 $"Window handle {windowHandle} does not exist or is invalid"));
@@ -248,7 +227,6 @@ public sealed class ScreenshotService
         // Check if window is minimized
         if (NativeMethods.IsIconic(windowHandle))
         {
-            _logger.LogOperationError("WindowMinimized", $"Window handle {windowHandle} is minimized");
             return Task.FromResult(ScreenshotControlResult.Error(
                 ScreenshotErrorCode.WindowMinimized,
                 "Cannot capture a minimized window. Restore the window first."));
@@ -257,7 +235,6 @@ public sealed class ScreenshotService
         // Check if window is visible
         if (!NativeMethods.IsWindowVisible(windowHandle))
         {
-            _logger.LogOperationError("WindowNotVisible", $"Window handle {windowHandle} is not visible");
             return Task.FromResult(ScreenshotControlResult.Error(
                 ScreenshotErrorCode.WindowNotVisible,
                 "Cannot capture a hidden window"));
@@ -266,7 +243,6 @@ public sealed class ScreenshotService
         // Get window dimensions
         if (!NativeMethods.GetWindowRect(windowHandle, out var windowRect))
         {
-            _logger.LogOperationError("GetWindowRectFailed", $"Failed to get window dimensions for {windowHandle}");
             return Task.FromResult(ScreenshotControlResult.Error(
                 ScreenshotErrorCode.CaptureError,
                 "Failed to get window dimensions"));
@@ -292,7 +268,6 @@ public sealed class ScreenshotService
         }
 
         // Fallback to screen region capture (works when PrintWindow fails, but window must be visible)
-        _logger.LogOperationError("PrintWindowFailed", "Falling back to screen region capture");
         var region = new CaptureRegion(windowRect.Left, windowRect.Top, width, height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
@@ -335,16 +310,11 @@ public sealed class ScreenshotService
             var processed = _imageProcessor.Process(
                 bitmap,
                 request.ImageFormat,
-                request.Quality);
-
-            _logger.LogCaptureSuccess(processed.Width, processed.Height);
-
-            // Handle output mode
+                request.Quality);// Handle output mode
             return BuildCaptureResult(processed, request, $"Captured window: {processed.Width}x{processed.Height} {processed.Format}");
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogOperationError("PrintWindowException", ex.Message);
             return ScreenshotControlResult.Error(
                 ScreenshotErrorCode.CaptureError,
                 $"PrintWindow capture failed: {ex.Message}");
@@ -440,11 +410,7 @@ public sealed class ScreenshotService
             ImageHeight = processed.Height,
             IncludedCursor = request.IncludeCursor,
             CursorPosition = cursorPosition
-        };
-
-        _logger.LogCaptureSuccess(processed.Width, processed.Height);
-
-        // Handle output mode
+        };// Handle output mode
         return Task.FromResult(BuildCompositeResult(processed, metadata, request,
             $"Captured all {monitors.Count} monitor(s): {processed.Width}x{processed.Height} {processed.Format}"));
     }
@@ -518,11 +484,7 @@ public sealed class ScreenshotService
         var processed = _imageProcessor.Process(
             bitmap,
             request.ImageFormat,
-            request.Quality);
-
-        _logger.LogCaptureSuccess(processed.Width, processed.Height);
-
-        // Handle output mode
+            request.Quality);// Handle output mode
         return Task.FromResult(BuildCaptureResult(processed, request,
             $"Captured {processed.Width}x{processed.Height} {processed.Format}"));
     }

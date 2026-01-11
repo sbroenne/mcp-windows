@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Runs Windows MCP Server LLM integration tests using agent-benchmark.
+    Runs Excel MCP Server LLM integration tests using agent-benchmark.
 
 .DESCRIPTION
-    This script runs the agent-benchmark test suite against the Windows MCP Server.
+    This script runs the agent-benchmark test suite against the Excel MCP Server.
     It builds the MCP server, downloads agent-benchmark if needed, and runs all test scenarios.
 
     Configuration can be provided via command-line parameters or a config file.
@@ -15,7 +15,7 @@
 
 .PARAMETER Scenario
     Optional. Run only a specific test scenario file. If not specified, runs all scenarios.
-    Example: notepad-workflow.yaml
+    Example: excel-file-worksheet-test.yaml
 
 .PARAMETER Build
     If specified, builds the MCP server before running tests.
@@ -32,8 +32,8 @@
     Builds the MCP server and runs all tests.
 
 .EXAMPLE
-    .\Run-LLMTests.ps1 -Scenario notepad-test.yaml
-    Runs only the notepad-test scenario.
+    .\Run-LLMTests.ps1 -Scenario excel-file-worksheet-test.yaml
+    Runs only the file/worksheet scenario.
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -AgentBenchmarkPath "..\..\..\..\agent-benchmark\agent-benchmark.exe"
@@ -52,9 +52,9 @@ $ErrorActionPreference = "Stop"
 # Paths
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
-$SrcDir = Join-Path $RepoRoot "src\Sbroenne.WindowsMcp"
-$ProjectPath = Join-Path $SrcDir "Sbroenne.WindowsMcp.csproj"
-$TestDir = Join-Path $RepoRoot "tests\Sbroenne.WindowsMcp.LLM.Tests"
+$SrcDir = Join-Path $RepoRoot "src\ExcelMcp.McpServer"
+$ProjectPath = Join-Path $SrcDir "ExcelMcp.McpServer.csproj"
+$TestDir = Join-Path $RepoRoot "tests\ExcelMcp.McpServer.LLM.Tests"
 $ScenariosDir = Join-Path $TestDir "Scenarios"
 $ReportsDir = Join-Path $TestDir "TestResults"
 
@@ -133,7 +133,7 @@ if (-not $env:AZURE_OPENAI_API_KEY) {
 
 # Build MCP server if requested (optional, dotnet run will build anyway)
 if ($Build) {
-    Write-Host "Building Windows MCP Server..." -ForegroundColor Cyan
+    Write-Host "Building Excel MCP Server..." -ForegroundColor Cyan
     Push-Location $SrcDir
     try {
         dotnet build -c Release
@@ -160,28 +160,28 @@ if ($AgentBenchmarkMode -eq "executable") {
         $DefaultDownloadPath = Join-Path $TestDir "agent-benchmark.exe"
         if ($ResolvedAgentBenchmarkPath -eq $DefaultDownloadPath) {
             Write-Host "Downloading agent-benchmark (latest release)..." -ForegroundColor Cyan
-            
+
             try {
                 # Get latest release info from GitHub API
                 $ReleaseInfo = Invoke-RestMethod "https://api.github.com/repos/mykhaliev/agent-benchmark/releases/latest"
                 $LatestVersion = $ReleaseInfo.tag_name
                 Write-Host "Latest version: $LatestVersion" -ForegroundColor DarkGray
-                
+
                 # Find the Windows amd64 zip asset
                 $Asset = $ReleaseInfo.assets | Where-Object { $_.name -match "windows_amd64\.zip$" -and $_.name -notmatch "upx" } | Select-Object -First 1
                 if (-not $Asset) {
                     throw "Could not find Windows amd64 zip asset in release $LatestVersion"
                 }
-                
+
                 $ZipPath = Join-Path $TestDir "agent-benchmark.zip"
                 Write-Host "Downloading: $($Asset.name)" -ForegroundColor DarkGray
                 Invoke-WebRequest -Uri $Asset.browser_download_url -OutFile $ZipPath
-                
+
                 # Extract the zip
                 Write-Host "Extracting..." -ForegroundColor DarkGray
                 Expand-Archive -Path $ZipPath -DestinationPath $TestDir -Force
                 Remove-Item $ZipPath -Force
-                
+
                 # The zip contains agent-benchmark.exe directly
                 if (Test-Path $ResolvedAgentBenchmarkPath) {
                     Write-Host "Downloaded agent-benchmark $LatestVersion to: $ResolvedAgentBenchmarkPath" -ForegroundColor Green
@@ -231,7 +231,7 @@ if ($ScenarioFiles.Count -eq 0) {
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "Windows MCP Server - LLM Integration Tests" -ForegroundColor Cyan
+Write-Host "Excel MCP Server - LLM Integration Tests" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Server: dotnet run --project $ProjectPath"
 Write-Host "Agent-Benchmark: $ResolvedAgentBenchmarkPath ($AgentBenchmarkMode)"
@@ -247,19 +247,16 @@ foreach ($ScenarioFile in $ScenarioFiles) {
     Write-Host "`nRunning: $($ScenarioFile.Name)" -ForegroundColor Cyan
     Write-Host ("-" * 50)
 
-    # Create temp file with substituted variables
-    $TempFile = Join-Path $env:TEMP "mcp-test-$($ScenarioFile.BaseName).yaml"
-    $Content = Get-Content $ScenarioFile.FullName -Raw
-    $Content = $Content -replace '\{\{SERVER_COMMAND\}\}', $ServerCommand
-    $ReportsDirForYaml = $ReportsDir -replace '\\', '/'
-    $Content = $Content -replace '\{\{TEST_RESULTS_PATH\}\}', $ReportsDirForYaml
-    $Content | Set-Content $TempFile -Encoding UTF8
+    # Set environment variables for template substitution
+    # agent-benchmark automatically picks up all env vars as template variables
+    $env:SERVER_COMMAND = $ServerCommand
+    $env:TEST_RESULTS_PATH = $ReportsDir -replace '\\', '/'
 
-    # Run agent-benchmark
+    # Run agent-benchmark directly on the original file
     $ReportFile = Join-Path $ReportsDir "$($ScenarioFile.BaseName)-report"
 
     $Args = @(
-        "-f", $TempFile,
+        "-f", $ScenarioFile.FullName,
         "-o", $ReportFile,
         "-reportType", "html,json",
         "-verbose"
@@ -282,9 +279,6 @@ foreach ($ScenarioFile in $ScenarioFiles) {
         & $ResolvedAgentBenchmarkPath @Args
         $ExitCode = $LASTEXITCODE
     }
-
-    # Clean up temp file
-    Remove-Item $TempFile -Force -ErrorAction SilentlyContinue
 
     if ($ExitCode -eq 0) {
         Write-Host "PASSED" -ForegroundColor Green

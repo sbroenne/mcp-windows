@@ -2,16 +2,9 @@
 // Licensed under the MIT License.
 
 using System.Runtime.Versioning;
-using Microsoft.Extensions.Logging.Abstractions;
-using ModelContextProtocol.Protocol;
-using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Input;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
-using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -23,8 +16,6 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Collection("WindowManagement")]
 public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
 {
-    private readonly WindowManagementTool _tool;
-    private readonly WindowService _windowService;
     private UnsavedChangesWindowForm? _testWindow;
     private Thread? _uiThread;
     private readonly ManualResetEventSlim _formReady = new(false);
@@ -33,42 +24,9 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
 
     private const string TestWindowTitle = "MCP DiscardChanges Test Window";
 
-    /// <summary>
-    /// Initializes a new instance of the <see cref="WindowCloseDiscardChangesTests"/> class.
-    /// </summary>
-    public WindowCloseDiscardChangesTests()
+    private static WindowManagementResult DeserializeResult(string json)
     {
-        var configuration = WindowConfiguration.FromEnvironment();
-        var elevationDetector = new ElevationDetector();
-        var secureDesktopDetector = new SecureDesktopDetector();
-        var monitorService = new MonitorService();
-
-        var windowEnumerator = new WindowEnumerator(elevationDetector, configuration);
-        var windowActivator = new WindowActivator(configuration);
-
-        // Create UIAutomationService for dialog dismissal
-        var staThread = new UIAutomationThread();
-        var mouseService = new MouseInputService();
-        var keyboardService = new KeyboardInputService();
-
-        var automationService = new UIAutomationService(
-            staThread,
-            monitorService,
-            mouseService,
-            keyboardService,
-            windowActivator,
-            elevationDetector,
-            NullLogger<UIAutomationService>.Instance);
-
-        _windowService = new WindowService(
-            windowEnumerator,
-            windowActivator,
-            monitorService,
-            secureDesktopDetector,
-            configuration,
-            automationService);  // Include automation service for discardChanges
-
-        _tool = new WindowManagementTool(_windowService, monitorService, configuration);
+        return JsonSerializer.Deserialize<WindowManagementResult>(json, WindowsToolsBase.JsonOptions)!;
     }
 
     /// <inheritdoc/>
@@ -145,33 +103,6 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
     }
 
     /// <summary>
-    /// Helper to create a RequestContext for testing.
-    /// </summary>
-#pragma warning disable SYSLIB0050 // FormatterServices.GetUninitializedObject is obsolete but necessary
-    private static RequestContext<CallToolRequestParams> CreateMockContext()
-    {
-        var contextType = typeof(RequestContext<CallToolRequestParams>);
-        var context = (RequestContext<CallToolRequestParams>)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(contextType);
-
-        var serverProp = contextType.GetProperty("Server");
-        if (serverProp != null)
-        {
-            var backingField = contextType.GetFields(System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                .FirstOrDefault(f => f.Name.Contains("Server"));
-
-            if (backingField != null)
-            {
-                var boxed = (object)context;
-                backingField.SetValue(boxed, new object());
-                context = (RequestContext<CallToolRequestParams>)boxed;
-            }
-        }
-
-        return context;
-    }
-#pragma warning restore SYSLIB0050
-
-    /// <summary>
     /// Tests that close with discardChanges=true dismisses the save confirmation dialog.
     /// </summary>
     [Fact]
@@ -179,13 +110,13 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
     public async Task ExecuteAsync_CloseWithDiscardChanges_DismissesSaveDialog()
     {
         // Arrange
-        var context = CreateMockContext();
 
         // Find the window
-        var findResult = await _tool.ExecuteAsync(
-            context,
+        var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
             title: TestWindowTitle);
+
+        var findResult = DeserializeResult(findResultJson);
 
         Assert.True(findResult.Success, $"Find should locate test window. Error: {findResult.Error}");
         Assert.NotNull(findResult.Windows);
@@ -194,11 +125,12 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         var windowHandle = findResult.Windows[0].Handle;
 
         // Act - Close with discardChanges=true
-        var closeResult = await _tool.ExecuteAsync(
-            context,
+        var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle,
             discardChanges: true);
+
+        var closeResult = DeserializeResult(closeResultJson);
 
         // Assert - Wait for the dialog to appear and be dismissed
         var dialogShown = await Task.Run(() => _dialogAppeared.Wait(TimeSpan.FromSeconds(5)));
@@ -220,13 +152,13 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
     public async Task ExecuteAsync_CloseWithoutDiscardChanges_DoesNotDismissDialog()
     {
         // Arrange
-        var context = CreateMockContext();
 
         // Find the window
-        var findResult = await _tool.ExecuteAsync(
-            context,
+        var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
             title: TestWindowTitle);
+
+        var findResult = DeserializeResult(findResultJson);
 
         Assert.True(findResult.Success, $"Find should locate test window. Error: {findResult.Error}");
         Assert.NotNull(findResult.Windows);
@@ -235,11 +167,12 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         var windowHandle = findResult.Windows[0].Handle;
 
         // Act - Close WITHOUT discardChanges (default: false)
-        var closeResult = await _tool.ExecuteAsync(
-            context,
+        var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle,
             discardChanges: false);
+
+        _ = DeserializeResult(closeResultJson);
 
         // Wait a moment for the dialog to appear
         var dialogShown = await Task.Run(() => _dialogAppeared.Wait(TimeSpan.FromSeconds(3)));
@@ -252,10 +185,11 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         Assert.False(_formClosed.IsSet, "Window should NOT be closed when discardChanges is false");
 
         // Verify window still exists by listing
-        var listResult = await _tool.ExecuteAsync(
-            context,
+        var listResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.List,
             filter: TestWindowTitle);
+
+        _ = DeserializeResult(listResultJson);
 
         // Window may still appear in list (behind dialog) or dialog may be the active window
         // The key assertion is that the window wasn't closed

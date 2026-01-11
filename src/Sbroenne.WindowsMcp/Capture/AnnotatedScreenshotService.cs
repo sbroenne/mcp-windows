@@ -3,8 +3,6 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using ImageFormat = Sbroenne.WindowsMcp.Models.ImageFormat;
@@ -20,12 +18,17 @@ public sealed class AnnotatedScreenshotService
     private readonly UIAutomationService _automationService;
     private readonly ScreenshotService _screenshotService;
     private readonly ImageProcessor _imageProcessor;
-    private readonly AnnotatedScreenshotLogger _logger;
 
     // Annotation styling constants
     private const int LabelFontSize = 11;
     private const int LabelPadding = 3;
     private const int BoundingBoxLineWidth = 2;
+
+    /// <summary>
+    /// Default maximum dimension (width or height) for annotated screenshots.
+    /// Images larger than this are scaled down proportionally to reduce tokens.
+    /// </summary>
+    private const int DefaultMaxDimensionForAnnotated = 1280;
 
     // Color palette for annotations (high contrast, easy to distinguish)
     private static readonly Color[] _annotationColors =
@@ -48,13 +51,11 @@ public sealed class AnnotatedScreenshotService
     public AnnotatedScreenshotService(
         UIAutomationService automationService,
         ScreenshotService screenshotService,
-        ImageProcessor imageProcessor,
-        AnnotatedScreenshotLogger logger)
+        ImageProcessor imageProcessor)
     {
         _automationService = automationService ?? throw new ArgumentNullException(nameof(automationService));
         _screenshotService = screenshotService ?? throw new ArgumentNullException(nameof(screenshotService));
         _imageProcessor = imageProcessor ?? throw new ArgumentNullException(nameof(imageProcessor));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     /// <inheritdoc />
@@ -70,8 +71,6 @@ public sealed class AnnotatedScreenshotService
     {
         try
         {
-            _logger.LogCaptureStarted(windowHandle);
-
             nint targetWindowHandle;
             string? targetWindowHandleString;
 
@@ -131,9 +130,7 @@ public sealed class AnnotatedScreenshotService
                 windowRect.Value,
                 format,
                 quality,
-                ScreenshotConfiguration.DefaultMaxDimensionForAnnotated);
-
-            _logger.LogCaptureSuccess(annotatedElements.Length);
+                DefaultMaxDimensionForAnnotated);
 
             return AnnotatedScreenshotResult.CreateSuccess(
                 annotatedImageData,
@@ -146,7 +143,6 @@ public sealed class AnnotatedScreenshotService
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _logger.LogCaptureError(ex, ex.Message);
             return AnnotatedScreenshotResult.CreateFailure($"Failed to capture annotated screenshot: {ex.Message}");
         }
     }

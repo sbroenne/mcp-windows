@@ -3,7 +3,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -16,20 +15,20 @@ namespace Sbroenne.WindowsMcp.Window;
 public sealed class WindowEnumerator
 {
     private readonly ElevationDetector _elevationDetector;
-    private readonly WindowConfiguration _configuration;
+
+    /// <summary>
+    /// Default timeout for querying window properties (hung detection) in milliseconds.
+    /// </summary>
+    private const int PropertyQueryTimeoutMs = 100;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="WindowEnumerator"/> class.
     /// </summary>
     /// <param name="elevationDetector">Elevation detector for checking window elevation status.</param>
-    /// <param name="configuration">Window configuration.</param>
-    public WindowEnumerator(ElevationDetector elevationDetector, WindowConfiguration configuration)
+    public WindowEnumerator(ElevationDetector elevationDetector)
     {
         ArgumentNullException.ThrowIfNull(elevationDetector);
-        ArgumentNullException.ThrowIfNull(configuration);
-
         _elevationDetector = elevationDetector;
-        _configuration = configuration;
     }
 
     /// <inheritdoc/>
@@ -350,7 +349,7 @@ public sealed class WindowEnumerator
             IntPtr.Zero,
             [],
             NativeConstants.SMTO_ABORTIFHUNG,
-            (uint)_configuration.PropertyQueryTimeoutMs,
+            PropertyQueryTimeoutMs,
             out result);
 
         return returnValue != IntPtr.Zero;

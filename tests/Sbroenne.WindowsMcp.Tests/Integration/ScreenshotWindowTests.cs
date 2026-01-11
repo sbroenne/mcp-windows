@@ -1,9 +1,6 @@
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
@@ -41,15 +38,7 @@ public sealed class ScreenshotWindowTests
         var monitorService = new MonitorService();
         var secureDesktopDetector = new SecureDesktopDetector();
         var imageProcessor = new ImageProcessor();
-        var configuration = ScreenshotConfiguration.FromEnvironment();
-        var logger = new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance);
-
-        _screenshotService = new ScreenshotService(
-            monitorService,
-            secureDesktopDetector,
-            imageProcessor,
-            configuration,
-            logger);
+        _screenshotService = new ScreenshotService(monitorService, secureDesktopDetector, imageProcessor);
     }
 
     [Fact]

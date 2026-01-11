@@ -1,9 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Configuration;
 using Sbroenne.WindowsMcp.Input;
-using Sbroenne.WindowsMcp.Logging;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -38,20 +36,17 @@ public sealed class CaptureAnnotatedTests : IDisposable
         // Create real services for integration testing
         _staThread = new UIAutomationThread();
 
-        var windowConfiguration = WindowConfiguration.FromEnvironment();
-        var screenshotConfiguration = ScreenshotConfiguration.FromEnvironment();
         var elevationDetector = new ElevationDetector();
         var secureDesktopDetector = new SecureDesktopDetector();
         var monitorService = new MonitorService();
 
-        var windowEnumerator = new WindowEnumerator(elevationDetector, windowConfiguration);
-        var windowActivator = new WindowActivator(windowConfiguration);
+        var windowEnumerator = new WindowEnumerator(elevationDetector);
+        var windowActivator = new WindowActivator();
         var windowService = new WindowService(
             windowEnumerator,
             windowActivator,
             monitorService,
-            secureDesktopDetector,
-            windowConfiguration);
+            secureDesktopDetector);
 
         var mouseService = new MouseInputService();
         var keyboardService = new KeyboardInputService();
@@ -69,16 +64,12 @@ public sealed class CaptureAnnotatedTests : IDisposable
         var screenshotService = new ScreenshotService(
             monitorService,
             secureDesktopDetector,
-            imageProcessor,
-            screenshotConfiguration,
-            new ScreenshotOperationLogger(NullLogger<ScreenshotOperationLogger>.Instance));
+            imageProcessor);
 
-        var annotatedLogger = new AnnotatedScreenshotLogger(NullLogger<AnnotatedScreenshotLogger>.Instance);
         _annotatedScreenshotService = new AnnotatedScreenshotService(
             _automationService,
             screenshotService,
-            imageProcessor,
-            annotatedLogger);
+            imageProcessor);
     }
 
     public void Dispose()
