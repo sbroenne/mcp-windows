@@ -33,6 +33,16 @@ public sealed class WindowService
     private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
+    /// Timeout for waiting for window to close after WM_CLOSE.
+    /// </summary>
+    private static readonly TimeSpan WindowCloseTimeout = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>
+    /// Polling interval for checking if window has closed.
+    /// </summary>
+    private const int WindowClosePollIntervalMs = 50;
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="WindowService"/> class.
     /// </summary>
     /// <param name="enumerator">Window enumerator service.</param>
@@ -253,8 +263,40 @@ public sealed class WindowService
         if (discardChanges && _automationService != null)
         {
             await DismissSaveDialogAsync(handle, cancellationToken);
-        }// Note: We return the window info before close. The window may prompt for save, etc.
+            // DismissSaveDialogAsync waits for dialog and clicks "Don't Save"
+            // The window will close naturally when the dialog is dismissed
+        }
+
+        // Wait for the window to actually close (prevents race conditions with subsequent operations)
+        // This follows FlaUI's pattern where Application.Close() waits for the process to exit
+        // Note: If a save dialog is shown (and discardChanges=false), we'll timeout and return
+        // which is the expected behavior - the window is still open waiting for user input
+        await WaitForWindowToCloseAsync(handle, cancellationToken);
+
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
+    }
+
+    /// <summary>
+    /// Waits for a window to close after WM_CLOSE has been sent.
+    /// Returns when the window no longer exists or timeout is reached.
+    /// </summary>
+    private static async Task WaitForWindowToCloseAsync(nint handle, CancellationToken cancellationToken)
+    {
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+
+        while (stopwatch.Elapsed < WindowCloseTimeout && !cancellationToken.IsCancellationRequested)
+        {
+            // Check if window still exists
+            if (!NativeMethods.IsWindow(handle))
+            {
+                return; // Window has closed
+            }
+
+            await Task.Delay(WindowClosePollIntervalMs, cancellationToken);
+        }
+
+        // Timeout reached - window may still be open (e.g., showing save dialog with discardChanges=false)
+        // This is okay, we just wanted to give it a chance to close
     }
 
     /// <summary>
