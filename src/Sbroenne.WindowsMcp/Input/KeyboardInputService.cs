@@ -18,9 +18,10 @@ public sealed class KeyboardInputService : IDisposable
     /// <summary>
     /// Delay in milliseconds after typing completes to allow the target application
     /// to process the input queue. Based on FlaUI's Wait.UntilInputIsProcessed() pattern.
+    /// Increased from 100ms to 200ms to handle fast LLM agents that call ui_read immediately.
     /// See: https://github.com/FlaUI/FlaUI/blob/main/src/FlaUI.Core/Input/Wait.cs
     /// </summary>
-    private const int PostInputProcessingDelayMs = 100;
+    private const int PostInputProcessingDelayMs = 200;
 
     /// <summary>Maximum number of characters to type in a single chunk.</summary>
     private const int TextChunkSize = 1000;

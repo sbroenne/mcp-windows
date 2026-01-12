@@ -794,26 +794,30 @@ public static class UIA3Extensions
     }
 
     /// <summary>
-    /// Gets text from TextPattern or Value pattern.
+    /// Gets text from ValuePattern or TextPattern.
+    /// ValuePattern is tried first because TextPattern.GetText(-1) can return truncated
+    /// text for some controls like Notepad's Document control.
     /// </summary>
     public static string? GetText(this UIA.IUIAutomationElement element)
     {
         ArgumentNullException.ThrowIfNull(element);
         try
         {
-            // Try TextPattern first
-            var textPattern = element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text);
-            if (textPattern != null)
-            {
-                var range = textPattern.DocumentRange;
-                return range?.GetText(-1);
-            }
-
-            // Fall back to ValuePattern
+            // Try ValuePattern first - more reliable for editable controls like Notepad
+            // TextPattern.GetText(-1) can return truncated text for some controls
             var valuePattern = element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
             if (valuePattern != null)
             {
                 return valuePattern.CurrentValue;
+            }
+
+            // Fall back to TextPattern for read-only text controls
+            // Use Int32.MaxValue instead of -1 as some controls handle it better
+            var textPattern = element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text);
+            if (textPattern != null)
+            {
+                var range = textPattern.DocumentRange;
+                return range?.GetText(int.MaxValue);
             }
 
             // Fall back to Name
