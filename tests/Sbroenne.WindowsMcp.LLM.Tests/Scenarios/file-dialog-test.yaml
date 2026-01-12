@@ -136,10 +136,10 @@ sessions:
           Save the document to {{TEST_RESULTS_PATH}}\notepad-file-test-{{randomValue type='UUID'}}.txt
         assertions:
           - type: no_hallucinated_tools
-          # Can use ui_file to handle save dialog, or keyboard shortcuts + manual dialog navigation
+          # Can use file_save to handle save dialog, or keyboard shortcuts + manual dialog navigation
           - anyOf:
               - type: tool_called
-                tool: ui_file
+                tool: file_save
               - type: tool_called
                 tool: keyboard_control
               - type: tool_called

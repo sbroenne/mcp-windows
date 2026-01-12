@@ -237,6 +237,8 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
+              - type: tool_called
+                tool: mouse_control
 
       - name: "Select blue color"
         prompt: |
@@ -248,6 +250,8 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
+              - type: tool_called
+                tool: mouse_control
 
       - name: "Select green color"
         prompt: |
@@ -259,6 +263,8 @@ sessions:
                 tool: ui_click
               - type: tool_called
                 tool: ui_find
+              - type: tool_called
+                tool: mouse_control
 
       - name: "Close Paint"
         prompt: |
