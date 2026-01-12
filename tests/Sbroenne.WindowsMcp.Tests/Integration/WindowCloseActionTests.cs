@@ -107,7 +107,23 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Step 1: Find the window (LLM would do this)
         var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
-            title: SacrificialWindowTitle);
+            handle: null,
+            title: SacrificialWindowTitle,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var findResult = DeserializeResult(findResultJson);
 
@@ -120,7 +136,23 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Step 2: Close using the handle (LLM would use the handle from step 1)
         var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
-            handle: windowHandle);
+            handle: windowHandle,
+            title: null,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var closeResult = DeserializeResult(closeResultJson);
 
@@ -140,7 +172,23 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Find and close
         var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
-            title: SacrificialWindowTitle);
+            handle: null,
+            title: SacrificialWindowTitle,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var findResult = DeserializeResult(findResultJson);
 
@@ -152,7 +200,23 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
         var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
-            handle: windowHandle);
+            handle: windowHandle,
+            title: null,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var closeResult = DeserializeResult(closeResultJson);
 
@@ -164,7 +228,23 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
         // Verify window is gone
         var listResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.List,
-            filter: SacrificialWindowTitle);
+            handle: null,
+            title: null,
+            processName: null,
+            filter: SacrificialWindowTitle,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var listResult = DeserializeResult(listResultJson);
 

@@ -34,7 +34,12 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     {
         // Act
         var resultJson = await AppTool.ExecuteAsync(
-            programPath: null!);
+            programPath: null!,
+            arguments: null,
+            workingDirectory: null,
+            waitForWindow: true,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -49,7 +54,12 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     {
         // Act
         var resultJson = await AppTool.ExecuteAsync(
-            programPath: "");
+            programPath: "",
+            arguments: null,
+            workingDirectory: null,
+            waitForWindow: true,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -64,7 +74,12 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     {
         // Act
         var resultJson = await AppTool.ExecuteAsync(
-            programPath: "   ");
+            programPath: "   ",
+            arguments: null,
+            workingDirectory: null,
+            waitForWindow: true,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -79,7 +94,12 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
     {
         // Act
         var resultJson = await AppTool.ExecuteAsync(
-            programPath: "nonexistent_program_xyz_12345.exe");
+            programPath: "nonexistent_program_xyz_12345.exe",
+            arguments: null,
+            workingDirectory: null,
+            waitForWindow: true,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -103,7 +123,10 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
             var resultJson = await AppTool.ExecuteAsync(
                 programPath: "cmd.exe",
                 arguments: "/c echo test",
-                waitForWindow: false);
+                workingDirectory: null,
+                waitForWindow: false,
+                timeoutMs: null,
+                cancellationToken: CancellationToken.None);
 
             var result = DeserializeResult(resultJson);
 
@@ -114,7 +137,12 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
 
         // Act
         var launchResultJson = await AppTool.ExecuteAsync(
-            programPath: testHarnessPath);
+            programPath: testHarnessPath,
+            arguments: null,
+            workingDirectory: null,
+            waitForWindow: true,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         var launchResult = DeserializeResult(launchResultJson);
 
@@ -133,7 +161,10 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
         var resultJson = await AppTool.ExecuteAsync(
             programPath: "cmd.exe",
             arguments: "/c timeout /t 5",
-            waitForWindow: false);
+            workingDirectory: null,
+            waitForWindow: false,
+            timeoutMs: null,
+            cancellationToken: CancellationToken.None);
 
         stopwatch.Stop();
 

@@ -35,8 +35,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act - monitorIndex not provided, should fail validation
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
+            target: null,
             x: x,
-            y: y);
+            y: y,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -57,9 +69,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
+            target: null,
             x: x,
             y: y,
-            monitorIndex: invalidIndex);
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: invalidIndex,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -81,9 +104,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
+            target: null,
             x: x,
             y: y,
-            monitorIndex: monitorIndex);
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: monitorIndex,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -103,7 +137,21 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
-            action: MouseAction.Click);
+            action: MouseAction.Click,
+            target: null,
+            x: null,
+            y: null,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -123,9 +171,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Move,
+            target: null,
             x: x,
             y: y,
-            monitorIndex: monitorIndex);
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: monitorIndex,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -146,10 +205,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act - Attempt drag without monitorIndex (should fail validation)
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Drag,
+            target: null,
             x: startX,  // Note: drag uses x/y for start position
             y: startY,
             endX: endX,
-            endY: endY);
+            endY: endY,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -169,9 +238,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Move,
+            target: null,
             x: x,
             y: y,
-            monitorIndex: monitorIndex);
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: monitorIndex,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -197,9 +277,20 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
             action: MouseAction.Click,
+            target: null,
             x: x,
             y: y,
-            monitorIndex: monitorIndex);
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: monitorIndex,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -221,7 +312,21 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
-            action: MouseAction.Click);
+            action: MouseAction.Click,
+            target: null,
+            x: null,
+            y: null,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -243,7 +348,21 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
 
         // Act
         var resultJson = await MouseControlTool.ExecuteAsync(
-            action: MouseAction.GetPosition);
+            action: MouseAction.GetPosition,
+            target: null,
+            x: null,
+            y: null,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 
@@ -263,7 +382,21 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     {
         // Act - get_position should determine which monitor contains the cursor
         var resultJson = await MouseControlTool.ExecuteAsync(
-            action: MouseAction.GetPosition);
+            action: MouseAction.GetPosition,
+            target: null,
+            x: null,
+            y: null,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: null,
+            cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
 

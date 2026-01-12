@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -35,13 +34,13 @@ public static partial class AppTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the launch operation including the window handle for subsequent operations.</returns>
     [McpServerTool(Name = "app", Title = "Launch Application", Destructive = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         string programPath,
-        [DefaultValue(null)] string? arguments = null,
-        [DefaultValue(null)] string? workingDirectory = null,
-        [DefaultValue(true)] bool waitForWindow = true,
-        [DefaultValue(null)] int? timeoutMs = null,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? arguments,
+        [DefaultValue(null)] string? workingDirectory,
+        [DefaultValue(true)] bool waitForWindow,
+        [DefaultValue(null)] int? timeoutMs,
+        CancellationToken cancellationToken)
     {
         const string actionName = "launch";
 

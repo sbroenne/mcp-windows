@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Input;

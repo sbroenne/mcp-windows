@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -49,25 +48,25 @@ public static partial class WindowManagementTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the window operation including success status and window information.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         WindowAction action,
-        [DefaultValue(null)] string? handle = null,
-        [DefaultValue(null)] string? title = null,
-        [DefaultValue(null)] string? processName = null,
-        [DefaultValue(null)] string? filter = null,
-        [DefaultValue(false)] bool regex = false,
-        [DefaultValue(false)] bool includeAllDesktops = false,
-        [DefaultValue(null)] int? x = null,
-        [DefaultValue(null)] int? y = null,
-        [DefaultValue(null)] int? width = null,
-        [DefaultValue(null)] int? height = null,
-        [DefaultValue(null)] int? timeoutMs = null,
-        [DefaultValue(null)] string? target = null,
-        [DefaultValue(null)] int? monitorIndex = null,
-        [DefaultValue(null)] string? state = null,
-        [DefaultValue(null)] string? excludeTitle = null,
-        [DefaultValue(false)] bool discardChanges = false,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? handle,
+        [DefaultValue(null)] string? title,
+        [DefaultValue(null)] string? processName,
+        [DefaultValue(null)] string? filter,
+        [DefaultValue(false)] bool regex,
+        [DefaultValue(false)] bool includeAllDesktops,
+        [DefaultValue(null)] int? x,
+        [DefaultValue(null)] int? y,
+        [DefaultValue(null)] int? width,
+        [DefaultValue(null)] int? height,
+        [DefaultValue(null)] int? timeoutMs,
+        [DefaultValue(null)] string? target,
+        [DefaultValue(null)] int? monitorIndex,
+        [DefaultValue(null)] string? state,
+        [DefaultValue(null)] string? excludeTitle,
+        [DefaultValue(false)] bool discardChanges,
+        CancellationToken cancellationToken)
     {
         try
         {

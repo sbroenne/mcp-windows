@@ -114,7 +114,23 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         // Find the window
         var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
-            title: TestWindowTitle);
+            handle: null,
+            title: TestWindowTitle,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var findResult = DeserializeResult(findResultJson);
 
@@ -128,7 +144,22 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle,
-            discardChanges: true);
+            title: null,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: true,
+            cancellationToken: CancellationToken.None);
 
         var closeResult = DeserializeResult(closeResultJson);
 
@@ -156,7 +187,23 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         // Find the window
         var findResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Find,
-            title: TestWindowTitle);
+            handle: null,
+            title: TestWindowTitle,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         var findResult = DeserializeResult(findResultJson);
 
@@ -170,7 +217,22 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         var closeResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.Close,
             handle: windowHandle,
-            discardChanges: false);
+            title: null,
+            processName: null,
+            filter: null,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         _ = DeserializeResult(closeResultJson);
 
@@ -187,7 +249,23 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         // Verify window still exists by listing
         var listResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.List,
-            filter: TestWindowTitle);
+            handle: null,
+            title: null,
+            processName: null,
+            filter: TestWindowTitle,
+            regex: false,
+            includeAllDesktops: false,
+            x: null,
+            y: null,
+            width: null,
+            height: null,
+            timeoutMs: null,
+            target: null,
+            monitorIndex: null,
+            state: null,
+            excludeTitle: null,
+            discardChanges: false,
+            cancellationToken: CancellationToken.None);
 
         _ = DeserializeResult(listResultJson);
 

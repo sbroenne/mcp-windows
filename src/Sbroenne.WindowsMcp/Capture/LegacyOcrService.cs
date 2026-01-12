@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System.Diagnostics;
-using System.Drawing.Imaging;
 using Microsoft.Extensions.Logging;
+using DrawingImageFormat = System.Drawing.Imaging.ImageFormat;
 using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using LocalBoundingRect = Sbroenne.WindowsMcp.Models.BoundingRect;
@@ -202,7 +202,7 @@ public sealed partial class LegacyOcrService
         {
             // Convert Bitmap to byte array (PNG format for lossless conversion)
             using var ms = new MemoryStream();
-            bitmap.Save(ms, ImageFormat.Png);
+            bitmap.Save(ms, DrawingImageFormat.Png);
             ms.Position = 0;
 
             cancellationToken.ThrowIfCancellationRequested();

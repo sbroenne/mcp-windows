@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Serialization;
 using Sbroenne.WindowsMcp.Utilities;
@@ -35,17 +34,17 @@ public static partial class KeyboardControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         string windowHandle,
         KeyboardAction action,
-        [DefaultValue(null)] string? text = null,
-        [DefaultValue(null)] string? key = null,
-        [DefaultValue(null)] string? modifiers = null,
-        [DefaultValue(1)] int repeat = 1,
-        [DefaultValue(null)] string? sequence = null,
-        [DefaultValue(null)] int? interKeyDelayMs = null,
-        [DefaultValue(false)] bool clearFirst = false,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? text,
+        [DefaultValue(null)] string? key,
+        [DefaultValue(null)] string? modifiers,
+        [DefaultValue(1)] int repeat,
+        [DefaultValue(null)] string? sequence,
+        [DefaultValue(null)] int? interKeyDelayMs,
+        [DefaultValue(false)] bool clearFirst,
+        CancellationToken cancellationToken)
     {
         try
         {

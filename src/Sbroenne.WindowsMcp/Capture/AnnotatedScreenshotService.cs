@@ -3,7 +3,6 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using ImageFormat = Sbroenne.WindowsMcp.Models.ImageFormat;
 
