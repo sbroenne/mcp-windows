@@ -1,5 +1,4 @@
 using System.Text.Json.Serialization;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Capture;
 

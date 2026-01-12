@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -34,18 +33,18 @@ public static partial class UIReadTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The extracted text content from the element or screen region.</returns>
     [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         string windowHandle,
-        [DefaultValue(null)] string? name = null,
-        [DefaultValue(null)] string? nameContains = null,
-        [DefaultValue(null)] string? namePattern = null,
-        [DefaultValue(null)] string? controlType = null,
-        [DefaultValue(null)] string? automationId = null,
-        [DefaultValue(null)] string? className = null,
-        [DefaultValue(1)] int foundIndex = 1,
-        [DefaultValue(false)] bool includeChildren = false,
-        [DefaultValue(null)] string? language = null,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? name,
+        [DefaultValue(null)] string? nameContains,
+        [DefaultValue(null)] string? namePattern,
+        [DefaultValue(null)] string? controlType,
+        [DefaultValue(null)] string? automationId,
+        [DefaultValue(null)] string? className,
+        [DefaultValue(1)] int foundIndex,
+        [DefaultValue(false)] bool includeChildren,
+        [DefaultValue(null)] string? language,
+        CancellationToken cancellationToken)
     {
         const string actionName = "read";
 

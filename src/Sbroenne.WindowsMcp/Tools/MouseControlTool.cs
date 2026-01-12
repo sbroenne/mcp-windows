@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -51,22 +50,22 @@ public static partial class MouseControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result includes success status, cursor position, monitor context, and 'target_window' for click actions.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         MouseAction action,
-        [DefaultValue(null)] string? target = null,
-        [DefaultValue(null)] int? x = null,
-        [DefaultValue(null)] int? y = null,
-        [DefaultValue(null)] int? endX = null,
-        [DefaultValue(null)] int? endY = null,
-        [DefaultValue(null)] string? direction = null,
-        [DefaultValue(1)] int amount = 1,
-        [DefaultValue(null)] string? modifiers = null,
-        [DefaultValue(null)] string? button = null,
-        [DefaultValue(null)] int? monitorIndex = null,
-        [DefaultValue(null)] string? expectedWindowTitle = null,
-        [DefaultValue(null)] string? expectedProcessName = null,
-        [DefaultValue(null)] string? windowHandle = null,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? target,
+        [DefaultValue(null)] int? x,
+        [DefaultValue(null)] int? y,
+        [DefaultValue(null)] int? endX,
+        [DefaultValue(null)] int? endY,
+        [DefaultValue(null)] string? direction,
+        [DefaultValue(1)] int amount,
+        [DefaultValue(null)] string? modifiers,
+        [DefaultValue(null)] string? button,
+        [DefaultValue(null)] int? monitorIndex,
+        [DefaultValue(null)] string? expectedWindowTitle,
+        [DefaultValue(null)] string? expectedProcessName,
+        [DefaultValue(null)] string? windowHandle,
+        CancellationToken cancellationToken)
     {
         try
         {

@@ -1,7 +1,6 @@
 using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Serialization;
 

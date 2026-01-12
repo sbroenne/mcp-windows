@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -63,23 +62,23 @@ public static partial class ScreenshotControlTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
-        [DefaultValue(null)] string? action = null,
-        [DefaultValue(true)] bool annotate = true,
-        [DefaultValue(null)] string? target = null,
-        [DefaultValue(null)] int? monitorIndex = null,
-        [DefaultValue(null)] string? windowHandle = null,
-        [DefaultValue(null)] int? regionX = null,
-        [DefaultValue(null)] int? regionY = null,
-        [DefaultValue(null)] int? regionWidth = null,
-        [DefaultValue(null)] int? regionHeight = null,
-        [DefaultValue(false)] bool includeCursor = false,
-        [DefaultValue(null)] string? imageFormat = null,
-        [DefaultValue(null)] int? quality = null,
-        [DefaultValue(null)] string? outputMode = null,
-        [DefaultValue(null)] string? outputPath = null,
-        [DefaultValue(null)] bool? includeImage = null,
-        CancellationToken cancellationToken = default)
+    public static async partial Task<string> ExecuteAsync(
+        [DefaultValue(null)] string? action,
+        [DefaultValue(true)] bool annotate,
+        [DefaultValue(null)] string? target,
+        [DefaultValue(null)] int? monitorIndex,
+        [DefaultValue(null)] string? windowHandle,
+        [DefaultValue(null)] int? regionX,
+        [DefaultValue(null)] int? regionY,
+        [DefaultValue(null)] int? regionWidth,
+        [DefaultValue(null)] int? regionHeight,
+        [DefaultValue(false)] bool includeCursor,
+        [DefaultValue(null)] string? imageFormat,
+        [DefaultValue(null)] int? quality,
+        [DefaultValue(null)] string? outputMode,
+        [DefaultValue(null)] string? outputPath,
+        [DefaultValue(null)] bool? includeImage,
+        CancellationToken cancellationToken)
     {
         try
         {

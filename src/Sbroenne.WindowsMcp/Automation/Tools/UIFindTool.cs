@@ -2,7 +2,6 @@ using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Server;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Automation.Tools;
@@ -39,22 +38,22 @@ public static partial class UIFindTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing list of found elements with their properties and element IDs.</returns>
     [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         string windowHandle,
-        [DefaultValue(null)] string? name = null,
-        [DefaultValue(null)] string? nameContains = null,
-        [DefaultValue(null)] string? namePattern = null,
-        [DefaultValue(null)] string? controlType = null,
-        [DefaultValue(null)] string? automationId = null,
-        [DefaultValue(null)] string? className = null,
-        [DefaultValue(null)] int? exactDepth = null,
-        [DefaultValue(1)] int foundIndex = 1,
-        [DefaultValue(false)] bool includeChildren = false,
-        [DefaultValue(false)] bool sortByProminence = false,
-        [DefaultValue(null)] string? inRegion = null,
-        [DefaultValue(null)] string? nearElement = null,
-        [DefaultValue(5000)] int timeoutMs = 5000,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? name,
+        [DefaultValue(null)] string? nameContains,
+        [DefaultValue(null)] string? namePattern,
+        [DefaultValue(null)] string? controlType,
+        [DefaultValue(null)] string? automationId,
+        [DefaultValue(null)] string? className,
+        [DefaultValue(null)] int? exactDepth,
+        [DefaultValue(1)] int foundIndex,
+        [DefaultValue(false)] bool includeChildren,
+        [DefaultValue(false)] bool sortByProminence,
+        [DefaultValue(null)] string? inRegion,
+        [DefaultValue(null)] string? nearElement,
+        [DefaultValue(5000)] int timeoutMs,
+        CancellationToken cancellationToken)
     {
         const string actionName = "find";
 

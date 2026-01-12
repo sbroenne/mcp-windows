@@ -28,10 +28,10 @@ public static partial class UIFileTool
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Success status with diagnostics.</returns>
     [McpServerTool(Name = "file_save", Title = "💾 SAVE FILE (handles Save As dialogs)", Destructive = true, OpenWorld = false)]
-    public static async Task<string> ExecuteAsync(
+    public static async partial Task<string> ExecuteAsync(
         string windowHandle,
-        [DefaultValue(null)] string? filePath = null,
-        CancellationToken cancellationToken = default)
+        [DefaultValue(null)] string? filePath,
+        CancellationToken cancellationToken)
     {
         const string actionName = "save";
 

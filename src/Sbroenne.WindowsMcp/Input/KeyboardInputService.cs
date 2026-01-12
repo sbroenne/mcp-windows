@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Input;
@@ -15,6 +14,13 @@ public sealed class KeyboardInputService : IDisposable
 
     /// <summary>Default delay between text chunks in milliseconds.</summary>
     private const int DefaultChunkDelayMs = 50;
+
+    /// <summary>
+    /// Delay in milliseconds after typing completes to allow the target application
+    /// to process the input queue. Based on FlaUI's Wait.UntilInputIsProcessed() pattern.
+    /// See: https://github.com/FlaUI/FlaUI/blob/main/src/FlaUI.Core/Input/Wait.cs
+    /// </summary>
+    private const int PostInputProcessingDelayMs = 100;
 
     /// <summary>Maximum number of characters to type in a single chunk.</summary>
     private const int TextChunkSize = 1000;
@@ -83,6 +89,11 @@ public sealed class KeyboardInputService : IDisposable
                 await Task.Delay(_chunkDelayMs, cancellationToken).ConfigureAwait(false);
             }
         }
+
+        // Allow target application to process the input queue before returning.
+        // This prevents race conditions when the caller immediately reads text after typing.
+        // Pattern based on FlaUI's Wait.UntilInputIsProcessed().
+        await Task.Delay(PostInputProcessingDelayMs, cancellationToken).ConfigureAwait(false);
 
         return KeyboardControlResult.CreateTypeSuccess(totalCharacters);
     }

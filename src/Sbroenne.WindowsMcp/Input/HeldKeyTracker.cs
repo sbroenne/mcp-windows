@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Input;
 

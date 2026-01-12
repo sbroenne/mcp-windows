@@ -1,6 +1,5 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Capture;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Automation;
 

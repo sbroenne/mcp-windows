@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Utilities;
 using UIA = Interop.UIAutomationClient;
