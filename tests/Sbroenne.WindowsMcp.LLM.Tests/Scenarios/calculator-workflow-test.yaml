@@ -1,17 +1,18 @@
 # =============================================================================
-# Notepad Workflow Scenario - End-to-End Notepad Automation
+# Calculator Workflow Scenario - Keyboard and UI Automation
 # =============================================================================
 #
-# Tests complete Notepad workflows: launch, type, save, close
+# Tests Calculator automation with keyboard input and UI element interaction
 #
 # Tools Covered:
-#   - app: Launch Notepad
-#   - keyboard_control / ui_type: Type text
-#   - window_management: Verify and close windows
-#   - file_save: Save files (implicit in "save" workflow)
+#   - app: Launch Calculator
+#   - keyboard_control: Type numbers and operators
+#   - ui_find: Find Calculator buttons
+#   - ui_click: Click Calculator buttons
+#   - ui_read: Read Calculator display
 #
 # Prerequisites:
-#   - Windows 10/11
+#   - Windows 10/11 with Calculator app
 #   - Windows MCP Server
 #   - Environment: AZURE_OPENAI_ENDPOINT
 #
@@ -92,54 +93,50 @@ ai_summary:
 
 settings:
   verbose: true
-  max_iterations: 15
+  max_iterations: 20
   session_delay: 5s
   test_delay: 2s
   tool_timeout: 60s
+
 sessions:
-  - name: Notepad Workflow - Discard
+  - name: Calculator Keyboard Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (discard)"
-        description: "Open Notepad, type text, close without saving"
+      - name: "Perform calculation using keyboard input"
+        description: "Launch Calculator, type calculation using keyboard, read result"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World"
-          3. Record proof that this worked (no screenshots, just text)
-          4. Close Notepad and click "Don't Save" if prompted
-          5. Verify no Notepad window is open (search for it)
+          Perform a calculation using keyboard input:
 
-          Report "VERIFIED: No Notepad window open" if closed successfully.
+          1. Launch Calculator (calc.exe)
+          2. Get the window handle
+          3. Use keyboard input to type: 25 + 17 =
+          4. Read the result from the Calculator display using UI automation
+          5. Report the result (should be 42)
+          6. Close Calculator
+
+          Report "Calculation result: [value]" and confirm Calculator was closed.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must launch Calculator first (using 'app' tool)
+          - type: tool_call_order
+            sequence:
+              - app
+              - keyboard_control
 
-          # OUTCOME: Proof that "Hello World" was typed
-          - anyOf:
-              - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+          # OUTCOME: Keyboard was used for input
+          - type: tool_param_matches_regex
+            tool: keyboard_control
+            params:
+              action: "(?i)(type|press|sequence)"
 
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Result was reported (42 or at least a number)
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(result|answer|equals|display).*(\\d+|42)"
+
+          # OUTCOME: Calculator was closed
+          - type: output_regex
+            pattern: "(?i)(closed|calculator.*(closed|exited)|verified)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -157,54 +154,47 @@ sessions:
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
 
-  - name: Notepad Workflow - Save
+  - name: Calculator UI Click Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (save file)"
-        description: "Open Notepad, type text, save to temp directory, close"
+      - name: "Perform calculation using UI button clicks"
+        description: "Launch Calculator, click buttons to perform calculation"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World from Agent Benchmark"
-          3. Save the file to {{TEMP_DIR}}/agent-benchmark-{{RUN_ID}}.txt
-          4. Record proof that this worked (confirm the file was saved)
-          5. Close Notepad
-          6. Verify no Notepad window is open (search for it)
+          Perform a calculation using UI button clicks (not keyboard):
 
-          Report "VERIFIED: File saved and Notepad closed" if successful.
+          1. Launch Calculator (calc.exe)
+          2. Get the window handle
+          3. Use UI automation to find and click the following buttons in order:
+             - Click "5" button
+             - Click "×" (multiply) button
+             - Click "8" button
+             - Click "=" button
+          4. Read the result from the display (should be 40)
+          5. Close Calculator
+
+          Report "Calculation result: [value]" and confirm Calculator was closed.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must launch Calculator first (using 'app' tool)
+          - type: tool_call_order
+            sequence:
+              - app
+              - ui_click
 
-          # OUTCOME: Proof that text was typed
-          - anyOf:
-              - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+          # OUTCOME: UI clicks were used
+          - type: tool_param_matches_regex
+            tool: ui_click
+            params:
+              controlType: "(?i)button"
 
-          # OUTCOME: File was saved (agent mentions save/saved)
+          # OUTCOME: Result was reported
           - type: output_regex
-            pattern: "(?i)(saved|file.*created|wrote.*file|save.*successful)"
+            pattern: "(?i)(result|answer|equals|display).*(\\d+|40)"
 
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Calculator was closed
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(closed|calculator.*(closed|exited)|verified)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -221,5 +211,3 @@ sessions:
 
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
-
-

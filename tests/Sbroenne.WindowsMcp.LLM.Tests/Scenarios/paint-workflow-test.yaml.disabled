@@ -1,17 +1,18 @@
 # =============================================================================
-# Notepad Workflow Scenario - End-to-End Notepad Automation
+# Paint Workflow Scenario - UI Automation and Drawing
 # =============================================================================
 #
-# Tests complete Notepad workflows: launch, type, save, close
+# Tests complete Paint workflows: launch, UI interaction, drawing, screenshot
 #
 # Tools Covered:
-#   - app: Launch Notepad
-#   - keyboard_control / ui_type: Type text
-#   - window_management: Verify and close windows
-#   - file_save: Save files (implicit in "save" workflow)
+#   - window_management: Launch, find, close windows
+#   - ui_automation (find): Find UI elements
+#   - ui_automation (click): Click UI elements
+#   - mouse_control: Drawing operations
+#   - screenshot_control: Capture proof
 #
 # Prerequisites:
-#   - Windows 10/11
+#   - Windows 10/11 with Microsoft Paint
 #   - Windows MCP Server
 #   - Environment: AZURE_OPENAI_ENDPOINT
 #
@@ -92,54 +93,46 @@ ai_summary:
 
 settings:
   verbose: true
-  max_iterations: 15
+  max_iterations: 20
   session_delay: 5s
   test_delay: 2s
   tool_timeout: 60s
+
 sessions:
-  - name: Notepad Workflow - Discard
+  - name: Paint Drawing Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (discard)"
-        description: "Open Notepad, type text, close without saving"
+      - name: "Draw shape and capture proof"
+        description: "Launch Paint, find canvas, draw a shape, take screenshot, close"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World"
-          3. Record proof that this worked (no screenshots, just text)
-          4. Close Notepad and click "Don't Save" if prompted
-          5. Verify no Notepad window is open (search for it)
+          1. Launch Microsoft Paint (mspaint.exe)
+          2. Get the window handle for Paint
+          3. Use UI automation to find the canvas element
+          4. Draw a simple line or shape on the canvas using mouse drag operations
+          5. Take a screenshot of the Paint window as proof
+          6. Close Paint and discard changes (click "Don't Save" if prompted)
+          7. Verify Paint is closed
 
-          Report "VERIFIED: No Notepad window open" if closed successfully.
+          Report "VERIFIED: Drawing completed and Paint closed" when done.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must launch Paint first (using 'app' tool)
+          - type: tool_call_order
+            sequence:
+              - app
+              - screenshot_control
 
-          # OUTCOME: Proof that "Hello World" was typed
+          # OUTCOME: Screenshot was captured
           - anyOf:
+              - type: tool_called
+                tool: screenshot_control
               - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+                pattern: "(?i)screenshot.*captured|captured.*screenshot"
 
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Paint was closed
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(verified|paint.*(closed|not found)|no.*paint.*window)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -157,54 +150,46 @@ sessions:
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
 
-  - name: Notepad Workflow - Save
+  - name: Paint UI Exploration Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (save file)"
-        description: "Open Notepad, type text, save to temp directory, close"
+      - name: "Explore Paint UI and click toolbar"
+        description: "Launch Paint, explore UI tree, click a toolbar button"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World from Agent Benchmark"
-          3. Save the file to {{TEMP_DIR}}/agent-benchmark-{{RUN_ID}}.txt
-          4. Record proof that this worked (confirm the file was saved)
-          5. Close Notepad
-          6. Verify no Notepad window is open (search for it)
+          1. Launch Microsoft Paint (mspaint.exe)
+          2. Get the window handle
+          3. Get the UI element tree for Paint to understand its structure
+          4. Find and click the "Pencil" or "Brushes" button in the toolbar
+          5. Verify the tool was selected (the UI should respond)
+          6. Close Paint and discard any changes
 
-          Report "VERIFIED: File saved and Notepad closed" if successful.
+          Report what toolbar button you clicked and confirm Paint was closed.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
+          # REQUIRED: Must launch Paint and use UI automation (using 'app' tool)
           - anyOf:
               - type: tool_call_order
                 sequence:
                   - app
-                  - keyboard_control
+                  - ui_click
               - type: tool_call_order
                 sequence:
                   - app
-                  - ui_type
+                  - ui_find
 
-          # OUTCOME: Proof that text was typed
+          # OUTCOME: UI automation was used to find/click elements
           - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
               - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+                pattern: "(?i)(clicked|selected|found).*(pencil|brush|tool)"
 
-          # OUTCOME: File was saved (agent mentions save/saved)
+          # OUTCOME: Paint was closed
           - type: output_regex
-            pattern: "(?i)(saved|file.*created|wrote.*file|save.*successful)"
-
-          # OUTCOME: LLM verified Notepad was closed
-          - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(closed|paint.*(closed|not found|exited))"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -221,5 +206,3 @@ sessions:
 
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
-
-

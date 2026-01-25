@@ -1,14 +1,12 @@
 # =============================================================================
-# Notepad Workflow Scenario - End-to-End Notepad Automation
+# Screenshot Workflow Scenario - Screenshot Capture Operations
 # =============================================================================
 #
-# Tests complete Notepad workflows: launch, type, save, close
+# Tests screenshot capture across different targets and scenarios
 #
 # Tools Covered:
-#   - app: Launch Notepad
-#   - keyboard_control / ui_type: Type text
-#   - window_management: Verify and close windows
-#   - file_save: Save files (implicit in "save" workflow)
+#   - screenshot_control: Capture screenshots (primary, secondary, window, region)
+#   - window_management: Launch and manage windows for screenshot targets
 #
 # Prerequisites:
 #   - Windows 10/11
@@ -92,54 +90,40 @@ ai_summary:
 
 settings:
   verbose: true
-  max_iterations: 15
+  max_iterations: 20
   session_delay: 5s
   test_delay: 2s
   tool_timeout: 60s
+
 sessions:
-  - name: Notepad Workflow - Discard
+  - name: Desktop Screenshot Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (discard)"
-        description: "Open Notepad, type text, close without saving"
+      - name: "Capture desktop and describe content"
+        description: "Take screenshot of primary screen and describe visible elements"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World"
-          3. Record proof that this worked (no screenshots, just text)
-          4. Close Notepad and click "Don't Save" if prompted
-          5. Verify no Notepad window is open (search for it)
+          Capture and analyze the desktop:
 
-          Report "VERIFIED: No Notepad window open" if closed successfully.
+          1. Take a screenshot of the primary screen
+          2. Describe what you see in the screenshot (desktop icons, taskbar, any open windows)
+          3. List available monitors using screenshot_control list_monitors action
+          4. Report the monitor configuration
+
+          Report "Desktop captured" and describe at least 3 visible elements.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must capture screenshot
+          - type: tool_called
+            tool: screenshot_control
 
-          # OUTCOME: Proof that "Hello World" was typed
-          - anyOf:
-              - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
-
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Screenshot was captured (agent describes content)
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(desktop|taskbar|screen|icon|window|captured|monitor)"
+
+          # OUTCOME: Multiple elements described
+          - type: output_regex
+            pattern: "(?i)(1\\.|2\\.|3\\.|first|second|third|taskbar|icon|start)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -157,54 +141,44 @@ sessions:
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
 
-  - name: Notepad Workflow - Save
+  - name: Window Screenshot Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (save file)"
-        description: "Open Notepad, type text, save to temp directory, close"
+      - name: "Capture specific window screenshot"
+        description: "Launch Notepad, capture its window specifically, close"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World from Agent Benchmark"
-          3. Save the file to {{TEMP_DIR}}/agent-benchmark-{{RUN_ID}}.txt
-          4. Record proof that this worked (confirm the file was saved)
-          5. Close Notepad
-          6. Verify no Notepad window is open (search for it)
+          Capture a specific window's screenshot:
 
-          Report "VERIFIED: File saved and Notepad closed" if successful.
+          1. Launch Notepad (notepad.exe)
+          2. Type some text: "Screenshot test content"
+          3. Get the window handle for Notepad
+          4. Take a screenshot specifically of the Notepad window (using window target)
+          5. Describe what you see in the Notepad screenshot
+          6. Close Notepad (click "Don't Save" if prompted)
+
+          Report "Window captured" and describe the Notepad content you see.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must launch then screenshot (using 'app' tool)
+          - type: tool_call_order
+            sequence:
+              - app
+              - screenshot_control
 
-          # OUTCOME: Proof that text was typed
-          - anyOf:
-              - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+          # REQUIRED: Screenshot must target a window
+          - type: tool_param_matches_regex
+            tool: screenshot_control
+            params:
+              target: "(?i)window"
 
-          # OUTCOME: File was saved (agent mentions save/saved)
+          # OUTCOME: Notepad content was described
           - type: output_regex
-            pattern: "(?i)(saved|file.*created|wrote.*file|save.*successful)"
+            pattern: "(?i)(notepad|text|content|screenshot.*test|captured)"
 
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Notepad was closed
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(closed|notepad.*(closed|exited))"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -221,5 +195,3 @@ sessions:
 
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
-
-

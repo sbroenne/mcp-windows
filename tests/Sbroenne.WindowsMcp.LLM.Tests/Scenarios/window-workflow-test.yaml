@@ -1,14 +1,14 @@
 # =============================================================================
-# Notepad Workflow Scenario - End-to-End Notepad Automation
+# Window Management Workflow Scenario - Multi-Window Operations
 # =============================================================================
 #
-# Tests complete Notepad workflows: launch, type, save, close
+# Tests window management across multiple applications:
+# launch, minimize, maximize, restore, move, resize, list, close
 #
 # Tools Covered:
-#   - app: Launch Notepad
-#   - keyboard_control / ui_type: Type text
-#   - window_management: Verify and close windows
-#   - file_save: Save files (implicit in "save" workflow)
+#   - app: Launch applications
+#   - window_management: find, list, minimize, maximize, restore, move, resize,
+#     close, move_and_activate, activate
 #
 # Prerequisites:
 #   - Windows 10/11
@@ -92,54 +92,58 @@ ai_summary:
 
 settings:
   verbose: true
-  max_iterations: 15
+  max_iterations: 25
   session_delay: 5s
   test_delay: 2s
   tool_timeout: 60s
+
 sessions:
-  - name: Notepad Workflow - Discard
+  - name: Multi-Window Management Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (discard)"
-        description: "Open Notepad, type text, close without saving"
+      - name: "Launch and manage multiple application windows"
+        description: "Launch Notepad and Calculator, manipulate windows, close cleanly"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World"
-          3. Record proof that this worked (no screenshots, just text)
-          4. Close Notepad and click "Don't Save" if prompted
-          5. Verify no Notepad window is open (search for it)
+          Perform this complete window management workflow:
 
-          Report "VERIFIED: No Notepad window open" if closed successfully.
+          1. Launch Notepad (notepad.exe)
+          2. Launch Calculator (calc.exe)
+          3. List all windows to see both applications
+          4. Minimize Notepad
+          5. Maximize Calculator
+          6. Restore Notepad
+          7. Move Calculator to position (100, 100)
+          8. Resize Notepad to 800x600
+          9. Close both applications (click "Don't Save" for Notepad if prompted)
+          10. Verify both applications are closed
+
+          Report which operations succeeded and confirm both apps are closed.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
-          - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
+          # REQUIRED: Must launch both apps (using 'app' tool)
+          - type: tool_param_matches_regex
+            tool: app
+            params:
+              programPath: "(?i)notepad"
 
-          # OUTCOME: Proof that "Hello World" was typed
+          - type: tool_param_matches_regex
+            tool: app
+            params:
+              programPath: "(?i)calc"
+
+          # REQUIRED: Must use window manipulation operations
           - anyOf:
+              - type: tool_param_matches_regex
+                tool: window_management
+                params:
+                  action: "(?i)(minimize|maximize|restore|move|resize)"
               - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+                pattern: "(?i)(minimized|maximized|restored|moved|resized)"
 
-          # OUTCOME: LLM verified Notepad was closed
+          # OUTCOME: Both apps were closed
           - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(both.*closed|closed.*both|notepad.*closed|calculator.*closed)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -157,54 +161,38 @@ sessions:
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
 
-  - name: Notepad Workflow - Save
+  - name: Window Activate Workflow
     agents:
       - gpt41-agent
       - gpt52-agent
     tests:
-      - name: "Complete Notepad automation (save file)"
-        description: "Open Notepad, type text, save to temp directory, close"
+      - name: "Activate and bring windows to foreground"
+        description: "Launch apps, switch focus between them, verify activation"
         prompt: |
-          1. Launch Notepad
-          2. Type "Hello World from Agent Benchmark"
-          3. Save the file to {{TEMP_DIR}}/agent-benchmark-{{RUN_ID}}.txt
-          4. Record proof that this worked (confirm the file was saved)
-          5. Close Notepad
-          6. Verify no Notepad window is open (search for it)
+          Test window activation:
 
-          Report "VERIFIED: File saved and Notepad closed" if successful.
+          1. Launch Notepad (notepad.exe)
+          2. Launch Calculator (calc.exe)
+          3. Get the foreground window (should be Calculator)
+          4. Activate Notepad window to bring it to front
+          5. Verify Notepad is now the foreground window
+          6. Use move_and_activate to move Calculator to (200, 200) and activate it
+          7. Close both applications
+
+          Report which window is foreground after each activation, and confirm cleanup.
         assertions:
-          # REQUIRED: Must launch Notepad first, then type text
+          # REQUIRED: Must use activate or move_and_activate
           - anyOf:
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - keyboard_control
-              - type: tool_call_order
-                sequence:
-                  - app
-                  - ui_type
-
-          # OUTCOME: Proof that text was typed
-          - anyOf:
+              - type: tool_param_matches_regex
+                tool: window_management
+                params:
+                  action: "(?i)(activate|move_and_activate|get_foreground)"
               - type: output_regex
-                pattern: "(?i)hello\\s*world"
-              - type: tool_param_matches_regex
-                tool: keyboard_control
-                params:
-                  text: "(?i)hello.*world"
-              - type: tool_param_matches_regex
-                tool: ui_type
-                params:
-                  text: "(?i)hello.*world"
+                pattern: "(?i)(activated|foreground|front)"
 
-          # OUTCOME: File was saved (agent mentions save/saved)
+          # OUTCOME: Apps were closed
           - type: output_regex
-            pattern: "(?i)(saved|file.*created|wrote.*file|save.*successful)"
-
-          # OUTCOME: LLM verified Notepad was closed
-          - type: output_regex
-            pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
+            pattern: "(?i)(closed|cleaned)"
 
           # SAFETY: No failure indicators
           - type: output_not_contains
@@ -221,5 +209,3 @@ sessions:
 
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
-
-
