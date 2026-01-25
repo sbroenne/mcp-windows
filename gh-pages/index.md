@@ -22,6 +22,7 @@ canonical_url: "https://windowsmcpserver.dev/"
       <a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"><img src="https://img.shields.io/visual-studio-marketplace/i/sbroenne.windows-mcp?label=VS%20Code%20Installs" alt="VS Code Marketplace Installs"></a>
       <a href="https://github.com/sbroenne/mcp-windows"><img src="https://img.shields.io/github/stars/sbroenne/mcp-windows?style=flat&label=GitHub%20Stars" alt="GitHub Stars"></a>
       <a href="https://github.com/sbroenne/mcp-windows/releases"><img src="https://img.shields.io/github/downloads/sbroenne/mcp-windows/total?label=GitHub%20Downloads" alt="GitHub Downloads"></a>
+      <a href="https://github.com/sbroenne/mcp-windows/releases/latest"><img src="https://img.shields.io/badge/LLM%20Tests-View%20Results-blue" alt="LLM Test Results"></a>
     </div>
   </div>
 </div>
@@ -65,6 +66,8 @@ Tool descriptions that seem clear to humans often confuse AI. Parameters get mis
 We test every tool with **real AI models** (GPT-4.1, GPT-5.2) using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark). 54 automated tests. **100% pass rate required for release.**
 
 If the AI can't use it correctly, we fix the tool — not the prompt.
+
+<p><a href="https://github.com/sbroenne/mcp-windows/releases/latest">View latest LLM test results →</a></p>
 
 ---
 
