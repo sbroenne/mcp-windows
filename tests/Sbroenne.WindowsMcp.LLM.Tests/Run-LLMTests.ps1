@@ -172,7 +172,13 @@ if ($AgentBenchmarkMode -eq "executable") {
 
             try {
                 # Get latest release info from GitHub API
-                $ReleaseInfo = Invoke-RestMethod "https://api.github.com/repos/mykhaliev/agent-benchmark/releases/latest"
+                # Use GITHUB_TOKEN if available to avoid rate limiting
+                $ApiHeaders = @{}
+                if ($env:GITHUB_TOKEN) {
+                    $ApiHeaders['Authorization'] = "Bearer $env:GITHUB_TOKEN"
+                    Write-Host "Using authenticated GitHub API request" -ForegroundColor DarkGray
+                }
+                $ReleaseInfo = Invoke-RestMethod "https://api.github.com/repos/mykhaliev/agent-benchmark/releases/latest" -Headers $ApiHeaders
                 $LatestVersion = $ReleaseInfo.tag_name
                 Write-Host "Latest version: $LatestVersion" -ForegroundColor DarkGray
 
