@@ -503,6 +503,34 @@ The server handles common Windows security scenarios:
 
 ---
 
+## Known Limitations
+
+### UAC & Elevated Processes
+
+Windows security prevents any non-elevated process from interacting with UAC prompts or elevated (Administrator) windows. **This is a fundamental Windows security boundary that no MCP server can bypass.**
+
+| Scenario | Behavior | Workaround |
+|----------|----------|------------|
+| `winget install` (or similar) triggers UAC prompt | Command may report success, but UAC blocks the installer until user approves | Run terminal as Administrator before invoking winget |
+| Target app is running as Administrator | `ui_click`, `ui_type`, `keyboard_control` return `ElevatedWindowActive` error | Run the MCP server elevated, or launch the app without elevation |
+| UAC prompt appears mid-workflow | AI cannot see or interact with the secure desktop | User must manually approve the UAC prompt |
+| Secure desktop (lock screen, Ctrl+Alt+Del) | All input methods blocked | User must unlock manually |
+
+### Why This Matters
+
+Many common operations trigger elevation:
+- Installing software (`winget`, `choco`, MSI installers)
+- Modifying system settings
+- Apps that "Run as Administrator"
+- Antivirus, device manager, service management tools
+
+When building automation workflows, **plan for elevation boundaries**:
+1. Pre-install required software before running AI workflows
+2. Use per-user installers when available (e.g., VS Code user installer)
+3. Run the MCP server elevated if you need to automate admin tasks (with appropriate caution)
+
+---
+
 ## Security Considerations
 
 - **UIPI**: Windows User Interface Privilege Isolation blocks input to elevated windows from non-elevated processes

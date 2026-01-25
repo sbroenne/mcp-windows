@@ -73,6 +73,18 @@ Full reference: [FEATURES.md](FEATURES.md)
 
 This MCP server controls your Windows desktop. Use responsibly.
 
+## Known Limitations
+
+**UAC & Elevated Processes** — Windows security prevents any non-elevated process from interacting with UAC prompts or elevated (Administrator) windows. This is a fundamental Windows security boundary, not an MCP limitation.
+
+| Scenario | What Happens | Workaround |
+|----------|--------------|------------|
+| `winget install` triggers UAC | AI cannot click the UAC prompt | Run terminal as Administrator first |
+| App running as Administrator | UI automation tools return `ElevatedWindowActive` error | Run MCP server elevated, or use the app non-elevated |
+| UAC prompt appears | AI cannot interact with secure desktop | User must manually approve |
+
+See [FEATURES.md](FEATURES.md#known-limitations) for details.
+
 ## Testing
 
 ```bash
