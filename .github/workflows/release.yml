@@ -244,10 +244,11 @@ jobs:
 
     - name: Download LLM Test Reports
       uses: actions/download-artifact@v4
-      if: needs.llm-tests.result == 'success'
+      if: always() && !cancelled()
       with:
-        name: llm-test-reports
+        pattern: llm-test-report-*
         path: llm-test-reports
+        merge-multiple: true
       continue-on-error: true
 
     - name: Package LLM Test Reports
