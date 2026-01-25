@@ -15,10 +15,12 @@ public static partial class UITypeTool
 {
     /// <summary>
     /// Types text into a text field or other input element. Automatically activates the target window.
+    /// ✅ WORKS ON ELEVATED WINDOWS - use this when keyboard_control fails with "elevated window" error.
     /// WARNING: Do NOT use for Save As dialogs - use file_save(windowHandle, filePath) instead. It handles path entry and Save button automatically.
     /// </summary>
     /// <remarks>
     /// Type text into Edit, Document, TextBox, or search fields. Auto-activates window, optionally clears existing text first.
+    /// ✅ Works on elevated/admin windows where keyboard_control fails. For Notepad, use controlType="Document" (not "Edit").
     /// TO SAVE FILES: Use file_save(windowHandle='...', filePath='C:/path/file.txt') - it handles the full Save As workflow automatically.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>

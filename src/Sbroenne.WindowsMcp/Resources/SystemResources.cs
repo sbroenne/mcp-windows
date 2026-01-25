@@ -192,14 +192,21 @@ public sealed class SystemResources
             | Goal | Primary Tool | Fallback |
             |------|-------------|----------|
             | Click button/checkbox | ui_click(windowHandle=..., nameContains=...) | mouse_control(windowHandle=...) |
-            | Type in text field | ui_type(windowHandle=..., text=...) | keyboard_control with window activated |
+            | Type in text field | ui_type(windowHandle=..., text=...) | ✅ Works on elevated windows! |
             | Save a file | file_save(windowHandle=..., filePath=...) | ⚠️ keyboard_control CANNOT handle Save As dialogs! |
-            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | - |
+            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | ⚠️ Fails on elevated windows - use ui_type |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
             | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
             | Wait for new window | window_management(action='wait_for', title='...') | - |
             | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
             | Find visible elements | screenshot_control with annotate=true | ui_find(windowHandle=...) |
+
+            ## ⚠️ Elevated Windows (GitHub Actions, Admin processes)
+
+            On elevated processes, `keyboard_control` fails. Use these alternatives:
+            - **Type text**: `ui_type(windowHandle=..., text="Hello")` ← works!
+            - **Notepad specifically**: `ui_type(windowHandle=..., controlType="Document", text="Hello")`
+            - **Click buttons**: `ui_click(windowHandle=..., nameContains="Button")` ← works!
 
             ## Key Principles
 

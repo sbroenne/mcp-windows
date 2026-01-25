@@ -18,9 +18,10 @@ public static partial class KeyboardControlTool
     /// Sends keyboard input to a specific window. The window is activated before input is sent.
     /// Best for: typing text, hotkeys (key='s', modifiers='ctrl'), special keys.
     /// For typing into a specific UI element by name/automationId, use ui_type instead.
+    /// ⚠️ ELEVATED WINDOWS: If this fails with "elevated window", use ui_automation(action='Type') instead - it bypasses the restriction.
     /// </summary>
     /// <remarks>
-    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. ⚠️ FOR SAVE: Use file_save tool - it handles Save As dialogs!
+    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. ⚠️ FOR SAVE: Use file_save tool - it handles Save As dialogs! ⚠️ If blocked by elevated window, use ui_automation(action='Type', windowHandle, text) instead.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from app() or window_management 'find'). REQUIRED - ensures input goes to the correct window.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
@@ -169,7 +170,7 @@ public static partial class KeyboardControlTool
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
-                "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
+                "Cannot send keyboard input to an elevated window. Use ui_automation(action='Type', windowHandle=..., text=...) instead - it bypasses this restriction. For Notepad, use controlType='Document'.");
         }
 
         // If clearFirst is true, select all existing content first (Ctrl+A)
@@ -213,7 +214,7 @@ public static partial class KeyboardControlTool
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
-                "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
+                "Cannot send keyboard input to an elevated window. Use ui_automation(action='Type', windowHandle=..., text=...) instead - it bypasses this restriction.");
         }
 
         var modifierKey = ParseModifiers(modifiers);
@@ -272,7 +273,7 @@ public static partial class KeyboardControlTool
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
-                "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
+                "Cannot send keyboard input to an elevated window. Use ui_automation instead.");
         }
 
         return await WindowsToolsBase.KeyboardInputService.KeyDownAsync(key, cancellationToken);
@@ -310,7 +311,7 @@ public static partial class KeyboardControlTool
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
-                "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
+                "Cannot send keyboard input to an elevated window. Use ui_automation instead.");
         }
 
         IReadOnlyList<KeySequenceItem> sequence;
