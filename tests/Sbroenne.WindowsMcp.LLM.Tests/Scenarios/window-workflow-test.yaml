@@ -161,51 +161,6 @@ sessions:
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
 
-  - name: Window Activate Workflow
-    agents:
-      - gpt41-agent
-      - gpt52-agent
-    tests:
-      - name: "Activate and bring windows to foreground"
-        description: "Launch apps, switch focus between them, verify activation"
-        prompt: |
-          Test window activation:
-
-          1. Launch Notepad (notepad.exe)
-          2. Launch Calculator (calc.exe)
-          3. Get the foreground window (should be Calculator)
-          4. Activate Notepad window to bring it to front
-          5. Verify Notepad is now the foreground window
-          6. Use move_and_activate to move Calculator to (200, 200) and activate it
-          7. Close both applications
-
-          Report which window is foreground after each activation, and confirm cleanup.
-        assertions:
-          # REQUIRED: Must use activate or move_and_activate
-          - anyOf:
-              - type: tool_param_matches_regex
-                tool: window_management
-                params:
-                  action: "(?i)(activate|move_and_activate|get_foreground)"
-              - type: output_regex
-                pattern: "(?i)(activated|foreground|front)"
-
-          # OUTCOME: Apps were closed
-          - type: output_regex
-            pattern: "(?i)(closed|cleaned)"
-
-          # SAFETY: No failure indicators
-          - type: output_not_contains
-            value: "failed"
-
-          # QUALITY: Only used real tools
-          - type: no_hallucinated_tools
-
-          # QUALITY: No errors during execution
-          - type: no_error_messages
-
-          # QUALITY: Agent executed directly without asking for confirmation
-          - type: no_clarification_questions
-
-          # QUALITY: No rate limit errors encountered
-          - type: no_rate_limit_errors
+# Window Activate Workflow moved to Integration/window-activate-test.yaml
+# because activation behavior varies by environment (elevated windows cannot
+# be activated from non-elevated processes in CI).
