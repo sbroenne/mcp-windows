@@ -53,9 +53,17 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+    - name: Cache agent-benchmark
+      uses: actions/cache@v4
+      id: cache-agent-benchmark
+      with:
+        path: tests/Sbroenne.WindowsMcp.LLM.Tests/agent-benchmark.exe
+        key: agent-benchmark-windows-amd64-v1
+
     - name: Run LLM Test - ${{ matrix.scenario }}
       env:
         AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         cd tests/Sbroenne.WindowsMcp.LLM.Tests
         
