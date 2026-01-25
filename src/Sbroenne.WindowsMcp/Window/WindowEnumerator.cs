@@ -352,20 +352,10 @@ public sealed class WindowEnumerator
 
     private bool IsWindowElevated(nint hwnd, uint processId)
     {
-        if (processId == 0)
-        {
-            return false;
-        }
-
-        // Get window center for elevation check
-        if (NativeMethods.GetWindowRect(hwnd, out RECT rect))
-        {
-            int centerX = (rect.Left + rect.Right) / 2;
-            int centerY = (rect.Top + rect.Bottom) / 2;
-            return _elevationDetector.IsTargetElevated(centerX, centerY);
-        }
-
-        return false;
+        // Directly check the process elevation status using the process ID.
+        // This is more reliable than using WindowFromPoint which could return
+        // a different overlapping window (causing false positives in CI environments).
+        return _elevationDetector.IsProcessElevated(processId);
     }
 
     private bool IsWindowResponding(nint hwnd)
