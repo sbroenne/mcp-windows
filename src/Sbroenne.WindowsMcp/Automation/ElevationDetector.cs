@@ -40,7 +40,13 @@ public class ElevationDetector
     /// Checks if the specified process is elevated (running as administrator).
     /// </summary>
     /// <param name="processId">The process ID to check.</param>
-    /// <returns>True if the process is elevated, false otherwise.</returns>
+    /// <returns>True if the process is definitely elevated, false if not elevated or unknown.</returns>
+    /// <remarks>
+    /// This method returns false when elevation status cannot be determined (e.g., due to
+    /// security policies, process protection, or access restrictions). This is intentional:
+    /// it's better to attempt interaction with a window and handle failure than to
+    /// incorrectly refuse interaction with a non-elevated window.
+    /// </remarks>
     public bool IsProcessElevated(uint processId)
     {
         if (processId == 0)
@@ -56,8 +62,9 @@ public class ElevationDetector
 
         if (hProcess == IntPtr.Zero)
         {
-            // Cannot open process - might be elevated or protected
-            return true;
+            // Cannot open process - may be due to security policies, anti-virus, etc.
+            // Default to false (not elevated) - better to try and fail than refuse.
+            return false;
         }
 
         try
@@ -65,8 +72,9 @@ public class ElevationDetector
             // Open the process token
             if (!NativeMethods.OpenProcessToken(hProcess, NativeConstants.TOKEN_QUERY, out var hToken))
             {
-                // Cannot open token - likely elevated
-                return true;
+                // Cannot open token - may be due to security policies.
+                // Default to false - better to try and fail than refuse.
+                return false;
             }
 
             try
@@ -82,8 +90,8 @@ public class ElevationDetector
                     Marshal.SizeOf<TOKEN_ELEVATION>(),
                     out returnLength))
                 {
-                    // Cannot query token - assume elevated
-                    return true;
+                    // Cannot query token - default to false.
+                    return false;
                 }
 
                 return tokenInfo.TokenIsElevated != 0;
