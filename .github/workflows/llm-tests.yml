@@ -59,6 +59,77 @@ jobs:
         }
       shell: pwsh
 
+    - name: Generate Job Summary
+      if: always()
+      run: |
+        $reportsDir = "tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults"
+        
+        # Start building the summary
+        $summary = @"
+        ## 🧪 LLM Integration Test Results
+
+        "@
+
+        $totalPassed = 0
+        $totalFailed = 0
+        $scenarioResults = @()
+
+        # Parse all JSON report files
+        $jsonFiles = Get-ChildItem -Path $reportsDir -Filter "*-report.json" -ErrorAction SilentlyContinue
+        
+        if ($jsonFiles.Count -eq 0) {
+          $summary += "`n⚠️ No test reports found.`n"
+        } else {
+          foreach ($jsonFile in $jsonFiles) {
+            try {
+              $report = Get-Content $jsonFile.FullName -Raw | ConvertFrom-Json
+              $scenarioName = $jsonFile.BaseName -replace '-report$', ''
+              
+              $passed = $report.summary.passed
+              $failed = $report.summary.failed
+              $total = $report.summary.total
+              $successRate = if ($total -gt 0) { [math]::Round(($passed / $total) * 100, 1) } else { 0 }
+              
+              $totalPassed += $passed
+              $totalFailed += $failed
+              
+              $status = if ($failed -eq 0) { "✅" } else { "❌" }
+              $scenarioResults += [PSCustomObject]@{
+                Name = $scenarioName
+                Status = $status
+                Passed = $passed
+                Failed = $failed
+                Total = $total
+                Rate = "$successRate%"
+              }
+            } catch {
+              Write-Warning "Failed to parse $($jsonFile.Name): $_"
+            }
+          }
+
+          # Build results table
+          $summary += "| Scenario | Status | Passed | Failed | Rate |`n"
+          $summary += "|----------|--------|--------|--------|------|`n"
+          
+          foreach ($result in $scenarioResults) {
+            $summary += "| $($result.Name) | $($result.Status) | $($result.Passed) | $($result.Failed) | $($result.Rate) |`n"
+          }
+
+          $overallStatus = if ($totalFailed -eq 0) { "✅ All tests passed" } else { "❌ Some tests failed" }
+          $summary += "`n**Overall: $overallStatus** ($totalPassed passed, $totalFailed failed)`n"
+        }
+
+        # Write to job summary
+        $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+        Write-Output "Job summary generated"
+        
+        # Fail the step if any tests failed
+        if ($totalFailed -gt 0) {
+          Write-Error "LLM tests failed: $totalFailed test(s) did not pass"
+          exit 1
+        }
+      shell: pwsh
+
     - name: Upload LLM Test Reports
       uses: actions/upload-artifact@v4
       if: always()

@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-    Runs Excel MCP Server LLM integration tests using agent-benchmark.
+    Runs Windows MCP Server LLM integration tests using agent-benchmark.
 
 .DESCRIPTION
-    This script runs the agent-benchmark test suite against the Excel MCP Server.
+    This script runs the agent-benchmark test suite against the Windows MCP Server.
     It builds the MCP server, downloads agent-benchmark if needed, and runs all test scenarios.
 
     Configuration can be provided via command-line parameters or a config file.
@@ -15,7 +15,11 @@
 
 .PARAMETER Scenario
     Optional. Run only a specific test scenario file. If not specified, runs all scenarios.
-    Example: excel-file-worksheet-test.yaml
+    Example: notepad-ui-test.yaml
+
+.PARAMETER TestFolder
+    Optional. Folder containing test YAML files. Default: "Scenarios"
+    Can be "Scenarios", "Integration", or a custom folder name.
 
 .PARAMETER Build
     If specified, builds the MCP server before running tests.
@@ -29,11 +33,15 @@
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -Build
-    Builds the MCP server and runs all tests.
+    Builds the MCP server and runs all Scenario tests.
 
 .EXAMPLE
-    .\Run-LLMTests.ps1 -Scenario excel-file-worksheet-test.yaml
-    Runs only the file/worksheet scenario.
+    .\Run-LLMTests.ps1 -TestFolder Integration -Build
+    Builds the MCP server and runs all Integration tests.
+
+.EXAMPLE
+    .\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
+    Runs only the notepad UI scenario.
 
 .EXAMPLE
     .\Run-LLMTests.ps1 -AgentBenchmarkPath "..\..\..\..\agent-benchmark\agent-benchmark.exe"
@@ -43,6 +51,7 @@
 [CmdletBinding()]
 param(
     [string]$Scenario = "",
+    [string]$TestFolder = "Scenarios",
     [switch]$Build,
     [string]$AgentBenchmarkPath
 )
@@ -55,7 +64,7 @@ $RepoRoot = (Get-Item $ScriptDir).Parent.Parent.FullName
 $SrcDir = Join-Path $RepoRoot "src\Sbroenne.WindowsMcp"
 $ProjectPath = Join-Path $SrcDir "Sbroenne.WindowsMcp.csproj"
 $TestDir = Join-Path $RepoRoot "tests\Sbroenne.WindowsMcp.LLM.Tests"
-$ScenariosDir = Join-Path $TestDir "Scenarios"
+$ScenariosDir = Join-Path $TestDir $TestFolder
 $ReportsDir = Join-Path $TestDir "TestResults"
 
 # The server command uses dotnet run with the project
@@ -133,7 +142,7 @@ if (-not $env:AZURE_OPENAI_API_KEY) {
 
 # Build MCP server if requested (optional, dotnet run will build anyway)
 if ($Build) {
-    Write-Host "Building Excel MCP Server..." -ForegroundColor Cyan
+    Write-Host "Building Windows MCP Server..." -ForegroundColor Cyan
     Push-Location $SrcDir
     try {
         dotnet build -c Release
@@ -231,11 +240,12 @@ if ($ScenarioFiles.Count -eq 0) {
 }
 
 Write-Host "`n========================================" -ForegroundColor Cyan
-Write-Host "Excel MCP Server - LLM Integration Tests" -ForegroundColor Cyan
+Write-Host "Windows MCP Server - LLM Integration Tests" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Server: dotnet run --project $ProjectPath"
 Write-Host "Agent-Benchmark: $ResolvedAgentBenchmarkPath ($AgentBenchmarkMode)"
-Write-Host "Scenarios: $($ScenarioFiles.Count) file(s)"
+Write-Host "Test Folder: $TestFolder"
+Write-Host "Tests: $($ScenarioFiles.Count) file(s)"
 Write-Host ""
 
 # Run each scenario

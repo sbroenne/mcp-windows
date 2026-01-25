@@ -11,17 +11,19 @@ on:
 
 jobs:
   # ==========================================================================
-  # LLM Integration Tests - DISABLED FOR NOW (run manually via workflow_dispatch)
+  # LLM Integration Tests - Runs in parallel, does NOT block release
   # ==========================================================================
-  # llm-tests:
-  #   uses: ./.github/workflows/llm-tests.yml
-  #   secrets: inherit
+  llm-tests:
+    uses: ./.github/workflows/llm-tests.yml
+    secrets: inherit
+    permissions:
+      id-token: write
+      contents: read
 
   # ==========================================================================
   # Build Standalone MCP Server - Self-contained binaries for x64 and ARM64
   # ==========================================================================
   build-standalone:
-    # needs: llm-tests  # Re-enable when LLM tests are stable in CI
     runs-on: windows-latest
 
     strategy:
@@ -101,7 +103,6 @@ jobs:
   # Build VS Code Extension - VSIX package with bundled MCP server
   # ==========================================================================
   build-vscode-extension:
-    # needs: llm-tests  # Re-enable when LLM tests are stable in CI
     runs-on: windows-latest
 
     steps:
@@ -213,7 +214,8 @@ jobs:
   # Publish & Release - Marketplace publish + GitHub Release with all artifacts
   # ==========================================================================
   release:
-    needs: [build-standalone, build-vscode-extension]
+    needs: [build-standalone, build-vscode-extension, llm-tests]
+    if: always() && needs.build-standalone.result == 'success' && needs.build-vscode-extension.result == 'success'
     runs-on: windows-latest
     permissions:
       contents: write
@@ -240,6 +242,34 @@ jobs:
         name: vscode-extension
         path: artifacts
 
+    - name: Download LLM Test Reports
+      uses: actions/download-artifact@v4
+      if: needs.llm-tests.result == 'success'
+      with:
+        name: llm-test-reports
+        path: llm-test-reports
+      continue-on-error: true
+
+    - name: Package LLM Test Reports
+      run: |
+        $version = "${{ env.VERSION }}"
+        if (Test-Path "llm-test-reports") {
+          $htmlFiles = Get-ChildItem -Path "llm-test-reports" -Filter "*.html" -Recurse
+          if ($htmlFiles.Count -gt 0) {
+            $zipName = "llm-test-reports-$version.zip"
+            Compress-Archive -Path "llm-test-reports/*" -DestinationPath "artifacts/$zipName"
+            Write-Output "Created LLM test reports archive: $zipName"
+            "LLM_TESTS_ATTACHED=true" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          } else {
+            Write-Output "No HTML test reports found"
+            "LLM_TESTS_ATTACHED=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+        } else {
+          Write-Output "LLM test reports not available"
+          "LLM_TESTS_ATTACHED=false" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        }
+      shell: pwsh
+
     - name: List Artifacts
       run: |
         Write-Output "Downloaded artifacts:"
@@ -265,15 +295,34 @@ jobs:
           $marketplaceStatus = "[ ] Marketplace publish failed (VSIX available below)"
         }
 
+        $llmTestStatus = ""
+        if ("${{ needs.llm-tests.result }}" -eq "success") {
+          $llmTestStatus = "[x] LLM integration tests passed"
+        } elseif ("${{ needs.llm-tests.result }}" -eq "failure") {
+          $llmTestStatus = "[ ] LLM integration tests failed (see reports below)"
+        } else {
+          $llmTestStatus = "[ ] LLM integration tests skipped"
+        }
+
+        $llmReportsNote = ""
+        if ("${{ env.LLM_TESTS_ATTACHED }}" -eq "true") {
+          $llmReportsNote = "`n**LLM Test Reports**: Download llm-test-reports-$version.zip for detailed HTML reports."
+        }
+
         $notes = @"
         ## Windows MCP Server v$version
 
         Let AI agents control Windows applications. Click buttons, type text, toggle settings - all by name, not coordinates.
 
+        ### Release Status
+
+        $marketplaceStatus
+        $llmTestStatus
+        $llmReportsNote
+
         ### Installation Options
 
         **VS Code Extension (Recommended)**
-        $marketplaceStatus
         - Search 'Windows MCP' in VS Code Extensions, or
         - Download windows-mcp-$version.vsix below and install manually
 
@@ -300,9 +349,14 @@ jobs:
         $tagName = "${{ github.ref_name }}"
         $version = "${{ env.VERSION }}"
 
+        # Get all release files (zips and vsix)
+        $releaseFiles = Get-ChildItem -Path "artifacts" -File | ForEach-Object { $_.FullName }
+        
+        Write-Output "Release files:"
+        $releaseFiles | ForEach-Object { Write-Output "  $_" }
+
         gh release create "$tagName" `
-          artifacts/*.zip `
-          artifacts/*.vsix `
+          @releaseFiles `
           --repo ${{ github.repository }} `
           --title "Windows MCP Server v$version" `
           --notes-file release_notes.md

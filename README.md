@@ -3,6 +3,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
+[![LLM Tests](https://img.shields.io/badge/LLM%20Tests-View%20Results-blue)](https://github.com/sbroenne/mcp-windows/releases/latest)
 
 **Windows automation that actually works.** Uses the Windows UI Automation API to find buttons by name, not pixels. Tested with real AI models before every release.
 

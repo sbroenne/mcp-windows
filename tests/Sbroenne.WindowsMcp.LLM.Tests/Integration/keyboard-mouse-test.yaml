@@ -37,15 +37,14 @@ providers:
     retry:
       retry_on_429: true
       max_retries: 5
-  - name: azure-openai-gpt5-chat
+
+  - name: azure-openai-gpt52
     type: AZURE
     auth_type: entra_id
     model: gpt-5.2-chat
     baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
     version: 2025-01-01-preview
-    retry:
-      retry_on_429: true
-      max_retries: 5
+
 servers:
   - name: windows-mcp
     type: stdio
@@ -70,30 +69,18 @@ agents:
     clarification_detection:
       enabled: true
       level: warning
-      use_builtin_patterns: true
+      judge_provider: azure-openai-gpt52
 
-  - name: gpt5-chat-agent
-    servers:
-      - name: windows-mcp
-    provider: azure-openai-gpt5-chat
-    system_prompt: |
-      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
-      Session: {{SESSION_NAME}}
-
-      CRITICAL RULES:
-      - Execute all tasks IMMEDIATELY without asking for confirmation
-      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
-      - NEVER request clarification - make reasonable assumptions and proceed
-      - Use available tools directly to complete the requested tasks
-      - Report results after completion, not before starting
-    clarification_detection:
-      enabled: true
-      level: warning
-      use_builtin_patterns: true
+ai_summary:
+  enabled: true
+  judge_provider: azure-openai-gpt52
 
 settings:
   verbose: true
   max_iterations: 15
+  session_delay: 5s
+  test_delay: 2s
+  tool_timeout: 60s
 
 
 sessions:
