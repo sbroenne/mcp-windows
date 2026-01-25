@@ -8,7 +8,17 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 public class ElevationDetector
 {
-    /// <inheritdoc/>
+    /// <summary>
+    /// Checks if the window at the specified screen coordinates belongs to an elevated process.
+    /// </summary>
+    /// <param name="x">X screen coordinate.</param>
+    /// <param name="y">Y screen coordinate.</param>
+    /// <returns>True if the window at the point is elevated.</returns>
+    /// <remarks>
+    /// WARNING: This method uses WindowFromPoint which returns whatever window is at that location.
+    /// If another window overlaps the target, the wrong window will be checked.
+    /// Prefer <see cref="IsProcessElevated(uint)"/> when you have the process ID.
+    /// </remarks>
     public bool IsTargetElevated(int x, int y)
     {
         var point = new POINT(x, y);
@@ -23,6 +33,16 @@ public class ElevationDetector
         // Get the process ID for the window
         _ = NativeMethods.GetWindowThreadProcessId(hwnd, out var processId);
 
+        return IsProcessElevated(processId);
+    }
+
+    /// <summary>
+    /// Checks if the specified process is elevated (running as administrator).
+    /// </summary>
+    /// <param name="processId">The process ID to check.</param>
+    /// <returns>True if the process is elevated, false otherwise.</returns>
+    public bool IsProcessElevated(uint processId)
+    {
         if (processId == 0)
         {
             return false;
