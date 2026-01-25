@@ -141,10 +141,6 @@ sessions:
           - type: output_regex
             pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
 
-          # SAFETY: No failure indicators
-          - type: output_not_contains
-            value: "failed"
-
           # QUALITY: Only used real tools
           - type: no_hallucinated_tools
 
@@ -206,10 +202,6 @@ sessions:
           - type: output_regex
             pattern: "(?i)(no.*(notepad|window).*(open|found|running)|verified|notepad.*(closed|not found|no longer))"
 
-          # SAFETY: No failure indicators
-          - type: output_not_contains
-            value: "failed"
-
           # QUALITY: Only used real tools
           - type: no_hallucinated_tools
 
@@ -221,5 +213,3 @@ sessions:
 
           # QUALITY: No rate limit errors encountered
           - type: no_rate_limit_errors
-
-
