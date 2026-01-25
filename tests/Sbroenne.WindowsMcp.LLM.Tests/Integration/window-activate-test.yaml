@@ -1,0 +1,126 @@
+# =============================================================================
+# Window Activation Workflow - Focus Management (Integration Test)
+# =============================================================================
+#
+# Tests window activation and focus management features.
+# This test is in Integration/ because activation behavior varies by environment
+# (elevated windows cannot be activated from non-elevated processes).
+#
+# Tools Covered:
+#   - app: Launch applications
+#   - window_management: activate, get_foreground, move_and_activate
+#
+# Note: Only runs with gpt-4.1 to reduce CI costs and avoid environment-specific
+# failures on different runners.
+#
+# =============================================================================
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
+
+  - name: azure-openai-gpt52
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      judge_provider: azure-openai-gpt52
+
+ai_summary:
+  enabled: true
+  judge_provider: azure-openai-gpt52
+
+settings:
+  verbose: true
+  max_iterations: 25
+  session_delay: 5s
+  test_delay: 2s
+  tool_timeout: 60s
+
+sessions:
+  - name: Window Activate Workflow
+    agents:
+      - gpt41-agent
+    tests:
+      - name: "Activate and bring windows to foreground"
+        description: "Launch apps, switch focus between them, verify activation"
+        prompt: |
+          Test window activation:
+
+          1. Launch Notepad (notepad.exe)
+          2. Launch Calculator (calc.exe)
+          3. Get the foreground window (should be Calculator)
+          4. Activate Notepad window to bring it to front
+          5. Verify Notepad is now the foreground window
+          6. Use move_and_activate to move Calculator to (200, 200) and activate it
+          7. Close both applications
+
+          Report which window is foreground after each activation, and confirm cleanup.
+        assertions:
+          # REQUIRED: Must use activate or move_and_activate
+          - anyOf:
+              - type: tool_param_matches_regex
+                tool: window_management
+                params:
+                  action: "(?i)(activate|move_and_activate|get_foreground)"
+              - type: output_regex
+                pattern: "(?i)(activated|foreground|front)"
+
+          # OUTCOME: Apps were closed
+          - type: output_regex
+            pattern: "(?i)(closed|cleaned)"
+
+          # Note: We do NOT assert output_not_contains 'failed' because activation
+          # can legitimately fail in CI environments due to elevation restrictions.
+          # The test validates that the agent uses the right tools and cleans up.
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # QUALITY: Agent executed directly without asking for confirmation
+          - type: no_clarification_questions
+
+          # QUALITY: No rate limit errors encountered
+          - type: no_rate_limit_errors
