@@ -52,3 +52,22 @@ Quick reference:
 - **Unit tests**: `dotnet test --filter "FullyQualifiedName~Unit"`
 - **Integration tests**: `dotnet test --filter "FullyQualifiedName~Integration"` (ALL MUST PASS)
 - **LLM tests**: Use `Run-LLMTests.ps1` script (expensive - only when requested)
+
+## LLM Test Authoring (CRITICAL)
+
+**NEVER put tool hints in LLM test prompts. This defeats the entire purpose of the test.**
+
+LLM test prompts must be **task-focused, not tool-focused**:
+
+| ❌ WRONG (tool hints) | ✅ CORRECT (task-focused) |
+|----------------------|---------------------------|
+| "Use App-Tool to launch Notepad" | "Create a text file" |
+| "Call State-Tool to get coordinates" | "Check Windows Update" |
+| "Use ui_click with nameContains='Save'" | "Save the document" |
+
+**The test evaluates whether the LLM can discover the right tools from their descriptions.**
+
+If a test fails because the LLM can't figure out which tools to use:
+1. ✅ Improve the **tool descriptions** in the MCP server
+2. ✅ Improve the **system prompts** (WindowsAutomationPrompts.cs)
+3. ❌ **NEVER** add hints to test prompts - that's cheating

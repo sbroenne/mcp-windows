@@ -12,6 +12,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests the SaveAsync method using keyboard-first approach (Ctrl+S) based on FlaUI/pywinauto patterns.
 /// </summary>
 [Collection("UITestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class SaveTests : IDisposable
 {
     private readonly UITestHarnessFixture _fixture;
@@ -182,6 +183,64 @@ public sealed class SaveTests : IDisposable
             var keyboardService = new KeyboardInputService();
             await keyboardService.PressKeyAsync("Escape");
             await Task.Delay(200);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task Save_NonExistentDirectory_ReturnsPathError()
+    {
+        // This test verifies that saving to a non-existent directory returns an error
+        // It uses real Notepad to trigger the actual Windows "Path does not exist" dialog
+
+        // Arrange: Launch Notepad
+        var notepad = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "notepad.exe",
+            UseShellExecute = true
+        });
+
+        try
+        {
+            await Task.Delay(2000); // Wait for Notepad to fully launch
+
+            // Find the Notepad window
+            var windows = await _windowEnumerator.EnumerateWindowsAsync();
+            var notepadWindow = windows.FirstOrDefault(w =>
+                w.ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) &&
+                w.Title.Contains("Notepad"));
+
+            Assert.NotNull(notepadWindow);
+            var notepadHandle = notepadWindow.Handle.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            // Create path to non-existent directory
+            var nonExistentPath = Path.Combine(
+                Path.GetTempPath(),
+                $"nonexistent-directory-{Guid.NewGuid()}",
+                "test.txt");
+
+            // Ensure directory really doesn't exist
+            var directory = Path.GetDirectoryName(nonExistentPath)!;
+            Assert.False(Directory.Exists(directory), $"Directory should not exist: {directory}");
+
+            // Act: Try to save to non-existent path
+            var result = await _automationService.SaveAsync(notepadHandle, nonExistentPath);
+
+            // Assert: Should fail with PathError
+            Assert.False(result.Success, "Save should fail for non-existent path");
+            Assert.Equal(Models.UIAutomationErrorType.PathError, result.ErrorType);
+            Assert.Contains("does not exist", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            // Cleanup: Kill Notepad
+            try
+            {
+                notepad?.Kill();
+                notepad?.WaitForExit(1000);
+            }
+            catch { }
+            notepad?.Dispose();
         }
     }
 }

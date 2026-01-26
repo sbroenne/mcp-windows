@@ -155,6 +155,7 @@ public class WindowFindTests : IClassFixture<WindowTestFixture>
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task FindWindow_MatchesByProcessName()
     {
         // Arrange - First list windows to get a process name

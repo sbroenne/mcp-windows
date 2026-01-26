@@ -15,6 +15,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 /// These tests use our own MCP tools for verification.
 /// </summary>
 [Collection("ModernTestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class WinUIWorkflowTests : IDisposable
 {
     private readonly ModernTestHarnessFixture _fixture;

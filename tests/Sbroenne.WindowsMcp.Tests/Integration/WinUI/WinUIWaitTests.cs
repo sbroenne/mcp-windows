@@ -14,6 +14,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 /// Tests verify that waiting for UI element state changes works correctly with modern WinUI 3 controls.
 /// </summary>
 [Collection("ModernTestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class WinUIWaitTests : IDisposable
 {
     private readonly ModernTestHarnessFixture _fixture;

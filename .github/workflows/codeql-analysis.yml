@@ -27,14 +27,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+      # Custom build excluding ModernHarness (WinUI project has source generator path issues in CodeQL)
+      - name: Build for CodeQL
+        run: |
+          dotnet restore
+          dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj --configuration Release --no-restore
+          dotnet build tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj --configuration Release --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4

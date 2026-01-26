@@ -15,6 +15,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 /// These tests cover slider and combobox which are important controls for MCP automation.
 /// </summary>
 [Collection("ModernTestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class WinUIFileDialogTests : IDisposable
 {
     private readonly ModernTestHarnessFixture _fixture;

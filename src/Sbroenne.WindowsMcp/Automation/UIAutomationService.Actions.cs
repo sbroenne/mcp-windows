@@ -1152,6 +1152,13 @@ public sealed partial class UIAutomationService
         await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
         await Task.Delay(300, cancellationToken);
 
+        // Check for error dialogs (e.g., "Path does not exist")
+        var errorResult = await HandleSaveErrorDialogAsync(cancellationToken);
+        if (errorResult != null)
+        {
+            return errorResult;
+        }
+
         // Handle overwrite confirmation if it appears
         await HandleOverwriteConfirmationAsync(cancellationToken);
 
@@ -1192,6 +1199,124 @@ public sealed partial class UIAutomationService
 
             await Task.Delay(SaveDialogPollInterval, cancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Checks for and handles error dialogs that appear during save (e.g., "Path does not exist").
+    /// Returns an error result if an error dialog was found and handled, null otherwise.
+    /// Polls for error dialogs for up to 1 second to handle timing variations.
+    /// Only checks the FOREGROUND window to avoid false positives from unrelated windows.
+    /// </summary>
+    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+
+        // Error dialog text patterns (case-insensitive)
+        // Must be specific to actual Windows error dialogs
+        string[] errorPatterns = [
+            "Path does not exist",
+            "could not find the path",
+            "cannot find the path",
+            "is not valid",
+            "access is denied"
+        ];
+
+        // Poll for error dialogs for up to 1 second with 100ms intervals
+        var deadline = DateTime.UtcNow + TimeSpan.FromMilliseconds(1000);
+
+        while (DateTime.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var errorInfo = await _staThread.ExecuteAsync(() =>
+            {
+                // CRITICAL: Only check the FOREGROUND window to avoid false positives
+                // from other applications (e.g., VS Code chat showing "does not exist" text)
+                var foregroundHwnd = NativeMethods.GetForegroundWindow();
+                if (foregroundHwnd == IntPtr.Zero)
+                {
+                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                }
+
+                var window = Uia.ElementFromHandle(foregroundHwnd);
+                if (window == null)
+                {
+                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                }
+
+                var windowName = window.CurrentName ?? "";
+
+                // Error dialogs from Save must have "Save" in the title
+                if (!windowName.Contains("Save", StringComparison.OrdinalIgnoreCase))
+                {
+                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                }
+
+                // Look for error text in the dialog
+                var textCondition = Uia.CreatePropertyCondition(
+                    UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Text);
+                var textElements = window.FindAll(UIA.TreeScope.TreeScope_Descendants, textCondition);
+
+                if (textElements != null)
+                {
+                    for (int j = 0; j < textElements.Length; j++)
+                    {
+                        var textElement = textElements.GetElement(j);
+                        var text = textElement.CurrentName ?? "";
+
+                        foreach (var pattern in errorPatterns)
+                        {
+                            if (text.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Found error - now find the OK button
+                                var buttonCondition = Uia.CreateAndCondition(
+                                    Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                                    Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "OK"));
+                                var okBtn = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
+
+                                return (dialog: (UIA.IUIAutomationElement?)window, okButton: (UIA.IUIAutomationElement?)okBtn, errorText: (string?)text);
+                            }
+                        }
+                    }
+                }
+
+                return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+            }, cancellationToken);
+
+            if (errorInfo.dialog != null)
+            {
+                // Found error dialog - click OK to dismiss it
+                if (errorInfo.okButton != null)
+                {
+                    bool clicked = await _staThread.ExecuteAsync(() => errorInfo.okButton.TryInvoke(), cancellationToken);
+                    if (!clicked)
+                    {
+                        var rect = await _staThread.ExecuteAsync(() => errorInfo.okButton.CurrentBoundingRectangle, cancellationToken);
+                        await _mouseService.ClickAsync(
+                            (rect.left + rect.right) / 2,
+                            (rect.top + rect.bottom) / 2,
+                            cancellationToken: cancellationToken);
+                    }
+                }
+
+                await Task.Delay(200, cancellationToken);
+
+                // Press Escape to close the Save As dialog
+                await _keyboardService.PressKeyAsync("Escape", cancellationToken: cancellationToken);
+                await Task.Delay(200, cancellationToken);
+
+                // Return error to LLM
+                return UIAutomationResult.CreateFailure(
+                    "save",
+                    UIAutomationErrorType.PathError,
+                    $"Save failed: {errorInfo.errorText}. The directory does not exist. Create the directory first or use an existing path.",
+                    CreateDiagnostics(stopwatch));
+            }
+
+            await Task.Delay(100, cancellationToken);
+        }
+
+        return null; // No error dialog found
     }
 
     /// <summary>
