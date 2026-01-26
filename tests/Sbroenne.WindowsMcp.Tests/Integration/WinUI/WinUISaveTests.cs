@@ -14,6 +14,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 /// Mirrors the WinForms SaveTests for framework parity.
 /// </summary>
 [Collection("ModernTestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class WinUISaveTests : IDisposable
 {
     private readonly ModernTestHarnessFixture _fixture;
