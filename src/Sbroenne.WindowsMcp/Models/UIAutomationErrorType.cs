@@ -46,4 +46,7 @@ public static class UIAutomationErrorType
 
     /// <summary>The foreground window does not match the expected target window.</summary>
     public const string WrongTargetWindow = "wrong_target_window";
+
+    /// <summary>The file path is invalid or the directory does not exist.</summary>
+    public const string PathError = "path_error";
 }

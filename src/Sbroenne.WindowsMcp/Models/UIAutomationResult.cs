@@ -397,6 +397,9 @@ public sealed record UIAutomationResult
         UIAutomationErrorType.InvalidParameter =>
             "Invalid parameter value. Check the parameter requirements.",
 
+        UIAutomationErrorType.PathError =>
+            "File path error. The directory does not exist. Create the directory first or use an existing path.",
+
         _ => string.Empty
     };
 

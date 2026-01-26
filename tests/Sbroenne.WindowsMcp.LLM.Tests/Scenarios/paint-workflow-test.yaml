@@ -1,0 +1,200 @@
+# =============================================================================
+# Paint Workflow Scenario - UI Automation and Drawing
+# =============================================================================
+#
+# Tests complete Paint workflows: launch, UI interaction, drawing, screenshot
+#
+# Tools Covered:
+#   - window_management: Launch, find, close windows
+#   - ui_automation (find): Find UI elements
+#   - ui_automation (click): Click UI elements
+#   - mouse_control: Drawing operations
+#   - screenshot_control: Capture proof
+#
+# Prerequisites:
+#   - Windows 10/11 with Microsoft Paint
+#   - Windows MCP Server
+#   - Environment: AZURE_OPENAI_ENDPOINT
+#
+# =============================================================================
+
+criteria:
+  success_rate: 1 # 100%
+
+providers:
+  - name: azure-openai-gpt41
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-4.1
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
+
+  - name: azure-openai-gpt52
+    type: AZURE
+    auth_type: entra_id
+    model: gpt-5.2-chat
+    baseUrl: "{{AZURE_OPENAI_ENDPOINT}}"
+    version: 2025-01-01-preview
+    retry:
+      retry_on_429: true
+      max_retries: 5
+
+servers:
+  - name: windows-mcp
+    type: stdio
+    command: "{{SERVER_COMMAND}}"
+    server_delay: 10s
+
+agents:
+  - name: gpt41-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt41
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      judge_provider: azure-openai-gpt52
+
+  - name: gpt52-agent
+    servers:
+      - name: windows-mcp
+    provider: azure-openai-gpt52
+    system_prompt: |
+      You are {{AGENT_NAME}}, an autonomous Windows automation agent using {{PROVIDER_NAME}}.
+      Session: {{SESSION_NAME}}
+
+      CRITICAL RULES:
+      - Execute all tasks IMMEDIATELY without asking for confirmation
+      - NEVER ask "Would you like me to...", "Should I proceed...", or similar questions
+      - NEVER request clarification - make reasonable assumptions and proceed
+      - Use available tools directly to complete the requested tasks
+      - Report results after completion, not before starting
+    clarification_detection:
+      enabled: true
+      level: warning
+      judge_provider: azure-openai-gpt52
+
+ai_summary:
+  enabled: true
+  judge_provider: azure-openai-gpt52
+
+settings:
+  verbose: true
+  max_iterations: 20
+  session_delay: 5s
+  test_delay: 2s
+  tool_timeout: 60s
+
+sessions:
+  - name: Paint Drawing Workflow
+    agents:
+      - gpt41-agent
+      - gpt52-agent
+    tests:
+      - name: "Draw shape and capture proof"
+        description: "Launch Paint, find canvas, draw a shape, take screenshot, close"
+        prompt: |
+          1. Launch Microsoft Paint (mspaint.exe)
+          2. Get the window handle for Paint
+          3. Use UI automation to find the canvas element
+          4. Draw a simple line or shape on the canvas using mouse drag operations
+          5. Take a screenshot of the Paint window as proof
+          6. Close Paint and discard changes (click "Don't Save" if prompted)
+          7. Verify Paint is closed
+
+          Report "VERIFIED: Drawing completed and Paint closed" when done.
+        assertions:
+          # REQUIRED: Must launch Paint first (using 'app' tool)
+          - type: tool_call_order
+            sequence:
+              - app
+              - screenshot_control
+
+          # OUTCOME: Screenshot was captured
+          - anyOf:
+              - type: tool_called
+                tool: screenshot_control
+              - type: output_regex
+                pattern: "(?i)screenshot.*captured|captured.*screenshot"
+
+          # OUTCOME: Paint was closed
+          - type: output_regex
+            pattern: "(?i)(verified|paint.*(closed|not found)|no.*paint.*window)"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # QUALITY: Agent executed directly without asking for confirmation
+          - type: no_clarification_questions
+
+          # QUALITY: No rate limit errors encountered
+          - type: no_rate_limit_errors
+
+  - name: Paint UI Exploration Workflow
+    agents:
+      - gpt41-agent
+      - gpt52-agent
+    tests:
+      - name: "Explore Paint UI and click toolbar"
+        description: "Launch Paint, explore UI tree, click a toolbar button"
+        prompt: |
+          1. Launch Microsoft Paint (mspaint.exe)
+          2. Get the window handle
+          3. Get the UI element tree for Paint to understand its structure
+          4. Find and click the "Pencil" or "Brushes" button in the toolbar
+          5. Verify the tool was selected (the UI should respond)
+          6. Close Paint and discard any changes
+
+          Report what toolbar button you clicked and confirm Paint was closed.
+        assertions:
+          # REQUIRED: Must launch Paint and use UI automation (using 'app' tool)
+          - anyOf:
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - ui_click
+              - type: tool_call_order
+                sequence:
+                  - app
+                  - ui_find
+
+          # OUTCOME: UI automation was used to find/click elements
+          - anyOf:
+              - type: tool_called
+                tool: ui_click
+              - type: tool_called
+                tool: ui_find
+              - type: output_regex
+                pattern: "(?i)(clicked|selected|found).*(pencil|brush|tool)"
+
+          # OUTCOME: Paint was closed
+          - type: output_regex
+            pattern: "(?i)(closed|paint.*(closed|not found|exited))"
+
+          # QUALITY: Only used real tools
+          - type: no_hallucinated_tools
+
+          # QUALITY: No errors during execution
+          - type: no_error_messages
+
+          # QUALITY: Agent executed directly without asking for confirmation
+          - type: no_clarification_questions
+
+          # QUALITY: No rate limit errors encountered
+          - type: no_rate_limit_errors
