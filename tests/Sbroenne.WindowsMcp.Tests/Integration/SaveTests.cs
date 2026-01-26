@@ -12,6 +12,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests the SaveAsync method using keyboard-first approach (Ctrl+S) based on FlaUI/pywinauto patterns.
 /// </summary>
 [Collection("UITestHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class SaveTests : IDisposable
 {
     private readonly UITestHarnessFixture _fixture;
