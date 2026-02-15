@@ -46,6 +46,8 @@ jobs:
   version:
     name: Calculate Version
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.calculate_version.outputs.version }}
       tag: ${{ steps.calculate_version.outputs.tag }}
@@ -168,6 +170,8 @@ jobs:
     # Always run if LLM tests pass OR if they were skipped
     if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     strategy:
       matrix:
@@ -250,6 +254,8 @@ jobs:
     # Always run if LLM tests pass OR if they were skipped
     if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
     runs-on: windows-latest
+    permissions:
+      contents: read
 
     steps:
     - uses: actions/checkout@v4
