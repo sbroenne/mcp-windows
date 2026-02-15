@@ -75,8 +75,7 @@ public static partial class WindowManagementTool
             switch (action)
             {
                 case WindowAction.List:
-                    operationResult = await HandleListAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
-                    break;
+                    return await HandleListSerializedAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
 
                 case WindowAction.Find:
                     operationResult = await HandleFindAsync(title, processName, regex, cancellationToken);
@@ -165,7 +164,11 @@ public static partial class WindowManagementTool
         }
     }
 
-    private static async Task<WindowManagementResult> HandleListAsync(
+    /// <summary>
+    /// Handles the list action, returning a slim JSON response with only
+    /// handle, title, and process name per window to minimize token usage.
+    /// </summary>
+    private static async Task<string> HandleListSerializedAsync(
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
@@ -174,16 +177,28 @@ public static partial class WindowManagementTool
     {
         var result = await WindowsToolsBase.WindowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
 
-        if (result.Success && !string.IsNullOrEmpty(excludeTitle) && result.Windows is not null)
+        if (!result.Success)
         {
-            var filteredWindows = result.Windows
-                .Where(w => !w.Title.Contains(excludeTitle, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-
-            return WindowManagementResult.CreateListSuccess(filteredWindows);
+            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
         }
 
-        return result;
+        var windows = result.Windows ?? [];
+
+        if (!string.IsNullOrEmpty(excludeTitle))
+        {
+            windows = windows
+                .Where(w => !w.Title.Contains(excludeTitle, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        var slimResult = new
+        {
+            success = true,
+            windows = windows.Select(w => new { handle = w.Handle, title = w.Title, processName = w.ProcessName, monitorIndex = w.MonitorIndex }),
+            count = windows.Count
+        };
+
+        return JsonSerializer.Serialize(slimResult, WindowsToolsBase.JsonOptions);
     }
 
     private static async Task<WindowManagementResult> HandleFindAsync(

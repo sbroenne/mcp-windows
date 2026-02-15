@@ -247,6 +247,7 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         Assert.False(_formClosed.IsSet, "Window should NOT be closed when discardChanges is false");
 
         // Verify window still exists by listing
+        // Verify the list call succeeds (returns valid JSON)
         var listResultJson = await WindowManagementTool.ExecuteAsync(
             action: WindowAction.List,
             handle: null,
@@ -267,7 +268,8 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
             discardChanges: false,
             cancellationToken: CancellationToken.None);
 
-        _ = DeserializeResult(listResultJson);
+        using var listDoc = JsonDocument.Parse(listResultJson);
+        Assert.True(listDoc.RootElement.GetProperty("success").GetBoolean());
 
         // Window may still appear in list (behind dialog) or dialog may be the active window
         // The key assertion is that the window wasn't closed

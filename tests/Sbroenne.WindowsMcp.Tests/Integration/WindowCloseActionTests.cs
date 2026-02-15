@@ -246,11 +246,12 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
             discardChanges: false,
             cancellationToken: CancellationToken.None);
 
-        var listResult = DeserializeResult(listResultJson);
+        using var listDoc = JsonDocument.Parse(listResultJson);
+        var root = listDoc.RootElement;
 
-        Assert.True(listResult.Success);
+        Assert.True(root.GetProperty("success").GetBoolean());
         Assert.True(
-            listResult.Windows == null || listResult.Windows.Count == 0,
+            !root.TryGetProperty("windows", out var windowsEl) || windowsEl.GetArrayLength() == 0,
             "Window should no longer exist after close");
     }
 
