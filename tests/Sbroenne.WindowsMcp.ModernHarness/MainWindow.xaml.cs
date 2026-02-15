@@ -266,7 +266,7 @@ public sealed partial class MainWindow : Window
     {
         var text = EditorTextBox.Text;
         var charCount = text.Length;
-        var wordCount = string.IsNullOrWhiteSpace(text) ? 0 : WordCountRegex().Matches(text).Count;
+        var wordCount = string.IsNullOrWhiteSpace(text) ? 0 : WordCountRegex().Count(text);
 
         CharacterCountText.Text = $"Characters: {charCount}";
         WordCountText.Text = $"Words: {wordCount}";
