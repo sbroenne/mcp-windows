@@ -63,7 +63,7 @@ Windows MCP Server asks Windows directly: "What buttons exist?" Windows knows. I
 
 Tool descriptions that seem clear to humans often confuse AI. Parameters get misunderstood. Actions get skipped.
 
-We test every tool with **real AI models** (GPT-4.1, GPT-5.2) using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark). 54 automated tests. **100% pass rate required for release.**
+We test every tool with **real AI models** (GPT-4.1, GPT-5.2) using [pytest-aitest](https://github.com/sbroenne/pytest-aitest). 54 automated tests. **100% pass rate required for release.**
 
 If the AI can't use it correctly, we fix the tool — not the prompt.
 
@@ -144,7 +144,7 @@ This MCP server controls your Windows desktop. Use responsibly.
 
 ## Related Projects
 
-- **[agent-benchmark](https://github.com/mykhaliev/agent-benchmark)** — LLM agent testing framework (powers our integration tests)
+- **[pytest-aitest](https://github.com/sbroenne/pytest-aitest)** — LLM agent testing framework (powers our integration tests)
 - **[Excel MCP Server](https://excelmcpserver.dev)** — AI-powered Excel automation
 - **[OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs)** — AI-powered streaming control
 

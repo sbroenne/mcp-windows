@@ -34,7 +34,7 @@ This reduces LLM costs by ~60% and improves response times when processing tool 
 
 ### LLM Testing & Validation
 
-Every tool is tested with **real AI models** using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) to ensure LLMs understand tool descriptions and use them correctly.
+Every tool is tested with **real AI models** using [pytest-aitest](https://github.com/sbroenne/pytest-aitest) to ensure LLMs understand tool descriptions and use them correctly.
 
 | Test Suite | Tests | Models | Pass Rate |
 |------------|-------|--------|-----------|

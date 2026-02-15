@@ -36,14 +36,14 @@ Each document is indexed by search engines and must work standalone.
 5. Tools: 2-column table (tool, purpose)
 6. Caution
 7. Testing: LLM tests + framework coverage
-8. Related Projects: agent-benchmark, Excel MCP, OBS MCP
+8. Related Projects: pytest-aitest, Excel MCP, OBS MCP
 9. License / Contributing (one line each)
 
 **Must include**:
 - Code examples using correct tool names (`ui_click`, `ui_type`, etc.)
 - Tools table
 - Framework coverage (WinForms, WinUI 3, Electron)
-- Link to agent-benchmark
+- Link to pytest-aitest
 - Links to FEATURES.md for details
 
 **Must NOT include**:
@@ -61,20 +61,20 @@ Each document is indexed by search engines and must work standalone.
 1. Hero + badges
 2. The Problem: Why screenshot automation fails (expanded)
 3. How It Works: UI Automation API + comparison table
-4. Tested with Real AI: Prominent, link to agent-benchmark
+4. Tested with Real AI: Prominent, link to pytest-aitest
 5. What You Can Do: Natural language examples
 6. Quick Start: Both install options
 7. Tools: Full table
 8. Feature Cards: 4 max (Semantic UI, LLM-Tested, Framework Coverage, Fallback)
 9. Caution
-10. Related Projects: agent-benchmark, Excel MCP, OBS MCP
+10. Related Projects: pytest-aitest, Excel MCP, OBS MCP
 11. Footer
 
 **Must include**:
 - Comparison table (reliability focus, "thousands of tokens")
 - Natural language examples
 - Feature cards (max 4)
-- Link to agent-benchmark
+- Link to pytest-aitest
 - SEO keywords in frontmatter
 
 **Must NOT include**:
@@ -105,7 +105,7 @@ Each document is indexed by search engines and must work standalone.
 - Comparison tables
 - Feature bullet lists
 - Code examples
-- agent-benchmark link (not relevant to end users)
+- pytest-aitest link (not relevant to end users)
 
 ## Key Differentiators
 
@@ -132,7 +132,7 @@ Always use the actual tool names:
 ## Related Projects
 
 **README.md and gh-pages only:**
-- [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) — LLM testing framework
+- [pytest-aitest](https://github.com/sbroenne/pytest-aitest) — LLM testing framework
 - [Excel MCP Server](https://excelmcpserver.dev) — Excel automation
 - [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) — Streaming control
 

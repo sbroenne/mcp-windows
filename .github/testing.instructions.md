@@ -207,28 +207,22 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Unit" -
 
 ### Running LLM Tests
 
-**ALWAYS use the PowerShell script:**
+**Use pytest-aitest via uv:**
 
 ```powershell
-d:\source\mcp-windows\tests\Sbroenne.WindowsMcp.LLM.Tests\Run-LLMTests.ps1 -Model "gpt-4o" -Scenario "notepad-workflow.yaml"
+cd tests/Sbroenne.WindowsMcp.LLM.Tests
+uv run pytest -v
 ```
 
-**Parameters:**
-- `-Model <model-name>` - Azure OpenAI model deployment name (e.g., "gpt-4o")
-- `-Scenario <scenario-file>` - Run specific scenario (e.g., "paint-smiley-test.yaml")
-- `-Build` - Build MCP server first (optional, dotnet run builds anyway)
-
-**The script handles:**
-- Setting up paths and environment variables
-- Substituting `{{SERVER_COMMAND}}`, `{{MODEL}}`, `{{TEST_RESULTS_PATH}}` in YAML
-- Running agent-benchmark with correct arguments
-- Generating reports to `TestResults` directory
+**Common commands:**
+- `uv run pytest -v` — Run all LLM tests
+- `uv run pytest test_notepad_ui.py -v` — Run specific test
+- `uv run pytest integration/ -v` — Run integration tests
+- `uv run pytest --collect-only` — List available tests without running
 
 **Do NOT:**
 - Publish to .exe manually
 - Set MCP_PROJECT_PATH or TEST_RESULTS_PATH manually
-- Run agent-benchmark.exe directly
-- cd to agent-benchmark directory
 
 ### Writing LLM Test Scenarios
 

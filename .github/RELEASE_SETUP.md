@@ -182,7 +182,7 @@ az login
 
 # Run a quick test
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
-.\Run-LLMTests.ps1 -Scenario window-management-test.yaml -Build
+uv run pytest -v
 ```
 
 ### Trigger a Test Release
@@ -240,4 +240,4 @@ GitHub Actions `windows-latest` runners have a desktop session by default. If te
 - [Azure OIDC for GitHub Actions](https://learn.microsoft.com/en-us/azure/developer/github/connect-from-azure)
 - [Federated Identity Credentials](https://learn.microsoft.com/en-us/graph/api/resources/federatedidentitycredentials-overview)
 - [Publishing VS Code Extensions](https://code.visualstudio.com/api/working-with-extensions/publishing-extension)
-- [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) — LLM testing framework
+- [pytest-aitest](https://github.com/sbroenne/pytest-aitest) — LLM testing framework
