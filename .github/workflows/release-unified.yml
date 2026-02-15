@@ -1,0 +1,523 @@
+name: Release All Components
+
+# Unified release workflow for Windows MCP Server:
+# - Standalone MCP Server binaries (win-x64, win-arm64)
+# - VS Code Extension (VSIX + Marketplace)
+#
+# All components are released with the same version.
+# Trigger: workflow_dispatch with version bump (major/minor/patch) or custom version.
+# The workflow auto-calculates the next version from the latest git tag,
+# creates the git tag after successful builds, then creates the GitHub release.
+#
+# Required GitHub Secrets:
+# - VSCE_TOKEN: VS Code Marketplace PAT
+# - AZURE_CLIENT_ID: Azure Entra ID app client ID (for LLM tests)
+# - AZURE_TENANT_ID: Azure Entra ID tenant ID (for LLM tests)
+# - AZURE_SUBSCRIPTION_ID: Azure subscription ID (for LLM tests)
+#
+# Required GitHub Variables:
+# - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint URL (for LLM tests)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        default: 'patch'
+        options:
+          - major
+          - minor
+          - patch
+      custom_version:
+        description: 'Custom version (e.g., 1.2.3, overrides version_bump)'
+        required: false
+        type: string
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '22'
+
+jobs:
+  # =============================================================================
+  # Job 0: Calculate Version
+  # =============================================================================
+  version:
+    name: Calculate Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.calculate_version.outputs.version }}
+      tag: ${{ steps.calculate_version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history and tags
+
+      - name: Calculate version
+        id: calculate_version
+        run: |
+          # If custom version is provided, use it
+          if [ -n "${{ inputs.custom_version }}" ]; then
+            VERSION="${{ inputs.custom_version }}"
+            echo "Using custom version: ${VERSION}"
+          else
+            # Get the latest tag matching v*
+            LATEST_TAG=$(git tag -l 'v*' --sort=-version:refname | head -n 1)
+            if [ -z "$LATEST_TAG" ]; then
+              LATEST_TAG="v0.0.0"
+            fi
+            echo "Latest tag: ${LATEST_TAG}"
+
+            # Remove 'v' prefix if present
+            CURRENT_VERSION="${LATEST_TAG#v}"
+            echo "Current version: ${CURRENT_VERSION}"
+
+            # Parse version components
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+
+            # Increment based on bump type
+            case "${{ inputs.version_bump }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            echo "New version: ${VERSION}"
+          fi
+
+          TAG="v${VERSION}"
+
+          # Check if tag already exists
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "::error::Tag $TAG already exists"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  # =============================================================================
+  # Job 1: LLM Integration Tests (optional - only if secrets configured)
+  # =============================================================================
+  llm-tests:
+    name: LLM Integration Tests
+    needs: [version]
+    runs-on: windows-latest
+    permissions:
+      id-token: write   # Required for Azure OIDC
+      contents: read
+    # Skip if Azure secrets are not configured
+    if: vars.AZURE_OPENAI_ENDPOINT != ''
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup Python & uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: '3.12'
+
+    - name: Azure Login (OIDC)
+      uses: azure/login@v2
+      with:
+        client-id: ${{ secrets.AZURE_CLIENT_ID }}
+        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+        subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+    - name: Run LLM Integration Tests
+      env:
+        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+        UV_LINK_MODE: copy
+      run: |
+        cd tests/Sbroenne.WindowsMcp.LLM.Tests
+        dotnet build ../../src/Sbroenne.WindowsMcp -c Release -v:q
+        uv sync
+        uv run pytest test_*.py -v --tb=short --junitxml=TestResults/results.xml -p no:aitest-summary
+      shell: pwsh
+
+    - name: Upload LLM Test Reports
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: llm-test-reports
+        path: tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults/
+        retention-days: 30
+
+  # =============================================================================
+  # Job 2: Build Standalone MCP Server - Self-contained binaries
+  # =============================================================================
+  build-standalone:
+    name: Build Standalone MCP Server
+    needs: [version, llm-tests]
+    # Always run if LLM tests pass OR if they were skipped
+    if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Set Version
+      run: |
+        $version = "${{ needs.version.outputs.version }}"
+        Write-Output "Version: $version"
+        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+
+    - name: Update Version in Project
+      run: |
+        $version = $env:VERSION
+        $csprojPath = "src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj"
+        $content = Get-Content $csprojPath -Raw
+        $content = $content -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+        $content = $content -replace '<AssemblyVersion>[\d\.]+\.[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+        $content = $content -replace '<FileVersion>[\d\.]+\.[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+        Set-Content $csprojPath $content
+        Write-Output "Updated project to version $version"
+      shell: pwsh
+
+    - name: Restore Dependencies
+      run: dotnet restore
+
+    - name: Publish (Self-contained single-file)
+      run: |
+        $rid = "${{ matrix.rid }}"
+        dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj `
+          -c Release `
+          -r $rid `
+          -o "publish/$rid" `
+          -p:SelfContained=true `
+          -p:PublishSingleFile=true `
+          -p:EnableCompressionInSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:PublishReadyToRun=false
+      shell: pwsh
+
+    - name: Create Release Archive
+      run: |
+        $version = $env:VERSION
+        $rid = "${{ matrix.rid }}"
+
+        $publishDir = "publish/$rid"
+        if (!(Test-Path $publishDir)) {
+          Write-Error "Publish directory not found: $publishDir"
+        }
+
+        $zipName = "windows-mcp-server-$version-$rid.zip"
+        Compress-Archive -Path "$publishDir/*" -DestinationPath $zipName
+
+        Write-Output "Created release archive: $zipName"
+        Get-ChildItem *.zip | Format-Table Name, Length
+      shell: pwsh
+
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: standalone-${{ matrix.rid }}
+        path: windows-mcp-server-*.zip
+        retention-days: 1
+
+  # =============================================================================
+  # Job 3: Build VS Code Extension
+  # =============================================================================
+  build-vscode-extension:
+    name: Build VS Code Extension
+    needs: [version, llm-tests]
+    # Always run if LLM tests pass OR if they were skipped
+    if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Set Version
+      run: |
+        $version = "${{ needs.version.outputs.version }}"
+        Write-Output "Version: $version"
+        "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+      shell: pwsh
+
+    - name: Update MCP Server Version
+      run: |
+        $version = $env:VERSION
+
+        Write-Output "Updating MCP Server to version $version for bundled executable"
+
+        $mcpCsprojPath = "src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj"
+        $mcpContent = Get-Content $mcpCsprojPath -Raw
+        $mcpContent = $mcpContent -replace '<Version>[\d\.]+</Version>', "<Version>$version</Version>"
+        $mcpContent = $mcpContent -replace '<AssemblyVersion>[\d\.]+\.[\d\.]+</AssemblyVersion>', "<AssemblyVersion>$version.0</AssemblyVersion>"
+        $mcpContent = $mcpContent -replace '<FileVersion>[\d\.]+\.[\d\.]+</FileVersion>', "<FileVersion>$version.0</FileVersion>"
+        Set-Content $mcpCsprojPath $mcpContent
+
+        Write-Output "Updated MCP Server project to version $version"
+      shell: pwsh
+
+    - name: Update Extension Version
+      run: |
+        $version = $env:VERSION
+
+        Write-Output "Updating VS Code extension to version $version"
+
+        cd vscode-extension
+        $packageJsonPath = 'package.json'
+        $packageJsonContent = Get-Content $packageJsonPath | ConvertFrom-Json
+
+        if ($packageJsonContent.version -ne $version) {
+          npm version "$version" --no-git-tag-version
+          Write-Output "Updated package.json to version $version"
+        } else {
+          Write-Output "package.json version is already $version, skipping npm version"
+        }
+
+        # Update CHANGELOG.md - replace [Unreleased] with new version
+        $date = Get-Date -Format 'yyyy-MM-dd'
+        $changelogPath = 'CHANGELOG.md'
+        if (Test-Path $changelogPath) {
+          $changelogContent = Get-Content $changelogPath -Raw
+          $newUnreleased = "## [Unreleased]`n`n## [$version] - $date"
+          $changelogContent = $changelogContent -replace '## \[Unreleased\]', $newUnreleased
+          Set-Content $changelogPath $changelogContent
+          Write-Output "Updated CHANGELOG.md: [Unreleased] -> [$version] - $date"
+        }
+
+        Write-Output "Updated extension version to $version"
+      shell: pwsh
+
+    - name: Install Dependencies
+      run: |
+        cd vscode-extension
+        npm install
+
+    - name: Build and Package Extension
+      run: |
+        $version = $env:VERSION
+        cd vscode-extension
+
+        # Run the package script which does: build:mcp-server + vsce package
+        npm run package
+
+        # vsce creates filename based on package.json name
+        $actualVsix = Get-ChildItem -Path . -Filter "*.vsix" -File | Select-Object -First 1
+        if (-not $actualVsix) {
+          Write-Error "No VSIX file found"
+          exit 1
+        }
+
+        $targetName = "windows-mcp-$version.vsix"
+        if ($actualVsix.Name -ne $targetName) {
+          Rename-Item $actualVsix.FullName -NewName $targetName
+          Write-Output "Renamed $($actualVsix.Name) to $targetName"
+        }
+
+        Write-Output "Created $targetName"
+        Get-Item $targetName | Format-Table Name, Length
+      shell: pwsh
+
+    - name: Upload VSIX Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: vscode-extension
+        path: vscode-extension/*.vsix
+        retention-days: 1
+
+  # =============================================================================
+  # Job 4: Create Git Tag
+  # =============================================================================
+  create-tag:
+    name: Create Git Tag
+    needs: [version, build-standalone, build-vscode-extension]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        run: |
+          TAG="${{ needs.version.outputs.tag }}"
+          echo "Creating tag: $TAG"
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+
+  # =============================================================================
+  # Job 5: Publish to VS Code Marketplace
+  # =============================================================================
+  publish:
+    name: Publish to Marketplace
+    needs: [version, create-tag]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Set Version
+      run: |
+        $version = "${{ needs.version.outputs.version }}"
+        echo "VERSION=$version" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Download VS Code VSIX
+      uses: actions/download-artifact@v4
+      with:
+        name: vscode-extension
+        path: vscode-vsix
+
+    - name: Publish to VS Code Marketplace
+      uses: HaaLeo/publish-vscode-extension@v2
+      with:
+        pat: ${{ secrets.VSCE_TOKEN }}
+        registryUrl: https://marketplace.visualstudio.com
+        extensionFile: vscode-vsix/windows-mcp-${{ env.VERSION }}.vsix
+      continue-on-error: true
+      id: publishToMarketplace
+
+  # =============================================================================
+  # Job 6: Create Unified GitHub Release
+  # =============================================================================
+  create-release:
+    name: Create GitHub Release
+    needs: [version, create-tag, publish]
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set Version
+      run: |
+        $version = "${{ needs.version.outputs.version }}"
+        echo "VERSION=$version" >> $env:GITHUB_ENV
+      shell: pwsh
+
+    - name: Download All Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: artifacts
+        pattern: standalone-*
+        merge-multiple: true
+
+    - name: Download VSIX Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: vscode-extension
+        path: artifacts
+
+    - name: List Artifacts
+      run: |
+        Write-Output "Downloaded artifacts:"
+        Get-ChildItem -Path artifacts -Recurse | Format-Table Name, Length
+      shell: pwsh
+
+    - name: Assemble Release Notes
+      run: |
+        $version = $env:VERSION
+        $marketplaceStatus = "Not published"
+        if ("${{ needs.publish.result }}" -eq "success") {
+          $marketplaceStatus = "[x] Published to VS Code Marketplace"
+        } else {
+          $marketplaceStatus = "[ ] Marketplace publish failed (VSIX available below)"
+        }
+
+        $notes = @"
+        ## Windows MCP Server v$version
+
+        Let AI agents control Windows applications. Click buttons, type text, toggle settings - all by name, not coordinates.
+
+        ### Release Status
+
+        $marketplaceStatus
+
+        ### Installation Options
+
+        **VS Code Extension (Recommended)**
+        - Search 'Windows MCP' in VS Code Extensions, or
+        - Download windows-mcp-$version.vsix below and install manually
+
+        **Standalone Binaries** (no .NET required)
+        - windows-mcp-server-$version-win-x64.zip - x64 (most PCs)
+        - windows-mcp-server-$version-win-arm64.zip - ARM64 (Surface Pro X, ARM dev kits)
+
+        ### What's Included
+
+        - ui_find, ui_click, ui_type: Semantic UI automation by name
+        - screenshot_control: Annotated screenshots with element data
+        - mouse_control, keyboard_control: Fallback for games/custom UIs
+        - window_management: Find, activate, move, resize windows
+
+        See README for full documentation.
+        "@
+
+        $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
+        Write-Output "Release notes created"
+      shell: pwsh
+
+    - name: Create GitHub Release
+      run: |
+        $tagName = "${{ needs.version.outputs.tag }}"
+        $version = $env:VERSION
+
+        # Get all release files (zips and vsix)
+        $releaseFiles = Get-ChildItem -Path "artifacts" -File | ForEach-Object { $_.FullName }
+        
+        Write-Output "Release files:"
+        $releaseFiles | ForEach-Object { Write-Output "  $_" }
+
+        gh release create "$tagName" `
+          @releaseFiles `
+          --repo ${{ github.repository }} `
+          --title "Windows MCP Server v$version" `
+          --notes-file release_notes.md
+
+        Write-Output "Released Windows MCP Server v$version"
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      shell: pwsh

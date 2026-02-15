@@ -4,14 +4,47 @@ This document explains how to configure the Azure and GitHub infrastructure for 
 
 ## Overview
 
-The release workflow (`.github/workflows/release.yml`) runs LLM integration tests with real Azure OpenAI models before building and publishing releases. This requires:
+The release workflow (`.github/workflows/release-unified.yml`) is a unified workflow that builds and publishes all Windows MCP Server components (standalone binaries and VS Code extension) with a single version number.
 
-1. **Azure Entra ID App Registration** — For passwordless GitHub Actions authentication (OIDC)
-2. **Azure OpenAI Access** — For running LLM tests with GPT-4 and GPT-5 models
-3. **GitHub Secrets & Variables** — To connect the workflow to Azure
+The workflow optionally runs LLM integration tests with real Azure OpenAI models before building and publishing releases (if Azure credentials are configured). This requires:
+
+1. **GitHub Secrets** — For VS Code Marketplace publishing (required)
+2. **Azure Entra ID App Registration** — For passwordless GitHub Actions authentication (optional, for LLM tests)
+3. **Azure OpenAI Access** — For running LLM tests with GPT-4 models (optional)
+4. **GitHub Variables** — To connect the workflow to Azure (optional, for LLM tests)
 
 ## Architecture
 
+```
+┌─────────────────────┐   Manual Trigger    ┌─────────────────────┐
+│   GitHub Actions    │ ──(workflow_dispatch)│  Release Workflow   │
+│   (windows-latest)  │                      │  (unified)          │
+└─────────────────────┘                      └─────────────────────┘
+         │                                            │
+         │ Version Calculation                        │
+         ▼                                            ▼
+┌─────────────────────┐                      ┌─────────────────────┐
+│  Build Standalone   │                      │  Build VS Code Ext  │
+│  (x64, ARM64)       │                      │  (VSIX + Publish)   │
+└─────────────────────┘                      └─────────────────────┘
+         │                                            │
+         │                                            │
+         └────────────────┬───────────────────────────┘
+                          │
+                          ▼
+                 ┌─────────────────────┐
+                 │  Create Git Tag     │
+                 │  (v1.2.3)           │
+                 └─────────────────────┘
+                          │
+                          ▼
+                 ┌─────────────────────┐
+                 │  GitHub Release     │
+                 │  (with artifacts)   │
+                 └─────────────────────┘
+```
+
+**Optional LLM Tests** (if Azure credentials configured):
 ```
 ┌─────────────────────┐      OIDC Token      ┌─────────────────────┐
 │   GitHub Actions    │ ──────────────────►  │  Azure Entra ID     │
@@ -125,16 +158,23 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions.
 
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
-| `AZURE_CLIENT_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | App registration Application (client) ID |
-| `AZURE_TENANT_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Microsoft Entra Directory (tenant) ID |
-| `AZURE_SUBSCRIPTION_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Azure subscription ID |
-| `VSCE_TOKEN` | `xxxxxxxx...` | VS Code Marketplace Personal Access Token |
+| `VSCE_TOKEN` | `xxxxxxxx...` | VS Code Marketplace Personal Access Token (required) |
 
-### Required Variables
+### Optional Secrets (for LLM tests)
+
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `AZURE_CLIENT_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | App registration Application (client) ID (optional) |
+| `AZURE_TENANT_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Microsoft Entra Directory (tenant) ID (optional) |
+| `AZURE_SUBSCRIPTION_ID` | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Azure subscription ID (optional) |
+
+### Optional Variables (for LLM tests)
 
 | Variable Name | Value | Description |
 |---------------|-------|-------------|
-| `AZURE_OPENAI_ENDPOINT` | `https://YOUR-RESOURCE.cognitiveservices.azure.com/` | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_ENDPOINT` | `https://YOUR-RESOURCE.cognitiveservices.azure.com/` | Azure OpenAI endpoint URL (optional) |
+
+**Note:** LLM tests will be automatically skipped if `AZURE_OPENAI_ENDPOINT` is not configured.
 
 ### Getting a VSCE Token
 
@@ -157,11 +197,49 @@ The LLM tests require specific model deployments. In your Azure OpenAI resource:
 
 **Note:** Deployment names are referenced in test YAML files under `tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/`.
 
+## How to Release
+
+The new release process uses a unified workflow that is triggered manually via workflow_dispatch:
+
+1. Go to GitHub Actions → "Release All Components"
+2. Click "Run workflow"
+3. Select version bump type:
+   - **patch**: 1.2.3 → 1.2.4 (bug fixes)
+   - **minor**: 1.2.3 → 1.3.0 (new features)
+   - **major**: 1.2.3 → 2.0.0 (breaking changes)
+4. Or enter a custom version (e.g., "1.5.0")
+5. Click "Run workflow"
+
+The workflow will:
+1. Calculate the next version from the latest `v*` tag
+2. (Optional) Run LLM integration tests if Azure is configured
+3. Build standalone binaries (win-x64, win-arm64)
+4. Build VS Code extension (VSIX)
+5. Create and push the git tag (e.g., `v1.2.4`)
+6. Publish to VS Code Marketplace
+7. Create GitHub release with all artifacts
+
+### Test a Release (Dry Run)
+
+To test the workflow without publishing:
+
+1. Go to GitHub Actions → "Release All Components"
+2. Run with a custom version like "0.0.0-test"
+3. The workflow will build everything but create a test tag
+4. You can then manually delete the test tag and release:
+   ```bash
+   git tag -d v0.0.0-test
+   git push origin :refs/tags/v0.0.0-test
+   gh release delete v0.0.0-test --yes
+   ```
+
 ## Verification
 
 After setup, verify the configuration:
 
-### Test Azure OIDC Locally
+### Test Azure OIDC Locally (Optional)
+
+Only needed if you want to run LLM tests:
 
 ```bash
 # This simulates what GitHub Actions will do
@@ -171,7 +249,9 @@ az login --federated-token <GITHUB_OIDC_TOKEN> \
   -u <CLIENT_ID>
 ```
 
-### Test LLM Connection
+### Test LLM Connection (Optional)
+
+Only needed if you want to run LLM tests:
 
 ```powershell
 # Set environment variable
@@ -183,19 +263,6 @@ az login
 # Run a quick test
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
 uv run pytest -v
-```
-
-### Trigger a Test Release
-
-```bash
-# Create and push a test tag
-git tag v0.0.1-test
-git push origin v0.0.1-test
-
-# Watch the Actions tab in GitHub
-# Delete the tag when done
-git tag -d v0.0.1-test
-git push origin :refs/tags/v0.0.1-test
 ```
 
 ## Troubleshooting
@@ -231,9 +298,54 @@ GitHub Actions `windows-latest` runners have a desktop session by default. If te
 ## Security Considerations
 
 1. **No secrets in code** — All credentials are in GitHub Secrets
-2. **OIDC over PATs** — Federated credentials are time-limited and scoped
-3. **Least privilege** — Only "Cognitive Services OpenAI User" role, not Contributor
-4. **Scoped credentials** — Federated credentials only work for this specific repo
+2. **OIDC over PATs** — Federated credentials are time-limited and scoped (if Azure is configured)
+3. **Least privilege** — Only "Cognitive Services OpenAI User" role, not Contributor (if Azure is configured)
+4. **Scoped credentials** — Federated credentials only work for this specific repo (if Azure is configured)
+5. **Manual approval** — Releases are triggered manually via workflow_dispatch, not automatically on push
+
+## Migration from Old Release Process
+
+If you were using the old tag-based release workflows (`release.yml`, `release-mcp-server.yml`, `release-vscode-extension.yml`), you need to:
+
+1. **Clean up old tags**: The old process created separate tags for MCP server (`mcp-v*`) and VS Code extension (`vscode-v*`). The new unified process uses only `v*` tags.
+
+   Run the cleanup script to remove old tags:
+   ```powershell
+   # Dry run first to see what will be deleted
+   .\.github\scripts\cleanup-old-tags.ps1 -DryRun
+   
+   # Actually delete the tags
+   .\.github\scripts\cleanup-old-tags.ps1
+   ```
+
+   This will delete:
+   - All `mcp-v*` tags (e.g., `mcp-v1.1.0`, `mcp-v1.2.0`)
+   - All `vscode-v*` tags (e.g., `vscode-v1.1.0`, `vscode-v1.2.0`)
+   - Keep all `v*` tags (e.g., `v1.3.6`)
+
+2. **Remove old workflows**: Delete the old workflow files:
+   ```bash
+   git rm .github/workflows/release.yml
+   git rm .github/workflows/release-mcp-server.yml
+   git rm .github/workflows/release-vscode-extension.yml
+   ```
+
+3. **Use the new workflow**: Going forward, use "Release All Components" workflow from the Actions tab. It will automatically calculate the next version from the latest `v*` tag.
+
+### Why the Change?
+
+The old process had several issues:
+- **Version inconsistency**: Separate tags (`v*`, `mcp-v*`, `vscode-v*`) could get out of sync
+- **Complex**: Three separate workflows with duplicated logic
+- **Error-prone**: Manual tag creation required, easy to make mistakes
+- **Inefficient**: Required multiple releases to publish both components
+
+The new unified workflow:
+- ✅ **Single version** for all components
+- ✅ **Automatic versioning** with semantic version bumps
+- ✅ **Single workflow** for all release steps
+- ✅ **Manual trigger** with clear version bump options
+- ✅ **Consistent with mcp-server-excel** for easier maintenance
 
 ## References
 
