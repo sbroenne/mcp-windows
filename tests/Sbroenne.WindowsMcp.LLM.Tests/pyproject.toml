@@ -1,0 +1,14 @@
+[project]
+name = "mcp-windows-llm-tests"
+version = "0.1.0"
+description = "LLM integration tests for Windows MCP Server using pytest-aitest"
+requires-python = ">=3.12"
+dependencies = [
+    "pytest-aitest",
+    "anyio",
+    "pytest-asyncio",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["."]

@@ -1,5 +1,7 @@
 # Tasks: Comprehensive LLM Tool Coverage Tests
 
+> **Note**: This spec was written for the original agent-benchmark implementation. The project has since migrated to [pytest-aitest](https://github.com/sbroenne/pytest-aitest). See `tests/Sbroenne.WindowsMcp.LLM.Tests/README.md` for current usage.
+
 **Input**: Design documents from `/specs/015-llm-tool-coverage/`  
 **Prerequisites**: plan.md ✅, spec.md ✅, research.md ✅, data-model.md ✅, quickstart.md ✅
 

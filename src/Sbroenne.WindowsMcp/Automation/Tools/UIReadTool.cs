@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tools;
@@ -30,6 +29,7 @@ public static partial class UIReadTool
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="includeChildren">Include child element text (default: false).</param>
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
+    /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The extracted text content from the element or screen region.</returns>
     [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false)]
@@ -44,6 +44,7 @@ public static partial class UIReadTool
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool includeChildren,
         [DefaultValue(null)] string? language,
+        [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         const string actionName = "read";
@@ -87,7 +88,7 @@ public static partial class UIReadTool
             var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, cancellationToken);
             if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
             {
-                return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
             }
 
             // Fallback: try OCR on the window region
@@ -95,12 +96,12 @@ public static partial class UIReadTool
             {
                 if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
                 {
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
                 }
 
                 if (!NativeMethods.GetWindowRect(hwnd, out var rect))
                 {
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
                 }
 
                 var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
@@ -118,7 +119,7 @@ public static partial class UIReadTool
                     {
                         UsageHint = $"Text extracted via OCR (fallback). Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
                     };
-                    return JsonSerializer.Serialize(ocrSuccessResult, WindowsToolsBase.JsonOptions);
+                    return WindowsToolsBase.SerializeUIResult(ocrSuccessResult, includeDiagnostics);
                 }
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -126,7 +127,7 @@ public static partial class UIReadTool
                 // OCR fallback failed - ignore and return original result
             }
 
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {

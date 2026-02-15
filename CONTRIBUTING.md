@@ -163,25 +163,25 @@ LLM integration tests verify that AI agents can correctly use the MCP tools with
 - **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps  
 - **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
 
-These tests use [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) and require:
+These tests use [pytest-aitest](https://github.com/sbroenne/pytest-aitest) and require:
 - Azure OpenAI API access (Entra ID auth or set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
 - Windows desktop session with GUI access
-- Go 1.21+ for running agent-benchmark
+- Python 3.12+ and uv
 
 **LLM tests run automatically during every release** via GitHub Actions with Azure OIDC authentication. A 100% pass rate is required before release. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for Azure and GitHub configuration details.
 
 #### Running LLM Tests
 
 ```powershell
-# Run all LLM tests (builds server first)
+# Run all LLM tests
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
-.\Run-LLMTests.ps1 -Build
+uv run pytest -v
 
-# Run specific scenario
-.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
+# Run specific test
+uv run pytest test_notepad_ui.py -v
 
-# Run with specific report type
-.\Run-LLMTests.ps1 -Scenario window-management-test.yaml -ReportType "html,json"
+# Run integration tests
+uv run pytest integration/ -v
 ```
 
 #### Available Test Scenarios

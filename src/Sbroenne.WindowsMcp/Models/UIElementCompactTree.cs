@@ -7,15 +7,6 @@ namespace Sbroenne.WindowsMcp.Models;
 /// Reduces token count compared to full UIElementInfo while preserving hierarchy.
 /// Use get_element_details action to fetch full details when needed.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON serialization overhead:
-/// - id: Element ID for subsequent operations
-/// - n: Name (human-readable)
-/// - t: Type (control type)
-/// - c: Click coordinates [x, y, monitorIndex]
-/// - e: Enabled status
-/// - ch: Children (nested tree elements)
-/// </remarks>
 public sealed record UIElementCompactTree
 {
     /// <summary>
@@ -27,32 +18,32 @@ public sealed record UIElementCompactTree
     /// <summary>
     /// Human-readable name from accessibility tree.
     /// </summary>
-    [JsonPropertyName("n")]
+    [JsonPropertyName("name")]
     public string? Name { get; init; }
 
     /// <summary>
     /// Control type (Button, Edit, Text, etc.).
     /// </summary>
-    [JsonPropertyName("t")]
+    [JsonPropertyName("type")]
     public required string Type { get; init; }
 
     /// <summary>
     /// Click coordinates as [x, y, monitorIndex]. Use with mouse_control:
     /// mouse_control(action='click', x=c[0], y=c[1], monitorIndex=c[2])
     /// </summary>
-    [JsonPropertyName("c")]
+    [JsonPropertyName("click")]
     public int[]? Click { get; init; }
 
     /// <summary>
     /// Whether the element is currently enabled.
     /// </summary>
-    [JsonPropertyName("e")]
+    [JsonPropertyName("enabled")]
     public required bool Enabled { get; init; }
 
     /// <summary>
     /// Child elements in the UI tree.
     /// </summary>
-    [JsonPropertyName("ch")]
+    [JsonPropertyName("children")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompactTree[]? Children { get; init; }
 

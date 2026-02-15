@@ -12,7 +12,7 @@ The constitution is NON-NEGOTIABLE and covers:
 - Security Best Practices (Principle VIII)
 - Modern .NET & C# (Principle XIII)
 - xUnit Testing (Principle XIV)
-- LLM Integration Testing with agent-benchmark (Principle XXIII)
+- LLM Integration Testing with pytest-aitest (Principle XXIII)
 - Token Optimization for LLM Efficiency (Principle XXIV)
 - UI Automation First (Principle XXV) - semantic UI automation is primary approach
 - And more (25 principles total)...
@@ -51,7 +51,7 @@ These are the reference implementations for Windows UI automation patterns:
 Quick reference:
 - **Unit tests**: `dotnet test --filter "FullyQualifiedName~Unit"`
 - **Integration tests**: `dotnet test --filter "FullyQualifiedName~Integration"` (ALL MUST PASS)
-- **LLM tests**: Use `Run-LLMTests.ps1` script (expensive - only when requested)
+- **LLM tests**: `cd tests/Sbroenne.WindowsMcp.LLM.Tests && uv run pytest -v` (expensive - only when requested)
 
 ## LLM Test Authoring (CRITICAL)
 

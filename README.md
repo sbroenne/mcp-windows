@@ -98,14 +98,14 @@ dotnet test --filter "FullyQualifiedName~Unit"   # Unit only
 
 ```powershell
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
-.\Run-LLMTests.ps1 
+uv run pytest -v
 ```
 
 Requires Azure OpenAI access. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md).
 
 ## Related Projects
 
-- **[agent-benchmark](https://github.com/mykhaliev/agent-benchmark)** — LLM agent testing framework (powers our integration tests)
+- **[pytest-aitest](https://github.com/sbroenne/pytest-aitest)** — LLM agent testing framework (powers our integration tests)
 - **[Excel MCP Server](https://excelmcpserver.dev)** — AI-powered Excel automation
 - **[OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs)** — AI-powered streaming control
 

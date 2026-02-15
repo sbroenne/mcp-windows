@@ -5,39 +5,18 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Result from a UI Automation tool operation.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON token count:
-/// - ok: Success
-/// - a: Action
-/// - Elements: Full element details (internal)
-/// - Items: Compact element list
-/// - Tree: Compact tree structure
-/// - n: Element count
-/// - hint: Usage hint
-/// - txt: Text content
-/// - et: Error type
-/// - err: Error message
-/// - fix: Recovery suggestion
-/// - diag: Diagnostics
-/// - tw: Target window
-/// - img: Annotated image data
-/// - fmt: Image format
-/// - w: Image width
-/// - h: Image height
-/// - ae: Annotated elements
-/// </remarks>
 public sealed record UIAutomationResult
 {
     /// <summary>
     /// Whether the operation succeeded.
     /// </summary>
-    [JsonPropertyName("ok")]
+    [JsonPropertyName("success")]
     public required bool Success { get; init; }
 
     /// <summary>
     /// Action that was performed.
     /// </summary>
-    [JsonPropertyName("a")]
+    [JsonPropertyName("action")]
     public required string Action { get; init; }
 
     /// <summary>
@@ -49,7 +28,7 @@ public sealed record UIAutomationResult
     /// <summary>
     /// Compact element list for Find actions (token-optimized, flat list).
     /// Use elementId from this list with get_element_details to fetch full info.
-    /// Format: id, n(name), t(type), c(click:[x,y,monitor]), e(enabled).
+    /// Format: id, name, type, click:[x,y,monitor], enabled.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompact[]? Items { get; init; }
@@ -57,7 +36,7 @@ public sealed record UIAutomationResult
     /// <summary>
     /// Compact tree structure for GetTree actions (token-optimized, with hierarchy).
     /// Use elementId from this list with get_element_details to fetch full info.
-    /// Format: id, n(name), t(type), c(click:[x,y,monitor]), e(enabled), ch(children).
+    /// Format: id, name, type, click:[x,y,monitor], enabled, children.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompactTree[]? Tree { get; init; }
@@ -65,7 +44,7 @@ public sealed record UIAutomationResult
     /// <summary>
     /// Number of elements found.
     /// </summary>
-    [JsonPropertyName("n")]
+    [JsonPropertyName("elementCount")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? ElementCount { get; init; }
 
@@ -80,21 +59,21 @@ public sealed record UIAutomationResult
     /// <summary>
     /// Text content (for get_text action).
     /// </summary>
-    [JsonPropertyName("txt")]
+    [JsonPropertyName("text")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Text { get; init; }
 
     /// <summary>
     /// Error type if failed.
     /// </summary>
-    [JsonPropertyName("et")]
+    [JsonPropertyName("errorType")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorType { get; init; }
 
     /// <summary>
     /// Error message if failed.
     /// </summary>
-    [JsonPropertyName("err")]
+    [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorMessage { get; init; }
 
@@ -102,14 +81,14 @@ public sealed record UIAutomationResult
     /// Suggested recovery action for LLM agents when the operation fails.
     /// Provides actionable guidance on what to try next.
     /// </summary>
-    [JsonPropertyName("fix")]
+    [JsonPropertyName("recoverySuggestion")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RecoverySuggestion { get; init; }
 
     /// <summary>
     /// Diagnostic info for debugging.
     /// </summary>
-    [JsonPropertyName("diag")]
+    [JsonPropertyName("diagnostics")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIAutomationDiagnostics? Diagnostics { get; init; }
 
@@ -117,35 +96,35 @@ public sealed record UIAutomationResult
     /// Information about the window that was the target of the action.
     /// Helps LLM agents verify the action was performed on the correct window.
     /// </summary>
-    [JsonPropertyName("tw")]
+    [JsonPropertyName("targetWindow")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
     /// Base64-encoded annotated screenshot image data (for capture_annotated action).
     /// </summary>
-    [JsonPropertyName("img")]
+    [JsonPropertyName("annotatedImageData")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AnnotatedImageData { get; init; }
 
     /// <summary>
     /// Format of the annotated image (jpeg or png).
     /// </summary>
-    [JsonPropertyName("fmt")]
+    [JsonPropertyName("annotatedImageFormat")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? AnnotatedImageFormat { get; init; }
 
     /// <summary>
     /// Width of the annotated image in pixels.
     /// </summary>
-    [JsonPropertyName("w")]
+    [JsonPropertyName("annotatedImageWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? AnnotatedImageWidth { get; init; }
 
     /// <summary>
     /// Height of the annotated image in pixels.
     /// </summary>
-    [JsonPropertyName("h")]
+    [JsonPropertyName("annotatedImageHeight")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? AnnotatedImageHeight { get; init; }
 
@@ -153,7 +132,7 @@ public sealed record UIAutomationResult
     /// Array of annotated elements with their numbered indices matching the labels on the screenshot.
     /// Use these to reference elements by number in subsequent operations.
     /// </summary>
-    [JsonPropertyName("ae")]
+    [JsonPropertyName("annotatedElements")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AnnotatedElement[]? AnnotatedElements { get; init; }
 

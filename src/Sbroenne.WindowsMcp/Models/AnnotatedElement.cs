@@ -12,19 +12,19 @@ public sealed record AnnotatedElement
     /// The numeric index of this element as shown on the annotated screenshot.
     /// Use this index to reference the element in subsequent operations.
     /// </summary>
-    [JsonPropertyName("i")]
+    [JsonPropertyName("index")]
     public required int Index { get; init; }
 
     /// <summary>
     /// The name of the element.
     /// </summary>
-    [JsonPropertyName("n")]
+    [JsonPropertyName("name")]
     public string? Name { get; init; }
 
     /// <summary>
     /// The control type (e.g., Button, Edit, CheckBox).
     /// </summary>
-    [JsonPropertyName("t")]
+    [JsonPropertyName("type")]
     public required string Type { get; init; }
 
     /// <summary>
@@ -36,6 +36,6 @@ public sealed record AnnotatedElement
     /// <summary>
     /// Click coordinates as [x, y, monitorIndex] array for mouse_control.
     /// </summary>
-    [JsonPropertyName("c")]
+    [JsonPropertyName("click")]
     public required int[] Click { get; init; }
 }

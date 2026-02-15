@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -33,6 +32,7 @@ public static partial class UITypeTool
     /// <param name="className">Element class name.</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="clearFirst">Clear existing text before typing (default: false).</param>
+    /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the type operation including success status and element information.</returns>
     [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false)]
@@ -47,6 +47,7 @@ public static partial class UITypeTool
         [DefaultValue(null)] string? className,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool clearFirst,
+        [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         const string actionName = "type";
@@ -77,7 +78,7 @@ public static partial class UITypeTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndTypeAsync(query, text, clearFirst, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {

@@ -1,5 +1,7 @@
 # Implementation Plan: Comprehensive LLM Tool Coverage Tests
 
+> **Note**: This spec was written for the original agent-benchmark implementation. The project has since migrated to [pytest-aitest](https://github.com/sbroenne/pytest-aitest). See `tests/Sbroenne.WindowsMcp.LLM.Tests/README.md` for current usage.
+
 **Branch**: `015-llm-tool-coverage` | **Date**: 2026-01-07 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/015-llm-tool-coverage/spec.md`
 

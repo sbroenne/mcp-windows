@@ -327,48 +327,51 @@ public sealed class SystemResources
             # Result Schema Reference
 
             JSON examples showing key fields in tool responses. Use for planning multi-step workflows.
-            Note: Property names use short abbreviations to minimize token usage.
 
             ## window_management
 
             ```json
-            // find/list returns windows array (ws):
+            // list returns windows array:
             {
-              "ok": true,
-              "ws": [
+              "success": true,
+              "windows": [
                 {
-                  "h": "12345678",
-                  "t": "Visual Studio Code",
-                  "pn": "Code",
-                  "pid": 1234,
-                  "s": "normal",
-                  "fg": true,
-                  "b": [0, 0, 1920, 1080]
+                  "handle": "12345678",
+                  "title": "Visual Studio Code",
+                  "processName": "Code"
                 }
               ],
-              "n": 1
+              "count": 1
             }
-            // activate/single window returns window object (w):
+            // find/activate returns single window object:
             {
-              "ok": true,
-              "w": { "h": "12345678", "t": "...", "s": "normal" }
+              "success": true,
+              "window": {
+                "handle": "12345678",
+                "title": "...",
+                "className": "...",
+                "processName": "Code",
+                "pid": 1234,
+                "state": "normal",
+                "isForeground": true,
+                "bounds": [0, 0, 1920, 1080]
+              }
             }
             ```
 
-            **Key fields:** `h` (handle) - pass verbatim to other tools as `windowHandle`. `ok` = success.
-            **Abbreviations:** h=handle, t=title, pn=process_name, pid=process_id, s=state, fg=foreground, b=bounds[x,y,w,h], n=count
+            **Key fields:** `handle` - pass verbatim to other tools as `windowHandle`. `success` = operation succeeded.
 
             ## ui_find / ui_click / ui_type / ui_read
 
             ```json
-            // ui_find returns elements array (ae):
+            // ui_find returns annotated elements:
             {
-              "ok": true,
-              "ae": [
+              "success": true,
+              "annotatedElements": [
                 {
                   "id": "path:fast:12345678:1.2.3",
-                  "n": "Save",
-                  "t": "Button",
+                  "name": "Save",
+                  "type": "Button",
                   "aid": "SaveButton",
                   "cp": [450, 300],
                   "br": [400, 280, 100, 40],
@@ -377,21 +380,21 @@ public sealed class SystemResources
                   "fw": "WPF"
                 }
               ],
-              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" },
-              "n": 1
+              "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" },
+              "elementCount": 1
             }
-            // ui_click/ui_type returns single element (el):
+            // ui_click/ui_type returns single element:
             {
-              "ok": true,
-              "el": { "id": "...", "n": "Save", "t": "Button", "ts": "on" },
-              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
+              "success": true,
+              "el": { "id": "...", "name": "Save", "type": "Button", "ts": "on" },
+              "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" }
             }
-            // ui_read returns text (txt):
+            // ui_read returns text:
             {
-              "ok": true,
-              "txt": "Hello World",
-              "el": { "id": "...", "n": "Content", "t": "Text" },
-              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
+              "success": true,
+              "text": "Hello World",
+              "el": { "id": "...", "name": "Content", "type": "Text" },
+              "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" }
             }
             ```
 
@@ -401,105 +404,98 @@ public sealed class SystemResources
             - `fw` (framework_type) - "Electron", "WPF", "WinForms" (affects search strategy)
             - `ts` (toggle_state) - "on"/"off" for checkboxes after clicking
 
-            **Abbreviations:** id=element_id, n=name/count, t=type, cp=clickable_point, br=bounding_rect, en=enabled, pat=patterns, fw=framework, tw=target_window, ts=toggle_state, txt=text
-
             ## file_save
 
             ```json
             // Save successful:
             {
-              "ok": true,
-              "fp": "C:\\Users\\User\\document.docx",
+              "success": true,
+              "filePath": "C:\\Users\\User\\document.docx",
               "method": "com_interop",
-              "tw": { "h": "12345678", "t": "Document1 - Word", "pn": "WINWORD" }
+              "targetWindow": { "handle": "12345678", "title": "Document1 - Word", "processName": "WINWORD" }
             }
             // Save via dialog:
             {
-              "ok": true,
-              "fp": "C:\\Users\\User\\file.txt",
+              "success": true,
+              "filePath": "C:\\Users\\User\\file.txt",
               "method": "save_dialog",
-              "tw": { "h": "12345678", "t": "Untitled - Notepad", "pn": "notepad" }
+              "targetWindow": { "handle": "12345678", "title": "Untitled - Notepad", "processName": "notepad" }
             }
             ```
 
-            **Key fields:** `fp` (file_path) - where file was saved. `method` - how it was saved (com_interop for Office, save_dialog for others).
-            **Abbreviations:** ok=success, fp=file_path, tw=target_window
+            **Key fields:** `filePath` - where file was saved. `method` - how it was saved (com_interop for Office, save_dialog for others).
 
             ## mouse_control
 
             ```json
             {
-              "ok": true,
-              "pos": [450, 300],
-              "mi": 0,
-              "mw": 1920,
-              "mh": 1080,
-              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
+              "success": true,
+              "position": [450, 300],
+              "monitorIndex": 0,
+              "monitorWidth": 1920,
+              "monitorHeight": 1080,
+              "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" }
             }
             ```
 
-            **Key field:** `tw` (target_window) - verify clicks went to correct window.
-            **Abbreviations:** ok=success, pos=position[x,y], mi=monitor_index, mw=monitor_width, mh=monitor_height, tw=target_window
+            **Key field:** `targetWindow` - verify clicks went to correct window.
 
             ## keyboard_control
 
             ```json
             {
-              "ok": true,
-              "cnt": 15,
-              "tw": { "h": "12345678", "t": "My App", "pn": "myapp" }
+              "success": true,
+              "charactersTyped": 15,
+              "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" }
             }
             ```
 
-            **Key field:** `tw` (target_window) - verify input went to correct window.
-            **Abbreviations:** ok=success, cnt=characters_typed, tw=target_window
+            **Key field:** `targetWindow` - verify input went to correct window.
 
             ## screenshot_control
 
             ```json
             // capture with annotate=true (default):
             {
-              "ok": true,
-              "ae": [
-                { "i": 1, "id": "...", "n": "File", "t": "MenuItem" },
-                { "i": 2, "id": "...", "n": "Edit", "t": "MenuItem" }
+              "success": true,
+              "annotatedElements": [
+                { "index": 1, "id": "...", "name": "File", "type": "MenuItem" },
+                { "index": 2, "id": "...", "name": "Edit", "type": "MenuItem" }
               ],
-              "n": 25,
-              "img": "base64...",
-              "fmt": "jpeg"
+              "elementCount": 25,
+              "imageData": "base64...",
+              "format": "jpeg"
             }
             // capture with annotate=false:
             {
-              "ok": true,
-              "img": "base64...",
-              "w": 1920,
-              "h": 1080,
-              "fmt": "jpeg"
+              "success": true,
+              "imageData": "base64...",
+              "width": 1920,
+              "height": 1080,
+              "format": "jpeg"
             }
             // list_monitors:
             {
-              "ok": true,
-              "mon": [
-                { "i": 0, "p": true, "w": 1920, "h": 1080, "x": 0, "y": 0 }
+              "success": true,
+              "monitors": [
+                { "index": 0, "isPrimary": true, "width": 1920, "height": 1080, "x": 0, "y": 0 }
               ]
             }
             ```
-
-            **Abbreviations:** ok=success, ae=annotated_elements, i=index, img=image_data, w=width, h=height, fmt=format, mon=monitors, p=is_primary
 
             ## Error Response (all tools)
 
             ```json
             {
-              "ok": false,
-              "ec": "element_not_found",
-              "err": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
-              "fix": "Use screenshot_control(annotate=true) to discover available elements.",
-              "tw": { "h": "12345678", "t": "...", "pn": "..." }
+              "success": false,
+              "errorCode": "element_not_found",
+              "error": "Element matching criteria not found. Try screenshot_control(annotate=true) to discover elements.",
+              "recoverySuggestion": "Use screenshot_control(annotate=true) to discover available elements.",
+              "targetWindow": { "handle": "12345678", "title": "...", "processName": "..." }
             }
             ```
 
-            **Key fields:** `ec` (error_code) - look up in system://error-recovery for recovery actions. `fix` = recovery suggestion.
+            **Key fields:** `errorCode` - look up in system://error-recovery for recovery actions. `recoverySuggestion` = recovery hint.
             """;
     }
 }

@@ -5,73 +5,60 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Represents the result of a keyboard control operation.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON token count:
-/// - ok: Success
-/// - ec: Error Code
-/// - err: Error message
-/// - cnt: Characters typed count
-/// - k: Key pressed
-/// - held: Held keys
-/// - seq: Sequence length
-/// - kbl: Keyboard layout
-/// - tw: Target window
-/// - msg: Message
-/// </remarks>
 public sealed record KeyboardControlResult
 {
     /// <summary>
     /// Gets or sets a value indicating whether the operation succeeded.
     /// </summary>
-    [JsonPropertyName("ok")]
+    [JsonPropertyName("success")]
     public required bool Success { get; init; }
 
     /// <summary>
     /// Gets or sets the error code if the operation failed.
     /// </summary>
-    [JsonPropertyName("ec")]
+    [JsonPropertyName("errorCode")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public KeyboardControlErrorCode ErrorCode { get; init; }
 
     /// <summary>
     /// Gets or sets the error message if the operation failed.
     /// </summary>
-    [JsonPropertyName("err")]
+    [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Error { get; init; }
 
     /// <summary>
     /// Gets or sets the number of characters typed (for Type action).
     /// </summary>
-    [JsonPropertyName("cnt")]
+    [JsonPropertyName("charactersTyped")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? CharactersTyped { get; init; }
 
     /// <summary>
     /// Gets or sets the key that was pressed (for Press, KeyDown, KeyUp actions).
     /// </summary>
-    [JsonPropertyName("k")]
+    [JsonPropertyName("keyPressed")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? KeyPressed { get; init; }
 
     /// <summary>
     /// Gets or sets the list of keys that are currently held.
     /// </summary>
-    [JsonPropertyName("held")]
+    [JsonPropertyName("heldKeys")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<string>? HeldKeys { get; init; }
 
     /// <summary>
     /// Gets or sets the number of keys executed in a sequence.
     /// </summary>
-    [JsonPropertyName("seq")]
+    [JsonPropertyName("sequenceLength")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? SequenceLength { get; init; }
 
     /// <summary>
     /// Gets or sets the keyboard layout information (for GetKeyboardLayout action).
     /// </summary>
-    [JsonPropertyName("kbl")]
+    [JsonPropertyName("keyboardLayout")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public KeyboardLayoutInfo? KeyboardLayout { get; init; }
 
@@ -79,14 +66,14 @@ public sealed record KeyboardControlResult
     /// Gets or sets information about the window that received the keyboard input.
     /// This helps LLM agents verify that input was sent to the correct window.
     /// </summary>
-    [JsonPropertyName("tw")]
+    [JsonPropertyName("targetWindow")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TargetWindowInfo? TargetWindow { get; init; }
 
     /// <summary>
     /// Gets or sets a message describing the result (e.g., for wait_for_idle action).
     /// </summary>
-    [JsonPropertyName("msg")]
+    [JsonPropertyName("message")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
 
