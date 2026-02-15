@@ -4,10 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Main application packages -->
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.1.1-preview.1.25612.2" />
-    <PackageVersion Include="ModelContextProtocol" Version="0.5.0-preview.1" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.3.0" />
+    <PackageVersion Include="ModelContextProtocol" Version="0.8.0-preview.1" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.3" />
     <PackageVersion Include="Interop.UIAutomationClient" Version="10.19041.0" />
     <!-- Test packages -->
     <PackageVersion Include="Bogus" Version="35.6.5" />
@@ -19,7 +19,7 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     <!-- WinUI 3 / Windows App SDK - using latest 1.8.x for .NET 10 -->
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260101001" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
   </ItemGroup>
 </Project>
