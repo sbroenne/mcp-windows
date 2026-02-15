@@ -2,9 +2,9 @@
 <!--
   Test Execution Configuration for .NET unit tests.
   
-  LLM integration tests have been migrated to agent-benchmark and are no longer
-  part of the dotnet test workflow. Run them separately using:
-    tests/Sbroenne.WindowsMcp.LLM.Tests/Run-LLMTests.ps1
+  LLM integration tests use pytest-aitest and are not part of the dotnet test
+  workflow. Run them separately using:
+    cd tests/Sbroenne.WindowsMcp.LLM.Tests && uv run pytest -v
   
   This file is auto-discovered by dotnet test when named .runsettings in solution root.
   Simply run: dotnet test

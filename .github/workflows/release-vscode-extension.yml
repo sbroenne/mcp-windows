@@ -26,10 +26,10 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
+    - name: Setup Python & uv
+      uses: astral-sh/setup-uv@v6
       with:
-        go-version: '1.23'
+        python-version: '3.12'
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -41,9 +41,12 @@ jobs:
     - name: Run LLM Integration Tests
       env:
         AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+        UV_LINK_MODE: copy
       run: |
         cd tests/Sbroenne.WindowsMcp.LLM.Tests
-        ./Run-LLMTests.ps1 -Build
+        dotnet build ../../src/Sbroenne.WindowsMcp -c Release -v:q
+        uv sync
+        uv run pytest test_*.py -v --tb=short --junitxml=TestResults/results.xml -p no:aitest-summary
       shell: pwsh
 
     - name: Upload LLM Test Reports

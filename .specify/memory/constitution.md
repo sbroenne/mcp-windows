@@ -255,24 +255,25 @@ As an MIT-licensed open source project, all dependencies MUST be freely usable:
 - Before adding any dependency, verify its license is compatible with MIT
 - Dependencies with "free for open source, paid for commercial" models are PROHIBITED to avoid contributor confusion
 
-### XXIII. LLM Integration Testing with agent-benchmark (NON-NEGOTIABLE)
+### XXIII. LLM Integration Testing with pytest-aitest (NON-NEGOTIABLE)
 
-Every tool MUST be validated for real-world LLM usability using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark):
+Every tool MUST be validated for real-world LLM usability using [pytest-aitest](https://github.com/sbroenne/pytest-aitest):
 
 **Test Structure**:
 - LLM tests live in `tests/Sbroenne.WindowsMcp.LLM.Tests/`
-- Each test scenario is a YAML file defining: name, tools, system prompt, test cases
-- Tests are run via `Run-LLMTests.ps1` script
+- Each test is a Python file using pytest-aitest's `aitest_run` fixture
+- Tests are run via `uv run pytest` (no wrapper script)
 
 **Assertion Types**:
-- `screenshot`: Capture and verify visual state after actions
-- `script`: Run PowerShell scripts to verify side effects (e.g., file creation, registry)
-- `tool_call`: Assert that specific tools were called with expected parameters
+- `result.tool_was_called("tool")`: Assert that specific tools were called
+- `result.tool_calls_for("tool")`: Get tool calls for parameter inspection
+- `result.success`: Assert no errors occurred
+- `result.asked_for_clarification`: Assert no clarification questions were asked
 
 **Test Categories**:
-- **Basic**: Single-tool scenarios (e.g., launch Notepad, type text)
-- **Workflow**: Multi-tool scenarios (e.g., create document, save, close)
-- **Edge Cases**: Error handling, invalid inputs, recovery scenarios
+- **Scenario** (root): Multi-step workflow tests (both gpt-4.1 and gpt-5.2-chat)
+- **Integration** (`integration/`): Single-tool tests (gpt-4.1 only)
+- **Eval** (`eval/`): External server evaluations
 
 **When to Add LLM Tests**:
 - New tools MUST have at least one basic LLM test
@@ -334,7 +335,7 @@ This server uses **Windows UI Automation API as the primary interaction method**
 | Runtime | .NET 10.0 |
 | Build Mode | Self-contained for releases (x64, ARM64); Framework-dependent for development |
 | Test Framework | xUnit 2.9+ with native assertions, Bogus, NSubstitute |
-| LLM Test Framework | agent-benchmark |
+| LLM Test Framework | pytest-aitest |
 | Logging | Microsoft.Extensions.Logging (built-in console provider) |
 | MCP SDK | ModelContextProtocol 0.5.0+ |
 | UI Automation | Interop.UIAutomationClient |

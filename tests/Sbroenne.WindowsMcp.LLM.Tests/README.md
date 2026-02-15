@@ -1,278 +1,173 @@
 # Windows MCP Server - LLM Integration Tests
 
-This project contains integration tests for the Windows MCP Server using [agent-benchmark](https://github.com/mykhaliev/agent-benchmark) - a framework for testing AI agents and MCP tool usage.
+This project contains integration tests for the Windows MCP Server using [pytest-aitest](https://github.com/sbroenne/pytest-aitest) — a pytest plugin for testing AI agents with MCP tools.
 
 ## Test Applications
 
 Tests use standard Windows applications as test targets (no custom test harnesses):
 
-- **Notepad** (`notepad.exe`) - Text editing, menu navigation, keyboard shortcuts
-- **Microsoft Paint** (`mspaint.exe`) - Tool selection, color palette, canvas drawing
+- **Notepad** (`notepad.exe`) — Text editing, menu navigation, keyboard shortcuts
+- **Calculator** (`calc.exe`) — Keyboard input and UI element interaction
+- **Microsoft Paint** (`mspaint.exe`) — Tool selection, color palette, canvas drawing (disabled)
 
 ## Prerequisites
 
-### 1. Build the Main Project First
+### 1. .NET 10 SDK
 
-The tests require the MCP server executable to be built. Run the following command from the repository root:
+The MCP server is built automatically when tests start (via a session-scoped fixture).
 
-```powershell
-dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release
-```
+### 2. Python 3.12+ and uv
 
-### 2. Azure OpenAI Configuration
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.12+.
 
-These tests use Azure OpenAI for LLM interactions and MCP tool invocations. Configure the following environment variables:
+### 3. Azure OpenAI Configuration
 
-- `AZURE_OPENAI_ENDPOINT` - Your Azure OpenAI endpoint URL
-- `AZURE_OPENAI_API_KEY` - Your Azure OpenAI API key
+Tests use Azure OpenAI via `DefaultAzureCredential` (az login). Set:
 
-### 3. Windows Desktop Environment
+- `AZURE_OPENAI_ENDPOINT` — Your Azure OpenAI endpoint URL
 
-These tests automate Windows UI elements (Notepad, windows, keyboard/mouse). They require:
+### 4. Windows Desktop Environment
+
+These tests automate Windows UI elements. They require:
 - Windows desktop with UI access
 - **NOT suitable for headless CI/CD pipelines**
-- Run on a Windows machine with an active desktop session
 
-### 4. Agent-Benchmark Tool
+## Setup
 
-The PowerShell runner script will automatically download agent-benchmark on first run. Alternatively, you can:
-- Download from [agent-benchmark releases](https://github.com/mykhaliev/agent-benchmark/releases)
-- Build from source: `git clone https://github.com/mykhaliev/agent-benchmark && cd agent-benchmark && go build`
-- Use a local Go project with `go run` mode (see Configuration below)
-
-## Configuration
-
-The test runner supports configuration via JSON files. Settings are loaded in this order (later overrides earlier):
-
-1. `llm-tests.config.json` - Shared defaults (committed to repo)
-2. `llm-tests.config.local.json` - Personal settings (git-ignored)
-3. Command-line parameters - Override everything
-
-### Configuration File
-
-Create `llm-tests.config.local.json` for your personal settings:
-
-```json
-{
-  "$schema": "./llm-tests.config.schema.json",
-  "agentBenchmarkPath": "../../../../agent-benchmark",
-  "agentBenchmarkMode": "go-run",
-  "verbose": false,
-  "build": false
-}
+```powershell
+cd tests/Sbroenne.WindowsMcp.LLM.Tests
+uv sync
 ```
-
-### Configuration Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `agentBenchmarkPath` | string | `null` | Path to agent-benchmark (absolute or relative to test dir) |
-| `agentBenchmarkMode` | string | `"executable"` | `"executable"` for .exe, `"go-run"` for Go project |
-| `verbose` | boolean | `false` | Show detailed output |
-| `build` | boolean | `false` | Build MCP server before tests |
-
-### Using a Local agent-benchmark
-
-If you have a local clone of agent-benchmark, you can run it directly with Go:
-
-```json
-{
-  "agentBenchmarkPath": "../../../../agent-benchmark",
-  "agentBenchmarkMode": "go-run"
-}
-```
-
-This runs `go run .` in the specified directory, which is useful for development.
 
 ## Running the Tests
 
-### Using PowerShell Runner (Recommended)
-
 ```powershell
-# Run all tests
-.\Run-LLMTests.ps1 -Build
+# Run all scenario tests
+uv run pytest test_*.py -v
 
-# Run a specific scenario
-.\Run-LLMTests.ps1 -Scenario notepad-ui-test.yaml
-```
+# Run a specific test file
+uv run pytest test_notepad_ui.py -v
 
-### Using agent-benchmark Directly
+# Run a single test with a specific model
+uv run pytest test_calculator_workflow.py::test_calculator_keyboard -k "gpt41" -v
 
-```powershell
-# Build the server first
-dotnet build src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release
+# Run integration tests
+uv run pytest integration/ -v
 
-# Run a scenario
-agent-benchmark `
-    -f tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/notepad-ui-test.yaml `
-    -o report `
-    -reportType html,json `
-    -verbose
+# Collect all tests (dry run)
+uv run pytest --collect-only
 ```
 
 ## Project Structure
 
 ```
 Sbroenne.WindowsMcp.LLM.Tests/
-├── Scenarios/
-│   ├── _config-template.yaml              # Reference configuration template
-│   ├── notepad-test.yaml                  # Legacy: Basic Notepad workflow
-│   ├── paint-smiley-test.yaml             # Legacy: Paint drawing test
-│   ├── notepad-ui-test.yaml               # Core UI tools (ui_find, ui_click, ui_type, ui_read)
-│   ├── window-management-test.yaml        # All 10 window_management actions
-│   ├── keyboard-mouse-test.yaml           # keyboard_control and mouse_control tools
-│   ├── screenshot-test.yaml               # screenshot_control actions
-│   ├── file-dialog-test.yaml              # file_save Save As dialog handling
-│   ├── paint-ui-test.yaml                 # Paint ribbon and canvas operations
-│   └── real-world-workflows-test.yaml     # 8 multi-step workflow scenarios
-├── output/                                # Test artifacts (git-ignored)
-├── Run-LLMTests.ps1                       # PowerShell test runner
-├── llm-tests.config.json                  # Shared configuration defaults
-├── llm-tests.config.local.json            # Personal settings (git-ignored)
-├── llm-tests.config.schema.json           # JSON schema for config files
-├── TestResults/                           # HTML reports (generated)
+├── conftest.py                            # Shared fixtures (server, agents, providers)
+├── pyproject.toml                         # Python project config and dependencies
+├── test_notepad_ui.py                     # Notepad discard/save workflows
+├── test_calculator_workflow.py            # Calculator keyboard + UI tests
+├── test_window_workflow.py                # Multi-window management
+├── test_paint_workflow.py                 # Paint workflows (skipped)
+├── test_screenshot_workflow.py            # Screenshot workflows (skipped)
+├── integration/                           # Tool-level integration tests
+│   ├── test_app_tool_uwp.py              # UWP app launching
+│   ├── test_file_dialog.py               # File save dialog handling
+│   ├── test_keyboard_mouse.py            # Keyboard/mouse control
+│   ├── test_paint_ui.py                  # Paint UI tools
+│   ├── test_run_dialog.py                # Win+R dialog
+│   ├── test_screenshot.py                # Screenshot control
+│   ├── test_window_activate.py           # Window activation
+│   └── test_window_management.py         # All 10 window_management actions
+├── eval/                                  # Evaluation tests (external servers)
+│   ├── test_4sysops_workflow.py
+│   ├── test_4sysops_cursortouch.py
+│   └── README.md
+├── TestResults/                           # Reports (generated, git-ignored)
 └── README.md                              # This file
 ```
 
-## Test Scenarios
+## Test Organization
 
-### Tool Coverage Tests (New)
+### Scenario Tests (root directory)
 
-| Scenario | Tools Covered | Description |
-|----------|---------------|-------------|
-| `notepad-ui-test.yaml` | ui_find, ui_click, ui_type, ui_read | Core UI interaction against Notepad |
-| `window-management-test.yaml` | app, window_management (10 actions) | All window operations |
-| `keyboard-mouse-test.yaml` | keyboard_control, mouse_control | Typing, hotkeys, clicks, dragging |
-| `screenshot-test.yaml` | screenshot_control | Annotated/plain captures, monitor list |
-| `file-dialog-test.yaml` | file_save | Save As dialogs for Notepad and Paint |
-| `paint-ui-test.yaml` | ui_find, ui_click, mouse_control | Paint ribbon and canvas |
-| `real-world-workflows-test.yaml` | All tools | 8 end-to-end workflow scenarios |
+Multi-step workflow tests that verify end-to-end user scenarios. Run with both `gpt-4.1` and `gpt-5.2-chat` models.
 
-### Window Management Actions Covered
+| Test File | Description |
+|-----------|-------------|
+| `test_notepad_ui.py` | Notepad text editing with discard and save workflows |
+| `test_calculator_workflow.py` | Calculator operations via keyboard and UI clicks |
+| `test_window_workflow.py` | Multi-window management across Notepad instances |
 
-| Action | Description | Test File |
-|--------|-------------|-----------|
-| `list` | List all open windows | window-management-test.yaml |
-| `find` | Find window by title/process | window-management-test.yaml |
-| `activate` | Bring window to foreground | window-management-test.yaml |
-| `minimize` | Minimize window | window-management-test.yaml |
-| `maximize` | Maximize window | window-management-test.yaml |
-| `restore` | Restore from min/max | window-management-test.yaml |
-| `close` | Close window | window-management-test.yaml |
-| `move` | Move window to position | window-management-test.yaml |
-| `resize` | Resize window dimensions | window-management-test.yaml |
-| `wait_for` | Wait for window state | window-management-test.yaml |
+### Integration Tests (`integration/`)
 
-### Legacy Tests
+Tool-level tests that verify individual MCP tool functionality. Run with `gpt-4.1` only.
 
-| Scenario | Description |
-|----------|-------------|
-| `notepad-test.yaml` | Basic Notepad workflow (type, save, close) |
-| `paint-smiley-test.yaml` | Paint drawing test |
+| Test File | Tools Covered |
+|-----------|---------------|
+| `test_window_management.py` | window_management (all 10 actions) |
+| `test_keyboard_mouse.py` | keyboard_control, mouse_control |
+| `test_file_dialog.py` | file_save |
+| `test_screenshot.py` | screenshot_control |
+| `test_app_tool_uwp.py` | app (UWP launching) |
+| `test_paint_ui.py` | ui_find, ui_click, mouse_control |
+| `test_run_dialog.py` | keyboard_control (Win+R) |
+| `test_window_activate.py` | app, window_management (activate) |
 
-## How agent-benchmark Works
+## Writing Tests
 
-Agent-benchmark uses YAML files to define test scenarios. Each scenario contains:
+Tests use pytest-aitest's `aitest_run` fixture:
 
-1. **Steps** - Sequential prompts sent to the LLM
-2. **Assertions** - Validations for each step's response and tool usage
+```python
+import pytest
+from pytest_aitest import Agent, MCPServer, Provider
 
-### Assertion Types
-
-- **tool_name** - Verifies a specific MCP tool was called
-- **tool_call_contains** - Verifies tool call arguments contain specific text
-- **response_contains** - Verifies the response contains specific text
-- **anyOf** - Passes if ANY child assertion passes (OR logic)
-- **allOf** - Passes if ALL child assertions pass (AND logic)
-- **not** - Passes if child assertion FAILS (negation)
-
-### Example Scenario
-
-```yaml
-name: "Open and Close Notepad"
-test_delay: 60s
-
-mcp_servers:
-  - name: windows-mcp
-    command: "path/to/Sbroenne.WindowsMcp.exe"
-
-scenarios:
-  - name: "Basic Window Operations"
-    model: "gpt-4o"
-    system_prompt: |
-      You are a Windows automation assistant.
-    
-    steps:
-      - prompt: "Open Notepad for me."
-        assertions:
-          - tool_name: window_management
-          - anyOf:
-              - tool_call_contains: '"action":"launch"'
-              - tool_call_contains: '"action":"Launch"'
-
-      - prompt: "Close the Notepad window."
-        assertions:
-          - tool_name: window_management
-          - tool_call_contains: '"handle"'
+async def test_example(aitest_run):
+    result = await aitest_run(
+        agent=agent,
+        prompt="Open Notepad and type hello",
+    )
+    assert result.success
+    assert result.tool_was_called("app")
 ```
 
-## Writing Good Test Scenarios
+### Test Prompts: Use Natural Language
 
-### User Prompts: Use Natural Language
-
-**❌ BAD - Leading the witness (tells LLM exactly what to do):**
-```yaml
-prompt: "Use window_management with action 'find' and title 'Notepad'"
+**❌ BAD — Leading the witness:**
+```python
+prompt="Use window_management with action 'find' and title 'Notepad'"
 ```
 
-**✅ GOOD - Natural user request (tests if LLM understands the tools):**
-```yaml
-prompt: "I need to find that Notepad window so I can work with it."
+**✅ GOOD — Natural user request:**
+```python
+prompt="I need to find that Notepad window so I can work with it."
 ```
 
-The test should verify the LLM can figure out the correct approach from tool descriptions alone.
+### Assertions
 
-### Assertions: Use anyOf for Flexibility
+```python
+# Tool was called
+assert result.tool_was_called("app")
 
-LLMs may achieve the same goal using different tools or parameters. Use `anyOf` to accept multiple valid approaches:
+# Tool call order
+names = [c.name for c in result.all_tool_calls]
+assert names.index("app") < names.index("keyboard_control")
 
-```yaml
-assertions:
-  # Accept either keyboard_control or ui_automation for typing
-  - anyOf:
-      - tool_name: keyboard_control
-      - allOf:
-          - tool_name: ui_automation
-          - anyOf:
-              - tool_call_contains: '"action":"Type"'
-              - tool_call_contains: '"action":"setValue"'
+# Tool parameter check
+call = result.tool_calls_for("keyboard_control")[0]
+assert re.search(r"hello", call.arguments.get("keys", ""), re.IGNORECASE)
+
+# Response content
+assert re.search(r"notepad", result.final_response, re.IGNORECASE)
+
+# Quality checks
+assert result.success
+assert not result.asked_for_clarification
 ```
-
-### Handle Rate Limiting
-
-Azure OpenAI has rate limits. Use `test_delay` to add delays between tests:
-
-```yaml
-test_delay: 60s  # 60 second delay between scenarios
-```
-
-## Migrating from skUnit
-
-This project was migrated from skUnit to agent-benchmark. Key differences:
-
-| Feature | skUnit | agent-benchmark |
-|---------|--------|-----------------|
-| Format | Markdown (.md) | YAML |
-| Language | C#/.NET | Go (standalone binary) |
-| FunctionCall | JSON object | tool_name + tool_call_contains |
-| ContainsAny | Comma-separated | anyOf with response_contains |
-| ContainsAll | Comma-separated | allOf with response_contains |
-| CI Integration | xUnit | Exit codes + HTML reports |
 
 ## Test Reports
 
-HTML reports are generated in `TestResults/` directory after each test run. Reports include:
-- Scenario results (pass/fail)
-- Step-by-step execution details
-- Tool calls and responses
-- Assertion results
+HTML reports are generated when using `--aitest-report`:
+
+```powershell
+uv run pytest test_notepad_ui.py -v --aitest-report=TestResults/report.html
+```

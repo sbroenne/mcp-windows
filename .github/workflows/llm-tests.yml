@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       scenario:
-        description: 'Specific scenario to run (leave empty for all)'
+        description: 'Specific test file to run (leave empty for all)'
         required: false
         type: string
         default: ''
@@ -29,9 +29,9 @@ jobs:
       fail-fast: false  # Run all scenarios even if one fails
       matrix:
         scenario:
-          - calculator-workflow-test.yaml
-          - notepad-ui-test.yaml
-          - window-workflow-test.yaml
+          - test_calculator_workflow.py
+          - test_notepad_ui.py
+          - test_window_workflow.py
 
     steps:
     - uses: actions/checkout@v4
@@ -41,10 +41,10 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
+    - name: Setup Python & uv
+      uses: astral-sh/setup-uv@v6
       with:
-        go-version: '1.23'
+        python-version: '3.12'
 
     - name: Azure Login (OIDC)
       uses: azure/login@v2
@@ -53,77 +53,79 @@ jobs:
         tenant-id: ${{ secrets.AZURE_TENANT_ID }}
         subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-    - name: Cache agent-benchmark
-      uses: actions/cache@v4
-      id: cache-agent-benchmark
-      with:
-        path: tests/Sbroenne.WindowsMcp.LLM.Tests/agent-benchmark.exe
-        key: agent-benchmark-windows-amd64-v1
+    - name: Build MCP Server
+      run: dotnet build src/Sbroenne.WindowsMcp -c Release -v:q
+      shell: pwsh
+
+    - name: Install Python Dependencies
+      run: |
+        cd tests/Sbroenne.WindowsMcp.LLM.Tests
+        uv sync
+      shell: pwsh
+      env:
+        UV_LINK_MODE: copy
 
     - name: Run LLM Test - ${{ matrix.scenario }}
       env:
         AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        UV_LINK_MODE: copy
       run: |
         cd tests/Sbroenne.WindowsMcp.LLM.Tests
-        
+
         # Check if a specific scenario was requested via workflow_dispatch
         $inputScenario = "${{ inputs.scenario }}"
         $matrixScenario = "${{ matrix.scenario }}"
-        
+
         if ($inputScenario -and $inputScenario -ne $matrixScenario) {
           Write-Output "Skipping $matrixScenario (specific scenario requested: $inputScenario)"
           exit 0
         }
-        
+
         Write-Output "Running scenario: $matrixScenario"
-        ./Run-LLMTests.ps1 -Build -Scenario $matrixScenario
+        uv run pytest $matrixScenario -v --tb=short --junitxml=TestResults/results.xml --aitest-report=TestResults/report.html --no-header -p no:aitest-summary 2>&1 | Tee-Object -Variable testOutput
+        $testOutput | ForEach-Object { Write-Output $_ }
       shell: pwsh
 
     - name: Generate Job Summary
       if: always()
       run: |
-        $reportsDir = "tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults"
-        $scenario = "${{ matrix.scenario }}" -replace '\.yaml$', ''
-        
-        # Start building the summary
+        $scenario = "${{ matrix.scenario }}" -replace '\.py$', ''
+
         $summary = @"
         ## 🧪 LLM Test: $scenario
 
         "@
 
-        # Find the report for this scenario
-        $jsonFile = Get-ChildItem -Path $reportsDir -Filter "$scenario-report.json" -ErrorAction SilentlyContinue | Select-Object -First 1
-        
-        if (-not $jsonFile) {
+        $junitFile = "tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults/results.xml"
+
+        if (-not (Test-Path $junitFile)) {
           $summary += "`n⚠️ No test report found for $scenario.`n"
         } else {
           try {
-            $report = Get-Content $jsonFile.FullName -Raw | ConvertFrom-Json
-            
-            $passed = $report.summary.passed
-            $failed = $report.summary.failed
-            $total = $report.summary.total
+            [xml]$report = Get-Content $junitFile
+            $suite = $report.testsuites.testsuite
+
+            $total = [int]$suite.tests
+            $failed = [int]$suite.failures + [int]$suite.errors
+            $passed = $total - $failed
+
             $successRate = if ($total -gt 0) { [math]::Round(($passed / $total) * 100, 1) } else { 0 }
-            
+
             $status = if ($failed -eq 0) { "✅ PASSED" } else { "❌ FAILED" }
             $summary += "`n**Status: $status** ($passed/$total tests passed, $successRate%)`n"
-            
-            # Add test details
-            if ($report.tests) {
-              $summary += "`n| Test | Agent | Result |`n"
-              $summary += "|------|-------|--------|`n"
-              foreach ($test in $report.tests) {
-                $testStatus = if ($test.passed) { "✅" } else { "❌" }
-                $summary += "| $($test.name) | $($test.agent) | $testStatus |`n"
-              }
+
+            $summary += "`n| Test | Result |`n"
+            $summary += "|------|--------|`n"
+            foreach ($tc in $suite.testcase) {
+              $testStatus = if ($tc.failure) { "❌" } else { "✅" }
+              $summary += "| $($tc.name) | $testStatus |`n"
             }
           } catch {
             $summary += "`n⚠️ Failed to parse report: $_`n"
           }
         }
 
-        # Write to job summary
         $summary | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
         Write-Output "Job summary generated for $scenario"
       shell: pwsh
@@ -143,7 +145,7 @@ jobs:
     if: always()
     permissions:
       contents: read
-    
+
     steps:
     - name: Download all test reports
       uses: actions/download-artifact@v4
@@ -156,39 +158,44 @@ jobs:
       run: |
         echo "## 🧪 LLM Integration Test Results" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         totalPassed=0
         totalFailed=0
-        
+        totalTests=0
+
         echo "| Scenario | Status | Passed | Failed | Rate |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|--------|--------|--------|------|" >> $GITHUB_STEP_SUMMARY
-        
-        for report in reports/*-report.json; do
+
+        for report in reports/results.xml; do
           if [ -f "$report" ]; then
-            scenario=$(basename "$report" | sed 's/-report\.json$//')
-            passed=$(jq -r '.summary.passed // 0' "$report")
-            failed=$(jq -r '.summary.failed // 0' "$report")
-            total=$(jq -r '.summary.total // 0' "$report")
-            
-            if [ "$total" -gt 0 ]; then
-              rate=$(echo "scale=1; $passed * 100 / $total" | bc)
+            tests=$(xmlstarlet sel -t -v "//testsuite/@tests" "$report" 2>/dev/null || echo "0")
+            failures=$(xmlstarlet sel -t -v "//testsuite/@failures" "$report" 2>/dev/null || echo "0")
+            errors=$(xmlstarlet sel -t -v "//testsuite/@errors" "$report" 2>/dev/null || echo "0")
+            name=$(xmlstarlet sel -t -v "//testsuite/@name" "$report" 2>/dev/null || echo "unknown")
+
+            failed=$((failures + errors))
+            passed=$((tests - failed))
+
+            if [ "$tests" -gt 0 ]; then
+              rate=$(echo "scale=1; $passed * 100 / $tests" | bc)
             else
               rate="0"
             fi
-            
+
             if [ "$failed" -eq 0 ]; then
               status="✅"
             else
               status="❌"
             fi
-            
-            echo "| $scenario | $status | $passed | $failed | ${rate}% |" >> $GITHUB_STEP_SUMMARY
-            
+
+            echo "| $name | $status | $passed | $failed | ${rate}% |" >> $GITHUB_STEP_SUMMARY
+
             totalPassed=$((totalPassed + passed))
             totalFailed=$((totalFailed + failed))
+            totalTests=$((totalTests + tests))
           fi
         done
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         if [ "$totalFailed" -eq 0 ]; then
           echo "**Overall: ✅ All tests passed** ($totalPassed passed, $totalFailed failed)" >> $GITHUB_STEP_SUMMARY
@@ -200,13 +207,14 @@ jobs:
     - name: Check for failures
       run: |
         totalFailed=0
-        for report in reports/*-report.json; do
+        for report in reports/results.xml; do
           if [ -f "$report" ]; then
-            failed=$(jq -r '.summary.failed // 0' "$report")
-            totalFailed=$((totalFailed + failed))
+            failures=$(xmlstarlet sel -t -v "//testsuite/@failures" "$report" 2>/dev/null || echo "0")
+            errors=$(xmlstarlet sel -t -v "//testsuite/@errors" "$report" 2>/dev/null || echo "0")
+            totalFailed=$((totalFailed + failures + errors))
           fi
         done
-        
+
         if [ "$totalFailed" -gt 0 ]; then
           echo "::error::LLM tests failed: $totalFailed test(s) did not pass"
           exit 1
