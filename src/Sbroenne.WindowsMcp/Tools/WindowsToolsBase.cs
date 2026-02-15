@@ -127,12 +127,12 @@ public static class WindowsToolsBase
     {
         if (data == null)
         {
-            return JsonSerializer.Serialize(new { ok = true }, JsonOptions);
+            return JsonSerializer.Serialize(new { success = true }, JsonOptions);
         }
 
-        // Merge ok=true with the data object
+        // Merge success=true with the data object
         var json = JsonSerializer.SerializeToElement(data, JsonOptions);
-        var dict = new Dictionary<string, object?> { ["ok"] = true };
+        var dict = new Dictionary<string, object?> { ["success"] = true };
 
         if (json.ValueKind == JsonValueKind.Object)
         {
@@ -158,9 +158,9 @@ public static class WindowsToolsBase
     {
         return JsonSerializer.Serialize(new
         {
-            ok = false,
-            err = error,
-            ie = true
+            success = false,
+            error,
+            isError = true
         }, JsonOptions);
     }
 
@@ -183,9 +183,9 @@ public static class WindowsToolsBase
 
         return JsonSerializer.Serialize(new
         {
-            ok = false,
-            err = errorMessage,
-            ie = true
+            success = false,
+            error = errorMessage,
+            isError = true
         }, JsonOptions);
     }
 
@@ -199,6 +199,24 @@ public static class WindowsToolsBase
     {
         throw new ArgumentException(
             $"{parameterName} is required for {action} action", parameterName);
+    }
+
+    /// <summary>
+    /// Serializes a UI automation result, stripping diagnostics unless explicitly requested.
+    /// </summary>
+    /// <param name="result">The UI automation result.</param>
+    /// <param name="includeDiagnostics">Whether to include diagnostics in the response.</param>
+    /// <returns>Serialized JSON response.</returns>
+    public static string SerializeUIResult(UIAutomationResult result, bool includeDiagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (!includeDiagnostics && result.Diagnostics != null)
+        {
+            result = result with { Diagnostics = null };
+        }
+
+        return JsonSerializer.Serialize(result, JsonOptions);
     }
 
     private static int GetTimeoutFromEnvironment()

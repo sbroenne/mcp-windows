@@ -25,6 +25,10 @@ public static partial class AppTool
     /// <remarks>
     /// Examples: app(programPath='notepad.exe'), app(programPath='chrome.exe', arguments='https://example.com').
     /// After launch, the window is focused and ready for input. Use the returned handle for subsequent operations.
+    ///
+    /// NOTE: Some apps (e.g., calc.exe, UWP/Store apps) launch as a stub that exits immediately and spawns a separate
+    /// process. If the launch appears to fail, use window_management(action='find', title='Calculator') to locate
+    /// the window by title instead.
     /// </remarks>
     /// <param name="programPath">Program to launch. Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'chrome.exe') or full path (e.g., 'C:\\Program Files\\App\\app.exe').</param>
     /// <param name="arguments">Command-line arguments for the program (optional). Example: '--new-window' for browsers.</param>

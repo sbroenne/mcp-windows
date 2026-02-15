@@ -5,22 +5,12 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Result of a window management operation.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON token count:
-/// - ok: Success
-/// - ec: Error code
-/// - err: Error message
-/// - w: Window (single)
-/// - ws: Windows (list)
-/// - n: Count
-/// - msg: Message
-/// </remarks>
 public sealed record WindowManagementResult
 {
     /// <summary>
     /// Gets a value indicating whether the operation succeeded.
     /// </summary>
-    [JsonPropertyName("ok")]
+    [JsonPropertyName("success")]
     public required bool Success { get; init; }
 
     /// <summary>
@@ -32,7 +22,7 @@ public sealed record WindowManagementResult
     /// <summary>
     /// Gets the error code string for JSON serialization.
     /// </summary>
-    [JsonPropertyName("ec")]
+    [JsonPropertyName("errorCode")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorCodeString => ErrorCode == WindowManagementErrorCode.None
         ? null
@@ -41,7 +31,7 @@ public sealed record WindowManagementResult
     /// <summary>
     /// Gets the error message if operation failed.
     /// </summary>
-    [JsonPropertyName("err")]
+    [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Error { get; init; }
 
@@ -49,29 +39,29 @@ public sealed record WindowManagementResult
     /// Gets the single window info (for find, activate, get_foreground, etc.).
     /// Uses compact format for reduced token count.
     /// </summary>
-    [JsonPropertyName("w")]
+    [JsonPropertyName("window")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public WindowInfoCompact? Window { get; init; }
 
     /// <summary>
     /// Gets the list of windows (for list action).
-    /// Uses compact format for reduced token count.
+    /// Uses minimal format (handle, title, process) to reduce token count.
     /// </summary>
-    [JsonPropertyName("ws")]
+    [JsonPropertyName("windows")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public IReadOnlyList<WindowInfoCompact>? Windows { get; init; }
 
     /// <summary>
     /// Gets the number of windows found/affected.
     /// </summary>
-    [JsonPropertyName("n")]
+    [JsonPropertyName("count")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Count { get; init; }
 
     /// <summary>
     /// Gets an informational message for successful results.
     /// </summary>
-    [JsonPropertyName("msg")]
+    [JsonPropertyName("message")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Message { get; init; }
 

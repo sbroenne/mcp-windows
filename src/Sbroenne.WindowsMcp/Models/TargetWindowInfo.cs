@@ -6,31 +6,24 @@ namespace Sbroenne.WindowsMcp.Models;
 /// Lightweight window information included in operation results to indicate
 /// which window received the input or was the target of an action.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON token count:
-/// - h: Handle (HWND as decimal string)
-/// - t: Title
-/// - pn: Process Name
-/// - pid: Process ID
-/// </remarks>
 public sealed record TargetWindowInfo
 {
     /// <summary>
     /// Gets the window handle (HWND) as decimal string for JSON safety.
     /// </summary>
-    [JsonPropertyName("h")]
+    [JsonPropertyName("handle")]
     public required string Handle { get; init; }
 
     /// <summary>
     /// Gets the window title text.
     /// </summary>
-    [JsonPropertyName("t")]
+    [JsonPropertyName("title")]
     public required string Title { get; init; }
 
     /// <summary>
     /// Gets the process name (e.g., "notepad.exe", "chrome.exe").
     /// </summary>
-    [JsonPropertyName("pn")]
+    [JsonPropertyName("processName")]
     public required string ProcessName { get; init; }
 
     /// <summary>

@@ -6,26 +6,13 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// The response payload for the mouse_control MCP tool.
 /// </summary>
-/// <remarks>
-/// Property names are intentionally short to minimize JSON token count:
-/// - ok: Success
-/// - pos: Final position [x, y]
-/// - tw: Target window info
-/// - mi: Monitor index
-/// - mw: Monitor width
-/// - mh: Monitor height
-/// - err: Error message
-/// - ec: Error code
-/// - ed: Error details
-/// - fix: Recovery suggestion
-/// </remarks>
 public sealed record MouseControlResult
 {
     /// <summary>
     /// Gets a value indicating whether the operation completed successfully.
     /// </summary>
     [Required]
-    [JsonPropertyName("ok")]
+    [JsonPropertyName("success")]
     public required bool Success { get; init; }
 
     /// <summary>
@@ -38,14 +25,14 @@ public sealed record MouseControlResult
     /// Gets the final cursor position as [x, y] array for JSON serialization.
     /// </summary>
     [Required]
-    [JsonPropertyName("pos")]
+    [JsonPropertyName("position")]
     public int[] Position => [FinalPosition.X, FinalPosition.Y];
 
     /// <summary>
     /// Gets detailed information about the window that received the mouse input.
     /// This helps LLM agents verify that clicks/input went to the correct window.
     /// </summary>
-    [JsonPropertyName("tw")]
+    [JsonPropertyName("targetWindow")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TargetWindowInfo? TargetWindow { get; init; }
 
@@ -53,7 +40,7 @@ public sealed record MouseControlResult
     /// Gets the monitor index where the operation occurred (0-based).
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("mi")]
+    [JsonPropertyName("monitorIndex")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorIndex { get; init; }
 
@@ -61,7 +48,7 @@ public sealed record MouseControlResult
     /// Gets the width of the monitor where the operation occurred.
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("mw")]
+    [JsonPropertyName("monitorWidth")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorWidth { get; init; }
 
@@ -69,14 +56,14 @@ public sealed record MouseControlResult
     /// Gets the height of the monitor where the operation occurred.
     /// Only populated for operations with explicit coordinates.
     /// </summary>
-    [JsonPropertyName("mh")]
+    [JsonPropertyName("monitorHeight")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MonitorHeight { get; init; }
 
     /// <summary>
     /// Gets the error message if the operation failed.
     /// </summary>
-    [JsonPropertyName("err")]
+    [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Error { get; init; }
 
@@ -89,14 +76,14 @@ public sealed record MouseControlResult
     /// <summary>
     /// Gets the error code string for JSON serialization.
     /// </summary>
-    [JsonPropertyName("ec")]
+    [JsonPropertyName("errorCode")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ErrorCodeString => ErrorCode == MouseControlErrorCode.Success ? null : ConvertErrorCodeToString(ErrorCode);
 
     /// <summary>
     /// Gets additional context for errors (e.g., valid_bounds for out-of-bounds errors).
     /// </summary>
-    [JsonPropertyName("ed")]
+    [JsonPropertyName("errorDetails")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object>? ErrorDetails { get; init; }
 
@@ -104,7 +91,7 @@ public sealed record MouseControlResult
     /// Gets the suggested recovery action for LLM agents when the operation fails.
     /// Provides actionable guidance on what to try next.
     /// </summary>
-    [JsonPropertyName("fix")]
+    [JsonPropertyName("recoverySuggestion")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? RecoverySuggestion { get; init; }
 
