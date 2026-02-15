@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -35,6 +34,7 @@ public static partial class UIFindTool
     /// <param name="inRegion">Filter to region: 'x,y,width,height' in screen coordinates.</param>
     /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
+    /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result containing list of found elements with their properties and element IDs.</returns>
     [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false)]
@@ -53,6 +53,7 @@ public static partial class UIFindTool
         [DefaultValue(null)] string? inRegion,
         [DefaultValue(null)] string? nearElement,
         [DefaultValue(5000)] int timeoutMs,
+        [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         const string actionName = "find";
@@ -84,7 +85,7 @@ public static partial class UIFindTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(query, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {

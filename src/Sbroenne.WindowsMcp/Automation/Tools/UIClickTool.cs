@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -28,6 +27,7 @@ public static partial class UIClickTool
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1').</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the click operation including success status and element information.</returns>
     [McpServerTool(Name = "ui_click", Title = "Click UI Element", Destructive = true, OpenWorld = false)]
@@ -40,6 +40,7 @@ public static partial class UIClickTool
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
         [DefaultValue(1)] int foundIndex,
+        [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         const string actionName = "click";
@@ -65,7 +66,7 @@ public static partial class UIClickTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndClickAsync(query, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {

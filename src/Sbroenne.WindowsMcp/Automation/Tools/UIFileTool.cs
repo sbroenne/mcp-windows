@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -25,12 +24,14 @@ public static partial class UIFileTool
     /// </remarks>
     /// <param name="windowHandle">Window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window handle, not a dialog.</param>
     /// <param name="filePath">Full path to save to (e.g., C:/Users/User/doc.txt). REQUIRED for new files. Forward/back slashes both work.</param>
+    /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Success status with diagnostics.</returns>
+    /// <returns>Success status.</returns>
     [McpServerTool(Name = "file_save", Title = "💾 SAVE FILE (handles Save As dialogs)", Destructive = true, OpenWorld = false)]
     public static async partial Task<string> ExecuteAsync(
         string windowHandle,
         [DefaultValue(null)] string? filePath,
+        [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         const string actionName = "save";
@@ -44,7 +45,7 @@ public static partial class UIFileTool
         try
         {
             var result = await WindowsToolsBase.UIAutomationService.SaveAsync(windowHandle, filePath, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {
