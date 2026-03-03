@@ -108,7 +108,7 @@ Remaining v* tags:
 
 The following documentation has been updated:
 - ✅ `.github/RELEASE_SETUP.md` - Complete setup guide with migration instructions
-- ✅ `.github/README.md` - Workflow overview
+- ✅ `.github/WORKFLOWS.md` - Workflow overview
 - ✅ `.github/RELEASE_COMPARISON.md` - Detailed comparison
 
 ## 5. Optional: Archive Old Release Workflow Runs

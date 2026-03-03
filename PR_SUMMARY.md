@@ -26,7 +26,7 @@ Implement a unified release workflow that:
 ### Files Added (5)
 1. `.github/workflows/release-unified.yml` (606 lines) - Main unified workflow
 2. `.github/scripts/cleanup-old-tags.ps1` (71 lines) - Tag cleanup script
-3. `.github/README.md` (73 lines) - Workflow directory overview
+3. `.github/WORKFLOWS.md` (73 lines) - Workflow directory overview
 4. `.github/RELEASE_COMPARISON.md` (92 lines) - Detailed comparison
 5. `.github/POST_MIGRATION_STEPS.md` (176 lines) - Migration guide
 
@@ -159,7 +159,7 @@ Complete documentation provided:
 - 📖 `.github/RELEASE_SETUP.md` - Setup and configuration guide
 - 📖 `.github/POST_MIGRATION_STEPS.md` - Step-by-step migration instructions
 - 📖 `.github/RELEASE_COMPARISON.md` - Detailed comparison with mcp-server-excel
-- 📖 `.github/README.md` - Workflow directory overview
+- 📖 `.github/WORKFLOWS.md` - Workflow directory overview
 - 🛠️ `.github/scripts/cleanup-old-tags.ps1` - Tag cleanup script
 
 ## Commits
