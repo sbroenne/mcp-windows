@@ -152,7 +152,7 @@ jobs:
         cd tests/Sbroenne.WindowsMcp.LLM.Tests
         dotnet build ../../src/Sbroenne.WindowsMcp -c Release -v:q
         uv sync
-        uv run pytest test_notepad_ui.py test_calculator_workflow.py test_window_workflow.py -v --tb=short --junitxml=TestResults/results.xml --aitest-report=TestResults/report.html --no-header -p no:aitest-summary
+        uv run pytest test_notepad_ui.py test_calculator_workflow.py test_window_workflow.py -v --tb=short --junitxml=TestResults/results.xml --no-header -p no:aitest-summary
       shell: pwsh
 
     - name: Upload LLM Test Reports
