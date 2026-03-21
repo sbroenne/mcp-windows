@@ -170,7 +170,7 @@ public class WindowFindTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(targetWindow);
 
         // Act - Find by process name
-        var findResult = await _windowService.FindWindowAsync(targetWindow.ProcessName);
+        var findResult = await _windowService.FindWindowAsync(title: null, processName: targetWindow.ProcessName);
 
         // Assert
         Assert.True(findResult.Success);

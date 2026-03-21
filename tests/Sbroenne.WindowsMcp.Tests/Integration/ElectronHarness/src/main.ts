@@ -1,9 +1,12 @@
-import { app, BrowserWindow, ipcMain, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 let lastSavePath: string | null = null;
+
+// Chromium 117+ requires the explicit "complete" mode for reliable Windows UIA exposure.
+app.commandLine.appendSwitch('force-renderer-accessibility', 'complete');
 
 function createWindow(): void {
     mainWindow = new BrowserWindow({
