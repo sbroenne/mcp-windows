@@ -86,7 +86,7 @@ jobs:
         }
 
         Write-Output "Running scenario: $matrixScenario"
-        uv run pytest $matrixScenario -v --tb=short --junitxml=TestResults/results.xml --aitest-report=TestResults/report.html --no-header -p no:aitest-summary 2>&1 | Tee-Object -Variable testOutput
+        uv run pytest $matrixScenario -v --tb=short --junitxml=TestResults/results.xml --no-header -p no:aitest-summary 2>&1 | Tee-Object -Variable testOutput
         $testOutput | ForEach-Object { Write-Output $_ }
       shell: pwsh
 
