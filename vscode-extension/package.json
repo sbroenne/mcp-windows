@@ -15,7 +15,7 @@
   "homepage": "https://github.com/sbroenne/mcp-windows",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.110.0"
   },
   "os": [
     "win32"
@@ -66,14 +66,14 @@
     "lint": "eslint src"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@types/node": "^22.19.2",
-    "@types/vscode": "^1.106.1",
-    "@typescript-eslint/eslint-plugin": "^8.46.2",
-    "@typescript-eslint/parser": "^8.46.2",
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "@types/vscode": "^1.110.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
     "@vscode/vsce": "^3.7.1",
-    "eslint": "^9.39.1",
+    "eslint": "^10.1.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.49.0"
+    "typescript-eslint": "^8.57.1"
   }
 }

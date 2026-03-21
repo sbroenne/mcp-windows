@@ -1131,12 +1131,29 @@ public sealed partial class UIAutomationService
         }
 
         // Focus the edit field
-        await _staThread.ExecuteAsync(() =>
+        int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
         {
             editField.TrySetFocus();
-            return true;
+            var rect = editField.GetBoundingRectangle();
+            if (rect.Width <= 0 || rect.Height <= 0)
+            {
+                return null;
+            }
+
+            return [(int)Math.Round(rect.X + (rect.Width / 2)), (int)Math.Round(rect.Y + (rect.Height / 2))];
         }, cancellationToken);
 
+        if (editFieldCenter is { Length: 2 })
+        {
+            await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
+            await Task.Delay(100, cancellationToken);
+        }
+        else
+        {
+            await Task.Delay(50, cancellationToken);
+        }
+
+        await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
         await Task.Delay(50, cancellationToken);
 
         // Clear existing text and type new path (pywinauto pattern: Ctrl+A then type)
