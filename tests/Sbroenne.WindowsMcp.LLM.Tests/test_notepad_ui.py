@@ -15,7 +15,7 @@ from conftest import (
     assert_tool_param_matches,
     make_agents,
 )
-from pytest_aitest import Agent, ClarificationDetection, MCPServer, Provider
+from pytest_skill_engineering import Eval as Agent, ClarificationDetection, MCPServer, Provider
 
 
 def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):

@@ -12,7 +12,12 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from pytest_aitest import Agent, ClarificationDetection, MCPServer, Provider
+from pytest_skill_engineering import (
+    Eval as Agent,
+    ClarificationDetection,
+    MCPServer,
+    Provider,
+)
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -67,6 +72,12 @@ def _build_mcp_server():
 def windows_mcp_server():
     """The Windows MCP Server under test."""
     return MCPServer(command=SERVER_COMMAND)
+
+
+@pytest.fixture
+def aitest_run(eval_run):
+    """Temporary compatibility alias while migrating to pytest-skill-engineering."""
+    return eval_run
 
 
 @pytest.fixture(scope="session")

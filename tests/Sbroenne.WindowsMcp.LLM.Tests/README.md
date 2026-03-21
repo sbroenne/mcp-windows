@@ -1,6 +1,6 @@
 # Windows MCP Server - LLM Integration Tests
 
-This project contains integration tests for the Windows MCP Server using [pytest-aitest](https://github.com/sbroenne/pytest-aitest) — a pytest plugin for testing AI agents with MCP tools.
+This project contains integration tests for the Windows MCP Server using [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering) — the successor to `pytest-aitest` for testing AI agents with MCP tools.
 
 ## Test Applications
 
@@ -115,11 +115,11 @@ Tool-level tests that verify individual MCP tool functionality. Run with `gpt-4.
 
 ## Writing Tests
 
-Tests use pytest-aitest's `aitest_run` fixture:
+Tests use `pytest-skill-engineering` via the local `aitest_run` compatibility fixture, which currently delegates to the package's `eval_run` fixture:
 
 ```python
 import pytest
-from pytest_aitest import Agent, MCPServer, Provider
+from pytest_skill_engineering import Eval as Agent, MCPServer, Provider
 
 async def test_example(aitest_run):
     result = await aitest_run(
@@ -166,8 +166,8 @@ assert not result.asked_for_clarification
 
 ## Test Reports
 
-HTML reports are generated when using `--aitest-report`:
+HTML reports are generated when using `--aitest-html` together with an AI summary model:
 
 ```powershell
-uv run pytest test_notepad_ui.py -v --aitest-report=TestResults/report.html
+uv run pytest test_notepad_ui.py -v --aitest-summary-model=azure/gpt-5.2-chat --aitest-html=TestResults/report.html
 ```

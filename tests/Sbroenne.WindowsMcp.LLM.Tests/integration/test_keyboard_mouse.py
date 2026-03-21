@@ -18,7 +18,7 @@ from conftest import (
     assert_tool_param_equals,
     assert_tool_param_matches,
 )
-from pytest_aitest import Agent, ClarificationDetection
+from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
 def _agent(windows_mcp_server, gpt41_provider):
