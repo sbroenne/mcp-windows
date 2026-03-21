@@ -17,6 +17,9 @@ on:
   # Allow other workflows to call this
   workflow_call:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # Run each scenario in isolated jobs for clean UI state
   llm-tests:
@@ -34,10 +37,10 @@ jobs:
           - test_window_workflow.py
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: 10.0.x
 
@@ -131,7 +134,7 @@ jobs:
       shell: pwsh
 
     - name: Upload LLM Test Report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: llm-test-report-${{ matrix.scenario }}
@@ -148,7 +151,7 @@ jobs:
 
     steps:
     - name: Download all test reports
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         pattern: llm-test-report-*
         path: reports

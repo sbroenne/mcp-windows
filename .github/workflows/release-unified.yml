@@ -38,6 +38,7 @@ on:
 env:
   DOTNET_VERSION: '10.0.x'
   NODE_VERSION: '22'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   # =============================================================================
@@ -52,7 +53,7 @@ jobs:
       version: ${{ steps.calculate_version.outputs.version }}
       tag: ${{ steps.calculate_version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Fetch all history and tags
 
@@ -123,10 +124,10 @@ jobs:
     if: vars.AZURE_OPENAI_ENDPOINT != ''
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -154,7 +155,7 @@ jobs:
       shell: pwsh
 
     - name: Upload LLM Test Reports
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       if: always()
       with:
         name: llm-test-reports
@@ -178,10 +179,10 @@ jobs:
         rid: [win-x64, win-arm64]
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -239,7 +240,7 @@ jobs:
       shell: pwsh
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: standalone-${{ matrix.rid }}
         path: windows-mcp-server-*.zip
@@ -258,15 +259,15 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ env.NODE_VERSION }}
 
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v5
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
@@ -355,7 +356,7 @@ jobs:
       shell: pwsh
 
     - name: Upload VSIX Artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: vscode-extension
         path: vscode-extension/*.vsix
@@ -371,7 +372,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -405,7 +406,7 @@ jobs:
       shell: pwsh
 
     - name: Download VS Code VSIX
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: vscode-extension
         path: vscode-vsix
@@ -430,7 +431,7 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: Set Version
       run: |
@@ -439,14 +440,14 @@ jobs:
       shell: pwsh
 
     - name: Download All Artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         path: artifacts
         pattern: standalone-*
         merge-multiple: true
 
     - name: Download VSIX Artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v6
       with:
         name: vscode-extension
         path: artifacts
