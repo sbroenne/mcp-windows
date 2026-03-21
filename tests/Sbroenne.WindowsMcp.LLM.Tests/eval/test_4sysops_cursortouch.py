@@ -11,7 +11,7 @@ Key Differences:
 """
 
 import pytest
-from pytest_aitest import Agent, ClarificationDetection, MCPServer, Provider
+from pytest_skill_engineering import Eval as Agent, ClarificationDetection, MCPServer, Provider
 
 from conftest import (
     SYSTEM_PROMPT,

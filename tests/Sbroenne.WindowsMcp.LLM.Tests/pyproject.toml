@@ -1,13 +1,17 @@
 [project]
 name = "mcp-windows-llm-tests"
 version = "0.1.0"
-description = "LLM integration tests for Windows MCP Server using pytest-aitest"
+description = "LLM integration tests for Windows MCP Server using pytest-skill-engineering"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest-aitest",
+    "pytest-skill-engineering",
     "anyio",
     "pytest-asyncio",
+    "trio",
 ]
+
+[tool.uv.sources]
+pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "373ddaea012af61808e0ae5715607c34b865bd34" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
