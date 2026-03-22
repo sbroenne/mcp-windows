@@ -203,7 +203,7 @@ class TestMouseClick:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Use mouse_control to click at coordinates (900, 600) in the Paint window to make a mark on the canvas.",
+            "Click at coordinates (900, 600) on the Paint canvas to make a mark.",
         )
         assert_quality(result)
         assert_tool_called(result, "mouse_control")
@@ -215,7 +215,7 @@ class TestMouseClick:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Use mouse_control to click at coordinates (1100, 500) in the Paint window to make another mark.",
+            "Click at coordinates (1100, 500) on the Paint canvas to make another mark.",
         )
         assert_quality(result)
         assert_tool_called(result, "mouse_control")
@@ -259,7 +259,7 @@ class TestMouseDrag:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Use mouse_control with action drag to draw a line from (700, 500) to (1200, 700) in the Paint window.",
+            "Draw a line from coordinates (700, 500) to (1200, 700) on the Paint canvas.",
         )
         assert_quality(result)
         assert_tool_called(result, "mouse_control")
@@ -271,7 +271,7 @@ class TestMouseDrag:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Use mouse_control with action drag to draw a horizontal line from (700, 600) to (1200, 600) in the Paint window.",
+            "Draw a horizontal line from coordinates (700, 600) to (1200, 600) on the Paint canvas.",
         )
         assert_quality(result)
         assert_tool_called(result, "mouse_control")

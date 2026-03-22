@@ -1,21 +1,18 @@
 # Copilot Instructions for mcp-windows
 
-## Project Constitution
+## Core Principles
 
-**ALWAYS read [.specify/memory/constitution.md](.specify/memory/constitution.md) for authoritative project principles.**
-
-The constitution is NON-NEGOTIABLE and covers:
-- Test-First Development (Principle I)
-- MCP Protocol Compliance (Principle III)
-- Augmentation, Not Duplication (Principle VI) - tools are "dumb actuators"
-- Microsoft Libraries First (Principle VII)
-- Security Best Practices (Principle VIII)
-- Modern .NET & C# (Principle XIII)
-- xUnit Testing (Principle XIV)
-- LLM Integration Testing with pytest-aitest (Principle XXIII)
-- Token Optimization for LLM Efficiency (Principle XXIV)
-- UI Automation First (Principle XXV) - semantic UI automation is primary approach
-- And more (25 principles total)...
+The project follows these NON-NEGOTIABLE principles:
+- **Test-First Development** - Write tests before implementation
+- **MCP Protocol Compliance** - Follow MCP specification strictly
+- **Augmentation, Not Duplication** - Tools are "dumb actuators", no complex logic in tools
+- **Microsoft Libraries First** - Prefer official Microsoft libraries over third-party alternatives
+- **Security Best Practices** - No secrets in code, validate inputs, follow security guidelines
+- **Modern .NET & C#** - Use current .NET and C# language features
+- **xUnit Testing** - All .NET tests use xUnit framework
+- **LLM Integration Testing** - Use pytest-skill-engineering with GitHub Copilot SDK
+- **Token Optimization** - Optimize MCP responses for LLM token efficiency
+- **UI Automation First** - Semantic UI automation is the primary approach
 
 ## Automation Patterns Reference
 

@@ -7,8 +7,8 @@ Provides MCP server, provider, and agent fixtures used across all test files.
 import os
 import re
 import subprocess
-import uuid
 import tempfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -81,24 +81,31 @@ def aitest_run(eval_run):
 
 
 @pytest.fixture(scope="session")
-def azure_openai_endpoint():
-    """Azure OpenAI endpoint from environment."""
-    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT") or os.environ.get("AZURE_API_BASE")
-    if not endpoint:
-        pytest.skip("AZURE_OPENAI_ENDPOINT or AZURE_API_BASE not set")
-    return endpoint
+def copilot_auth():
+    """Require GitHub SDK auth via GITHUB_TOKEN or an existing gh login."""
+    if os.environ.get("GITHUB_TOKEN"):
+        return "GITHUB_TOKEN"
+
+    result = subprocess.run(
+        ["gh", "auth", "status"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        pytest.skip("GITHUB_TOKEN not set and gh auth status failed")
+    return "gh"
 
 
 @pytest.fixture(scope="session")
-def gpt41_provider():
-    """Azure OpenAI GPT-4.1 provider."""
-    return Provider(model="azure/gpt-4.1")
+def gpt41_provider(copilot_auth):
+    """GitHub Copilot GPT-4.1 provider."""
+    return Provider(model="copilot/gpt-4.1")
 
 
 @pytest.fixture(scope="session")
-def gpt52_provider():
-    """Azure OpenAI GPT-5.2-chat provider."""
-    return Provider(model="azure/gpt-5.2-chat")
+def gpt52_provider(copilot_auth):
+    """GitHub Copilot GPT-5.2 provider."""
+    return Provider(model="copilot/gpt-5.2")
 
 
 @pytest.fixture(scope="session")

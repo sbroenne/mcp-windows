@@ -20,11 +20,12 @@ The MCP server is built automatically when tests start (via a session-scoped fix
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and Python 3.12+.
 
-### 3. Azure OpenAI Configuration
+### 3. GitHub Copilot SDK Configuration
 
-Tests use Azure OpenAI via `DefaultAzureCredential` (az login). Set:
+Tests use the GitHub Copilot SDK via `pytest-skill-engineering[copilot]`.
 
-- `AZURE_OPENAI_ENDPOINT` — Your Azure OpenAI endpoint URL
+- In CI, `GITHUB_TOKEN` is used automatically
+- Locally, either set `GITHUB_TOKEN` or sign in with `gh auth login`
 
 ### 4. Windows Desktop Environment
 
@@ -37,6 +38,7 @@ These tests automate Windows UI elements. They require:
 ```powershell
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
 uv sync
+gh auth login
 ```
 
 ## Running the Tests
@@ -90,7 +92,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 
 ### Scenario Tests (root directory)
 
-Multi-step workflow tests that verify end-to-end user scenarios. Run with both `gpt-4.1` and `gpt-5.2-chat` models.
+Multi-step workflow tests that verify end-to-end user scenarios. Run with both `gpt-4.1` and `gpt-5.2` models through GitHub Copilot.
 
 | Test File | Description |
 |-----------|-------------|

@@ -16,7 +16,7 @@ public sealed record KeyboardControlRequest
     public string? Text { get; init; }
 
     /// <summary>
-    /// Gets or sets the key name to press (for Press, KeyDown, KeyUp, Combo actions).
+    /// Gets or sets the key name to press (for Press, KeyDown, KeyUp actions).
     /// </summary>
     public string? Key { get; init; }
 
