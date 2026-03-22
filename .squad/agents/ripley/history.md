@@ -5,6 +5,34 @@
 - **Stack:** C# / .NET 10, Windows UI Automation, MCP protocol, xUnit, pytest-aitest (LLM tests), TypeScript (VS Code extension)
 - **Created:** 2026-03-22
 
+## Core Context
+
+### Plugin Shipment (2026-03-23) — COMPLETE
+
+**Status:** ✅ APPROVED FOR PRODUCTION SHIPMENT
+
+Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
+
+**Achievement:**
+- Plugin bundle created under `plugin/` (shared Copilot CLI + Claude Code)
+- Hook contract redesigned: inline `-Command` → dedicated `-File` script
+- Root resolution: multi-probe with marker validation (no silent failures)
+- Binary provisioning: architecture detection, GitHub Releases download, graceful short-circuit
+- All tests pass: 966 unit, 733 integration
+- Safety review approved with documented non-blocking limitations (English Windows only, internet required on first use)
+
+**Key Pattern:** Never embed PowerShell variables in JSON `-Command` strings. Always use `-File` with separate script. `$PSScriptRoot` provides reliable self-location in Windows PowerShell 5.1.
+
+**Status:** Ready for GitHub Releases and MCP Registry publication.
+
+### Project Foundation (Grade: A-)
+
+- **MCP Compliance:** ModelContextProtocol 1.1.0 SDK, stdio transport
+- **Testing:** 966+ unit tests, 733 integration tests (100% pass rate)
+- **Code Quality:** 0 build warnings, modern C# 12 with .NET 10
+- **Security:** asInvoker manifest, UAC/elevation detection, no shell injection
+- **Architecture:** Lazy singleton pattern (MCP static tools), COM apartment threading, Result/Outcome pattern
+
 ## Learnings
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->

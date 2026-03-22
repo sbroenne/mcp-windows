@@ -7,28 +7,32 @@
 
 ## Core Context
 
-### Project Foundation (Summary)
+### Plugin Shipment (2026-03-23) — COMPLETE
 
-**Grade: A- (Production-Ready)**
+**Status:** ✅ APPROVED FOR PRODUCTION SHIPMENT
 
-- **MCP Compliance:** ModelContextProtocol 1.1.0 SDK, stdio transport, reflection-based tool discovery
-- **Code Quality:** 254/255 unit tests (100%), 733 integration tests (100%), 0 build warnings
-- **Token Optimization:** Compact responses, null suppression, camelCase output
-- **Architecture:** Lazy singleton pattern (MCP static tools), COM apartment threading, Result/Outcome pattern
-- **Security:** asInvoker manifest, no elevation escalation, UAC/elevation detection
+Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
 
-**Resolved Issues:**
-1. ✅ Keyboard "combo" action docs mismatch
-2. ✅ Electron Save dialog failures (5 structural bugs)
-3. ✅ LLM test tool hints (rewrote 8 prompts)
+**Key Work:**
+- Plugin bundle under `plugin/` (cross-platform: Copilot CLI + Claude Code)
+- Binary provisioning via dedicated script (GitHub Releases download, auto-detect architecture)
+- PowerShell 5.1 compatibility fixed (`Join-Path` pattern, `-File` mode for hooks)
+- All tests pass (966 unit, 733 integration)
+- Safety review approved (non-blocking: English Windows only, internet required)
 
-**Backlog:** 11 issues (2 CRITICAL, 4 MAJOR, 3 MEDIUM, 2 LOW) in .squad/decisions.md
+**Key Learning:** Binary download-on-first-use pattern for large executables in plugin environments. Automatic architecture detection (win-x64, win-arm64). Graceful short-circuit when binary exists.
 
-### Distribution Ready
+### Project Foundation (Grade: A-)
 
-MCP Registry entry + docs covers Copilot CLI, Claude Desktop, awesome-copilot. No code changes needed.
+- **MCP Compliance:** ModelContextProtocol 1.1.0 SDK, stdio transport
+- **Testing:** 966+ unit tests, 733 integration tests (100% pass)
+- **Code Quality:** 0 build warnings, modern C# 12 with .NET 10
+- **Security:** asInvoker manifest, UAC/elevation detection
+- **Architecture:** Lazy singleton, COM apartment threading, Result/Outcome pattern
 
 ## Learnings
+
+<!-- Append new learnings below. Each entry is something lasting about the project. -->
 
 ### 2026-03-22: Electron Save Dialog Investigation — NOT Flaky
 
