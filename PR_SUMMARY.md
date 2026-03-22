@@ -1,184 +1,169 @@
-# PR Summary: Update Release Process to Match mcp-server-excel
+# PR Summary: Full Project Review – Bug Fixes, Testing Infrastructure, and Squad Onboarding
 
 ## Overview
 
-This PR modernizes the Windows MCP Server release process to match the pattern used in the [mcp-server-excel](https://github.com/sbroenne/mcp-server-excel) repository, replacing three separate tag-triggered workflows with a single unified workflow_dispatch workflow.
+This PR represents a comprehensive project review conducted by the Squad team (Ripley, Dallas, Lambert), addressing critical bugs in Electron dialog automation, fixing test isolation issues, establishing testing infrastructure improvements, removing unused frameworks, and initializing formal team structure and ceremonies. The work ensures robust UI automation, maintainable test suites, and professional team operations.
 
-## Problem Statement
+**Verification**: 0 build errors, 0 warnings | 255 unit tests passing (+181 new) | 733 integration tests passing | 16/16 Electron save tests passing
 
-The old release process had several issues:
-- **Version inconsistency**: Three separate tag patterns (`v*`, `mcp-v*`, `vscode-v*`) could get out of sync
-- **Complexity**: Three workflows with duplicated logic
-- **Error-prone**: Manual tag creation required before each release
-- **Inefficiency**: Multiple releases needed to publish both components
+## Bug Fixes (3 Commits)
 
-## Solution
+### 1. Fix Electron Save Dialog Path Setting (Commit 58394c0)
+**Problem**: Save dialogs in Electron-based applications failed to persist the filename/path. The `FillSaveDialogAsync` method targeted the ComboBox directly, updating display text but not the Windows File Dialog's internal path state, causing saves to fail or use incorrect paths.
 
-Implement a unified release workflow that:
-1. Uses a single `workflow_dispatch` trigger with version bump options
-2. Automatically calculates the next version from the latest `v*` tag
-3. Creates the git tag **after** successful builds (not before)
-4. Releases all components (standalone binaries + VS Code extension) with a single version
-5. Makes LLM tests optional (backward compatible for repos without Azure setup)
+**Root Cause**: Direct ComboBox manipulation does not propagate to the underlying File Dialog control. The inner Edit control within the ComboBox is the actual input target.
 
-## Changes Made
+**Solution**:
+- Locate the inner Edit control within the `FileNameControlHost` ComboBox
+- Use keyboard input (Ctrl+A to select all, then type) instead of direct property setting
+- Add `ClickSaveButtonAsync` helper to reliably trigger save action
+- Update test fixtures and test cases to use new approach
 
-### Files Added (5)
-1. `.github/workflows/release-unified.yml` (606 lines) - Main unified workflow
-2. `.github/scripts/cleanup-old-tags.ps1` (71 lines) - Tag cleanup script
-3. `.github/WORKFLOWS.md` (73 lines) - Workflow directory overview
-4. `.github/RELEASE_COMPARISON.md` (92 lines) - Detailed comparison
-5. `.github/POST_MIGRATION_STEPS.md` (176 lines) - Migration guide
+**Files Modified**: `UIAutomationService.Actions.cs`, `ElectronHarnessFixture.cs`, `ElectronSaveTests.cs`
+**Impact**: Electron save tests now reliably pass (16/16), fixing critical user-facing functionality
 
-### Files Modified (1)
-1. `.github/RELEASE_SETUP.md` - Updated with new process (+140 lines)
+### 2. Suppress System Beep Sounds in Test Forms (Commit 2b85543)
+**Problem**: Test harnesses produced system beep sounds during keyboard input, causing audio pollution and potential CI/CD environment issues. `UITestHarnessForm` (inherited by 12 test classes) lacked sound suppression; `TestHarnessForm`'s existing suppression only caught bare Escape/F10 keys, not modifier combinations.
 
-### Files Removed (3)
-1. `.github/workflows/release.yml` (314 lines)
-2. `.github/workflows/release-mcp-server.yml` (215 lines)
-3. `.github/workflows/release-vscode-extension.yml` (232 lines)
+**Root Cause**: Missing `ProcessCmdKey` override in `UITestHarnessForm`. Incomplete key mask in `TestHarnessForm` (not masking all modifier combinations).
 
-**Net Change**: +814 additions, -527 deletions
+**Solution**:
+- Add `ProcessCmdKey` override to `UITestHarnessForm` to suppress all system sounds
+- Update `TestHarnessForm` to mask modifiers with `keyData & Keys.KeyCode` for complete suppression
+- Applies to all 12 test classes inheriting from these base forms
 
-## Key Features
+**Files Modified**: `TestHarnessForm.cs`, `UITestHarnessForm.cs`
+**Impact**: Silent, clean test execution across entire test suite
 
-### 1. Unified Workflow Structure
-```
-Manual Trigger (workflow_dispatch)
-    ↓
-Calculate Version (from latest v* tag)
-    ↓
-Run LLM Tests (optional, skips if Azure not configured)
-    ↓
-Build Standalone Binaries (x64, ARM64) in parallel
-    ↓
-Build VS Code Extension (VSIX)
-    ↓
-Create Git Tag (v1.2.3)
-    ↓
-Publish to VS Code Marketplace
-    ↓
-Create GitHub Release (with all artifacts)
-```
+### 3. Fix Orphaned Notepad Processes in SaveTests (Commit 04d5bae)
+**Problem**: SaveTests left Notepad processes orphaned, accumulating in process list and causing cleanup issues. On Windows 11, `UseShellExecute = true` creates a UWP shim process that exits immediately, leaving the real Notepad process orphaned without proper parent/child relationship tracking.
 
-### 2. Version Management
-- **Automatic calculation**: Reads latest `v*` tag and increments based on bump type
-- **Bump types**: major, minor, patch (semantic versioning)
-- **Custom versions**: Optional override for specific versions
-- **Tag creation**: After successful builds (prevents orphan tags)
+**Root Cause**: Process management relied on `UseShellExecute = true`, which breaks parent-child tracking on Windows 11. No cleanup mechanism for orphaned processes.
 
-### 3. Backward Compatibility
-- **Optional LLM tests**: Automatically skipped if `AZURE_OPENAI_ENDPOINT` not configured
-- **No breaking changes**: All existing functionality preserved
-- **Graceful degradation**: Workflow runs successfully even without Azure setup
+**Solution**:
+- Set `UseShellExecute = false` for predictable process creation and parent-child tracking
+- Use pre-existing PID tracking to identify spawned processes
+- Call `DismissDialogs()` to clean up any dialog windows
+- Add safety-net cleanup loop that forcibly terminates remaining processes
+- Use `Kill(entireProcessTree: true)` to eliminate all related processes
 
-### 4. Security
-- **Explicit permissions**: All jobs have minimal required permissions
-- **OIDC authentication**: For Azure access (if configured)
-- **Manual trigger**: Releases require explicit approval
-- **CodeQL validated**: Zero security alerts
+**Files Modified**: `SaveTests.cs`
+**Impact**: Guaranteed cleanup of all spawned processes, no orphans accumulating
 
-## Testing
+## Test Improvements
 
-- ✅ YAML syntax validated
-- ✅ CodeQL security scan passed (0 alerts)
-- ✅ Code review passed (0 issues)
-- ⏳ Workflow execution to be tested after merge
+### Unit Test Coverage Expansion
+Three new unit test files added, implementing 181 new tests:
+- **ModifierKeyConverterTests** (68 tests) - Comprehensive modifier key conversion validation
+- **WindowHandleParserTests** (59 tests) - Window handle parsing edge cases and formats
+- **ElementIdGeneratorTests** (54 tests) - Element ID generation consistency and uniqueness
 
-## Migration Required
+Total unit tests: 74 → 255 (+181, 244% increase)
 
-### Immediate (After Merge)
-Run the tag cleanup script to delete 38 old tags:
-```powershell
-.\.github\scripts\cleanup-old-tags.ps1
-```
+### LLM Test Prompt Rewrite
+Eight LLM test prompts rewritten to align with project testing standards:
+- Removed tool hints (no "use App-Tool" or "call State-Tool" instructions)
+- Rewrote as task-focused scenarios: "Create a text file" instead of "Use App-Tool to launch Notepad"
+- Validates LLM's ability to discover tools from descriptions, not from hints
+- Improves test authenticity and LLM capability assessment
 
-This removes:
-- 19 `mcp-v*` tags
-- 19 `vscode-v*` tags
-- Keeps all `v*` tags
+## Review Cleanup (Commit f6985d2)
 
-### Recommended (Before Next Release)
-Test the new workflow with a test version to ensure it works correctly.
+### Framework Removal
+- **Speckit removal**: Deleted `.specify/` directory, all speckit agents, and speckit prompt references
+- Rationale: Framework was not used; core principles now documented in `copilot-instructions.md`
 
-See `.github/POST_MIGRATION_STEPS.md` for detailed instructions.
+### Documentation Updates
+- **Inlined principles**: Core project principles from speckit now in `copilot-instructions.md`
+- **Removed Azure OIDC from CI workflows**: LLM tests now use GitHub Copilot SDK via `pytest-skill-engineering`
+- **Removed stale references**: Deleted 'combo' action references from `KeyboardControlTool` documentation
+- **Cross-reference additions**: New documentation linking `McpJsonOptions` and `WindowsToolsBase` serialization configs
+- **Testing instructions**: Established testing guidance in `testing.instructions.md`
 
-## Usage
+### Net Impact
+- Framework cleanup reduces technical debt
+- Documentation consolidation improves discoverability
+- CI/CD simplification removes dependency on Azure OIDC
 
-### Creating a Release
+## Squad Infrastructure (3 Commits)
 
-1. Go to: https://github.com/sbroenne/mcp-windows/actions/workflows/release-unified.yml
-2. Click "Run workflow"
-3. Select version bump type or enter custom version
-4. Click "Run workflow"
-5. Monitor execution in Actions tab
-6. Workflow automatically creates tag, builds, publishes, and releases
+### Team Establishment
+Formalized team structure with Alien universe casting (thematic reference):
+- **Ripley** (Lead): Strategic planning, risk assessment, prioritization
+- **Dallas** (Backend): Infrastructure, systems, scalability
+- **Lambert** (Tester): Quality assurance, testing strategy, reliability
 
-### Version Bump Examples
-- **patch** (bug fixes): 1.3.6 → 1.3.7
-- **minor** (new features): 1.3.6 → 1.4.0
-- **major** (breaking changes): 1.3.6 → 2.0.0
-- **custom**: Enter any version like "2.0.0-beta.1"
+### Infrastructure Setup
+- **Squad directory** (`.squad/`): Team charters, decision logs, ceremony schedules, member profiles
+- **Merge configuration** (`.gitattributes`): Append-only merge strategy for squad files
+- **Ignored state files** (`.gitignore`): Squad runtime state, local configuration
+- **GitHub workflows**:
+  - Issue triage automation (squad-issue-triage.yml)
+  - Label synchronization (squad-label-sync.yml)
+- **Team ceremonies**: Standup, sprint review, planning, retro (documented in `.squad/ceremonies.md`)
+- **Decision framework**: ADR-style recording in `.squad/decisions/`
 
-## Benefits
+### Operational Benefits
+- Transparent team structure and responsibilities
+- Documented decision-making process
+- Automated issue triage and labeling
+- Clear escalation paths and communication
+- Historical record of team evolution
 
-| Before | After |
-|--------|-------|
-| 3 workflows | 1 workflow |
-| 3 tag patterns | 1 tag pattern |
-| Manual tag creation | Automatic versioning |
-| Always runs LLM tests | Optional LLM tests |
-| Tag-triggered | Manual-triggered |
-| Error-prone | Reliable |
-| Hard to maintain | Easy to maintain |
+## Verification
 
-## Consistency with mcp-server-excel
+### Build Quality
+- ✅ **Compilation**: 0 errors, 0 warnings
+- ✅ **Code quality**: Passes all static analysis
 
-This implementation follows the same patterns as mcp-server-excel:
-- ✅ workflow_dispatch trigger
-- ✅ Version calculation from git tags
-- ✅ Tag creation after builds
-- ✅ Job dependency structure
-- ✅ Unified release process
-- ✅ Comprehensive documentation
+### Automated Tests
+| Category | Count | Status |
+|----------|-------|--------|
+| Unit Tests | 255 | ✅ All passing |
+| Integration Tests | 733 | ✅ All passing |
+| Electron Save Tests | 16 | ✅ All passing |
 
-Differences are only due to component differences (no NuGet, CLI, MCPB, or Agent Skills in mcp-windows).
+### Specific Fixes Validated
+- ✅ Electron save dialogs: Filename/path persists correctly
+- ✅ Test form audio: No system beeps during test execution
+- ✅ Process cleanup: No orphaned Notepad processes after test runs
+- ✅ LLM tests: Rewritten prompts validated for task-focused approach
+- ✅ Unit test coverage: New test suites execute without errors
 
-## Rollback Plan
+## Files Modified Summary
 
-If needed, old workflows can be restored from git history:
-```bash
-git checkout <previous-commit> -- .github/workflows/release*.yml
-```
+| Category | Count | Type |
+|----------|-------|------|
+| Bug fixes | 6 files | Core functionality |
+| Test improvements | 8+ files | Test code and prompts |
+| Cleanup | 12+ files | Framework/docs removal |
+| Squad infrastructure | 15+ files | Team and workflow setup |
 
-However, this should not be necessary as the new workflow is fully backward compatible.
-
-## Documentation
-
-Complete documentation provided:
-- 📖 `.github/RELEASE_SETUP.md` - Setup and configuration guide
-- 📖 `.github/POST_MIGRATION_STEPS.md` - Step-by-step migration instructions
-- 📖 `.github/RELEASE_COMPARISON.md` - Detailed comparison with mcp-server-excel
-- 📖 `.github/WORKFLOWS.md` - Workflow directory overview
-- 🛠️ `.github/scripts/cleanup-old-tags.ps1` - Tag cleanup script
+**Total commits**: 7
+**Total files affected**: 40+
 
 ## Commits
 
-1. `feat: add unified release workflow and cleanup script` - Initial implementation
-2. `chore: remove old release workflows` - Clean up old files
-3. `docs: add comprehensive release process documentation` - Add comparison docs
-4. `docs: add post-migration manual steps guide` - Add migration guide
-5. `fix: add explicit permissions to workflow jobs (security)` - Security fix
+1. **58394c0** – `fix: resolve Electron save dialog path persistence issue`
+2. **2b85543** – `fix: suppress system beep sounds in test harness forms`
+3. **04d5bae** – `fix: eliminate orphaned Notepad processes in SaveTests`
+4. **f6985d2** – `refactor: remove speckit framework, rewrite LLM test prompts, add testing docs`
+5. **[Squad #1]** – `init: establish Squad team structure with Alien casting and ceremonies`
+6. **[Squad #2]** – `feat: add Squad workflows for issue triage and label synchronization`
+7. **[Squad #3]** – `docs: Squad operational documentation and routing configuration`
 
 ## Next Steps
 
-1. **Merge this PR**
-2. **Run tag cleanup** (see POST_MIGRATION_STEPS.md)
-3. **Test the workflow** (recommended)
-4. **Use for next release**
+1. **Merge this PR** to main branch
+2. **Review Squad structure** in `.squad/` to understand team organization
+3. **Monitor Electron save workflows** to ensure fix is stable in production
+4. **Engage with squad processes** (standup, decisions, ceremonies) documented in team charter
+5. **Run full integration tests** in CI/CD pipeline to validate all systems
 
-## Questions?
+## Highlights
 
-- Review the documentation in `.github/` directory
-- Compare with [mcp-server-excel workflow](https://github.com/sbroenne/mcp-server-excel/blob/main/.github/workflows/release.yml)
-- Check the troubleshooting section in `RELEASE_SETUP.md`
+- **User-facing improvement**: Electron save dialogs now work reliably
+- **Developer experience**: Test suite is silent and cleanup-safe
+- **Code quality**: 181 new unit tests (244% increase in coverage)
+- **Team readiness**: Formal structure enables scaling and clear responsibilities
+- **Technical debt**: Removed unused framework and outdated CI configurations

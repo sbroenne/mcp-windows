@@ -25,7 +25,7 @@ public sealed class ElectronSaveTests : IDisposable
     public ElectronSaveTests(ElectronHarnessFixture fixture)
     {
         _fixture = fixture;
-        _fixture.BringToFront();
+        _fixture.Reset();
         Thread.Sleep(200);
 
         _windowHandle = _fixture.WindowHandleString;
@@ -52,6 +52,9 @@ public sealed class ElectronSaveTests : IDisposable
 
     public void Dispose()
     {
+        // Dismiss any dialogs left open by the test
+        _fixture.DismissDialogs();
+
         _staThread.Dispose();
         _automationService.Dispose();
 
@@ -86,18 +89,17 @@ public sealed class ElectronSaveTests : IDisposable
         await Task.Delay(500);
 
         // Act: Call SaveAsync on the main window
-        // This sends Ctrl+S, which triggers the Save As dialog in the Electron harness
-        // Then it fills in the filename and presses Enter
         var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
 
         // Assert
-        Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
+        Assert.True(result.Success, $"SaveAsync failed: {result.ErrorMessage}");
 
         // Wait for file system to settle
         await Task.Delay(500);
 
         // Verify the file was created
-        Assert.True(File.Exists(testFilePath), $"Expected file to exist at: {testFilePath}");
+        Assert.True(File.Exists(testFilePath),
+            $"Expected file to exist at: {testFilePath}. Duration={result.Diagnostics?.DurationMs}ms");
 
         // Verify the file has content (the Electron harness writes a timestamp)
         var content = File.ReadAllText(testFilePath);
@@ -165,12 +167,9 @@ public sealed class ElectronSaveTests : IDisposable
         // Assert - should succeed (either saved directly or dialog hint returned)
         Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
 
-        // Cleanup: if a dialog was opened (hint returned), close it with Escape
-        if (result.UsageHint != null && result.UsageHint.Contains("dialog"))
-        {
-            var keyboardService = new KeyboardInputService();
-            await keyboardService.PressKeyAsync("Escape");
-            await Task.Delay(200);
-        }
+        // Unconditionally dismiss any dialogs — the Electron harness always opens a Save As dialog
+        // on Ctrl+S, and DismissDialogs() is safe to call even if no dialog is open.
+        _fixture.DismissDialogs();
+        await Task.Delay(200);
     }
 }

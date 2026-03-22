@@ -189,9 +189,13 @@ public sealed class TestHarnessForm : Form
         _inputTextBox = new TextBox
         {
             Location = new Point(90, 42),
-            Size = new Size(380, 25),
+            Size = new Size(380, 50),
             Font = new Font("Consolas", 11),
             Name = "InputTextBox",
+            Multiline = true,
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            ScrollBars = ScrollBars.Vertical,
         };
         _inputTextBox.KeyDown += OnTextBoxKeyDown;
         _inputTextBox.TextChanged += OnTextBoxTextChanged;
@@ -201,7 +205,7 @@ public sealed class TestHarnessForm : Form
         _testButton = new Button
         {
             Text = "Click Me",
-            Location = new Point(10, 80),
+            Location = new Point(10, 105),
             Size = new Size(110, 40),
             Font = new Font("Segoe UI", 10),
             Name = "TestButton",
@@ -215,7 +219,7 @@ public sealed class TestHarnessForm : Form
         _testButton2 = new Button
         {
             Text = "Button 2",
-            Location = new Point(125, 80),
+            Location = new Point(125, 105),
             Size = new Size(110, 40),
             Font = new Font("Segoe UI", 10),
             Name = "TestButton2",
@@ -226,7 +230,7 @@ public sealed class TestHarnessForm : Form
         // Right-click test area
         _rightClickPanel = new Panel
         {
-            Location = new Point(240, 80),
+            Location = new Point(240, 105),
             Size = new Size(115, 40),
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.LightYellow,
@@ -247,7 +251,7 @@ public sealed class TestHarnessForm : Form
         // Scroll test area
         _scrollPanel = new Panel
         {
-            Location = new Point(360, 80),
+            Location = new Point(360, 105),
             Size = new Size(110, 40),
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.LightCyan,
@@ -271,7 +275,7 @@ public sealed class TestHarnessForm : Form
         // Drag test area - a large panel for testing drag operations
         _dragPanel = new Panel
         {
-            Location = new Point(10, 130),
+            Location = new Point(10, 155),
             Size = new Size(460, 80),
             BorderStyle = BorderStyle.FixedSingle,
             BackColor = Color.LightGreen,
@@ -299,15 +303,15 @@ public sealed class TestHarnessForm : Form
         var logLabel = new Label
         {
             Text = "Event Log:",
-            Location = new Point(10, 215),
+            Location = new Point(10, 240),
             Size = new Size(80, 20),
         };
         Controls.Add(logLabel);
 
         _eventLog = new ListBox
         {
-            Location = new Point(10, 235),
-            Size = new Size(460, 160),
+            Location = new Point(10, 260),
+            Size = new Size(460, 135),
             Font = new Font("Consolas", 9),
             Name = "EventLog",
         };
@@ -318,6 +322,31 @@ public sealed class TestHarnessForm : Form
         MouseUp += OnFormMouseUp;
         MouseMove += OnFormMouseMove;
         MouseWheel += OnFormMouseWheel;
+    }
+
+    /// <inheritdoc />
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Mask out modifiers so Ctrl+Escape, Shift+F10, etc. are also suppressed.
+        var key = keyData & Keys.KeyCode;
+
+        // Suppress Escape key beep — the form has no CancelButton, so Escape
+        // would normally produce a system beep via MessageBeep.
+        if (key == Keys.Escape)
+        {
+            LogEvent("Key pressed: Escape (suppressed beep)");
+            return true;
+        }
+
+        // Suppress F10 which activates the menu bar — this form has no menu,
+        // and the test just needs to verify the key was sent successfully.
+        if (key == Keys.F10)
+        {
+            LogEvent("Key pressed: F10 (suppressed menu activation)");
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
     }
 
     /// <summary>

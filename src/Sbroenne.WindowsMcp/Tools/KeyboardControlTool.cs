@@ -20,10 +20,10 @@ public static partial class KeyboardControlTool
     /// For typing into a specific UI element by name/automationId, use ui_type instead.
     /// </summary>
     /// <remarks>
-    /// Supports type (text), press (key), key_down, key_up, combo, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. ⚠️ FOR SAVE: Use file_save tool - it handles Save As dialogs!
+    /// Supports type (text), press (key), key_down, key_up, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. ⚠️ FOR SAVE: Use file_save tool - it handles Save As dialogs!
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from app() or window_management 'find'). REQUIRED - ensures input goes to the correct window.</param>
-    /// <param name="action">The keyboard action: type, press, key_down, key_up, combo, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
+    /// <param name="action">The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
     /// <param name="text">Text to type (required for type action).</param>
     /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
     /// <param name="modifiers">Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.</param>

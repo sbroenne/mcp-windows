@@ -84,10 +84,7 @@ launchSettings.json
 .idea/
 *.sln.iml
 
-# Project-specific
-.specify/memory/
-
-# LLM Integration Test Results (screenshots and logs)
+# LLM Integration Test Results(screenshots and logs)
 specs/007-llm-integration-testing/results/
 
 # Node.js
@@ -113,3 +110,11 @@ __pycache__/
 aitest-reports/
 .venv/
 uv.lock
+
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/orchestration-log/
+.squad/log/
+.squad/decisions/inbox/
+.squad/sessions/
+# Squad: SubSquad activation file (local to this machine)
+.squad-workstream

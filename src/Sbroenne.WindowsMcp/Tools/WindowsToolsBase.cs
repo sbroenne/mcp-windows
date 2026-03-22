@@ -84,8 +84,13 @@ public static class WindowsToolsBase
     public static LegacyOcrService LegacyOcrService => _legacyOcrService;
 
     /// <summary>
-    /// JSON serializer options optimized for LLM token efficiency.
+    /// JSON serializer options for tool response serialization, optimized for LLM token efficiency.
     /// </summary>
+    /// <remarks>
+    /// Distinct from <see cref="Serialization.McpJsonOptions.Default"/> which is for MCP protocol data.
+    /// CamelCase is belt-and-suspenders (all models use [JsonPropertyName] attributes).
+    /// JsonStringEnumConverter ensures enum values are human-readable strings, not numbers.
+    /// </remarks>
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = false,

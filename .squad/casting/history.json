@@ -1,0 +1,22 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "Alien",
+      "used_at": "2026-03-22T07:03:27Z",
+      "team_size": 3,
+      "repo": "mcp-windows"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "mcp-windows-2026-03-22": {
+      "assignment_id": "mcp-windows-2026-03-22",
+      "universe": "Alien",
+      "created_at": "2026-03-22T07:03:27Z",
+      "agents": {
+        "ripley": "Lead",
+        "dallas": "Backend Dev",
+        "lambert": "Tester"
+      }
+    }
+  }
+}

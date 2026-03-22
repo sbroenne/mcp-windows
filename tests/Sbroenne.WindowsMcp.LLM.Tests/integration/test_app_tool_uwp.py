@@ -52,7 +52,7 @@ class TestCalculatorViaAppTool:
         result = await aitest_run(
             a,
             (
-                'Launch Calculator using the app tool with programPath set to "calc.exe".\n'
+                "Launch the Calculator application.\n"
                 "Report whether the launch was successful and what window handle was returned."
             ),
         )
@@ -66,7 +66,7 @@ class TestCalculatorViaAppTool:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Verify that Calculator is now open by finding its window using window_management.",
+            "Verify that Calculator is now open by finding its window.",
         )
         assert_quality(result)
         assert_tool_called(result, "window_management")
@@ -104,7 +104,7 @@ class TestNotepadViaAppTool:
         result = await aitest_run(
             a,
             (
-                'Launch Notepad using the app tool with programPath set to "notepad.exe".\n'
+                "Launch the Notepad application.\n"
                 "Report whether the launch was successful and what window handle was returned."
             ),
         )
@@ -118,7 +118,7 @@ class TestNotepadViaAppTool:
         a = _agent(windows_mcp_server, gpt41_provider)
         result = await aitest_run(
             a,
-            "Verify that Notepad is now open by finding its window using window_management.",
+            "Verify that Notepad is now open by finding its window.",
         )
         assert_quality(result)
         assert_tool_called(result, "window_management")

@@ -26,6 +26,11 @@ public sealed class ElectronHarnessFixture : IDisposable
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint FindWindow(string? lpClassName, string lpWindowName);
 
+    [DllImport("user32.dll")]
+    private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
+
+    private const uint WM_CLOSE = 0x0010;
+
     private Process? _electronProcess;
     private nint _windowHandle;
     private bool _disposed;
@@ -269,6 +274,37 @@ public sealed class ElectronHarnessFixture : IDisposable
         }
     }
 
+    /// <summary>
+    /// Dismisses any open modal dialogs (Save As, etc.) by sending WM_CLOSE
+    /// to known dialog titles. Uses FindWindow + PostMessage which is targeted
+    /// and doesn't interfere with the main Electron window (unlike keybd_event Escape).
+    /// </summary>
+#pragma warning disable CA1822 // Mark members as static — called as instance method from tests for readability
+    public void DismissDialogs()
+#pragma warning restore CA1822
+    {
+        string[] dialogTitles = ["Save As", "Save as", "Save"];
+        foreach (var title in dialogTitles)
+        {
+            var dialogHwnd = FindWindow(null, title);
+            if (dialogHwnd != nint.Zero)
+            {
+                PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
+                Thread.Sleep(200);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Resets the fixture state between tests.
+    /// Dismisses any leftover dialogs and brings the main window to front.
+    /// </summary>
+    public void Reset()
+    {
+        DismissDialogs();
+        BringToFront();
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -280,10 +316,17 @@ public sealed class ElectronHarnessFixture : IDisposable
 
         try
         {
+            // Dismiss any leftover dialogs before closing
+            DismissDialogs();
+
             if (_electronProcess is { HasExited: false })
             {
-                // Try graceful shutdown first
-                _electronProcess.CloseMainWindow();
+                // Use PostMessage(WM_CLOSE) on the known window handle — more reliable than
+                // CloseMainWindow() which may be a no-op when UseShellExecute=true.
+                if (_windowHandle != nint.Zero)
+                {
+                    PostMessage(_windowHandle, WM_CLOSE, nint.Zero, nint.Zero);
+                }
 
                 if (!_electronProcess.WaitForExit(TimeSpan.FromSeconds(5)))
                 {

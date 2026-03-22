@@ -111,17 +111,14 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   # =============================================================================
-  # Job 1: LLM Integration Tests (optional - only if secrets configured)
+  # Job 1: LLM Integration Tests
   # =============================================================================
   llm-tests:
     name: LLM Integration Tests
     needs: [version]
     runs-on: windows-latest
     permissions:
-      id-token: write   # Required for Azure OIDC
       contents: read
-    # Skip if Azure secrets are not configured
-    if: vars.AZURE_OPENAI_ENDPOINT != ''
 
     steps:
     - uses: actions/checkout@v6
@@ -136,16 +133,8 @@ jobs:
       with:
         python-version: '3.12'
 
-    - name: Azure Login (OIDC)
-      uses: azure/login@v2
-      with:
-        client-id: ${{ secrets.AZURE_CLIENT_ID }}
-        tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-        allow-no-subscriptions: true
-
     - name: Run LLM Integration Tests
       env:
-        AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         UV_LINK_MODE: copy
       run: |

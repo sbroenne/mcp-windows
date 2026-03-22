@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
@@ -186,6 +188,15 @@ public sealed class SaveTests : IDisposable
         }
     }
 
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern nint FindWindow(string? lpClassName, string? lpWindowName);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
+
+    private const uint WM_CLOSE = 0x0010;
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task Save_NonExistentDirectory_ReturnsPathError()
@@ -193,11 +204,18 @@ public sealed class SaveTests : IDisposable
         // This test verifies that saving to a non-existent directory returns an error
         // It uses real Notepad to trigger the actual Windows "Path does not exist" dialog
 
-        // Arrange: Launch Notepad
-        var notepad = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        // Record existing Notepad PIDs before launching so we only kill ours
+        var preExistingPids = Process.GetProcessesByName("Notepad")
+            .Select(p => p.Id)
+            .ToHashSet();
+
+        // Arrange: Launch Notepad without UseShellExecute to get a reliable process handle.
+        // UseShellExecute = true on Windows 11 returns a shim process for the UWP Notepad,
+        // which exits immediately — making cleanup impossible and leaving orphaned windows.
+        var notepad = Process.Start(new ProcessStartInfo
         {
             FileName = "notepad.exe",
-            UseShellExecute = true
+            UseShellExecute = false,
         });
 
         try
@@ -233,14 +251,55 @@ public sealed class SaveTests : IDisposable
         }
         finally
         {
-            // Cleanup: Kill Notepad
+            // Dismiss any Save As dialogs that SaveAsync may have opened
+            DismissDialogs();
+            await Task.Delay(300);
+
+            // Kill the process we launched
             try
             {
-                notepad?.Kill();
-                notepad?.WaitForExit(1000);
+                if (notepad is { HasExited: false })
+                {
+                    notepad.Kill(entireProcessTree: true);
+                    notepad.WaitForExit(3000);
+                }
             }
             catch { }
             notepad?.Dispose();
+
+            // Safety net: kill any NEW Notepad processes spawned during the test
+            // (handles the UWP app alias case where the real Notepad is a child process)
+            foreach (var proc in Process.GetProcessesByName("Notepad"))
+            {
+                if (!preExistingPids.Contains(proc.Id))
+                {
+                    try
+                    {
+                        proc.Kill(entireProcessTree: true);
+                        proc.WaitForExit(2000);
+                    }
+                    catch { }
+                }
+
+                proc.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Dismisses common dialogs (Save As, etc.) that may be left open after a test.
+    /// </summary>
+    private static void DismissDialogs()
+    {
+        string[] dialogTitles = ["Save As", "Save as", "Save"];
+        foreach (var title in dialogTitles)
+        {
+            var dialogHwnd = FindWindow(null, title);
+            if (dialogHwnd != nint.Zero)
+            {
+                PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
+                Thread.Sleep(200);
+            }
         }
     }
 }

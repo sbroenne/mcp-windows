@@ -4,9 +4,10 @@ version = "0.1.0"
 description = "LLM integration tests for Windows MCP Server using pytest-skill-engineering"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest-skill-engineering",
-    "anyio",
+    "pytest-skill-engineering[copilot]",
+    "anyio==4.11.0",
     "pytest-asyncio",
+    "socksio",
     "trio",
 ]
 
