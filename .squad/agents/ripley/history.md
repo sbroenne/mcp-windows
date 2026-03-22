@@ -9,7 +9,124 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
-### 2026-03-22: Full Project Architecture Review (Complete)
+### 2026-03-22: Copilot CLI & Claude Desktop MCP Support Assessment
+
+**Finding: No code changes needed. Infrastructure already supports it.**
+
+The Windows MCP Server meets all requirements for Copilot CLI, Claude Desktop, and other MCP clients:
+- **MCP 1.0 Compliance:** Using official ModelContextProtocol 1.1.0 SDK, stdio transport, reflection-based tool discovery
+- **Distribution Ready:** Standalone executables (win-x64, win-arm64) published to GitHub releases
+- **LLM-Optimized:** Token-efficient responses, tested with GPT-4.1 and GPT-5.2 models
+- **Secure:** No elevation escalation, proper UAC/elevation detection, no shell injection vectors
+
+**What's needed:**
+1. **Documentation** (15 min) — Add "Copilot CLI & Claude Desktop" section to README with download + config steps
+2. **MCP Registry Entry** (10 min) — PR to https://github.com/modelcontextprotocol/servers for auto-discovery
+3. **Release Polish** (5 min) — Verify asset naming in release workflow
+
+**Why this works:** MCP is transport-agnostic. Any MCP client can invoke the stdio executable. VS Code extension already does this automatically. Other clients just need a config file.
+
+**Architecture pattern:** Stdio-based MCP servers are the standard integration pattern. No special code, no SDK-specific changes. Once your server compiles, it works everywhere.
+
+**Key files:**
+- `src/Sbroenne.WindowsMcp/Program.cs:49-87` — MCP server registration via `AddMcpServer()` / `WithStdioServerTransport()`
+- `.github/workflows/release-unified.yml` — Release asset generation (verify naming)
+- `vscode-extension/src/extension.ts:28-46` — How VS Code integrates (reference for docs)
+
+### 2026-03-22: GitHub Copilot CLI & Claude Code Plugin Research
+
+**Finding: "Plugin" is NOT the standard terminology. The correct term is MCP (Model Context Protocol) server integration.**
+
+Both GitHub Copilot CLI and Anthropic's Claude Code support MCP—an open standard for tool integration—but use different configuration files and naming:
+
+**GitHub Copilot CLI:**
+- **Feature Name:** MCP Server Integration (not "plugins")
+- **Config File:** `~/.copilot/mcp-config.json` or `.vscode/mcp.json`
+- **Top-level Key:** `"mcpServers"` or `"servers"` (VS Code)
+- **Transport:** stdio, HTTP/SSE, Docker
+- **GUI Support:** MCP Server Gallery in VS Code
+- **Use Case:** Copilot Chat, Copilot CLI agent mode
+
+**Claude Desktop / Claude Code:**
+
+---
+
+### 2026-03-22: Marketplace & Distribution Path Research
+
+**Research Complete. See .squad/decisions/inbox/ripley-marketplace-plan.md for full plan.**
+
+**Key Findings:**
+
+1. **Three Ecosystems → One Hub:** Copilot CLI, Claude Desktop, and awesome-copilot all rely on the MCP Registry (https://registry.modelcontextprotocol.io/) as the central discovery source.
+
+2. **awesome-copilot is Official & Active:** Not community-run. Official GitHub org, maintained, hundreds of contributors. Accepts MCP server PRs.
+
+3. **"Plugins" vs "MCP Servers":** Claude Plugins are bundles (skills + hooks + MCP). Our server is just the MCP part. MCP Registry is where users discover us.
+
+4. **MVP Path is Simple:**
+   - Create `server.json` in repo root (15 min)
+   - Update README with setup instructions (30 min)
+   - Run `mcp-publisher publish` after next release (30 min)
+   - Optional: Submit to awesome-copilot (1 hour)
+   - Result: Listed in all three ecosystems
+
+5. **No Blockers Found:** Server already MCP 1.0 compliant. Standalone executables ready. Release workflow correct.
+
+6. **Blocker Myth:** "We need a Claude plugin marketplace entry" — False. MCP Registry handles discovery for Claude, Copilot CLI, and others. Separate plugin bundles are future optimization, not blocker.
+
+**Architecture Decision:** Stdio-based MCP server is the standard integration pattern. Zero code changes needed. This is a packaging + documentation task.
+- **Feature Name:** MCP Server Connection (not "plugins")
+- **Config File:** `%APPDATA%\Claude\claudedesktopconfig.json` (Desktop), `.mcp.json` or `~/.claude.json` (CLI)
+- **Top-level Key:** `"mcpServers"`
+- **Transport:** Primarily stdio (local), HTTP/SSE for remote
+- **Restart Required:** Yes on Claude Desktop, No on Claude Code CLI
+- **Use Case:** Claude Chat, Claude Code Editor, Claude Code Channels
+
+**Key Clarity:**
+- "Plugins" is loose terminology; the ecosystem calls them "MCP servers"
+- This repo (mcp-windows) is AN MCP SERVER, not a client
+- Users configure mcp-windows as an MCP server in their Copilot CLI or Claude Desktop config
+- Distribution: Standalone executables published to GitHub releases (already done)
+
+**No Code Changes Needed.** The infrastructure is production-ready. What's needed is documentation on how users add mcp-windows to their configs.
+
+---
+
+### 2026-03-23: MVP Distribution Review & Terminology Correction
+
+**Review Summary:**
+Reviewed Dallas's MVP distribution work (server.json, README restructure, MCP_CLIENT_SETUP.md expansion). Flagged critical issues with terminology and false claims before registry submission.
+
+**Issues Identified & Corrected:**
+
+1. **False NuGet Registry Claim**
+   - Problem: server.json claimed `"registryType": "nuget"` without actual NuGet publication setup
+   - Correction: Removed false claim. server.json is informational metadata only (preparation for future registry submission, not publication to NuGet)
+   - Impact: Prevents misleading users and future compliance issues with MCP Registry
+
+2. **Incorrect "Plugin" Terminology**
+   - Problem: README.md used "Copilot Desktop plugin" language
+   - Correction: Replaced with official terminology "MCP server integration"
+   - Rationale: GitHub and Anthropic docs use "MCP Server Integration" standard. Users searching "plugin" won't find MCP setup guides
+   - Authority: GitHub Docs, Anthropic Docs, MCP Spec
+
+3. **Missing Claude Code Guidance**
+   - Problem: README didn't mention Claude Code / Claude Desktop setup
+   - Correction: Added guidance using standard config paths (`claudedesktopconfig.json`, `.mcp.json`)
+   - Note: Did not invent paths; used officially documented locations only
+
+**Standards Applied:**
+- Principle VI (Augmentation): MCP is the correct abstraction; no inventing new integration patterns
+- Principle VII (Microsoft Libraries First): Relying on official ModelContextProtocol SDK
+- Constitution requirements: Token optimization, terminology precision
+
+**Approval Status:** ✅ MVP distribution work APPROVED with corrections applied
+
+**Next Phase:** Server.json ready for MCP Registry publication (10 min) after next release. awesome-copilot PR (1 hour) is optional expansion.
+
+**Team Coordination:** Dallas implemented, Ripley reviewed, Coordinator applied corrections, Scribe documented.
+
+<!-- Append new learnings below. Each entry is something lasting about the project. -->
 
 **Overall Grade: A- (Production-Ready)**
 

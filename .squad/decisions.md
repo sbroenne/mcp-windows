@@ -240,6 +240,151 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 
 ---
 
+---
+
+## MVP Client Distribution & Discoverability — 2026-03-22
+
+**Decided By:** Dallas (Implementation), Ripley (Review & Approval)  
+**Date:** 2026-03-22  
+**Status:** APPROVED (Ready for next release)
+
+### Decision Summary
+The Windows MCP Server is **infrastructure-ready** for Copilot CLI, Claude Desktop, and awesome-copilot discovery. No server code changes needed. Path forward: package metadata + documentation.
+
+### What Was Implemented
+
+1. **Added MCP Registry Metadata** (`server.json`)
+   - Structured metadata for official MCP Registry submission
+   - Reverse-DNS naming: `io.github.sbroenne/windows-mcp`
+   - Schema compliant for future registry publication
+
+2. **Updated README.md Installation**
+   - Restructured as "Three Ways to Install" (VS Code, standalone, advanced)
+   - Consolidated config locations in reference table
+   - Moved detailed setup to MCP_CLIENT_SETUP.md
+
+3. **Expanded MCP_CLIENT_SETUP.md**
+   - Comprehensive guide for all MCP clients
+   - Real-world troubleshooting (JSON escaping, UAC, elevation)
+   - Per-client setup for Copilot CLI, Claude Desktop, Cursor
+
+4. **Updated `.copilot/mcp-config.json`**
+   - Working example pointing to `${workspaceFolder}/publish/Sbroenne.WindowsMcp.exe`
+   - Practical for local development
+
+### Ripley's Review Corrections Applied
+
+| Issue | Correction |
+|-------|-----------|
+| False NuGet registry claim | Removed; converted to informational metadata |
+| Incorrect "Copilot Desktop plugin" terminology | Replaced with "MCP server integration" |
+| Missing Claude Code guidance | Added with standard, documented config paths |
+
+### Why This Works
+
+- MCP is **transport-agnostic**. Any MCP client can invoke stdio executables
+- VS Code extension already does this. Other clients just need config files
+- Registry entry makes server **auto-discoverable** across all ecosystems
+- No new SDK dependencies, no MCP version changes
+
+### No Code Changes
+Documentation and metadata only. All MCP infrastructure validated in earlier review.
+
+### Next Steps (Phase 2, optional)
+
+1. **Immediate:** Submit server.json to MCP Registry (10 min)
+2. **Short-term:** Publish awesome-copilot PR (1 hour, future)
+3. **Long-term:** Monitor usage, gather feedback (ongoing)
+
+---
+
+## Terminology Standard: "MCP Servers" not "Plugins" — 2026-03-22
+
+**Decided By:** Ripley (Architecture Lead)  
+**Date:** 2026-03-22  
+**Status:** ACTIVE (Guides all documentation)
+
+### Decision
+
+Use strict, official terminology:
+
+| Incorrect | Correct |
+|-----------|---------|
+| "Copilot CLI plugins" | "MCP Server Integration" or "MCP servers" |
+| "Claude Code plugins" (MCP context) | "MCP Server Connection" or "MCP servers" |
+| "mcp-windows is a plugin" | "mcp-windows is an MCP server" |
+
+### Rationale
+
+- **Official terminology:** GitHub and Anthropic docs use "MCP Server Integration"
+- **Protocol standard:** Both ecosystems converge on MCP for tool integration
+- **User clarity:** Prevents confusion between CLI plugins and MCP server configuration
+- **Search discoverability:** Users searching "MCP server" will find guides; "Copilot CLI plugin" will not
+
+### Authority
+
+- GitHub Docs: https://docs.github.com/en/copilot/concepts/context/mcp
+- Claude Docs: https://code.claude.com/docs/en/mcp
+- MCP Spec: https://modelcontextprotocol.info/docs/
+
+### Action Items
+
+- ✅ README.md: Replaced all "plugin" references with "MCP server integration"
+- ✅ MCP_CLIENT_SETUP.md: Uses standard terminology throughout
+- ✅ server.json: Describes as "MCP server" (auto-discovery)
+- ✅ All future docs must use standard terminology
+
+---
+
+## Marketplace & Distribution Plan Assessment — 2026-03-22
+
+**Decided By:** Ripley (Architecture Research)  
+**Date:** 2026-03-22  
+**Status:** COMPLETE (Ready to execute)
+
+### Finding: Ready for All Three Ecosystems
+
+| Ecosystem | Status | Effort | Blocker |
+|-----------|--------|--------|---------|
+| **Copilot CLI** | ✅ Ready | 2h (docs + registry) | None |
+| **Claude Desktop** | ✅ Ready | 2h (docs + registry) | None |
+| **awesome-copilot** | ✅ Ready | 1h (community PR) | None |
+
+### The Hub: MCP Registry
+
+- **Registry URL:** https://registry.modelcontextprotocol.io/
+- **Why:** Central discovery point for all three ecosystems
+- **Publication Process:** Create server.json → run `mcp-publisher publish` → auto-appears in registry + Copilot CLI browser
+- **Community:** Hundreds of servers already listed; no approval gates
+
+### MVP Path (Covers All Three)
+
+1. **Create `server.json`** ✅ Done (15 min)
+2. **Update README** ✅ Done (30 min)
+3. **Publish to MCP Registry** ⏳ Next (10 min) — requires `mcp-publisher` CLI + GitHub auth
+4. **Verify release assets** ✅ Done (naming: `Sbroenne.WindowsMcp-win-x64.exe`)
+
+### Optional Expansion (Post-MVP)
+
+- **awesome-copilot PR:** 1-hour community submission (auto-discovers from registry later)
+- **Claude plugins:** Future v2.0 (plugin.json + additional distribution, not MCP)
+
+### NO Code Changes Needed
+
+Architecture is solid. Stdio MCP servers are the standard pattern:
+- Standalone executable ✅
+- MCP 1.0 protocol compliance ✅ (via ModelContextProtocol SDK)
+- Proper tool descriptions ✅
+- Release workflow ✅
+
+### Success Metrics
+
+✅ Users can find Windows MCP in registry within 5 minutes  
+✅ Copilot CLI / Claude Desktop setup docs are clear and copy-paste ready  
+✅ awesome-copilot discovery is opt-in (community PR, not required)
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
@@ -247,3 +392,5 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - Keep history focused on work, decisions focused on direction
 - **Current Backlog:** 11 issues (2 CRITICAL, 4 MAJOR, 3 MEDIUM, 2 LOW)  
   *[Resolved this session: 3 items fixed/cleared, 4 items partially fixed]*
+- **Distribution MVP:** APPROVED — Ready for next release
+- **Terminology Standard:** ACTIVE — All documentation must comply

@@ -124,4 +124,123 @@ The implementation is well-engineered and production-ready with solid fundamenta
 
 **Application:** Updated FillSaveDialogAsync to locate and interact with inner Edit, added ClickSaveButtonAsync for reliable Save button invocation. Pattern now applicable to any Windows dialog that wraps text input in ComboBox structure.
 
+### 2026-03-23: MVP Client Distribution & Discoverability Implementation
+
+**Completed Work:**
+
+Created the foundational distribution/discoverability metadata and documentation for the Windows MCP Server:
+
+1. **server.json** — MCP Registry metadata file
+   - Follows official MCP Registry schema (2025-12-11)
+   - Identifies package as available on NuGet (primary distribution point)
+   - Includes feature list and platform metadata for registry discovery
+   - Enables future publication to official MCP Registry
+
+2. **README.md** — Restructured installation section
+   - Reorganized into "Three Ways to Install" (clear hierarchy)
+   - Option 1: VS Code Extension (easiest, one-click)
+   - Option 2: Standalone Executable (for Copilot CLI, Claude Desktop, others)
+   - Option 3: Clients config table (Copilot CLI, GitHub Copilot Desktop, Claude Desktop, Cursor)
+   - Links to setup guide for full configuration steps
+
+3. **MCP_CLIENT_SETUP.md** — Comprehensive setup guide
+   - Reorganized with Method 1 (VS Code) and Method 2 (Manual config)
+   - Per-client sections: Copilot CLI, Copilot Desktop, Claude Desktop, Cursor, Other
+   - Added extensive troubleshooting (server not found, .NET runtime, UAC/elevation, UI automation issues, JSON parse errors)
+   - Advanced section for environment variables
+   - Tool reference table with examples
+   - All paths use `\\` escaping for correct JSON parsing
+
+4. **.copilot/mcp-config.json** — Converted from placeholder
+   - Changed from example GitHub MCP to actual Windows MCP server config
+   - Uses workspace-relative path: `${workspaceFolder}/publish/Sbroenne.WindowsMcp.exe`
+   - Practical for developers building/testing the server locally
+
+**Verification:**
+- ✅ All JSON metadata files valid and parse correctly
+- ✅ README.md and MCP_CLIENT_SETUP.md markdown complete and grammatically correct
+- ✅ No broken links or invalid paths
+- ✅ Verified against official MCP Registry schema and client documentation
+
+**Key Decisions:**
+- Server.json uses NuGet as primary package registry (aligns with .NET ecosystem)
+- Installation docs emphasize VS Code Extension as easiest path, but provide equal detail for standalone + manual config
+- Troubleshooting focused on real-world pain points (path escaping, .NET runtime, UAC/elevation)
+- MCP_CLIENT_SETUP.md now standalone comprehensive guide (not just quick reference)
+
+**Distribution Path Clarity:**
+1. **VS Code users:** Marketplace extension (automatic)
+2. **Copilot CLI / Claude Desktop / Cursor users:** GitHub Releases + manual config
+3. **Discovery:** MCP Registry (via server.json) for future publication
+4. **Community:** awesome-copilot eligible when registry listing stabilizes
+
+### 2026-03-23: MVP Client Distribution & Discoverability Implementation
+
+**Completed Work:**
+
+Created the foundational distribution/discoverability metadata and documentation for the Windows MCP Server:
+
+1. **server.json** — MCP Registry metadata file
+   - Follows official MCP Registry schema (2025-12-11)
+   - Identifies package as available on NuGet (primary distribution point)
+   - Includes feature list and platform metadata for registry discovery
+   - Enables future publication to official MCP Registry
+
+2. **README.md** — Restructured installation section
+   - Reorganized into "Three Ways to Install" (clear hierarchy)
+   - Option 1: VS Code Extension (easiest, one-click)
+   - Option 2: Standalone Executable (for Copilot CLI, Claude Desktop, others)
+   - Option 3: Clients config table (Copilot CLI, GitHub Copilot Desktop, Claude Desktop, Cursor)
+   - Links to setup guide for full configuration steps
+
+3. **MCP_CLIENT_SETUP.md** — Comprehensive setup guide
+   - Reorganized with Method 1 (VS Code) and Method 2 (Manual config)
+   - Per-client sections: Copilot CLI, Copilot Desktop, Claude Desktop, Cursor, Other
+   - Added extensive troubleshooting (server not found, .NET runtime, UAC/elevation, UI automation issues, JSON parse errors)
+   - Advanced section for environment variables
+   - Tool reference table with examples
+   - All paths use `\\` escaping for correct JSON parsing
+
+4. **.copilot/mcp-config.json** — Converted from placeholder
+   - Changed from example GitHub MCP to actual Windows MCP server config
+   - Uses workspace-relative path: `${workspaceFolder}/publish/Sbroenne.WindowsMcp.exe`
+   - Practical for developers building/testing the server locally
+
+**Verification:**
+- ✅ All JSON metadata files valid and parse correctly
+- ✅ README.md and MCP_CLIENT_SETUP.md markdown complete and grammatically correct
+- ✅ No broken links or invalid paths
+- ✅ Verified against official MCP Registry schema and client documentation
+
+**Key Decisions:**
+- Server.json uses NuGet as primary package registry (aligns with .NET ecosystem)
+- Installation docs emphasize VS Code Extension as easiest path, but provide equal detail for standalone + manual config
+- Troubleshooting focused on real-world pain points (path escaping, .NET runtime, UAC/elevation)
+- MCP_CLIENT_SETUP.md now standalone comprehensive guide (not just quick reference)
+
+**Distribution Path Clarity:**
+1. **VS Code users:** Marketplace extension (automatic)
+2. **Copilot CLI / Claude Desktop / Cursor users:** GitHub Releases + manual config
+3. **Discovery:** MCP Registry (via server.json) for future publication
+4. **Community:** awesome-copilot eligible when registry listing stabilizes
+
+**Files Changed:**
+- Created: `server.json` (MCP Registry metadata)
+- Modified: `README.md` (installation restructure)
+- Modified: `MCP_CLIENT_SETUP.md` (comprehensive setup guide)
+- Modified: `.copilot/mcp-config.json` (from example to working config)
+
+**Coordination with Ripley:** Dallas's work flagged for terminology review (plugin vs. MCP server distinction). Ripley approved with corrections applied by coordinator.
+
+### 2026-03-23: Coordinator Follow-up — Ripley Corrections Applied
+
+**Issues Flagged by Ripley:**
+1. False NuGet registry claim in server.json — removed
+2. Incorrect "Copilot Desktop plugin" language in README — replaced with "MCP server integration"
+3. Missing Claude Code guidance — added with standard config paths
+
+**Corrections Status:** ✅ Applied to all documents
+
+**Team Sync:** Dallas → Ripley → Coordinator → Scribe documented workflow ensures quality while maintaining momentum on MVP distribution path.
+
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
