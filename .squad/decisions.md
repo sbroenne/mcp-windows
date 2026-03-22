@@ -385,6 +385,30 @@ Architecture is solid. Stdio MCP servers are the standard pattern:
 
 ---
 
+---
+
+## Remove misdirected "plugin support" repo artifacts — 2026-03-23
+
+**Decided By:** Dallas (Implementation)  
+**Date:** 2026-03-23  
+**Status:** COMPLETED
+
+### Summary
+
+Reverted the documentation/metadata changes that framed this repo as needing repo-level "plugin support" artifacts for GitHub Copilot or Claude. Restored `README.md` to the tracked version and removed `MCP_CLIENT_SETUP.md`, `server.json`, `.copilot/mcp-config.json`, and `.squad/skills/mcp-client-distribution/SKILL.md`.
+
+### Rationale
+
+Current external research and repo review showed the earlier change set was based on the wrong product framing. We should verify official, current client terminology and integration surfaces before adding distribution metadata or setup docs tied to speculative client behavior.
+
+### Team Guidance
+
+- Treat requests about Copilot/Claude integration as terminology-sensitive
+- Verify against current official docs before creating repo-level client-distribution artifacts
+- Prefer reverting speculative repo artifacts quickly rather than letting them become de facto project direction
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
@@ -392,5 +416,6 @@ Architecture is solid. Stdio MCP servers are the standard pattern:
 - Keep history focused on work, decisions focused on direction
 - **Current Backlog:** 11 issues (2 CRITICAL, 4 MAJOR, 3 MEDIUM, 2 LOW)  
   *[Resolved this session: 3 items fixed/cleared, 4 items partially fixed]*
-- **Distribution MVP:** APPROVED — Ready for next release
+- **Distribution MVP:** RETRACTED — Misdirected implementation removed
 - **Terminology Standard:** ACTIVE — All documentation must comply
+- **Plugin Research:** GitHub Copilot CLI supports MCP servers; Claude Code has official plugins + MCP integration. Verify official docs per-product.

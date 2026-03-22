@@ -196,4 +196,10 @@ Created foundational distribution/discoverability metadata and documentation:
 
 **Coordination:** Dallas (implementation), Ripley (review), Coordinator (corrections), Scribe (documentation)
 
+### 2026-03-23: Reverted Misdirected "Plugin Support" Artifacts
+
+Removed the repo changes that were based on the wrong framing of Copilot/Claude integration as repo-level "plugin support": restored `README.md`, deleted `MCP_CLIENT_SETUP.md`, `server.json`, `.copilot/mcp-config.json`, and removed the distribution skill draft.
+
+**Key lesson:** for Copilot and Claude requests, verify current official product terminology and integration surface from current docs before changing repo docs or metadata. Do not persist speculative client/distribution artifacts in the repo when they are based on an incorrect product model.
+
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
