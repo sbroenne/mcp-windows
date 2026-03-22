@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Chromium Browser Test Page</title>
+    <style>
+        body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; line-height: 1.5; }
+        nav { margin-bottom: 20px; }
+        nav a { margin-right: 16px; }
+        main { max-width: 720px; }
+        .card { border: 1px solid #d0d7de; border-radius: 8px; padding: 16px; margin-top: 16px; }
+        label { display: block; margin: 8px 0 4px; font-weight: 600; }
+        input { width: 100%; padding: 8px 12px; margin-bottom: 12px; }
+        button { padding: 8px 16px; }
+        .focus-status { display: none; margin-top: 12px; color: #0a3622; font-weight: 600; }
+        #sign-in-button:focus + .focus-status { display: block; }
+    </style>
+</head>
+<body>
+    <nav aria-label="Primary navigation">
+        <a href="#docs">Docs</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#support">Support</a>
+    </nav>
+
+    <main>
+        <h1>Chromium browser smoke page</h1>
+        <p>This page exists only for deterministic Windows UI Automation coverage in Chromium browsers.</p>
+
+        <section class="card" aria-labelledby="search-title">
+            <h2 id="search-title">Search docs</h2>
+            <label for="docs-search">Search</label>
+            <input id="docs-search" type="search" aria-label="Docs Search" placeholder="Search the docs">
+            <button id="sign-in-button" type="button" aria-label="Sign in">Sign in</button>
+            <p class="focus-status">Sign in button focused</p>
+            <p id="sign-in-status" role="status">Signed out</p>
+        </section>
+    </main>
+</body>
+</html>
