@@ -38,7 +38,41 @@
 
 ## Learnings
 
+### 2026-03-22: Public browser test sites for Chromium validation
+
+- The strongest **public, stateless practice sites** for Chromium coverage are `the-internet.herokuapp.com`, `practice.expandtesting.com`, Selenium's hosted `selenium.dev/selenium/web/*.html` pages, `example.cypress.io`, and `demo.playwright.dev/todomvc/`.
+- For our **semantic UIA-first** approach, the best fit is pages with stable visible text / ARIA names and simple DOMs: forms, tables, alerts, iframes, uploads, shadow DOM, and navigation all map well to `ui_find`, `ui_click`, `ui_type`, and `ui_read`.
+- Public sites are good for **manual validation and opt-in smoke coverage**, but they are a weak foundation for required CI because of uptime drift, network dependence, anti-bot changes, content churn, and shared-state pollution.
+- QA recommendation: keep a **two-tier strategy** — public sites for exploratory/manual/browser-proof checks, but mirror or self-host the core scenarios we care about for deterministic CI.
+
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-03-22: Chromium Browser Test Slice Shipped
+
+**Status:** ✅ COMPLETED — Ready for PR review by Dallas
+
+Created the **first real Chromium browser test slice** as opt-in Microsoft Edge smoke coverage against a local static HTML page.
+
+**What was built:**
+- Local HTML page (`chromium-local-page.html`) with three stable semantic selectors (Primary navigation, Docs Search, Sign in)
+- Browser session harness (`ChromiumBrowserSession.cs`) — launch/teardown with isolated profiles via `--user-data-dir`
+- Three smoke tests (`EdgeLocalPageTests.cs`) — launch, discover content, read semantic labels
+- Environment gating: `WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1` (opt-in only)
+
+**Test results:** ✅ 3/3 passed in real Edge run; focused suite passes with guard active.
+
+**Key decisions:**
+1. Two-tier public site strategy: public sites for manual/smoke, mirrors/local pages for deterministic CI
+2. Page-content discovery focus: browser chrome/tabs out of scope for now
+3. Isolated Edge profile per test (no cross-test pollution)
+4. Documented constraints for Dallas as reviewer
+
+**Next phases (separate PRs):**
+- Layer 2: Public site integration tests (non-blocking CI)
+- Layer 3: LLM browser scenarios (release validation)
+- Layer 4: Edge-case tests (dynamic IDs, waits, visibility)
+
+---
 
 **Overall Test Quality: GOOD with CRITICAL gaps**
 
@@ -357,3 +391,19 @@ The blocking failure moved back to `plugin\hooks\hooks.json`. The hook shells ou
 
 **Decision Validation:**
 Dallas initial pass flagged as insufficient without guardrails. This pass added guardrails via prompt assertions and focused integration test slice.
+
+### 2026-03-24: First real Chromium slice — local Edge page-content discovery
+
+**Status:** ✅ VERIFIED
+
+**Slice chosen:** keep the first real-browser coverage tightly scoped to **Edge page content only**, not browser chrome. The stable contract is: a local static HTML page opens in Edge, and UIA can discover page landmarks plus ARIA-labeled controls (`Primary navigation`, `Docs Search`, `Sign in`).
+
+**Why this held up:**
+- Local `file:///` content avoids network drift, shared-state pollution, and public-site outages.
+- Edge is preinstalled on supported Windows machines, so the slice is realistic without adding dependency sprawl.
+- Address bar, tab strip, and other browser chrome remain intentionally out of scope for this first gate because they are less deterministic and need separate treatment.
+
+**Implementation pattern captured:**
+- Use an **opt-in env var** (`WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1`) so the slice is available now without making every desktop run pay for browser startup.
+- Launch Edge with an isolated `--user-data-dir` and `--force-renderer-accessibility` to reduce state bleed and improve UIA exposure.
+- Resolve the local HTML page from the test project tree rather than relying on temp-generated content.

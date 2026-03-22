@@ -458,6 +458,172 @@ This is a minor compatibility check, not a blocker. The skill and MCP server can
 
 ---
 
+## Lambert — Chromium Browser Test Site Recommendation
+
+**Decided By:** Lambert  
+**Date:** 2026-03-22  
+**Status:** ACTIVE
+
+### Question
+
+What public test websites should we use to build more sophisticated Chromium browser tests, especially ones already common in Playwright / Selenium / Cypress / WebDriver practice?
+
+### Short Answer
+
+Yes — there are several widely used public test sites. We should use them selectively.
+
+**Decision:** adopt a **two-tier browser test strategy**:
+
+1. **Public sites for local/manual validation and optional smoke checks**
+2. **Mirrored or self-hosted pages for required CI**
+
+Do **not** make release-blocking CI depend on third-party public websites.
+
+### Best-Fit Public Sites
+
+#### Tier A — Best matches for our semantic UIA-style approach
+
+**1. The Internet — https://the-internet.herokuapp.com/**
+- Community status: one of the most common Selenium/WebDriver practice sites
+- Strong scenarios: login, checkboxes, dropdowns, sortable tables, JS alerts, file operations, iframes, drag-drop, multiple windows, dynamic loading, shadow DOM
+- Why it fits: visible text is simple and stable; pages are focused; excellent for semantic UIA targeting
+- Risk: public hosting + shared internet dependency make it unsuitable as the only CI backbone
+
+**2. Expand Testing Practice — https://practice.expandtesting.com/**
+- Community status: explicitly built as automation practice site with Playwright scenarios
+- Strong scenarios: login, register, OTP, dynamic tables, drag-drop, forms, file ops, autocomplete, notifications, shadow DOM, infinite scroll, JS dialogs
+- Why it fits: broad coverage, clear labels, predictable flows
+- Risk: third-party infrastructure; good for smoke, not deterministic CI alone
+
+**3. Selenium hosted pages — https://www.selenium.dev/selenium/web/**
+- Community status: official Selenium demo pages from Selenium docs
+- Strong scenarios: web forms, alerts, iframes
+- Why it fits: official, minimal, low-noise
+- Risk: narrower coverage than The Internet / ExpandTesting
+
+#### Tier B — Useful, but selective
+
+**4. Cypress Kitchen Sink — https://example.cypress.io/**
+- Strong scenarios: forms, navigation, query/traversal, storage, files
+- Caution: framework-demo-oriented; not first choice for regression coverage
+
+**5. Playwright TodoMVC demo — https://demo.playwright.dev/todomvc/**
+- Strong scenarios: text input, list creation/completion, filtering, keyboard interactions
+- Good for semantic discovery; too narrow standalone
+
+**6. SauceDemo — https://www.saucedemo.com/**
+- Strong scenarios: login, inventory, cart, checkout
+- Useful for realistic flows; better for manual/smoke than brittle CI
+
+#### Tier C — Exploratory value
+
+**7. EvilTester Test Pages — https://testpages.eviltester.com/**
+**8. AcademyBugs / bug-seeded sites**
+- Great for exploratory/manual thinking
+- Less appropriate for stable regression assertions
+
+### Recommended Scenario Mapping
+
+| Scenario | Recommended site |
+|---|---|
+| Forms, text fields, controls | Selenium web-form, The Internet, ExpandTesting |
+| Tables / dynamic tables | The Internet, ExpandTesting |
+| Navigation / multi-step flows | Cypress Kitchen Sink, SauceDemo, TodoMVC |
+| JS dialogs / alerts | The Internet, Selenium alerts, ExpandTesting |
+| Iframes / nested frames | The Internet, Selenium iframes |
+| File upload / download | The Internet, ExpandTesting |
+| Shadow DOM | The Internet, ExpandTesting |
+| Drag and drop / slider | The Internet, ExpandTesting |
+| Infinite scroll / slow resources | ExpandTesting, EvilTester |
+| Keyboard interactions | TodoMVC |
+
+### What We Actually Use
+
+**For immediate manual / local validation:**
+1. The Internet
+2. ExpandTesting Practice
+3. Selenium hosted pages
+4. Playwright TodoMVC demo
+
+**For required automated CI (later):**
+Mirror or self-host a curated subset:
+1. Selenium web-form / alerts / iframes
+2. The Internet scenarios we care about
+3. A small TodoMVC-style page for keyboard + list state
+
+### CI Risks if We Use Public Sites Directly
+
+1. **Uptime risk** — site outages break our build unrelated to our code
+2. **Internet dependency** — CI agents may have flaky outbound access
+3. **Content drift** — labels/structure can change without notice
+4. **Anti-bot / throttling** — hosts can rate-limit automation traffic
+5. **Shared-state pollution** — demo apps may retain data across runs
+6. **Performance variance** — slow responses create false negatives
+7. **Regional / security differences** — cookies/redirects vary by environment
+
+### QA Guidance
+
+- Use public sites to discover where Chromium + UIA succeeds or fails
+- Use them for **exploratory testing**, **manual validation**, and maybe **non-blocking smoke checks**
+- For **release-gating CI**, prefer **self-hosted mirrors or tiny internal demo pages**
+
+That is the safest path for sophisticated browser coverage without inheriting internet flake as product flake.
+
+---
+
+## Lambert Decision: First Chromium Test Slice
+
+**Decided By:** Lambert  
+**Date:** 2026-03-22  
+**Status:** ACTIVE — Ready for PR review by Dallas
+
+### Decision
+
+Ship the first real Chromium browser test slice as **opt-in Microsoft Edge smoke coverage against a local static HTML page**.
+
+### Exact Scope
+
+**In scope now:**
+- Launch Edge to a deterministic local `file:///` page
+- Verify UIA can discover **page content** only
+- Assert three stable selectors:
+  - `Primary navigation`
+  - `Docs Search`
+  - `Sign in`
+
+**Explicitly out of scope for this slice:**
+- Address bar / browser chrome
+- Tab switching
+- Public practice sites
+- Non-Chromium browsers
+
+### Why
+
+This is the smallest slice that proves real-browser value without importing flaky dependencies. Public sites are better reserved for opt-in nightly or exploratory runs; PR-safe coverage should stay local and deterministic.
+
+### Reviewer Constraints for Dallas
+
+1. Do **not** broaden this slice into address-bar or tab-strip automation in the same change.
+2. Preserve the opt-in gate: `WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1`.
+3. Preserve isolated browser state (`--user-data-dir`) and local-page determinism.
+4. Treat page-content support separately from browser chrome in docs and prompts.
+
+### Implementation Details
+
+**Files created:**
+- `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\chromium-local-page.html` — Deterministic test page with stable selectors
+- `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\ChromiumBrowserSession.cs` — Browser harness (launch, teardown)
+- `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\EdgeLocalPageTests.cs` — Three smoke tests (launch, discover, read)
+
+**Test results:** ✅ 3/3 passed in real Edge run; focused suite passes with guard active.
+
+**Validation:**
+- Opt-in gate works correctly
+- Page content discovery succeeds
+- Isolated profiles prevent cross-test pollution
+
+---
+
 ### Lambert's Review (Non-Blocking Caveat)
 
 **Approval:** ✅ Approved  

@@ -37,6 +37,34 @@ Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-03-22: First Chromium Test Slice — Design Approved
+
+**Status:** ✅ APPROVED FOR LAMBERT'S PR
+
+Lambert completed the **first real Chromium browser test slice** as opt-in Edge smoke testing against deterministic local HTML.
+
+**Architecture decision validated:**
+- **Layer 1:** Local Electron harness (existing, KEEP) — ground truth, 100% deterministic
+- **Layer 2:** Public website integration tests (NEW, opt-in) — Edge/Chrome + real pages, non-blocking CI
+- **Layer 3:** LLM browser scenarios (FUTURE) — task-focused, release validation only
+- **Layer 4:** Edge-case tests (FUTURE) — dynamic IDs, waits, visibility
+
+**Why this design works:**
+1. Electron harness proves API-level UIA integration → product doesn't need to change
+2. Public sites (separate PR) prove real-world browser content discovery → better validation
+3. LLM tests (separate PR) prove full-loop user task completion → end-to-end confidence
+4. Layered approach isolates CI flake by tier and gating strategy
+
+**Key constraints for implementation (all enforced in Lambert's slice):**
+- Page-content focus only; browser chrome/tabs deferred
+- Opt-in gate: `WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1`
+- Isolated profiles per test via `--user-data-dir`
+- Local page determinism (no network dependency)
+
+**Next phases:** Public sites (Layer 2) and LLM scenarios (Layer 3) in separate changes to keep PRs focused. No blocker for shipping this layer.
+
+---
+
 ### 2026-03-24: Token Efficiency Review — Browser Automation
 
 **Finding: Browser follow-through is token efficient. Approved without changes.**
@@ -455,3 +483,27 @@ The mcp-windows project demonstrates excellent architecture with strong MCP prot
 - Lambert (test coverage): 60 focused tests green with guardrails
 - Ripley (token review + polish): Efficiency approved, consistency finalized
 
+
+### 2026-03-25: Chromium Browser Test Strategy — Three-Layer Approach
+
+**Decision: Proposed three-layer browser test strategy. Written to .squad/decisions/inbox/ripley-browser-test-strategy.md.**
+
+**Layers:**
+1. **Local Electron Harness** (existing) — Deterministic UIA baseline against controlled Chromium renderer. No changes needed.
+2. **Public Website Integration** (new) — BrowserHarnessFixture launching Edge with `--force-renderer-accessibility` against public test sites. Nightly CI only, not per-PR.
+3. **LLM End-to-End** (new) — pytest-aitest browser scenarios. Task-focused, no tool hints. Release validation only.
+
+**Top 5 Public Test Sites Selected:**
+1. `demo.playwright.dev/todomvc` (PRIMARY) — Playwright team's React TodoMVC. Excellent ARIA labels, Microsoft-maintained, low churn risk.
+2. `the-internet.herokuapp.com` (SECONDARY) — Sauce Labs classic. Isolated scenarios at unique URLs (/login, /checkboxes, /dynamic_controls).
+3. `saucedemo.com` — Realistic e-commerce flow for multi-step workflow testing.
+4. `uitestingplayground.com` — Edge cases: dynamic IDs, AJAX delays, visibility toggles.
+5. `practice.expandtesting.com` — HTML forms, radio buttons, dynamic tables.
+
+**Key Constraints Enforced:**
+- No Playwright/Selenium/CDP integration — we test UIA-on-Chromium, not browser protocols
+- No tool hints in LLM tests — task-focused prompts only
+- No always-on CI network dependency — public site tests are nightly/release-gated via `[Trait]` markers
+- If public site is down, skip test, don't fail
+
+**Architecture Pattern:** `BrowserHarnessFixture` mirrors `ElectronHarnessFixture` pattern — AppTool launch, `DisableParallelization`, WM_CLOSE teardown.

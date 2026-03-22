@@ -34,6 +34,39 @@ Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-03-22: First Chromium Test Slice — Review Ready
+
+**Status:** ✅ READY FOR DALLAS'S REVIEW
+
+Lambert shipped the **first real Chromium browser test slice** for your review as the responsible reviewer.
+
+**What to review:**
+1. Local HTML page (`chromium-local-page.html`) — three stable semantic selectors
+2. Browser harness (`ChromiumBrowserSession.cs`) — launch/teardown pattern modeling ElectronHarnessFixture
+3. Three smoke tests (`EdgeLocalPageTests.cs`) — page-content discovery focus
+4. Documentation updates (`README.md`, `FEATURES.md`) — local Edge smoke test capability
+5. Decision documents (now merged to `.squad/decisions.md`) — scope constraints and two-tier strategy
+
+**Key constraints you should enforce:**
+1. ❌ No address-bar or tab-strip automation in this change
+2. ✅ Preserve opt-in gate: `WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1`
+3. ✅ Preserve isolated profiles (`--user-data-dir` per test)
+4. ✅ Page-content focus; document browser chrome as deferred
+5. ✅ Local page determinism (no network dependency)
+
+**Validation passed:**
+- Real Edge run: ✅ 3/3 tests passed
+- Focused suite with guard disabled: ✅ Tests correctly skipped
+- Profile isolation: ✅ Verified no cross-test pollution
+
+**Next phases (separate PRs):**
+- Layer 2: Public site integration tests (non-blocking)
+- Layer 3: LLM browser scenarios (release validation)
+
+This is the minimal, shippable slice per architecture decision.
+
+---
+
 ### 2026-03-22: Electron Save Dialog Investigation — NOT Flaky
 
 **Overall Assessment: Production-Ready**
