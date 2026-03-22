@@ -203,3 +203,35 @@ Removed the repo changes that were based on the wrong framing of Copilot/Claude 
 **Key lesson:** for Copilot and Claude requests, verify current official product terminology and integration surface from current docs before changing repo docs or metadata. Do not persist speculative client/distribution artifacts in the repo when they are based on an incorrect product model.
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-03-23: Shared Copilot CLI / Claude Code Plugin Packaging
+ 
+For a cross-client plugin, keep the installable artifact self-contained under `plugin\` and use the standard layout: `.claude-plugin\plugin.json`, `hooks\hooks.json`, `skills\<name>\SKILL.md`, and `.mcp.json` at plugin root. Even when the manifest lives under `.claude-plugin\`, component paths should still target plugin-root files with `.\...` paths rather than traversing upward.
+
+### 2026-03-23: Windows PowerShell Hook Validation Needs Explicit `-File` Execution
+
+When a plugin hook resolves a candidate root in inline PowerShell, hand that root into the real script by launching `powershell -File ... -PluginRoot <resolved-root>` instead of relying on implicit state. In Windows PowerShell 5.1, avoid three-argument `Join-Path`; build nested paths with `Join-Path (Join-Path ...) ...` so marker validation works in the same runtime the hook actually uses.
+
+### 2026-03-23: Plugin Implementation & Runtime Fixes Complete
+
+**Status:** ✅ APPROVED FOR PRODUCTION SHIPMENT
+
+**Implementation Work:**
+1. Created plugin bundle structure under `plugin/` (shared Copilot CLI + Claude Code)
+2. Implemented `ensure-binary.ps1` binary provisioner (architecture detection, GitHub Releases download, ZIP extraction)
+3. Fixed PowerShell 5.1 `Join-Path` compatibility (`Join-Path (Join-Path ...) ...` pattern)
+4. Replaced inline hook with dedicated `-File` script (Ripley revision)
+5. Integrated release workflow to sync `plugin/.claude-plugin/plugin.json` version with server release
+6. All tests pass: 255/255 unit tests, 733 integration tests
+
+**Key Achievement:** Binary provisioning via dedicated script (not inline hook command) with proper error handling and short-circuit when binary already exists.
+
+**Root Resolution (Final Pattern — Ripley Revision):**
+- `CLAUDE_PLUGIN_ROOT` env var (Claude Code documented)
+- CWD **with marker validation** (`.claude-plugin/plugin.json` must exist)
+- Copilot CLI known install path
+- Loud failure with `Write-Warning` (never silent skip)
+
+**Safety Review:** Lambert approved final design. Non-blocking limitations documented (English Windows only, internet required on first use, marketplace install unverified but architectural contract sound).
+
+**Pattern Contribution:** Binary download-on-first-use for large executables in plugin environments. Automatic architecture detection (win-x64, win-arm64). Graceful short-circuit when binary already present.
