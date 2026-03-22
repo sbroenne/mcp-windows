@@ -1100,25 +1100,46 @@ public sealed partial class UIAutomationService
 
         await Task.Delay(100, cancellationToken);
 
-        // Find the filename edit field (common AutomationIds: FileNameControlHost, 1001, Edit)
+        // Find the filename edit field.
+        // FileNameControlHost is a ComboBox — we need its INNER Edit child for reliable text entry.
+        // Setting Value Pattern on the ComboBox updates display text but NOT the dialog's internal path state.
         var editField = await _staThread.ExecuteAsync(() =>
         {
-            // Try by AutomationId first (most reliable)
-            string[] editAutomationIds = ["FileNameControlHost", "1001"];
-            foreach (var autoId in editAutomationIds)
+            // First try to find FileNameControlHost (ComboBox) and get its inner Edit
+            var fileNameHost = dialog.FindFirst(
+                UIA.TreeScope.TreeScope_Descendants,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost"));
+            if (fileNameHost != null)
             {
-                var condition = Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, autoId);
-                var field = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
-                if (field != null)
+                // Look for inner Edit control within the ComboBox
+                var editCondition = Uia.CreatePropertyCondition(
+                    UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+                var innerEdit = fileNameHost.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
+                if (innerEdit != null)
                 {
-                    return field;
+                    return innerEdit;
+                }
+
+                // If no inner Edit, the host itself may be an Edit
+                if (fileNameHost.CurrentControlType == UIA3ControlTypeIds.Edit)
+                {
+                    return fileNameHost;
                 }
             }
 
+            // Try AutomationId "1001" (some dialog variants)
+            var field1001 = dialog.FindFirst(
+                UIA.TreeScope.TreeScope_Descendants,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1001"));
+            if (field1001 != null)
+            {
+                return field1001;
+            }
+
             // Fallback: find any Edit control
-            var editCondition = Uia.CreatePropertyCondition(
+            var editFallback = Uia.CreatePropertyCondition(
                 UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
-            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
+            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, editFallback);
         }, cancellationToken);
 
         if (editField == null)
@@ -1130,7 +1151,7 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
-        // Focus the edit field
+        // Focus the edit field and click it to ensure keyboard input goes here
         int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
         {
             editField.TrySetFocus();
@@ -1156,17 +1177,29 @@ public sealed partial class UIAutomationService
         await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
         await Task.Delay(50, cancellationToken);
 
-        // Clear existing text and type new path (pywinauto pattern: Ctrl+A then type)
-        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-        await Task.Delay(50, cancellationToken);
-
         // Normalize path to Windows format (backslashes)
         var normalizedPath = filePath.Replace('/', '\\');
-        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
-        await Task.Delay(100, cancellationToken);
 
-        // Press Enter to save (equivalent to clicking Save button)
-        await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+        // Select all existing text and type the new path.
+        // We use keyboard input rather than Value Pattern because the Windows File Dialog
+        // only updates its internal path state from keyboard input, not from UIA Value Pattern.
+        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+        await Task.Delay(50, cancellationToken);
+        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+
+        // Wait for the dialog to process the typed text
+        await Task.Delay(200, cancellationToken);
+
+        // Click the Save button directly — more reliable than Enter which can interact
+        // with autocomplete dropdowns in the Windows file dialog (FlaUI pattern).
+        var saveClicked = await ClickSaveButtonAsync(dialog, cancellationToken);
+
+        if (!saveClicked)
+        {
+            // Fallback: press Enter
+            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+        }
+
         await Task.Delay(300, cancellationToken);
 
         // Check for error dialogs (e.g., "Path does not exist")
@@ -1180,6 +1213,61 @@ public sealed partial class UIAutomationService
         await HandleOverwriteConfirmationAsync(cancellationToken);
 
         return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
+    }
+
+    /// <summary>
+    /// Finds and clicks the Save button in a Save As dialog.
+    /// Returns true if the button was found and clicked, false otherwise.
+    /// </summary>
+    private async Task<bool> ClickSaveButtonAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    {
+        var saveButton = await _staThread.ExecuteAsync(() =>
+        {
+            // Standard Save button names (includes accelerator variants)
+            string[] saveButtonNames = ["Save", "&Save"];
+            foreach (var name in saveButtonNames)
+            {
+                var condition = Uia.CreateAndCondition(
+                    Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                    Uia.CreatePropertyCondition(UIA3PropertyIds.Name, name));
+                var button = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
+                if (button != null)
+                {
+                    return button;
+                }
+            }
+
+            // Fallback: search by AutomationId "1" (common for Save button in file dialogs)
+            var idCondition = Uia.CreateAndCondition(
+                Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
+            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, idCondition);
+        }, cancellationToken);
+
+        if (saveButton == null)
+        {
+            return false;
+        }
+
+        // Try Invoke pattern first, fall back to click
+        bool invoked = await _staThread.ExecuteAsync(() => saveButton.TryInvoke(), cancellationToken);
+        if (!invoked)
+        {
+            var rect = await _staThread.ExecuteAsync(() => saveButton.GetBoundingRectangle(), cancellationToken);
+            if (rect.Width > 0 && rect.Height > 0)
+            {
+                await _mouseService.ClickAsync(
+                    (int)Math.Round(rect.X + (rect.Width / 2)),
+                    (int)Math.Round(rect.Y + (rect.Height / 2)),
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>
