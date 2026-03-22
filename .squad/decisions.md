@@ -409,6 +409,66 @@ Current external research and repo review showed the earlier change set was base
 
 ---
 
+---
+
+## Browser Automation Support — 2026-03-24
+
+**Decided By:** Ripley (Architecture), Dallas (Implementation), Lambert (QA)  
+**Date:** 2026-03-24  
+**Status:** APPROVED (Ready for team implementation)
+
+### Decision Summary
+
+**Browser automation support is architecturally strong with excellent Electron/Chromium coverage.** Primary gaps are documentation, system prompts, and validation testing — not implementation.
+
+### Architecture Decision
+
+- **DO NOT add Playwright/Selenium/CDP integration** — violates Principle III (Augmentation, Not Duplication)
+- **DO add browser-awareness to existing tools** — system prompts, tool descriptions, integration tests
+
+### What Works Today ✅
+
+1. **Chromium/Electron Detection** — Auto-detected via class name `Chrome_WidgetWin_1`
+2. **ARIA Label Support** — ARIA labels map to UIA Name property
+3. **Web Content Access** — Document control exposes web page hierarchy
+4. **Element Finding** — `ui_find` with `nameContains`, `controlType` works for web elements
+5. **Test Coverage** — 50 passing integration tests (Electron UI automation, screenshots, file save)
+
+### Gaps (Ranked by Value)
+
+| Priority | Gap | Impact | Effort | Status |
+|----------|-----|--------|--------|--------|
+| **P0** | No browser-specific guidance in system prompts | LLMs don't know they CAN automate browsers | 2h | ⏳ PENDING |
+| **P0** | No browser examples in tool descriptions | Users/LLMs see "notepad.exe" examples, not "chrome.exe" | 1h | ⏳ PENDING |
+| **P1** | No browser integration tests | Can't prevent regressions | 4h | ⏳ PENDING |
+| **P1** | No LLM tests for browser scenarios | Don't know if LLMs can figure it out | 3h | ⏳ PENDING |
+| **P1** | ARIA label mismatch | "More information..." visible but UIA name is "Learn more" | 0h | DOCUMENTED |
+| **P2** | No form interaction validation | Web form typing untested on real pages | 2h | ⏳ PENDING |
+
+### Concrete Next Steps
+
+1. **System prompt**: Add `BrowserAutomation()` method to `WindowsAutomationPrompts.cs` — browser patterns like URL navigation, tab management, web content discovery
+2. **Tool descriptions**: Add Chrome/Edge examples to AppTool, UIFindTool, UIClickTool descriptions
+3. **Integration tests**: Un-skip and fix `BrowserAutomationTests.cs` (adjust "More information" → "Learn more")
+4. **LLM tests**: Create `test_browser_automation.py` — navigate to URL, find web content, click link
+5. **Documentation**: Add "Browser Automation" section to FEATURES.md showing what works
+
+### Team Assignments
+
+- **Dallas**: System prompt + tool descriptions (3-4 hours)
+- **Lambert**: Browser tests + LLM tests (6-8 hours)
+- **Ripley**: Review prompt quality + validate LLM test design (2-3 hours)
+- **Scribe**: Update FEATURES.md with "Browser Automation" section (1 hour)
+
+### References
+
+- **Ripley's Assessment:** .squad/decisions/inbox/ripley-browser-automation.md
+- **Dallas's Assessment:** .squad/decisions/inbox/dallas-browser-automation.md
+- **Lambert's Assessment:** .squad/decisions/inbox/lambert-browser-automation.md
+- **Lambert's Edge Cases:** .squad/decisions/inbox/lambert-browser-edge-cases.md
+
+---
+
 ## Governance
 
 - All meaningful changes require team consensus
@@ -419,3 +479,4 @@ Current external research and repo review showed the earlier change set was base
 - **Distribution MVP:** RETRACTED — Misdirected implementation removed
 - **Terminology Standard:** ACTIVE — All documentation must comply
 - **Plugin Research:** GitHub Copilot CLI supports MCP servers; Claude Code has official plugins + MCP integration. Verify official docs per-product.
+- **Browser Automation:** APPROVED — Ready for implementation by Dallas/Lambert/Ripley

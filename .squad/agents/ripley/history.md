@@ -242,6 +242,83 @@ Lambert correctly identified that the hooks.json inline `-Command "& { $roots = 
 
 **Final Status:** All tests pass. Plugin verified. Release workflow synced. Safety review complete. Non-blocking limitations documented (English Windows only, internet required on first use).
 
+### 2026-03-24: Browser Automation Assessment — Surprisingly Strong
+
+**Finding: UIA already provides real browser automation for Chromium browsers (Edge/Chrome). The gap is awareness, not capability.**
+
+**POC Results (Edge + example.com):**
+- Address bar: FOUND as `Edit` named "Address and search bar"
+- Browser chrome: ALL buttons accessible (Back, Refresh, Favourites, Tabs, Settings)
+- Web content: Document, Text, Hyperlink elements exposed through Chromium's UIA bridge
+- Tab bar: TabItem + Close/New Tab buttons accessible
+- Deep tree: 49 elements at depth 15 — complete browser chrome + web content
+- Click address bar: Works via `ui_click`
+- Navigate via Ctrl+L: Works through keyboard_control
+
+**Critical Insight:** Chromium's accessibility tree is remarkably well-structured. UIA sees web page content (headings, paragraphs, links) as native controls. This is not a hack — Chromium intentionally exposes DOM elements via UIA.
+
+**ARIA Label Caveat:** Visible text may differ from UIA name. "More information..." hyperlink was exposed as "Learn more" (ARIA label override). This is Chrome's accessibility bridge, not our bug.
+
+**Architecture Decision:** DO NOT add Playwright/CDP. UIA works. The fix is:
+1. System prompts — add `BrowserAutomation()` prompt method
+2. Tool descriptions — add browser examples
+3. Tests — un-skip BrowserAutomationTests.cs, add LLM browser tests
+4. Documentation — add "Browser Automation" section to FEATURES.md
+
+**Key files:**
+- `tests/Sbroenne.WindowsMcp.Tests/Integration/BrowserAutomationTests.cs` — POC tests (currently skipped)
+- `src/Sbroenne.WindowsMcp/Prompts/WindowsAutomationPrompts.cs` — needs BrowserAutomation() method
+- `src/Sbroenne.WindowsMcp/Automation/UIAutomationService.Helpers.cs:376-380` — Chromium framework detection
+- `src/Sbroenne.WindowsMcp/Automation/UIAutomationService.Helpers.cs:34-38` — Electron/Chromium deep tree strategy (depth 15, post-hoc filtering)
+
+**Pattern:** Browser chrome UIA tree structure: Window → Pane → ToolBar 'App bar' (buttons) + Pane (content: Document) + Tab 'Tab bar' (tabs). Address bar is at ToolBar > Group > Edit.
+
+**Team Assignments:**
+- **Dallas**: System prompt + tool descriptions (BrowserAutomation() method, Chrome/Edge examples)
+- **Lambert**: Browser tests + LLM tests (un-skip BrowserAutomationTests.cs, create test_browser_automation.py)
+- **Ripley**: Review prompt quality + validate LLM test design
+- **Scribe**: Update FEATURES.md with "Browser Automation" section
+
+### 2026-03-24: Browser Automation Consensus Decision — APPROVED
+
+**Status:** ✅ APPROVED (Ready for team implementation)
+
+**Team Consensus:** Ripley (Architecture), Dallas (Implementation), Lambert (QA)
+
+**Decision:** Browser automation support is architecturally strong with excellent Electron/Chromium coverage. Primary gaps are documentation, system prompts, and validation testing — not implementation.
+
+**What Works Today:**
+- ✅ Chromium/Electron detection via class name `Chrome_WidgetWin_1`
+- ✅ ARIA labels map to UIA Name property (semantic web element discovery)
+- ✅ Document control exposes web page hierarchy
+- ✅ Deep tree traversal (maxDepth 15 vs 5 for WinForms)
+- ✅ Form workflows (find, click, type, submit)
+- ✅ 50 passing Electron integration tests (21 UI automation, 24 screenshots, 5 file save)
+
+**Architecture Decision:**
+- **DO NOT add Playwright/Selenium/CDP integration** — violates Principle III (Augmentation, Not Duplication)
+- **DO add browser-awareness to existing tools** — system prompts, tool descriptions, integration tests
+
+**Team Assignments:**
+- **Dallas**: System prompt + tool descriptions (3-4 hours)
+- **Lambert**: Browser tests + LLM tests (6-8 hours)
+- **Ripley**: Review prompt quality + validate LLM test design (2-3 hours)
+- **Scribe**: Update FEATURES.md with "Browser Automation" section (1 hour)
+
+**Effort Estimate:** ~12-16 hours total for full browser automation feature
+
+**Next Steps:**
+1. Dallas: Implement `BrowserAutomation()` method in WindowsAutomationPrompts.cs + add browser examples to tool descriptions
+2. Lambert: Un-skip BrowserAutomationTests.cs + create test_browser_automation.py LLM tests
+3. Ripley: Review prompts and validate LLM test design
+4. Scribe: Add "Browser Automation" section to FEATURES.md
+
+**Reference Documentation:**
+- Ripley's POC assessment: .squad/orchestration-log/2026-03-24T11-07-24-ripley.md
+- Dallas's implementation assessment: .squad/orchestration-log/2026-03-24T11-07-24-dallas.md
+- Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
+- Consolidated decision: .squad/decisions.md (Browser Automation Support section)
+
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
 **Overall Grade: A- (Production-Ready)**

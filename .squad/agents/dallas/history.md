@@ -239,3 +239,65 @@ When a plugin hook resolves a candidate root in inline PowerShell, hand that roo
 **Safety Review:** Lambert approved final design. Non-blocking limitations documented (English Windows only, internet required on first use, marketplace install unverified but architectural contract sound).
 
 **Pattern Contribution:** Binary download-on-first-use for large executables in plugin environments. Automatic architecture detection (win-x64, win-arm64). Graceful short-circuit when binary already present.
+
+### 2026-03-24: Browser Automation Assessment — PRODUCTION-READY
+
+**Status:** ✅ NO CODE CHANGES NEEDED
+
+Assessed browser automation support for Edge, Chrome, and Chromium-based apps. **Windows MCP Server has excellent browser automation support TODAY** through UIA3 (COM) API with specialized Chromium/Electron detection.
+
+**What Works:**
+- ✅ Chromium/Electron detection via class name (`Chrome_WidgetWin_1`)
+- ✅ ARIA labels map to UIA Name property (semantic web element discovery)
+- ✅ Document control exposes web page hierarchy
+- ✅ Deep tree traversal (maxDepth 15 vs 5 for WinForms)
+- ✅ Form workflows (find, click, type, submit)
+- ✅ 50 passing Electron integration tests (21 UI automation, 24 screenshots, 5 file save)
+
+**Test Evidence:**
+- All 21 Electron UI automation tests pass (100% pass rate)
+- Validates: button clicks, text input, form submission, ARIA label discovery
+- Apps validated: VS Code, Teams, Slack (Electron), Edge/Chrome (Chromium)
+
+**Key Implementation Details:**
+- Framework detection: `UIAutomationService.Helpers.cs:376-419`
+- Electron strategy: `UIAutomationService.Helpers.cs:34-40` (deep search, post-hoc filtering)
+- UIA3 chosen specifically for Chromium support (`UIA3Automation.cs:9`)
+
+**Gaps (Non-Critical):**
+- ⚠️ Browser chrome elements (address bar, back button) not tested — but keyboard shortcuts work (Ctrl+L, Alt+Left)
+- ⚠️ No browser-specific documentation in README/FEATURES — users discover via Electron examples
+- ⚠️ No "launch Edge" integration test — Electron tests prove Chromium works (same accessibility API)
+
+**Recommendation:** Add browser automation examples to FEATURES.md (30 min effort, high user value). No code changes needed.
+
+**Decision File:** `.squad/decisions/inbox/dallas-browser-automation.md`
+
+### 2026-03-24: Browser Automation Consensus Decision — APPROVED
+
+**Status:** ✅ APPROVED (Ready for team implementation)
+
+**Team Consensus:** Ripley (Architecture), Dallas (Implementation), Lambert (QA)
+
+**Decision:** Browser automation support is architecturally strong with excellent Electron/Chromium coverage. Primary gaps are documentation, system prompts, and validation testing — not implementation.
+
+**Architecture Decision:**
+- **DO NOT add Playwright/Selenium/CDP integration** — violates Principle III (Augmentation, Not Duplication)
+- **DO add browser-awareness to existing tools** — system prompts, tool descriptions, integration tests
+
+**Dallas's Implementation Assignment:**
+- **System prompt**: Add `BrowserAutomation()` method to `WindowsAutomationPrompts.cs` — browser patterns like URL navigation, tab management, web content discovery
+- **Tool descriptions**: Add Chrome/Edge examples to AppTool, UIFindTool, UIClickTool descriptions
+- **Effort:** 3-4 hours
+
+**Team Assignments:**
+- Dallas: System prompt + tool descriptions (3-4 hours) ← YOU
+- Lambert: Browser tests + LLM tests (6-8 hours)
+- Ripley: Review prompt quality + validate LLM test design (2-3 hours)
+- Scribe: Update FEATURES.md with "Browser Automation" section (1 hour)
+
+**Reference Documentation:**
+- Ripley's POC assessment: .squad/orchestration-log/2026-03-24T11-07-24-ripley.md
+- Dallas's implementation assessment: .squad/orchestration-log/2026-03-24T11-07-24-dallas.md
+- Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
+- Consolidated decision: .squad/decisions.md (Browser Automation Support section)

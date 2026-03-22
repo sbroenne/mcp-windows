@@ -223,3 +223,88 @@ The blocking failure moved back to `plugin\hooks\hooks.json`. The hook shells ou
 **Recommendation:** Ship to GitHub Releases and MCP Registry with documented limitations. Root resolution pattern is sound, PowerShell contract is safe, binary provisioning is reliable.
 
 **Team Grade:** ✅ Production-Ready
+
+### 2026-03-23: Browser Automation Assessment — Coverage Gap Identified
+
+**Status:** MEDIUM RISK — Architecturally sound but insufficiently validated
+
+**Assessment Outcome:**
+- ✅ Electron/Chromium apps: EXCELLENT (49 passing integration tests)
+- ❌ Real browsers (Chrome/Edge/Firefox): UNTESTED (0 tests)
+- ⚠️ LLM tests for browser workflows: NONE (0 tests)
+
+**Key Findings:**
+1. **Strong Electron Foundation:**
+   - 49 integration tests covering ARIA labels, Document hierarchy, form interactions, save workflows
+   - Framework detection recognizes `Chromium/Electron` apps via class names
+   - Deep tree traversal strategy (maxDepth=15) for nested web content
+   - System prompts reference Electron/Chromium explicitly
+
+2. **Critical Gaps:**
+   - ZERO tests against real browsers (Chrome, Edge, Firefox)
+   - Untested scenarios: address bar interaction, web page element discovery, browser UI controls, tab management
+   - No LLM tests for browser-specific workflows
+   - Unknown Firefox compatibility (non-Chromium UIA implementation)
+
+3. **POC Test Created:**
+   - `tests/Sbroenne.WindowsMcp.Tests/Integration/BrowserAutomationTests.cs`
+   - 5 skipped tests validating critical browser workflows
+   - Manual execution required to capture AutomationIds/patterns
+   - Tests use Edge (pre-installed on Windows 10/11)
+
+**Risk Assessment:**
+- Production Risk: MEDIUM (users will attempt browser automation, will hit unknown failures)
+- Test Confidence: LOW for browsers, HIGH for Electron apps
+- Architecture: READY (no code changes needed, validation only)
+
+**Recommendations (Prioritized):**
+1. **IMMEDIATE:** Run POC tests manually, document element discovery patterns
+2. **IMMEDIATE:** Add "Browser Support" section to FEATURES.md with honest status
+3. **SHORT-TERM:** Convert POC to production tests (10-15 tests, Edge only)
+4. **SHORT-TERM:** Add browser LLM tests (5-8 scenarios)
+5. **MEDIUM-TERM:** Firefox validation, complex web app testing
+
+**Decision:** Add browser validation tests before claiming browser support. Current state is misleading — we claim Electron support (true) but imply browser support (untested).
+
+**Files Created:**
+- `tests/Sbroenne.WindowsMcp.Tests/Integration/BrowserAutomationTests.cs` — POC test with 5 critical scenarios
+- `.squad/decisions/inbox/lambert-browser-automation.md` — Full assessment and recommendations
+
+**Baseline Validation:**
+- All integration tests passing (115 tests, 0 failures)
+- POC test compiles cleanly (0 warnings, 0 errors)
+- No regressions introduced
+
+### 2026-03-24: Browser Automation Consensus Decision — APPROVED
+
+**Status:** ✅ APPROVED (Ready for team implementation)
+
+**Team Consensus:** Ripley (Architecture), Dallas (Implementation), Lambert (QA)
+
+**Decision:** Browser automation support is architecturally strong with excellent Electron/Chromium coverage. Primary gaps are documentation, system prompts, and validation testing — not implementation.
+
+**Lambert's Testing Assignment:**
+- **Browser integration tests**: Un-skip and fix `BrowserAutomationTests.cs` — convert POC to production tests, target Edge (pre-installed), cover critical workflows (address bar, form fields, browser UI controls, tab management)
+- **LLM browser tests**: Create `test_browser_automation.py` — 5-8 scenarios (navigate to URL, find web content, click link, fill form, submit form)
+- **Effort:** 6-8 hours
+
+**Team Assignments:**
+- Dallas: System prompt + tool descriptions (3-4 hours)
+- Lambert: Browser tests + LLM tests (6-8 hours) ← YOU
+- Ripley: Review prompt quality + validate LLM test design (2-3 hours)
+- Scribe: Update FEATURES.md with "Browser Automation" section (1 hour)
+
+**Critical Gaps (Your Focus):**
+1. **Address bar interaction** — CRITICAL, currently untested
+2. **Web page element discovery** — CRITICAL, currently untested
+3. **Form field interaction** — CRITICAL, currently untested
+4. **Browser UI controls** — MEDIUM, currently untested (address bar, back button, tabs)
+5. **Tab management** — MEDIUM, currently untested
+6. **LLM workflow tests** — MEDIUM, currently none
+
+**Reference Documentation:**
+- Ripley's POC assessment: .squad/orchestration-log/2026-03-24T11-07-24-ripley.md
+- Dallas's implementation assessment: .squad/orchestration-log/2026-03-24T11-07-24-dallas.md
+- Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
+- Lambert's edge cases: .squad/decisions/inbox/lambert-browser-edge-cases.md
+- Consolidated decision: .squad/decisions.md (Browser Automation Support section)
