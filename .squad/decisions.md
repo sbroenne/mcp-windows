@@ -364,6 +364,154 @@ Use strict, official terminology:
 3. **Publish to MCP Registry** ⏳ Next (10 min) — requires `mcp-publisher` CLI + GitHub auth
 4. **Verify release assets** ✅ Done (naming: `Sbroenne.WindowsMcp-win-x64.exe`)
 
+---
+
+## Plugin Test Harness Assessment: pytest-skill-engineering — 2026-03-24
+
+**Decided By:** Ripley (Architecture)  
+**Date:** 2026-03-24  
+**Status:** ✅ IMPLEMENTED & APPROVED
+**Implementation Owner:** Dallas (Test Engineering)  
+**Review:** Lambert (QA)
+
+---
+
+### Question
+
+Can `pytest-skill-engineering` test our `plugin/` directory? Is it the right harness for this job?
+
+### Verdict: YES — Correct Harness, Narrow Scope
+
+`pytest-skill-engineering` is the correct test harness for our plugin's AI-facing contract. We already use it — `tests/Sbroenne.WindowsMcp.LLM.Tests/pyproject.toml` depends on `pytest-skill-engineering[copilot]` and all 54 existing LLM tests run through it. There's no adoption decision to make.
+
+The framework validates exactly the right thing: **can a model discover our tools, follow our skill instructions, and complete tasks using the plugin bundle?** It does NOT test host-platform mechanics (hooks, binary provisioning, install flow), and it shouldn't — those aren't AI-facing contracts.
+
+---
+
+### What CAN Be Tested
+
+| Component | Method | Value |
+|-----------|--------|-------|
+| `SKILL.md` effectiveness | `CopilotEval` with `skill_directories` | **HIGH** — Does the skill steer LLMs toward semantic-first automation? |
+| Plugin structure | `load_plugin("plugin/")` | **MEDIUM** — Validates manifest is parseable by the framework |
+| Semantic-first guidance | A/B: with skill vs without | **HIGH** — Proves the skill has measurable impact |
+| `.mcp.json` config | `load_mcp_config()` | **LOW** — Trivial structural check |
+
+### What CANNOT Be Tested (Remains Manual/E2E)
+
+| Component | Why | Current Coverage |
+|-----------|-----|------------------|
+| `hooks/hooks.json` | Host runtime (Copilot CLI / Claude Code) dispatches hooks; not testable in harness | Manual verification done at ship time |
+| `session-start.ps1` | Hook invocation is a host concern | PowerShell script tested manually |
+| `ensure-binary.ps1` | Infrastructure, not AI-facing | 966 unit tests already cover provisioning logic |
+| `copilot plugin install` flow | Host CLI command | Manual acceptance test only |
+
+---
+
+### Test Scope & Implementation
+
+**File:** `tests/Sbroenne.WindowsMcp.LLM.Tests/test_plugin_skill.py`
+
+#### Tests Implemented ✅
+
+1. **`test_windows_automation_skill_loads_from_plugin_bundle`**  
+   Validates plugin manifest advertises skill directory. Loads SKILL.md and checks for expected guidance markers.  
+   **Result:** ✅ Passed
+
+2. **`test_windows_automation_skill_is_prepended_to_agent_prompt`**  
+   Confirms skill content injected ahead of system prompt via `build_system_prompt()`.  
+   **Result:** ✅ Passed  
+   **Note:** Uses internal API `build_system_prompt` from `pytest_skill_engineering.execution.pydantic_adapter`
+
+3. **`test_windows_automation_skill_text_steers_semantic_first_choices`**  
+   Regex checks for semantic-first guidance: ui_find, ui_read, ui_click, ui_type preferred; screenshot/mouse/keyboard fallback-only.  
+   **Result:** ✅ Passed
+
+#### Tests NOT Written (Per Scope Decision)
+
+- Don't duplicate existing MCP tool tests (54 tests already cover tool discovery)
+- Don't test hooks or binary provisioning (not AI-facing)
+- Don't test `copilot plugin install` (host platform responsibility)
+- Don't write A/B tests yet — they're expensive (2× LLM cost) and we haven't established the skill's baseline. Defer until the basic tests pass.
+
+---
+
+### Prompt Discipline
+
+All test prompts are **task-focused, no tool hints**. Per Constitution Principle XXIII: *The test evaluates whether the LLM can discover the right tools from their descriptions.* If the LLM picks the wrong tool, we fix SKILL.md or system prompts, NOT the test.
+
+---
+
+### Layout Compatibility
+
+Our plugin uses `.claude-plugin/plugin.json` (Claude Code standard). The harness can load individual components if auto-detection fails:
+
+```python
+agent = CopilotEval(
+    skill_directories=["../../plugin/skills/windows-automation"],
+    mcp_servers=[windows_mcp_server],
+    system_prompt=SYSTEM_PROMPT,
+)
+```
+
+This is a minor compatibility check, not a blocker. The skill and MCP server can always be loaded individually.
+
+---
+
+### Lambert's Review (Non-Blocking Caveat)
+
+**Approval:** ✅ Approved  
+**Caveat:** One assertion path uses an internal prompt-builder helper (`build_system_prompt` from `pytest_skill_engineering.execution.pydantic_adapter`) that may need adjustment if the pinned library version changes.
+
+**Mitigation:** Monitor library updates; if assertion fails on dependency upgrade, fallback to manual prompt composition or reach out to `pytest-skill-engineering` maintainers.
+
+---
+
+### Next Phase: Live Behavioral Evals
+
+If we want live behavioral plugin-skill evals later, we should first align the `pytest-skill-engineering` Copilot adapter with the currently installed `copilot` SDK API. (Current blocker: `CopilotClientOptions` / `options=` parameter no longer exists in installed SDK.)
+
+---
+
+## Plugin Harness Decision — 2026-03-22
+
+**Date:** 2026-03-22  
+**Owner:** Dallas  
+**Context:** Add the smallest useful automated test slice for the shipped plugin skill using `pytest-skill-engineering`.
+
+### Decision
+
+Use `pytest-skill-engineering`'s direct skill APIs (`load_skill` plus prompt composition) instead of trying to load the whole plugin bundle.
+
+### Why
+
+1. The harness exposes real skill support (`load_skill`, `Skill`, `Eval.skill`) but no whole-plugin loader.
+2. Ripley's framing was correct: this harness is a fit for the plugin skill layer, not install hooks, provisioning, or release download paths.
+3. In the current local test environment, live Copilot-backed evals are blocked by a dependency mismatch between `pytest-skill-engineering` and the installed `copilot` SDK (`CopilotClientOptions` / `options=` no longer exist), so a deterministic skill-loading slice is the narrow, honest option.
+
+### Test Slice Added
+
+- Manifest check: `plugin/.claude-plugin/plugin.json` advertises `./skills/`
+- Skill load check: `plugin/skills/windows-automation/SKILL.md` parses through `load_skill`
+- Prompt wiring check: harness prepends skill content ahead of the shared system prompt
+- Guidance check: skill text explicitly prefers `ui_find` / `ui_click` / `ui_type`, `file_save`, and fallback-only screenshots/mouse usage
+
+### Follow-up
+
+If we want live behavioral plugin-skill evals later, we should first align the `pytest-skill-engineering` Copilot adapter with the currently installed `copilot` SDK API.
+
+---
+
+## Browser Automation Discoverability Decision — 2026-03-24
+
+**Decision:** Keep browser automation discoverability concentrated in three places: the shared quickstart prompt, one dedicated browser prompt, and compact browser examples in the app/find/click tool descriptions.
+
+**Rationale:** This reuses the existing semantic UI Automation framing, keeps token cost low, and avoids scattering duplicate browser guidance across many docs or prompt surfaces.
+
+**Docs:** Add one short README note plus one compact `FEATURES.md` section instead of broad browser-specific duplication.
+
+**Validation:** `dotnet build .\src\Sbroenne.WindowsMcp\Sbroenne.WindowsMcp.csproj --no-restore` and `dotnet test .\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj --filter "FullyQualifiedName~WindowsAutomationPromptsTests" --no-restore`
+
 ### Optional Expansion (Post-MVP)
 
 - **awesome-copilot PR:** 1-hour community submission (auto-discovers from registry later)
