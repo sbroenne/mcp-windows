@@ -1,6 +1,6 @@
 ---
 name: "chromium-local-smoke-tests"
-description: "Pattern for always-on Chromium browser smoke coverage using deterministic local Edge/Chrome pages plus a stable public-web slice"
+description: "Pattern for always-on Chromium browser smoke coverage using a deterministic local Edge page plus a stable public-web slice"
 domain: "testing"
 confidence: "high"
 source: "earned"
@@ -10,12 +10,11 @@ source: "earned"
 Use this when the team wants a small, always-on Chromium browser slice that proves real page interaction honestly without creating browser-specific MCP tools.
 
 ## Pattern
-- Prefer **Edge and Chrome + local static HTML** for the deterministic slice, then pair them with one **stable public-web page** for required internet coverage.
+- Prefer **Edge + local static HTML** for the deterministic slice, then pair it with one **stable public-web page** for required internet coverage.
 - Keep the scope to **page content discovery** first: landmarks, ARIA-labeled inputs, and buttons.
-- Launch Chromium app windows with startup hygiene, `--force-renderer-accessibility`, and an **isolated `--user-data-dir`** for deterministic smoke reliability.
+- Launch Edge as an app window with startup hygiene, `--force-renderer-accessibility`, and an **isolated `--user-data-dir`** for reliability.
 - Keep the public tier to a **stable browser-testing page** (for example `https://demo.playwright.dev/todomvc/`) and assert only long-lived page content such as labeled inputs or links.
-- Keep browser chrome, logins, and ambient profile state out of the default smoke slice.
-- For manual checks against authenticated or SSO-only sites, **reuse an already-open signed-in Edge/Chrome window first** instead of relaunching the URL. Treat a Chromium launcher stub exiting immediately as normal until you confirm whether the existing browser session already opened the page.
+- Keep browser chrome, logins, and ambient profile state out of the default slice.
 
 ## Good first assertions (local tier)
 - Landmark or navigation container is discoverable.
@@ -29,7 +28,7 @@ Use this when the team wants a small, always-on Chromium browser slice that prov
 - Keep the post-click assertion inside the page content itself; avoid browser chrome, URL assertions, tabs, or address bar checks.
 
 ## Harness implementation note
-- Use app-window launch (`--app=`) plus accessibility/startup hygiene and an isolated profile, then wait for **all page-owned readiness selectors** before running assertions. Only if readiness does not appear should the test harness use a narrow, test-only dismissal path for known Edge first-run/sync dialogs; if a sync popup appears, look specifically for a `"Got it"` button and dismiss that exact button before proceeding.
+- Use app-window launch (`--app=`) plus accessibility/startup hygiene and an isolated profile, then wait for **all page-owned readiness selectors** before running assertions. Only if readiness does not appear should the test harness use a narrow, test-only dismissal path for known Edge first-run/sync dialogs; if Stefan's sync popup appears, look specifically for a `"Got it"` button and dismiss that exact button before proceeding.
 - Close the launched Edge window first, then kill the dedicated temp-profile browser process tree only if it fails to exit promptly. Delete the temp profile after teardown.
 
 ## Good public-site assertions (smoke tier)
