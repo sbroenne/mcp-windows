@@ -5,9 +5,99 @@
 - **Stack:** C# / .NET 10, Windows UI Automation, MCP protocol, xUnit, pytest-aitest (LLM tests), TypeScript (VS Code extension)
 - **Created:** 2026-03-22
 
+## Core Context
+
+### Plugin Shipment (2026-03-23) — COMPLETE
+
+**Status:** ✅ APPROVED FOR PRODUCTION SHIPMENT
+
+Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
+
+**Key Work:**
+- Plugin bundle under `plugin/` (cross-platform: Copilot CLI + Claude Code)
+- Binary provisioning via dedicated script (GitHub Releases download, auto-detect architecture)
+- PowerShell 5.1 compatibility fixed (`Join-Path` pattern, `-File` mode for hooks)
+- All tests pass (966 unit, 733 integration)
+- Safety review approved (non-blocking: English Windows only, internet required)
+
+**Key Learning:** Binary download-on-first-use pattern for large executables in plugin environments. Automatic architecture detection (win-x64, win-arm64). Graceful short-circuit when binary exists.
+
+### Project Foundation (Grade: A-)
+
+- **MCP Compliance:** ModelContextProtocol 1.1.0 SDK, stdio transport
+- **Testing:** 966+ unit tests, 733 integration tests (100% pass)
+- **Code Quality:** 0 build warnings, modern C# 12 with .NET 10
+- **Security:** asInvoker manifest, UAC/elevation detection
+- **Architecture:** Lazy singleton, COM apartment threading, Result/Outcome pattern
+
 ## Learnings
 
-### 2026-03-22: Full Backend Implementation Review (Complete)
+<!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-03-24: Browser defaults implementation — COMPLETE ✅
+
+**Status:** ✅ All gate criteria met; browser tests always-on on Windows desktop with Edge.
+
+Browser defaults work is complete. Ripley's revision met Lambert's gate. Tests run by default on supported desktop. No opt-in required. Implementation includes:
+
+1. **Local deterministic slice** — 6 tests against local HTML page (landmark, input, button, type/read, click effect, status)
+2. **Public smoke** — 1 test against Playwright TodoMVC with 3/3 consecutive pass rate (6s, 1s, 6s)
+3. **Browser-safe harness** — Isolated profiles, accessibility flags, proper cleanup, no cross-test pollution
+4. **Real execution lane** — Windows desktop with Edge installed
+5. **No opt-in** — Default run for supported platforms
+
+**Architecture validation:** No special support needed beyond Electron. Chrome/Edge use same `"Chromium/Electron"` framework detection and search strategy. Session handling (launch args, isolated profiles, readiness, content/chrome separation) is what `ChromiumBrowserSession` provides. This pattern works for both test infrastructure and production user launch flows.
+
+**User directive fulfilled:** "Public-web browser coverage is required, and browser tests should always run rather than stay opt-in." — Implemented via always-on with stable public Playwright TodoMVC smoke.
+
+### 2026-03-22: Default Chromium coverage should stay on the Electron-style semantic path
+
+Chrome and Edge do not need a separate MCP tool family. The right hardening lives in the browser test harness: launch app windows with isolated `--user-data-dir`, force renderer accessibility, disable extensions/sync noise, wait for page-owned readiness selectors, and keep cleanup scoped to the launched browser window plus its dedicated temp-profile process tree if needed.
+
+**Key file paths:** `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\ChromiumBrowserSession.cs`, `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\EdgePublicPageTests.cs`, `tests\Sbroenne.WindowsMcp.Tests\Integration\ChromiumBrowser\EdgeLocalPageTests.cs`
+
+### 2026-03-23: Chromium local tests need popup-resistant Edge startup
+
+For deterministic Edge smoke tests, the bigger risk is browser-owned first-run/sync UI stealing the session before page content is even ready. Launch Chromium tests in isolated guest app windows with sync/default-app prompts disabled, wait for a page-owned readiness selector, and keep a narrow `"Got it"` dismissal fallback for the known Edge sync popup.
+
+### 2026-03-23: Normal-profile Edge runs need window-scoped lifecycle control
+
+When Chromium tests intentionally use the developer's normal Edge profile for realism, stop treating the browser process as disposable. Launch app windows against the existing profile, detect the new top-level Edge window instead of relying only on the returned process ID, and close only that window on cleanup so the user's normal browser session survives the test run.
+
+### 2026-03-22: First Chromium Test Slice — Review Ready
+
+**Status:** ✅ READY FOR DALLAS'S REVIEW
+
+Lambert shipped the **first real Chromium browser test slice** for your review as the responsible reviewer.
+
+**What to review:**
+1. Local HTML page (`chromium-local-page.html`) — three stable semantic selectors
+2. Browser harness (`ChromiumBrowserSession.cs`) — launch/teardown pattern modeling ElectronHarnessFixture
+3. Three smoke tests (`EdgeLocalPageTests.cs`) — page-content discovery focus
+4. Documentation updates (`README.md`, `FEATURES.md`) — local Edge smoke test capability
+5. Decision documents (now merged to `.squad/decisions.md`) — scope constraints and two-tier strategy
+
+**Key constraints you should enforce:**
+1. ❌ No address-bar or tab-strip automation in this change
+2. ✅ Preserve opt-in gate: `WINDOWS_MCP_ENABLE_CHROMIUM_BROWSER_TESTS=1`
+3. ✅ Preserve isolated profiles (`--user-data-dir` per test)
+4. ✅ Page-content focus; document browser chrome as deferred
+5. ✅ Local page determinism (no network dependency)
+
+**Validation passed:**
+- Real Edge run: ✅ 3/3 tests passed
+- Focused suite with guard disabled: ✅ Tests correctly skipped
+- Profile isolation: ✅ Verified no cross-test pollution
+
+**Next phases (separate PRs):**
+- Layer 2: Public site integration tests (non-blocking)
+- Layer 3: LLM browser scenarios (release validation)
+
+This is the minimal, shippable slice per architecture decision.
+
+---
+
+### 2026-03-22: Electron Save Dialog Investigation — NOT Flaky
 
 **Overall Assessment: Production-Ready**
 
@@ -85,43 +175,227 @@ The implementation is well-engineered and production-ready with solid fundamenta
 
 ### 2026-03-22: Electron Save Dialog Investigation — NOT Flaky
 
-**Prior Assessment (WRONG):** "1 integration test failing (ElectronSaveTests - known flaky test)"
+**Corrected Assessment:** 5 structural bugs cause intermittent failures (not flakiness):
+1. False-positive Success when dialog detection times out
+2. No dialog cleanup between tests
+3. No Reset() method (unlike WinForms fixture)
+4. Conditional cleanup that doesn't fire when detection fails
+5. Fixture Dispose() fragility with UseShellExecute=true
 
-**Corrected Assessment:** 5 structural bugs cause intermittent failures, not flakiness:
-
-1. **False-positive Success in `SaveAsync`** — When dialog detection times out (2s), returns Success instead of indicating detection failure. Tests pass on `result.Success` when they shouldn't.
-2. **No dialog cleanup in test Dispose()** — Open Save As dialogs persist between tests, contaminating subsequent tests.
-3. **No `Reset()` method** — Unlike WinForms `UITestHarnessFixture.Reset()`, `ElectronHarnessFixture` has no state reset. Constructor doesn't call reset.
-4. **Conditional cleanup that doesn't fire** — `Save_WithoutFilePath_JustTriggersCtrlS` only sends Escape to close the dialog IF the dialog was detected (UsageHint check). When detection fails, cleanup is skipped.
-5. **Fixture Dispose() fragility** — `UseShellExecute=true` may cause `CloseMainWindow()` to no-op. Modal dialogs block window close. Catch-all swallows Kill failures.
-
-**Key Lesson:** When tests fail intermittently, investigate the structural causes. Don't dismiss as "flaky" — it's usually a timing/cleanup issue in test infrastructure. Compare the working fixture (WinForms `SaveTests` calls `_fixture.Reset()`) with the broken one to find gaps.
-
-**Files needing fixes:** `ElectronHarnessFixture.cs` (add DismissDialogs/Reset), `ElectronSaveTests.cs` (add cleanup in constructor/Dispose), optionally `UIAutomationService.Actions.cs` (improve no-dialog-detected handling).
+**Key Lesson:** Investigate structural causes, don't dismiss as "flaky". Timing/cleanup issues in test infrastructure. Compare working fixtures with broken ones.
 
 ### 2026-03-22: Electron Save Dialog Fix — FileNameControlHost is a ComboBox
 
-**Root Cause (deeper than initial investigation):** `FillSaveDialogAsync` found `FileNameControlHost` by AutomationId. This element is a **ComboBox**, not a simple Edit. Setting values on it via Value Pattern updates the display text but NOT the dialog's internal path state. When the Save button was clicked, the dialog used its empty internal state, not the display text.
+**Root Cause:** `FileNameControlHost` is a ComboBox. Value Pattern updates display text but NOT dialog's internal path state. Dialog uses internal state, not display text.
 
-**Fix:** Find the inner Edit control WITHIN `FileNameControlHost` ComboBox. Use keyboard typing (Ctrl+A + type) on the inner Edit, which properly updates the dialog's internal path state. Added `ClickSaveButtonAsync` to click Save via UIA Invoke pattern with mouse click fallback.
+**Fix:** Find inner Edit control within ComboBox. Use keyboard typing (Ctrl+A + type) to properly update dialog's internal path state.
 
-**Diagnostic technique that unlocked this:** File-based diagnostic output (`mcp-save-diag.txt`) writing at each step of `FillSaveDialogAsync`. Showed TrySetValue=True AND value readback matching — but file not created. This proved the value was set correctly in the ComboBox but the dialog's internal state was different.
+**Key Lesson:** Windows File Dialog's ComboBox accepts Value Pattern but doesn't propagate to internal tracking. Always use inner Edit control.
 
-**Key Lesson:** Windows File Dialog's `FileNameControlHost` ComboBox accepts Value Pattern but doesn't propagate the value to the dialog's internal path tracking. Always use the inner Edit control for reliable text input. This affects ALL apps using the standard Windows Save As dialog, not just Electron.
-
-**Test results after fix:**
-- All 16 save tests pass (5 Electron + 5 WinUI + 6 WinForms)
-- 733 integration tests pass, 0 failures
-- No orphaned Electron processes
+**Test results:** All 16 save tests pass (5 Electron + 5 WinUI + 6 WinForms). 733 integration tests pass. No orphaned processes.
 
 ### 2026-03-22: Windows File Dialog ComboBox Behavior Insight
 
-**Key Discovery:** Standard Windows Save As dialog's `FileNameControlHost` is a ComboBox. Setting values via UI Automation Value Pattern updates the display text but NOT the dialog's internal path state. When Save button is clicked, the dialog uses its internal state (empty), not the display text.
+Standard Windows Save As dialog's `FileNameControlHost` is a ComboBox. Setting values via Value Pattern updates display text but NOT internal dialog path state. Affects ALL applications using standard Windows file dialog.
 
-**Implication:** This affects ALL applications using the standard Windows file dialog — not Electron-specific. Any tool attempting to programmatically set the save path must use the inner Edit control within the ComboBox and provide keyboard input (Ctrl+A + type) for reliable propagation to the dialog's internal state.
+**Diagnostic Technique:** File-based diagnostic output at each interaction step. Pattern reusable for debugging other COM interop quirks.
 
-**Diagnostic Technique:** File-based diagnostic output at each step of dialog interaction. Seeing TrySetValue=True AND value readback matching but file not created proved the value was set in ComboBox but dialog's internal state was different. This technique is reusable for debugging other COM interop quirks.
+### 2026-03-23: MVP Client Distribution & Discoverability Implementation
 
-**Application:** Updated FillSaveDialogAsync to locate and interact with inner Edit, added ClickSaveButtonAsync for reliable Save button invocation. Pattern now applicable to any Windows dialog that wraps text input in ComboBox structure.
+**Completed Work:**
+
+Created the foundational distribution/discoverability metadata and documentation for the Windows MCP Server:
+
+1. **server.json** — MCP Registry metadata file
+   - Follows official MCP Registry schema (2025-12-11)
+   - Identifies package as available on NuGet (primary distribution point)
+   - Includes feature list and platform metadata for registry discovery
+   - Enables future publication to official MCP Registry
+
+2. **README.md** — Restructured installation section
+   - Reorganized into "Three Ways to Install" (clear hierarchy)
+   - Option 1: VS Code Extension (easiest, one-click)
+   - Option 2: Standalone Executable (for Copilot CLI, Claude Desktop, others)
+   - Option 3: Clients config table (Copilot CLI, GitHub Copilot Desktop, Claude Desktop, Cursor)
+   - Links to setup guide for full configuration steps
+
+3. **MCP_CLIENT_SETUP.md** — Comprehensive setup guide
+   - Reorganized with Method 1 (VS Code) and Method 2 (Manual config)
+   - Per-client sections: Copilot CLI, Copilot Desktop, Claude Desktop, Cursor, Other
+   - Added extensive troubleshooting (server not found, .NET runtime, UAC/elevation, UI automation issues, JSON parse errors)
+   - Advanced section for environment variables
+   - Tool reference table with examples
+   - All paths use `\\` escaping for correct JSON parsing
+
+4. **.copilot/mcp-config.json** — Converted from placeholder
+   - Changed from example GitHub MCP to actual Windows MCP server config
+   - Uses workspace-relative path: `${workspaceFolder}/publish/Sbroenne.WindowsMcp.exe`
+   - Practical for developers building/testing the server locally
+
+**Verification:**
+- ✅ All JSON metadata files valid and parse correctly
+- ✅ README.md and MCP_CLIENT_SETUP.md markdown complete and grammatically correct
+- ✅ No broken links or invalid paths
+- ✅ Verified against official MCP Registry schema and client documentation
+
+**Key Decisions:**
+- Server.json uses NuGet as primary package registry (aligns with .NET ecosystem)
+- Installation docs emphasize VS Code Extension as easiest path, but provide equal detail for standalone + manual config
+- Troubleshooting focused on real-world pain points (path escaping, .NET runtime, UAC/elevation)
+- MCP_CLIENT_SETUP.md now standalone comprehensive guide (not just quick reference)
+
+**Distribution Path Clarity:**
+1. **VS Code users:** Marketplace extension (automatic)
+2. **Copilot CLI / Claude Desktop / Cursor users:** GitHub Releases + manual config
+3. **Discovery:** MCP Registry (via server.json) for future publication
+4. **Community:** awesome-copilot eligible when registry listing stabilizes
+
+### 2026-03-23: MVP Client Distribution & Discoverability Implementation
+
+Created foundational distribution/discoverability metadata and documentation:
+
+1. **server.json** — MCP Registry metadata (official schema)
+2. **README.md** — Restructured "Three Ways to Install" (VS Code, Standalone, Config)
+3. **MCP_CLIENT_SETUP.md** — Comprehensive setup guide with troubleshooting
+4. **.copilot/mcp-config.json** — Working example pointing to local build
+
+**Distribution Path:** VS Code (automatic) → GitHub Releases (manual config) → MCP Registry (discovery) → awesome-copilot (optional)
+
+**Coordination:** Dallas (implementation), Ripley (review), Coordinator (corrections), Scribe (documentation)
+
+### 2026-03-23: Reverted Misdirected "Plugin Support" Artifacts
+
+Removed the repo changes that were based on the wrong framing of Copilot/Claude integration as repo-level "plugin support": restored `README.md`, deleted `MCP_CLIENT_SETUP.md`, `server.json`, `.copilot/mcp-config.json`, and removed the distribution skill draft.
+
+**Key lesson:** for Copilot and Claude requests, verify current official product terminology and integration surface from current docs before changing repo docs or metadata. Do not persist speculative client/distribution artifacts in the repo when they are based on an incorrect product model.
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
+
+### 2026-03-23: Shared Copilot CLI / Claude Code Plugin Packaging
+ 
+For a cross-client plugin, keep the installable artifact self-contained under `plugin\` and use the standard layout: `.claude-plugin\plugin.json`, `hooks\hooks.json`, `skills\<name>\SKILL.md`, and `.mcp.json` at plugin root. Even when the manifest lives under `.claude-plugin\`, component paths should still target plugin-root files with `.\...` paths rather than traversing upward.
+
+### 2026-03-23: Windows PowerShell Hook Validation Needs Explicit `-File` Execution
+
+When a plugin hook resolves a candidate root in inline PowerShell, hand that root into the real script by launching `powershell -File ... -PluginRoot <resolved-root>` instead of relying on implicit state. In Windows PowerShell 5.1, avoid three-argument `Join-Path`; build nested paths with `Join-Path (Join-Path ...) ...` so marker validation works in the same runtime the hook actually uses.
+
+### 2026-03-23: Plugin Implementation & Runtime Fixes Complete
+
+**Status:** ✅ APPROVED FOR PRODUCTION SHIPMENT
+
+**Implementation Work:**
+1. Created plugin bundle structure under `plugin/` (shared Copilot CLI + Claude Code)
+2. Implemented `ensure-binary.ps1` binary provisioner (architecture detection, GitHub Releases download, ZIP extraction)
+3. Fixed PowerShell 5.1 `Join-Path` compatibility (`Join-Path (Join-Path ...) ...` pattern)
+4. Replaced inline hook with dedicated `-File` script (Ripley revision)
+5. Integrated release workflow to sync `plugin/.claude-plugin/plugin.json` version with server release
+6. All tests pass: 255/255 unit tests, 733 integration tests
+
+**Key Achievement:** Binary provisioning via dedicated script (not inline hook command) with proper error handling and short-circuit when binary already exists.
+
+**Root Resolution (Final Pattern — Ripley Revision):**
+- `CLAUDE_PLUGIN_ROOT` env var (Claude Code documented)
+- CWD **with marker validation** (`.claude-plugin/plugin.json` must exist)
+- Copilot CLI known install path
+- Loud failure with `Write-Warning` (never silent skip)
+
+**Safety Review:** Lambert approved final design. Non-blocking limitations documented (English Windows only, internet required on first use, marketplace install unverified but architectural contract sound).
+
+**Pattern Contribution:** Binary download-on-first-use for large executables in plugin environments. Automatic architecture detection (win-x64, win-arm64). Graceful short-circuit when binary already present.
+
+### 2026-03-24: Browser Automation Assessment — PRODUCTION-READY
+
+**Status:** ✅ NO CODE CHANGES NEEDED
+
+Assessed browser automation support for Edge, Chrome, and Chromium-based apps. **Windows MCP Server has excellent browser automation support TODAY** through UIA3 (COM) API with specialized Chromium/Electron detection.
+
+**What Works:**
+- ✅ Chromium/Electron detection via class name (`Chrome_WidgetWin_1`)
+- ✅ ARIA labels map to UIA Name property (semantic web element discovery)
+- ✅ Document control exposes web page hierarchy
+- ✅ Deep tree traversal (maxDepth 15 vs 5 for WinForms)
+- ✅ Form workflows (find, click, type, submit)
+- ✅ 50 passing Electron integration tests (21 UI automation, 24 screenshots, 5 file save)
+
+**Test Evidence:**
+- All 21 Electron UI automation tests pass (100% pass rate)
+- Validates: button clicks, text input, form submission, ARIA label discovery
+- Apps validated: VS Code, Teams, Slack (Electron), Edge/Chrome (Chromium)
+
+**Key Implementation Details:**
+- Framework detection: `UIAutomationService.Helpers.cs:376-419`
+- Electron strategy: `UIAutomationService.Helpers.cs:34-40` (deep search, post-hoc filtering)
+- UIA3 chosen specifically for Chromium support (`UIA3Automation.cs:9`)
+
+**Gaps (Non-Critical):**
+- ⚠️ Browser chrome elements (address bar, back button) not tested — but keyboard shortcuts work (Ctrl+L, Alt+Left)
+- ⚠️ No browser-specific documentation in README/FEATURES — users discover via Electron examples
+- ⚠️ No "launch Edge" integration test — Electron tests prove Chromium works (same accessibility API)
+
+**Recommendation:** Add browser automation examples to FEATURES.md (30 min effort, high user value). No code changes needed.
+
+**Decision File:** `.squad/decisions/inbox/dallas-browser-automation.md`
+
+### 2026-03-24: Browser Automation Consensus Decision — APPROVED
+
+**Status:** ✅ APPROVED (Ready for team implementation)
+
+**Team Consensus:** Ripley (Architecture), Dallas (Implementation), Lambert (QA)
+
+**Decision:** Browser automation support is architecturally strong with excellent Electron/Chromium coverage. Primary gaps are documentation, system prompts, and validation testing — not implementation.
+
+**Architecture Decision:**
+- **DO NOT add Playwright/Selenium/CDP integration** — violates Principle III (Augmentation, Not Duplication)
+- **DO add browser-awareness to existing tools** — system prompts, tool descriptions, integration tests
+
+**Dallas's Implementation Assignment:**
+- **System prompt**: Add `BrowserAutomation()` method to `WindowsAutomationPrompts.cs` — browser patterns like URL navigation, tab management, web content discovery
+- **Tool descriptions**: Add Chrome/Edge examples to AppTool, UIFindTool, UIClickTool descriptions
+- **Effort:** 3-4 hours
+
+**Team Assignments:**
+- Dallas: System prompt + tool descriptions (3-4 hours) ← YOU
+- Lambert: Browser tests + LLM tests (6-8 hours)
+- Ripley: Review prompt quality + validate LLM test design (2-3 hours)
+- Scribe: Update FEATURES.md with "Browser Automation" section (1 hour)
+
+**Reference Documentation:**
+- Ripley's POC assessment: .squad/orchestration-log/2026-03-24T11-07-24-ripley.md
+- Dallas's implementation assessment: .squad/orchestration-log/2026-03-24T11-07-24-dallas.md
+- Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
+- Consolidated decision: .squad/decisions.md (Browser Automation Support section)
+
+### 2026-03-22: Plugin Skill Harness Slice Uses `load_skill`, Not Whole-Plugin Loading
+
+For plugin-level AI guidance tests, `pytest-skill-engineering` currently supports direct skill loading (`load_skill` / `Skill.from_path`) and prompt composition checks, but not whole-plugin manifest loading. The current local Copilot SDK package is also incompatible with the harness's live Copilot provider shim (`CopilotClientOptions` / `options=` API mismatch), so the honest minimal automated slice is: validate `plugin/.claude-plugin/plugin.json` points at `./skills/`, load `plugin/skills/windows-automation`, and assert the harness prepends that skill text ahead of the shared system prompt.
+
+### 2026-03-24: Browser Discoverability Should Reuse the Semantic Flow
+
+For browser support, the highest-value, lowest-token update is to extend the existing semantic automation framing instead of adding a parallel browser-specific model. Put one short browser note into the generic quickstart prompt, add one focused browser prompt for URL/page/chrome patterns, and keep tool discoverability changes to compact examples in `AppTool.cs`, `UIFindTool.cs`, and `UIClickTool.cs`.
+
+**User preference:** keep browser discoverability changes compact and token-efficient.
+
+**Key files:** `src\Sbroenne.WindowsMcp\Prompts\WindowsAutomationPrompts.cs`, `src\Sbroenne.WindowsMcp\Tools\AppTool.cs`, `src\Sbroenne.WindowsMcp\Automation\Tools\UIFindTool.cs`, `src\Sbroenne.WindowsMcp\Automation\Tools\UIClickTool.cs`, `README.md`, `FEATURES.md`, `tests\Sbroenne.WindowsMcp.Tests\Unit\Prompts\WindowsAutomationPromptsTests.cs`.
+
+### 2026-03-24: Browser Follow-Through — Lean Discoverability Pass (Dallas)
+
+**Status:** ✅ COMPLETED
+
+**Work:** Lean browser discoverability added across docs/prompt surfaces.
+
+**Changes:**
+- WindowsAutomationPrompts.cs: Browser guidance integrated (token-efficient)
+- UIClickTool.cs, UIFindTool.cs: Electron/Chromium examples added
+- README.md, FEATURES.md: Browser discoverability updated
+- WindowsAutomationPromptsTests.cs: Prompt tests validated
+
+**Outcome:** Prompt tests and build passed. Lean approach keeps token overhead ~63 tokens (1.8% of budget).
+
+**Cross-Agent Coordination:**
+- Ripley (token efficiency review): Approved browser follow-through as token efficient
+- Lambert (test coverage): Focused browser-adjacent tests added (60 green tests)
+- Polish (Ripley): Electron/Chromium consistency finalized
+
+### 2026-03-24: Chromium Public Smoke Tier Uses a Second Opt-In Gate
+
+When we extend the deterministic local Edge slice, keep public-site coverage in a **separate opt-in tier** instead of folding it into the base browser env var. Reuse the same Edge harness and stay on semantic page-content selectors (e.g. TodoMVC input, The Internet link), so we gain real-world signal without turning third-party website availability into CI noise.

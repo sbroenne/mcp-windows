@@ -1,8 +1,8 @@
 ---
 layout: default
 title: "Windows MCP Server — Windows Automation That Actually Works"
-description: "Windows computer use for AI agents. Uses the Windows UI Automation API to find buttons by name, not pixels. Tested with real AI models. Works with GitHub Copilot, Claude Desktop, Cursor."
-keywords: "Windows MCP Server, Windows computer use, MCP server, Windows UI Automation, accessibility API, GitHub Copilot Windows, Claude Desktop, Cursor, agentic automation, RPA, UIA, WinForms, WinUI, Electron"
+description: "Windows computer use for AI agents. Automate any Windows app, browser, or website by name — not pixels. Tested with real AI models. Works with GitHub Copilot, Claude Desktop, Cursor."
+keywords: "Windows MCP Server, Windows computer use, MCP server, Windows UI Automation, browser automation, Edge automation, Chrome automation, Chromium automation, accessibility API, GitHub Copilot Windows, Claude Desktop, Cursor, agentic automation, RPA, UIA, WinForms, WinUI, Electron"
 canonical_url: "https://windowsmcpserver.dev/"
 ---
 
@@ -39,13 +39,15 @@ Your AI says "click Save" and the server finds the Save button by name. No scree
 
 ## What You Can Do
 
-Ask your AI assistant to control any Windows application:
+Ask your AI assistant to control any Windows application or browser:
 
 - "Click the Save button in Notepad"
 - "Type my email in the login field"
 - "Toggle Dark Mode in Settings"
 - "Move this window to my second monitor"
 - "Read the error message from that dialog"
+- "Open my banking site in Edge and click Transfer"
+- "Fill out the form on this page in Chrome"
 
 Works with **GitHub Copilot**, **Claude Desktop**, **Cursor**, and any MCP client.
 
@@ -120,8 +122,13 @@ Download from [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases
 </div>
 
 <div class="feature-card">
+<h3>🌐 Browser Automation</h3>
+<p>Automate Edge and Chrome page content by name — links, buttons, forms, ARIA labels. Works with signed-in sessions. Use the dedicated <code>windows_mcp_browser_automation</code> prompt.</p>
+</div>
+
+<div class="feature-card">
 <h3>💻 Broad App Support</h3>
-<p>Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack). Same commands work across all.</p>
+<p>Tested against classic Windows apps, modern Windows 11 apps, Electron apps (VS Code, Teams, Slack), and Chromium browsers. Same commands work across all.</p>
 </div>
 
 <div class="feature-card">

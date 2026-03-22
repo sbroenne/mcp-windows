@@ -1,8 +1,8 @@
 ---
 layout: default
 title: "Complete Feature Reference"
-description: "10 specialized tools for comprehensive Windows automation. App launcher, 5 UI tools, mouse, keyboard, window management, and screenshots."
-keywords: "Windows MCP features, UI automation, mouse control, keyboard control, window management, screenshot capture"
+description: "10 specialized tools for comprehensive Windows automation. App launcher, 5 UI tools, browser automation (Edge, Chrome), mouse, keyboard, window management, and screenshots."
+keywords: "Windows MCP features, UI automation, browser automation, Edge automation, Chrome automation, Chromium, mouse control, keyboard control, window management, screenshot capture"
 permalink: /features/
 ---
 

@@ -64,6 +64,8 @@ public sealed class PromptDiscoveryTests
 
             Assert.Contains("windows_mcp_quickstart", promptNames);
             Assert.Contains("windows_mcp_find_and_click", promptNames);
+            Assert.Contains("windows_mcp_electron_discovery", promptNames);
+            Assert.Contains("windows_mcp_browser_automation", promptNames);
 
             await SendJsonRpcAsync(process, new
             {
@@ -86,6 +88,33 @@ public sealed class PromptDiscoveryTests
             // Verify prompts mention key tools (ui_find, ui_click, window_management)
             Assert.Contains("ui_find", allText, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("window_management", allText, StringComparison.OrdinalIgnoreCase);
+
+            await SendJsonRpcAsync(process, new
+            {
+                jsonrpc = "2.0",
+                id = 4,
+                method = "prompts/get",
+                @params = new
+                {
+                    name = "windows_mcp_browser_automation",
+                    arguments = new
+                    {
+                        browser = "Microsoft Edge",
+                        goal = "Open docs and use search",
+                        url = "https://example.com"
+                    }
+                }
+            }, cancellationToken);
+
+            JsonElement browserResponse = await ReadJsonRpcResponseAsync(process, id: 4, cancellationToken);
+            Assert.True(browserResponse.TryGetProperty("result", out var browserResult), "Expected browser prompts/get response.result");
+            Assert.True(browserResult.TryGetProperty("messages", out var browserMessages) && browserMessages.ValueKind == JsonValueKind.Array,
+                "Expected browser prompt result.messages array");
+
+            var browserText = string.Join("\n", EnumerateAllText(browserMessages));
+            Assert.Contains("best-effort", browserText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("token efficiency", browserText, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("Ctrl+L", browserText, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {

@@ -19,9 +19,10 @@ public static partial class UIFindTool
     /// Finds UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc.
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
     /// REQUIRED: windowHandle (from window_management tool).
+    /// For Electron/Chromium, visible text and ARIA labels usually show up here as element names.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
-    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, this is the ARIA label.</param>
+    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps and Chromium browsers, this is often the visible label or ARIA label.</param>
     /// <param name="nameContains">Substring to search in element names (case-insensitive). Preferred for dialog buttons - e.g., 'Don\\'t save'.</param>
     /// <param name="namePattern">Regex pattern to match element names. Use for complex matching like 'Button [0-9]+' or 'Save|Cancel'.</param>
     /// <param name="controlType">Control type filter (Button, Edit, Text, CheckBox, ComboBox, Menu, MenuItem, etc.)</param>

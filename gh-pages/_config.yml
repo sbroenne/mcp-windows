@@ -3,7 +3,7 @@
 
 # Site settings
 title: "Windows MCP Server"
-description: "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA."
+description: "AI-powered Windows automation — UI Automation, browser automation (Edge, Chrome), mouse, keyboard, window management, and screenshots for computer use, QA, and RPA."
 url: "https://windowsmcpserver.dev"
 baseurl: ""
 repository: "sbroenne/mcp-windows"

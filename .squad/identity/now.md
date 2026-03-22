@@ -1,9 +1,10 @@
 ---
-updated_at: 2026-03-22T06:49:26.802Z
-focus_area: Initial setup
+updated_at: 
+2026-03-22T16:03:12Z
+focus_area: Browser automation hardening with real user profile
 active_issues: []
 ---
 
 # What We're Focused On
 
-Getting started. Updated by coordinator at session start.
+Driving toward great browser automation support using Stefan's normal Edge profile for realistic signed-in behavior, while preserving clear opt-in boundaries.

@@ -19,16 +19,21 @@ public static partial class AppTool
     private const int StubDetectionDelayMs = 300;
 
     /// <summary>
-    /// Launch applications. Use this to start programs like notepad.exe, calc.exe, chrome.exe, winword.exe, excel.exe, etc.
+    /// Launch applications. Use this to start programs like notepad.exe, calc.exe, msedge.exe, chrome.exe, winword.exe, excel.exe, etc.
     /// Returns a window handle for use with window_management, keyboard_control, and other tools.
     /// </summary>
     /// <remarks>
-    /// Examples: app(programPath='notepad.exe'), app(programPath='chrome.exe', arguments='https://example.com').
+    /// Examples: app(programPath='notepad.exe'), app(programPath='msedge.exe', arguments='https://example.com').
     /// After launch, the window is focused and ready for input. Use the returned handle for subsequent operations.
+    /// Launch a browser with a URL, then use ui_find/ui_click/ui_type with the returned handle to automate page content.
+    /// Edge (msedge.exe) and Chrome (chrome.exe) page content is fully automatable: links, buttons, and form fields
+    /// surface as ARIA/visible-text UIA names. Browser chrome (address bar, tabs) is best-effort — use keyboard shortcuts.
     ///
     /// NOTE: Some apps (e.g., calc.exe, UWP/Store apps) launch as a stub that exits immediately and spawns a separate
     /// process. If the launch appears to fail, use window_management(action='find', title='Calculator') to locate
     /// the window by title instead.
+    /// NOTE: Chromium browsers (Edge, Chrome) also use a stub/session model — if you need an authenticated page,
+    /// check window_management(action='find') for an existing signed-in window before calling app().
     /// </remarks>
     /// <param name="programPath">Program to launch. Can be executable name (e.g., 'notepad.exe', 'calc.exe', 'chrome.exe') or full path (e.g., 'C:\\Program Files\\App\\app.exe').</param>
     /// <param name="arguments">Command-line arguments for the program (optional). Example: '--new-window' for browsers.</param>
