@@ -114,4 +114,14 @@ The implementation is well-engineered and production-ready with solid fundamenta
 - 733 integration tests pass, 0 failures
 - No orphaned Electron processes
 
+### 2026-03-22: Windows File Dialog ComboBox Behavior Insight
+
+**Key Discovery:** Standard Windows Save As dialog's `FileNameControlHost` is a ComboBox. Setting values via UI Automation Value Pattern updates the display text but NOT the dialog's internal path state. When Save button is clicked, the dialog uses its internal state (empty), not the display text.
+
+**Implication:** This affects ALL applications using the standard Windows file dialog — not Electron-specific. Any tool attempting to programmatically set the save path must use the inner Edit control within the ComboBox and provide keyboard input (Ctrl+A + type) for reliable propagation to the dialog's internal state.
+
+**Diagnostic Technique:** File-based diagnostic output at each step of dialog interaction. Seeing TrySetValue=True AND value readback matching but file not created proved the value was set in ComboBox but dialog's internal state was different. This technique is reusable for debugging other COM interop quirks.
+
+**Application:** Updated FillSaveDialogAsync to locate and interact with inner Edit, added ClickSaveButtonAsync for reliable Save button invocation. Pattern now applicable to any Windows dialog that wraps text input in ComboBox structure.
+
 <!-- Append new learnings below. Each entry is something lasting about the project. -->

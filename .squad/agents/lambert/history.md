@@ -103,3 +103,42 @@ Test inventory: ~1,055 automated tests across unit, integration, and LLM categor
 4. **SHORT-TERM:** Enable code coverage reporting (target: 80%+ for non-trivial logic)
 5. **MEDIUM-TERM:** Add multi-monitor edge case tests
 6. **MEDIUM-TERM:** Add unit tests for COM interop helpers (COMExceptionHelper, VirtualDesktopManager)
+
+### 2026-03-22: LLM Test Tool Hints Fixed + Unit Tests Added
+
+**LLM Test Fixes (8 prompts across 2 files):**
+- `test_keyboard_mouse.py`: Rewrote 4 prompts (lines 206, 218, 262, 274) — removed `mouse_control` tool references, made task-focused ("Click at coordinates..." / "Draw a line from...")
+- `test_app_tool_uwp.py`: Rewrote 4 prompts (lines 55, 69, 107, 121) — removed `app tool with programPath` and `using window_management` references, made task-focused ("Launch the Calculator application" / "Verify that Calculator is now open by finding its window")
+
+**Unit Tests Added (3 new test files, ~50 new tests):**
+- `ModifierKeyConverterTests.cs`: 30 tests — string parsing (single/multi/case-insensitive/whitespace/aliases), numeric deserialization, null handling, invalid input errors, serialization, round-trips, object property serialization
+- `WindowHandleParserTests.cs`: 15 tests — valid decimal parsing, zero, large values, null/empty, non-numeric, negatives, whitespace rejection, special characters, overflow, format, round-trips
+- `ElementIdGeneratorTests.cs`: 6 tests — null argument handling, non-existent short IDs, malformed full IDs (wrong parts, invalid handle), stale elements, concurrent thread safety
+
+**Key Learnings:**
+- WindowHandleParser strictly rejects whitespace — digits-only validation (no trimming)
+- ElementIdGenerator with window:0 falls back to the desktop root element — path:0 actually finds a child element (the first desktop child)
+- ModifierKeyConverter writes numeric values, reads both numeric and string — round-trip always goes through numeric representation
+- TreatWarningsAsErrors is enabled — must use CultureInfo.InvariantCulture for ToString calls
+
+### 2026-03-22: Core Utility Unit Tests — Pattern and Coverage
+
+**Unit Tests Created (3 files, ~51 tests):**
+- `ModifierKeyConverterTests.cs` (30 tests): Validates string→modifier parsing, numeric deserialization, whitespace/case handling, aliases, null handling, JSON serialization round-trips, error cases
+- `WindowHandleParserTests.cs` (15 tests): Validates decimal parsing, zero/large values, null/empty rejection, non-numeric rejection, negatives, whitespace rejection, overflow detection, format consistency
+- `ElementIdGeneratorTests.cs` (6 tests): Validates null argument handling, non-existent IDs, malformed IDs, stale element detection, concurrent thread safety
+
+**Key Technical Insights:**
+- **WindowHandleParser:** Strict digits-only validation (no trimming). Rejects all whitespace and special characters. Format: decimal string → nint.
+- **ElementIdGenerator:** window:0 falls back to desktop root element; path:0 actually finds first desktop child (NOT root). Thread-safe but environment-dependent due to COM object identity.
+- **ModifierKeyConverter:** Writes numeric values, reads both numeric and string. Round-trip always goes through numeric representation. JSON serialization uses numeric keys.
+
+**Testing Lesson:** When unit tests for core utilities are missing, integration tests don't expose edge cases. These three utilities are used by 8+ tools each; bugs propagate silently. Pattern: tight input validation, early error detection, clear error messages for LLM consumption.
+
+**Pattern for Future Utilities:**
+1. Test valid inputs: single/multi/edge values, boundary conditions
+2. Test null/empty inputs
+3. Test invalid inputs: wrong type, out of range, malformed
+4. Test serialization round-trips
+5. Test error messages for LLM consumption (should be specific, not generic)
+

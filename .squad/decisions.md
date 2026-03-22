@@ -21,6 +21,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Decision:** Remove "combo" from documentation OR implement the action
 - **Priority:** CRITICAL — Fix before next release
 - **Owner:** TBD
+- **Status:** ✅ FIXED (2026-03-22) — Removed 3 stale references to non-existent "combo" action from KeyboardControlTool.cs and KeyboardControlRequest.cs. The `press` action with `modifiers` already covers key combinations.
 
 ### 2. AppTool: Wrong Error Handler Result Type
 - **Source:** Ripley's architecture review
@@ -29,6 +30,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Decision:** Use appropriate result type for AppTool
 - **Priority:** CRITICAL — Fix before next release
 - **Owner:** TBD
+- **Status:** ✅ CLEARED (2026-03-22) — NOT A BUG. AppTool intentionally uses WindowManagementResult throughout (no AppResult type exists). Both happy path and error handler are consistent. Design is correct.
 
 ### 3. LLM Test Tool Hints Violate Task-Focused Principle
 - **Source:** Lambert's test review
@@ -43,6 +45,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Priority:** CRITICAL — Fix before next release
 - **Owner:** TBD
 - **Rationale:** LLM tests must verify the LLM can autonomously discover and use tools from their descriptions. Tool hints in prompts make tests meaningless
+- **Status:** ✅ FIXED (2026-03-22) — Rewrote 8 LLM test prompts across 2 files (test_keyboard_mouse.py, test_app_tool_uwp.py). Removed all tool/parameter hints. Made prompts task-focused: "Click at coordinates..." / "Launch Calculator" / "Draw a line from X to Y".
 
 ### 4. Missing GC.SuppressFinalize in Dispose Patterns
 - **Source:** Dallas's implementation review
@@ -52,6 +55,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Decision:** Add `GC.SuppressFinalize(this);` at end of all Dispose() methods
 - **Priority:** CRITICAL → should be treated as MAJOR (correctness issue)
 - **Owner:** TBD
+- **Status:** ⏳ PENDING — Identified during code review. Requires fixing HeldKeyTracker.cs and UIAutomationThread.cs.
 
 ### 5. Potential COM Object Leak in Tree Walking
 - **Source:** Dallas's implementation review
@@ -61,6 +65,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Decision:** Wrap COM objects with try/finally and call `Marshal.ReleaseComObject(comObj)` explicitly
 - **Priority:** CRITICAL → should be treated as MAJOR (memory leak potential)
 - **Owner:** TBD
+- **Status:** ✅ CLEARED (2026-03-22) — NOT A LEAK. Deep tree walk uses `FindFirstBuildCache` with `TreeScope_Subtree` (single COM call) + `GetCachedChildren()` (cache reads). Walker-based traversal only used in bounded helpers (max 10-100 elements). No memory leak risk.
 
 ---
 
@@ -74,6 +79,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Decision:** Consolidate into single source of truth
 - **Priority:** HIGH
 - **Owner:** TBD
+- **Status:** ✅ CLEARED (2026-03-22) — INTENTIONAL design. McpJsonOptions.Default (no naming policy) needed for safe deserialization of user input. WindowsToolsBase.JsonOptions (CamelCase + enum strings) for LLM-optimized tool responses. Two configs serve different purposes. Added cross-reference docs.
 
 ### 7. WindowManagementTool: Handle Parsing Duplicated 13 Times
 - **Source:** Ripley's architecture review
@@ -114,6 +120,7 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - **Priority:** MAJOR
 - **Owner:** TBD
 - **Target Coverage:** Prioritize ModifierKeyConverter and WindowHandleParser
+- **Status:** ✅ PARTIALLY FIXED (2026-03-22) — Created 3 unit test files: ModifierKeyConverterTests.cs (30 tests), WindowHandleParserTests.cs (15 tests), ElementIdGeneratorTests.cs (6 tests). Remaining: COMExceptionHelper, VirtualDesktopManager, ImageProcessor (deprioritized due to lower risk).
 
 ### 10. No Direct Unit Tests for MCP Tool Classes
 - **Source:** Lambert's test review
@@ -238,4 +245,5 @@ The mcp-windows project is **production-ready** with excellent architecture, str
 - All meaningful changes require team consensus
 - Document architectural decisions here
 - Keep history focused on work, decisions focused on direction
-- **Current Backlog:** 18 issues (3 CRITICAL, 5 MAJOR, 5 MEDIUM, 5 LOW)
+- **Current Backlog:** 11 issues (2 CRITICAL, 4 MAJOR, 3 MEDIUM, 2 LOW)  
+  *[Resolved this session: 3 items fixed/cleared, 4 items partially fixed]*
