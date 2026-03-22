@@ -1,0 +1,27 @@
+.squad: Consolidate browser defaults verdict and team history
+
+Merges 11 inbox decisions into decisions.md:
+- Ripley's browser revision (gate-ready with 7/7 passing tests)
+- Lambert's browser gate approval (all criteria met)
+- Lambert's Chromium interaction slice (page-content focus)
+- Lambert's public-browser review (accepted)
+- Dallas's browser defaults directive (always-on, no opt-in)
+- Dallas's public browser tier (opt-in smoke)
+- Dallas's Chromium click-fix (user profile strategy)
+- Dallas's PSE reinstall (environment management)
+- 3 user directives from Stefan Broenner (do it, use normal profiles, always-on public coverage)
+
+Updated agent history files with latest session outcomes:
+- Lambert: Browser gate approval outcome and lasting lessons
+- Dallas: Browser defaults implementation completion
+- Ripley: Browser revision approval and architecture validation
+
+Created:
+- .squad/orchestration-log/2026-03-22T16-42-49Z-scribe.md — Session work summary
+- .squad/log/2026-03-22T16-42-49Z-browser-defaults-verdict.md — Session log
+
+Deleted: All .squad/decisions/inbox/*.md files (consolidated)
+
+Summary: Browser automation gate is APPROVED. Tests always-on on Windows desktop with Edge. No opt-in required. Architecture needs no changes beyond existing session handling. Public TodoMVC smoke test stable 3/3 runs.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

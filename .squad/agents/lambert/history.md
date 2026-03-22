@@ -47,6 +47,73 @@
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-03-23: Chromium local interaction slice exposes a real click gap
+
+**Status:** ⚠️ PARTIAL — `ui_type` and `ui_read` equivalents are proven on local Edge page content; `ui_click` remains red for Chromium page buttons.
+
+**What was added:**
+- `EdgeLocalPageTests.cs` now includes interaction coverage, not just discovery:
+  - typing into the ARIA-labeled search box and reading the typed value back
+  - reading deterministic page-owned status text
+  - clicking the ARIA-labeled Sign in button and expecting page-owned content to react
+- `chromium-local-page.html` now includes deterministic read targets for the interaction slice (`Signed out` status text and click-revealed content owned by the page)
+
+**Validated behavior:**
+- `FindAndTypeAsync` works against Chromium page content (`Docs Search` input) and `GetTextAsync` reads the typed value back.
+- `GetTextAsync` works against static Chromium page text (`Signed out`).
+- `FindAndClickAsync` returns success for the Chromium page button, but the page does **not** expose the expected post-click content change. The test stays red, which is exactly the gap Dallas needs to fix.
+
+**Lasting lesson:**
+- For deterministic Chromium interaction tests, the best fixture pattern is: one editable field for round-trip type/read, one always-visible text node for baseline read, and one page-owned post-click assertion that proves DOM-level interaction rather than mere element discovery.
+- Do not weaken the click assertion to browser chrome or raw success flags. The whole point of this slice is proving page-content interaction, not just that a click API returned `Success=true`.
+ 
+### 2026-03-23: Public-Site Chromium Tier Review — ACCEPTED
+
+**Status:** ✅ ACCEPTED — Dallas's public-site smoke tier is approved.
+
+**What was reviewed:**
+- `EdgePublicPageTests.cs` — 2 tests against Playwright TodoMVC and The Internet practice sites
+- `ChromiumBrowserSession.LaunchPublicSite()` — public-site launch with enum-driven target selection
+- `ChromiumPublicSite` enum — clean value type for site targeting
+- Env-var gating chain: `WINDOWS_MCP_ENABLE_PUBLIC_CHROMIUM_BROWSER_TESTS` requires base var too
+
+**Findings — all positive:**
+1. **Selector stability:** Both assertions are semantic (visible text + control type), not CSS/XPath. TodoMVC placeholder ("What needs to be done?") is the canonical text across all implementations — decade-stable. "Form Authentication" link on The Internet is a longstanding fixture.
+2. **Env-var gating:** Correct two-gate chain (`SkipUnlessPublicSitesEnabled` → `SkipUnlessEnabled`). Default CI skips all 5 Chromium tests. Public tier requires both env vars.
+3. **Scope discipline:** No browser chrome, no login flows, no address bar, no tab strip. Pure page-content discovery. Follows the skill pattern exactly.
+4. **Trait markers:** `RequiresInternet` and `PublicSite` traits enable proper filtering. `[Collection("ChromiumBrowser")]` prevents parallel Edge launches.
+5. **Timeout:** 15s for public pages (vs 5s local) is appropriate for network latency.
+6. **No CI coupling:** Zero risk of blocking PRs or default test runs.
+
+**Minor observation (non-blocking):**
+- The Internet (`the-internet.herokuapp.com`) is maintained by an individual, not a test-tooling company. Slightly higher churn risk than Playwright's own demo. Acceptable for opt-in smoke.
+
+**Next highest-value slice:** Browser interaction tests — `ui_click`, `ui_type`, `ui_read` against local page. We can discover elements; now prove we can interact with them. Use the existing local HTML page to type in the search box, click the button, read content. This is the foundation LLM browser scenarios need.
+
+### 2026-03-24: Always-run browser gate — APPROVED ✅
+
+**Status:** ✅ APPROVED — Browser tests always-on on Windows desktop with Edge.
+
+**Final Gate Criteria Met:**
+
+| Requirement | Evidence |
+|-------------|----------|
+| **No opt-in env-var** | `SkipUnlessSupported()` checks Edge installation only |
+| **Deterministic local Edge slice** | 6 tests pass: landmark, input, button, type/read, click effect, status read |
+| **Stable public-web smoke** | `demo.playwright.dev/todomvc` passes 3/3 consecutive runs |
+| **Browser chrome best-effort** | All assertions on page content (ARIA labels, control types) |
+| **Isolation / cleanup** | Isolated `--user-data-dir`, temp profile deleted after test |
+| **Real execution lane** | Any Windows desktop with Edge installed |
+
+**Architecture Answer:** No special support needed beyond Electron. Chrome/Edge detected via `"Chromium/Electron"` framework strategy with existing class name detection and search. Session handling (launch args, isolated profiles, readiness waits, content separation) is exactly what `ChromiumBrowserSession` provides. CI exclusion is correct platform behavior (headless ci agents correctly excluded).
+
+**Test Results:** 7/7 pass (~11s); public smoke stable 3/3 consecutive runs (6s, 1s, 6s).
+
+**Lasting lesson:**
+- Browser gate was correctly two-part: deterministic local coverage always-on, public smoke must prove stability first.
+- Chrome/Edge don't need new automation engine; they need session handling and honest scope (page content, not chrome).
+- CI exclusion is platform constraint, not test limitation; always-run means "on supported desktop" not "in headless CI".
+
 ### 2026-03-22: Chromium Browser Test Slice Shipped
 
 **Status:** ✅ COMPLETED — Ready for PR review by Dallas

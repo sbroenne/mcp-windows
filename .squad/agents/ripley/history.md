@@ -65,6 +65,30 @@ Lambert completed the **first real Chromium browser test slice** as opt-in Edge 
 
 ---
 
+### 2026-03-24: Browser revision complete — Gate approved ✅
+
+**Status:** ✅ APPROVED BY LAMBERT — Browser tests always-on, no opt-in
+
+Ripley's browser revision met all of Lambert's gate criteria. Tests run by default on Windows desktop with Edge installed. No opt-in env-var required. Architecture answer confirmed: no special support beyond Electron needed.
+
+**What was delivered:**
+1. Deterministic local Edge slice (6 tests) — landmark, input, button, type/read, click, status read
+2. Stable public smoke (1 test) — Playwright TodoMVC, 3/3 consecutive pass rate
+3. Real execution lane — Any Windows desktop with Edge
+4. Browser-safe harness — Isolated profiles, accessibility flags, proper cleanup
+5. Honest scoping — Page content only, browser chrome is best-effort
+
+**Architecture validated:**
+- Chrome/Edge detected via existing `"Chromium/Electron"` framework strategy
+- No new tools or special engine needed
+- Session handling (launch args, isolated profiles, readiness, content separation) handled by `ChromiumBrowserSession`
+- Same pattern works for both test infrastructure and production user launches
+- CI correctly excludes RequiresDesktop (headless agents); always-on means "on supported desktop"
+
+**User directive fulfilled:** "Public-web browser coverage is required, and browser tests should always run" — Implemented via always-on defaults with stable TodoMVC smoke.
+
+---
+
 ### 2026-03-24: Token Efficiency Review — Browser Automation
 
 **Finding: Browser follow-through is token efficient. Approved without changes.**
@@ -507,3 +531,43 @@ The mcp-windows project demonstrates excellent architecture with strong MCP prot
 - If public site is down, skip test, don't fail
 
 **Architecture Pattern:** `BrowserHarnessFixture` mirrors `ElectronHarnessFixture` pattern — AppTool launch, `DisableParallelization`, WM_CLOSE teardown.
+
+### 2026-03-25: Chromium Browser Test Gate — Revision Complete
+
+**Status:** ✓ GATE-READY FOR LAMBERT APPROVAL
+
+**Context:** Lambert rejected Dallas's browser coverage work citing: (1) public test failed on `example.com` timeout, (2) no CI execution lane. As revision owner (Dallas locked out), I independently assessed and validated the implementation.
+
+**Findings:**
+
+1. **Public test stability resolved:** Implementation now uses `demo.playwright.dev/todomvc` (Playwright team's React app) instead of `example.com`. 20s timeout, passes 3/3 consecutive runs.
+
+2. **Gate criteria all met:**
+   - No env-var opt-in: `SkipUnlessSupported()` checks Edge installation only
+   - 6 local + 1 public tests, all pass (7/7)
+   - Browser chrome best-effort: all assertions on page content (ARIA labels, control types)
+   - Isolation: `--user-data-dir` per test, temp profile deleted after
+
+3. **CI exclusion is correct:** GitHub `windows-latest` is headless (no desktop session). `RequiresDesktop` tests are correctly excluded. This is the same pattern for ALL desktop-requiring tests (Electron, WinUI, window activation).
+
+**Architecture Answer — Chrome/Edge vs Electron:**
+
+**No special support needed beyond Electron.** The codebase already treats Chrome/Edge/Electron identically via the `"Chromium/Electron"` framework strategy:
+- Same class name detection (`Chrome*` prefix)
+- Same search strategy (depth 15, post-hoc filtering)
+- Same prompts (`ElectronDiscovery`, `BrowserAutomation`)
+
+What browsers need beyond Electron is **session handling** (launch args, profiles, popup dismissal), not new tools. This is provided by `ChromiumBrowserSession` for tests, and documented launch patterns for users.
+
+**Test Results:**
+`
+7/7 tests passed
+- 6 local (landmark, input, button, type/read, click effect, status)
+- 1 public (TodoMVC input discovery)
+Duration: ~11s total
+`
+
+**Key Files:**
+- `tests/Sbroenne.WindowsMcp.Tests/Integration/ChromiumBrowser/` — test suite
+- `src/Sbroenne.WindowsMcp/Automation/UIAutomationService.Helpers.cs:376-420` — framework detection
+- `.squad/decisions/inbox/ripley-browser-revision.md` — full gate analysis
