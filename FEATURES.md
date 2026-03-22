@@ -71,6 +71,19 @@ LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#ll
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
 | Find/move windows | `window_management` | Window lifecycle control |
 
+### Browser Automation
+
+- Edge, Chrome, and other Chromium apps are auto-detected and searched with the deeper Chromium strategy.
+- Launch with `app(programPath='msedge.exe', arguments='https://example.com')` or find an existing browser window first.
+- Page links, buttons, and form fields usually surface visible text or ARIA labels as the UIA `name`, so start with `ui_find`, `ui_click`, and `ui_type`.
+- For authenticated or SSO-only sites, prefer reusing an already-open signed-in Edge/Chrome window first. A Chromium launcher helper exiting immediately is often normal existing-session behavior, so check the browser window before retrying the launch.
+- Keep discovery compact: `screenshot_control` already returns annotated element metadata without image bytes unless you opt in.
+- For browser chrome like the address bar or tab switching, prefer shortcuts such as `Ctrl+L`, `Ctrl+R`, and `Ctrl+Tab`.
+- Treat browser chrome and non-Chromium browsers as best-effort until dedicated browser coverage expands beyond the Electron/Chromium harnesses.
+- The Chromium smoke slice now runs by default: deterministic local Edge/Chrome test pages plus a required public-web smoke check against `https://demo.playwright.dev/todomvc/`.
+- Chromium browser coverage stays on the same semantic-first model as Electron: deep Chromium tree search, ARIA/visible-text discovery, and no separate browser-only tool family.
+- The deterministic Chromium smoke harness launches Edge and Chrome app windows with isolated browser state (`--user-data-dir`), forces renderer accessibility, waits for page-owned readiness signals, and only uses narrow popup dismissal as a fallback so browser-owned UI does not mask real page interaction results.
+
 ## Tools Overview
 
 | Tool | Description |

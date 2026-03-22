@@ -33,12 +33,14 @@ mouse_control(action='click', x=450, y=300)
 
 Same command works every time. Any machine. Any DPI. Any theme.
 
+Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
+
 ## Key Features
 
 - **🧠 Semantic UI** — Find elements by name, not coordinates. Works regardless of DPI, theme, or window position.
 - **� Multi-Monitor** — Full support for multiple displays with per-monitor DPI scaling.
 - **🧪 LLM-Tested** — 54 tests with real AI models (GPT-4.1, GPT-5.2). 100% pass rate required for release.
-- **💻 Broad App Support** — Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack).
+- **💻 Broad App Support** — Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack). Chromium browser pages follow the same ARIA-driven pattern, but browser chrome remains best-effort.
 - **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls.
 - **🪙 Token Optimized** — Short property names, JPEG screenshots, auto-scaling. ~60% fewer tokens than standard JSON.
 
@@ -46,10 +48,24 @@ Same command works every time. Any machine. Any DPI. Any theme.
 
 **VS Code Extension** — [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp). Works with GitHub Copilot automatically.
 
+**Plugin (GitHub Copilot CLI / Claude Code)** — Install the shared plugin bundle in [`plugin/`](plugin/README.md):
+
+```powershell
+copilot plugin install sbroenne/mcp-windows:plugin
+```
+
+For local Claude Code development:
+
+```powershell
+claude --plugin-dir .\plugin
+```
+
+On first use, the plugin downloads the current standalone release into `plugin\bin\`.
+
 **Standalone** — [Download from Releases](https://github.com/sbroenne/mcp-windows/releases). Add to your MCP config:
 
 ```json
-{ "servers": { "windows": { "command": "path/to/Sbroenne.WindowsMcp.exe" } } }
+{ "servers": { "windows": { "command": "path\\to\\Sbroenne.WindowsMcp.exe" } } }
 ```
 
 ## Tools
@@ -92,7 +108,11 @@ dotnet test                                      # All tests
 dotnet test --filter "FullyQualifiedName~Unit"   # Unit only
 ```
 
-**Framework coverage**: Tests run against WinForms, WinUI 3, and Electron apps.
+**Framework coverage**: Tests run against WinForms, WinUI 3, Electron apps, and real Chromium browser app windows by default. The Chromium smoke stack now exercises both Edge and Chrome (when installed) across a deterministic local page and a required public-web slice (`demo.playwright.dev/todomvc`) using the same semantic-first UI Automation model with isolated browser state and browser-window-only cleanup.
+
+```powershell
+dotnet test .\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj --filter "FullyQualifiedName~ChromiumBrowser"
+```
 
 **LLM tests**: 54 tests with real AI models (GPT-4.1, GPT-5.2). 100% pass rate required for release.
 

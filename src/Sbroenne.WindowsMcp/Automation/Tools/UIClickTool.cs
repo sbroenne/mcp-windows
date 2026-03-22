@@ -18,14 +18,15 @@ public static partial class UIClickTool
     /// <remarks>
     /// Clicks a UI element. Automatically activates the target window before clicking.
     /// You MUST use this tool for every click operation - each click requires a separate tool call.
+    /// Works for Electron/Chromium elements: links, buttons, tabs, menu items exposed through UIA names or ARIA labels.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
-    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps, the ARIA label.</param>
+    /// <param name="name">Element name (exact match, case-insensitive). For Electron apps and Chromium browsers, this is often the visible label or ARIA label.</param>
     /// <param name="nameContains">Substring in element name (case-insensitive). Preferred for dialog buttons like 'Don\\'t save'.</param>
     /// <param name="namePattern">Regex pattern for element name matching.</param>
     /// <param name="controlType">Control type (Button, MenuItem, Hyperlink, ListItem, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
-    /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1').</param>
+    /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
