@@ -37,6 +37,28 @@ Team: Ripley (architecture), Dallas (implementation), Lambert (safety review).
 
 <!-- Append new learnings below. Each entry is something lasting about the project. -->
 
+### 2026-03-24: Token Efficiency Review — Browser Automation
+
+**Finding: Browser follow-through is token efficient. Approved without changes.**
+
+Key metrics:
+- Always-on browser overhead: ~63 tokens (1.8% of tool description budget)
+- 2 browser prompts: both < 260 tokens, both enforce budget via SharpToken test
+- Token budget enforcement pattern: `BrowserFocusedPrompts_AreMoreCompactThanQuickstart` test using SharpToken `cl100k_base` encoding
+- No DOM-thinking, no browser-specific params, no new tools — all browser support is through existing UIA/ARIA abstraction
+
+**Architecture pattern:** Token costs divide into always-on (tool descriptions, ~3,400 tokens) and on-demand (prompts + resources, ~6,200 tokens). Only always-on costs matter for optimization because they're paid per request. Prompts/resources are opt-in.
+
+**Rejected additions:** cssSelector/xpath params, browser DOM resource, CDP integration, additional prompts. Two browser prompts (ElectronDiscovery + BrowserAutomation) is the right number — different user intents, same underlying tech.
+
+**P2 improvement:** UIClickTool/UIFindTool `name` param should say "Electron/Chromium apps" not just "Electron apps" — 6 tokens total, bundle with next code change.
+
+**Key files:**
+- `tests/Sbroenne.WindowsMcp.Tests/Unit/Prompts/WindowsAutomationPromptsTests.cs` — token budget enforcement
+- `src/Sbroenne.WindowsMcp/Prompts/WindowsAutomationPrompts.cs` — 9 prompts including BrowserAutomation
+- `src/Sbroenne.WindowsMcp/Tools/AppTool.cs:22-28` — already has msedge.exe/chrome.exe examples
+- `.squad/decisions/inbox/ripley-token-efficiency.md` — full verdict
+
 ### 2026-03-22: Copilot CLI & Claude Desktop MCP Support Assessment
 
 **Finding: No code changes needed. Infrastructure already supports it.**
@@ -384,3 +406,52 @@ The mcp-windows project demonstrates excellent architecture with strong MCP prot
 - **Immediate:** Fix 3 critical issues (combo action, AppTool error type, LLM test tool hints)
 - **Short-Term:** Consolidate JSON config, extract handle parsing, standardize null checks
 - **Medium-Term:** Add code coverage, negative tests, performance benchmarks
+
+### 2026-03-24: Browser Guidance Polish — Token Consistency
+
+**Change:** Made browser-related guidance consistently say "Electron/Chromium" instead of vague "browser" references.
+
+**Files modified:**
+- UIClickTool.cs: "browser page elements too" → "Electron/Chromium elements"
+- UIClickTool.cs: className param clarified as "for Chromium"
+- UIFindTool.cs: "For browser pages" → "For Electron/Chromium"
+
+**Token impact:** Net -3 tokens (67 → 64 for affected lines). Flat or better.
+
+**Rationale:** 
+- Specificity helps LLMs recognize when tools apply (Electron/Chromium use ARIA, native Win32 doesn't)
+- "browser" is ambiguous (Chrome? Edge? IE legacy controls?)
+- Consistency with existing param descriptions that already said "Electron/Chromium"
+
+**Pattern:** When guidance exists in multiple places, align to the most specific version.
+
+### 2026-03-24: Browser Follow-Through — Token Efficiency + Polish (Ripley)
+
+**Status:** ✅ COMPLETED
+
+**Work (Part 1):** Token efficiency review of Dallas/Lambert browser follow-through.
+
+**Verdict:** APPROVED — Browser follow-through is token efficient. No changes required.
+
+**Metrics:**
+- Always-on browser overhead: ~63 tokens (1.8% of tool description budget)
+- 2 browser prompts: both < 260 tokens, enforced by SharpToken test
+- Architecture: No DOM-thinking, no browser-specific params, no new tools
+
+**What Passed:**
+- Existing UIA/ARIA abstraction carries browser support without bloat
+- Token budget enforcement via `BrowserFocusedPrompts_AreMoreCompactThanQuickstart` test
+- Two prompts (ElectronDiscovery + BrowserAutomation) serve different intents
+
+**Work (Part 2):** Browser guidance polish after Lambert coverage tests.
+
+**Changes:**
+- UIClickTool, UIFindTool: "Electron/Chromium" specificity added
+- Token footprint improved: 67 → 64 tokens (-3)
+- Build clean, tests pass
+
+**Cross-Agent Coordination:**
+- Dallas (browser docs follow-up): Lean discoverability pass
+- Lambert (test coverage): 60 focused tests green with guardrails
+- Ripley (token review + polish): Efficiency approved, consistency finalized
+

@@ -308,3 +308,52 @@ The blocking failure moved back to `plugin\hooks\hooks.json`. The hook shells ou
 - Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
 - Lambert's edge cases: .squad/decisions/inbox/lambert-browser-edge-cases.md
 - Consolidated decision: .squad/decisions.md (Browser Automation Support section)
+
+### 2026-03-24: Browser Prompt Guardrails — token-efficient coverage added
+
+**Status:** ✅ VERIFIED
+
+**What changed:**
+- Added browser-focused prompt coverage in `tests/Sbroenne.WindowsMcp.Tests/Unit/Prompts/WindowsAutomationPromptsTests.cs`
+- Added MCP prompt discovery coverage in `tests/Sbroenne.WindowsMcp.Tests/Integration/PromptDiscoveryTests.cs`
+- Added safe browser-adjacent Electron checks in `tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/UIAutomationElectronTests.cs`
+- Tightened shipped guidance in `src/Sbroenne.WindowsMcp/Prompts/WindowsAutomationPrompts.cs`, `README.md`, and `FEATURES.md`
+
+**Key QA learning:**
+- Browser support claims need two guardrails at once: explicit **best-effort** wording and **token-budget** assertions
+- The cheapest durable coverage is prompt/unit + prompt discovery + Electron search-field/navigation tests; real-browser claims still need dedicated Edge coverage later
+- Useful prompt budget pattern: assert browser-specific prompts stay smaller than Quickstart instead of pretending the full quickstart is "small"
+
+**Relevant file paths:**
+- `src/Sbroenne.WindowsMcp/Prompts/WindowsAutomationPrompts.cs`
+- `tests/Sbroenne.WindowsMcp.Tests/Unit/Prompts/WindowsAutomationPromptsTests.cs`
+- `tests/Sbroenne.WindowsMcp.Tests/Integration/PromptDiscoveryTests.cs`
+- `tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/UIAutomationElectronTests.cs`
+- `README.md`
+- `FEATURES.md`
+
+### 2026-03-24: Browser Follow-Through — Test Coverage and Guardrails (Lambert)
+
+**Status:** ✅ COMPLETED
+
+**Work:** Focused browser-adjacent test coverage with guardrails. 60 focused tests green.
+
+**Changes:**
+- WindowsAutomationPromptsTests.cs: Browser prompt coverage added with token budget assertions
+- PromptDiscoveryTests.cs: Verified browser prompts exposed by server
+- UIAutomationElectronTests.cs: Browser-adjacent patterns (search input, navigation buttons)
+
+**Test Results:** 60 new browser-focused tests, all green. No regressions.
+
+**Guardrails:**
+- Browser-facing prompts explicitly mention "best-effort Chromium guidance"
+- Token-efficient screenshot guidance (prefer metadata-only discovery before images)
+- Electron harness covers browser-adjacent patterns without claiming real browser parity
+
+**Cross-Agent Coordination:**
+- Dallas (browser docs follow-up): Lean discoverability pass
+- Ripley (token efficiency review): Approved browser overhead (~63 tokens, <260 token prompts)
+- Polish (Ripley): Electron/Chromium wording standardized
+
+**Decision Validation:**
+Dallas initial pass flagged as insufficient without guardrails. This pass added guardrails via prompt assertions and focused integration test slice.

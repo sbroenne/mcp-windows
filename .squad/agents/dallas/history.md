@@ -301,3 +301,34 @@ Assessed browser automation support for Edge, Chrome, and Chromium-based apps. *
 - Dallas's implementation assessment: .squad/orchestration-log/2026-03-24T11-07-24-dallas.md
 - Lambert's QA assessment: .squad/orchestration-log/2026-03-24T11-07-24-lambert.md
 - Consolidated decision: .squad/decisions.md (Browser Automation Support section)
+
+### 2026-03-22: Plugin Skill Harness Slice Uses `load_skill`, Not Whole-Plugin Loading
+
+For plugin-level AI guidance tests, `pytest-skill-engineering` currently supports direct skill loading (`load_skill` / `Skill.from_path`) and prompt composition checks, but not whole-plugin manifest loading. The current local Copilot SDK package is also incompatible with the harness's live Copilot provider shim (`CopilotClientOptions` / `options=` API mismatch), so the honest minimal automated slice is: validate `plugin/.claude-plugin/plugin.json` points at `./skills/`, load `plugin/skills/windows-automation`, and assert the harness prepends that skill text ahead of the shared system prompt.
+
+### 2026-03-24: Browser Discoverability Should Reuse the Semantic Flow
+
+For browser support, the highest-value, lowest-token update is to extend the existing semantic automation framing instead of adding a parallel browser-specific model. Put one short browser note into the generic quickstart prompt, add one focused browser prompt for URL/page/chrome patterns, and keep tool discoverability changes to compact examples in `AppTool.cs`, `UIFindTool.cs`, and `UIClickTool.cs`.
+
+**User preference:** keep browser discoverability changes compact and token-efficient.
+
+**Key files:** `src\Sbroenne.WindowsMcp\Prompts\WindowsAutomationPrompts.cs`, `src\Sbroenne.WindowsMcp\Tools\AppTool.cs`, `src\Sbroenne.WindowsMcp\Automation\Tools\UIFindTool.cs`, `src\Sbroenne.WindowsMcp\Automation\Tools\UIClickTool.cs`, `README.md`, `FEATURES.md`, `tests\Sbroenne.WindowsMcp.Tests\Unit\Prompts\WindowsAutomationPromptsTests.cs`.
+
+### 2026-03-24: Browser Follow-Through — Lean Discoverability Pass (Dallas)
+
+**Status:** ✅ COMPLETED
+
+**Work:** Lean browser discoverability added across docs/prompt surfaces.
+
+**Changes:**
+- WindowsAutomationPrompts.cs: Browser guidance integrated (token-efficient)
+- UIClickTool.cs, UIFindTool.cs: Electron/Chromium examples added
+- README.md, FEATURES.md: Browser discoverability updated
+- WindowsAutomationPromptsTests.cs: Prompt tests validated
+
+**Outcome:** Prompt tests and build passed. Lean approach keeps token overhead ~63 tokens (1.8% of budget).
+
+**Cross-Agent Coordination:**
+- Ripley (token efficiency review): Approved browser follow-through as token efficient
+- Lambert (test coverage): Focused browser-adjacent tests added (60 green tests)
+- Polish (Ripley): Electron/Chromium consistency finalized

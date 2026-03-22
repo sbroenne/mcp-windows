@@ -1,5 +1,5 @@
 # Project Decisions
-**Last Updated:** 2026-03-22T110450Z
+**Last Updated:** 2026-03-24T141944Z
 
 ## Plugin Packaging & Architecture
 
@@ -106,11 +106,88 @@
 
 ---
 
+## Browser Automation Support
+
+### 6. Browser Token Efficiency (Approved by Ripley)
+**Status:** ✅ APPROVED  
+**Date:** 2026-03-24
+
+**Finding:** Browser follow-through is token efficient. No changes required.
+
+**Evidence:**
+- Always-on browser overhead: ~63 tokens (1.8% of tool description budget)
+- 2 browser-focused prompts: both < 260 tokens (enforced by `BrowserFocusedPrompts_AreMoreCompactThanQuickstart` test)
+- No browser-specific tools, params, or error codes added
+- Browser references woven into existing tool descriptions (msedge.exe in AppTool, Electron/ARIA in UIClick/UIFind, Chrome_WidgetWin_1 in className examples)
+
+**Architecture Pattern:**
+- Always-on cost: tool descriptions (~3,400 tokens) paid on every request
+- On-demand cost: prompts + resources (~6,200 tokens) paid only when user requests
+- Token budgets enforced by automated SharpToken tests (first-class constraint, not afterthought)
+
+**Rejected Additions:**
+- cssSelector/xpath params → Violates semantic UIA abstraction
+- Playwright/Selenium/CDP integration → Violates Augmentation principle
+- Browser DOM resource → Hundreds of tokens for guidance already covered
+- Additional browser prompts → 2 is the right number
+
+**Minor Improvement (P2):**
+- UIClickTool & UIFindTool: "For Electron apps" → "For Electron/Chromium apps" (~6 tokens)
+
+---
+
+### 7. Browser Guidance Consistency (Implemented by Ripley)
+**Status:** ✅ COMPLETED  
+**Date:** 2026-03-24
+
+**Problem:** Tool descriptions had inconsistent browser-related wording across UIClickTool and UIFindTool.
+
+**Solution:** Standardize all references to "Electron/Chromium" for specificity and LLM clarity.
+
+**Changes:**
+1. UIClickTool.cs line 21: "browser page elements too" → "Electron/Chromium elements"
+2. UIClickTool.cs line 29: className example clarified
+3. UIFindTool.cs line 22: "For browser pages" → "For Electron/Chromium"
+
+**Impact:**
+- Token footprint: 67 → 64 tokens (net -3)
+- Consistency: All browser guidance now uses same terminology
+- LLM clarity: "Electron/Chromium" signals when semantic UIA automation applies
+
+**Validation:** ✅ Build passes, token count reduced, consistency achieved.
+
+---
+
+### 8. Browser Test Coverage Strategy (Approved by Lambert)
+**Status:** ✅ APPROVED  
+**Date:** 2026-03-24
+
+**Decision:** Ship browser guidance as **best-effort Chromium guidance**, not blanket browser support.
+
+**Rationale:**
+- Electron coverage is strong and maps well to Chromium page content discovery
+- Real browser (Edge/Chrome) behavior not deeply validated yet
+- Prompt guidance must stay token-efficient
+
+**Guardrails Added:**
+- Unit tests assert browser-facing prompts mention best-effort scope
+- Prompt discovery integration verifies browser prompt exposed by server
+- Electron harness exercises browser-adjacent patterns without claiming Chrome parity
+
+**Follow-Up (P1):**
+1. Add dedicated Edge integration coverage (address bar, tabs, browser chrome)
+2. Add browser LLM tests with task-focused prompts only
+3. Keep README/FEATURES language honest until those tests exist
+
+---
+
 ## Summary
 
 **Plugin shipment ready.** Three agents completed:
-1. **Ripley** — Researched architecture, fixed hook boundary, revised root resolution
-2. **Dallas** — Implemented bundle, fixed PowerShell runtime issue
-3. **Lambert** — Safety review, identified and approved fixes
+1. **Ripley** — Researched architecture, fixed hook boundary, revised root resolution, token efficiency review, browser polish
+2. **Dallas** — Implemented bundle, fixed PowerShell runtime issue, browser docs follow-up
+3. **Lambert** — Safety review, browser test coverage strategy
+
+**Browser follow-through delivered with token efficiency verified and test guardrails in place.**
 
 **All tests pass.** All safety gates cleared. Ready for GitHub Releases and MCP Registry publication.
