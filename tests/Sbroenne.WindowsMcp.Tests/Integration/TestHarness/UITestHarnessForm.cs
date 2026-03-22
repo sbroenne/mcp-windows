@@ -622,6 +622,21 @@ public sealed class UITestHarnessForm : Form
         _statusLabel.Text = message;
     }
 
+    /// <inheritdoc />
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Suppress Escape key beep — the form has no CancelButton, so Escape
+        // would normally produce a system beep via MessageBeep.
+        // Mask out modifiers so Ctrl+Escape, Shift+Escape, etc. are also suppressed.
+        var key = keyData & Keys.KeyCode;
+        if (key is Keys.Escape or Keys.F10)
+        {
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
     /// <summary>
     /// Handles Ctrl+S to show Save As dialog (like a real application).
     /// </summary>
