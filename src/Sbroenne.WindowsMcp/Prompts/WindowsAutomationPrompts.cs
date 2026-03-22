@@ -25,7 +25,9 @@ public sealed class WindowsAutomationPrompts
                 "You are operating a Windows automation MCP server with focused tools for app launching and UI interaction. " +
                 "WORKFLOW: 1) Launch app with app(programPath='...') OR find existing window with window_management(action='find'), " +
                 "2) Use the returned handle with ui_click, ui_type, ui_read, or file_save tools. " +
-                "Use mouse_control and keyboard_control only as fallbacks."),
+                "Use mouse_control and keyboard_control only as fallbacks. " +
+                "Browser automation is fully supported: Edge and Chrome page content (links, buttons, forms) is discoverable via ui_* tools using ARIA labels and visible text. " +
+                "Use the windows_mcp_browser_automation prompt for a browser-specific workflow."),
             new(ChatRole.User,
                 $"Goal: {goal}\n" +
                 $"App: {target}\n" +
@@ -43,7 +45,7 @@ public sealed class WindowsAutomationPrompts
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "\n" +
                 "If you don't know element names:\n" +
-                "• screenshot_control(target='window', windowHandle='<handle>') — see all interactive elements with numbered labels\n" +
+                "• screenshot_control(target='window', windowHandle='<handle>') — see numbered elements; image stays omitted by default to save tokens\n" +
                 "\n" +
                 "Fallbacks (only if ui_* tools fail):\n" +
                 "• mouse_control(action='click', windowHandle='<handle>', x=..., y=...) — use clickablePoint from find result\n" +
@@ -137,19 +139,56 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "Electron apps expose large accessibility trees. Framework auto-detection automatically uses deeper search " +
-                "for Electron/Chromium apps. Use sortByProminence=true when multiple matches."),
+                "Electron apps expose large accessibility trees. This is the safest starting pattern for Electron, " +
+                "and for Edge/Chrome page content when accessibility is exposed. Use sortByProminence=true when multiple matches."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Intent: {intent}\n" +
                 "\n" +
                 "Strategy:\n" +
                 $"1) window_management(action='find', title='{windowTitle}') → get handle\n" +
-                "2) screenshot_control(target='window', windowHandle='<handle>') — see interactable elements with numbered labels.\n" +
+                "2) screenshot_control(target='window', windowHandle='<handle>') — see numbered elements; keep default image omission for token efficiency.\n" +
                 "3) ui_find(windowHandle='<handle>', nameContains='...', sortByProminence=true) — discover elements.\n" +
-                "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron.\n" +
+                "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron or browser content.\n" +
                 "5) ui_click(windowHandle='<handle>', nameContains='...') — click the element.\n" +
-                "6) For text input, use ui_type with the element.")
+                "6) For text input, use ui_type with the element.\n" +
+                "7) Real browser pages are best-effort today: start with page content before browser chrome.")
+        ];
+    }
+
+    /// <summary>Browser workflow for Edge/Chrome page content using the same semantic UI tools.</summary>
+    /// <param name="browser">Browser executable or window title. Example: 'msedge.exe', 'chrome.exe', 'Microsoft Edge'.</param>
+    /// <param name="goal">What you want to do on the page. Example: 'Open docs and click Sign in'.</param>
+    /// <param name="url">Optional URL to open when launching a new browser instance.</param>
+    /// <returns>A multi-message prompt template.</returns>
+    [McpServerPrompt(Name = "windows_mcp_browser_automation")]
+    public static IEnumerable<ChatMessage> BrowserAutomation(
+        string browser,
+        string goal,
+        string? url = null)
+    {
+        return
+        [
+            new(ChatRole.System,
+                "Use the standard semantic workflow for Chromium browsers (Edge, Chrome). " +
+                "Page content — links, buttons, form fields, and text — is reliably discoverable via ui_* tools using ARIA labels and visible text. " +
+                "Browser chrome (address bar, tab bar, toolbar) is best-effort: prefer keyboard shortcuts for those. " +
+                "For authenticated or SSO-only sites, check whether a signed-in browser window is already open before launching a new instance — " +
+                "Chromium launcher helpers often exit immediately when an existing session picks up the request, so that is not a failure."),
+            new(ChatRole.User,
+                $"Browser: {browser}\n" +
+                $"Goal: {goal}\n" +
+                (string.IsNullOrWhiteSpace(url) ? "" : $"URL: {url}\n") +
+                "\n" +
+                "1) Get a handle — prefer reusing an existing session:\n" +
+                $"   • window_management(action='find', title='{browser}') — find already-open browser first\n" +
+                (string.IsNullOrWhiteSpace(url)
+                    ? $"   • app(programPath='{browser}') — only if no existing window found\n"
+                    : $"   • app(programPath='{browser}', arguments='{url}') — only if no existing window found\n") +
+                "2) Use ui_find(windowHandle='<handle>', nameContains='...', controlType='Button'/'Hyperlink'/'Edit'/'Document', sortByProminence=true).\n" +
+                "3) Prefer nameContains or namePattern for page text and ARIA labels, then use ui_click or ui_type.\n" +
+                "4) For browser chrome, prefer keyboard_control: Ctrl+L address bar, Ctrl+R refresh, Ctrl+Tab next tab.\n" +
+                "5) If names are unclear, use screenshot_control(target='window', windowHandle='<handle>') first; keep the default image omission for token efficiency.")
         ];
     }
 
