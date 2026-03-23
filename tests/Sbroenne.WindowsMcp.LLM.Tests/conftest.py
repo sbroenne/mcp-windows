@@ -1,7 +1,9 @@
 """
 Shared fixtures for Windows MCP Server LLM integration tests.
 
-Provides MCP server, provider, and agent fixtures used across all test files.
+Provides MCP server configuration and PydanticAI agent fixtures. The eval
+harness uses PydanticAI directly (openai:gpt-4.1 via GitHub Models), which
+supports proper tool calling without any LiteLLM dependency.
 """
 
 import os
@@ -9,15 +11,14 @@ import re
 import subprocess
 import tempfile
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 import pytest
-from pytest_skill_engineering import (
-    Eval as Agent,
-    ClarificationDetection,
-    MCPServer,
-    Provider,
-)
+from pydantic_ai import Agent
+from pydantic_ai.mcp import MCPServerStdio
+from pydantic_ai.messages import ModelResponse, ToolCallPart
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -25,12 +26,16 @@ from pytest_skill_engineering import (
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PROJECT_PATH = REPO_ROOT / "src" / "Sbroenne.WindowsMcp" / "Sbroenne.WindowsMcp.csproj"
 TEST_RESULTS_DIR = Path(__file__).resolve().parent / "TestResults"
+SKILL_DIR = REPO_ROOT / "plugin" / "skills" / "windows-automation"
 
 # Server command as a list to handle paths with spaces correctly.
 # Uses --no-build because dotnet build output on stdout corrupts MCP's
 # JSON-RPC protocol.  The _build_mcp_server fixture below guarantees a
 # current build exists before any test starts.
-SERVER_COMMAND = ["dotnet", "run", "--no-build", "--project", str(PROJECT_PATH), "-c", "Release", "--"]
+SERVER_COMMAND = [
+    "dotnet", "run", "--no-build", "--project", str(PROJECT_PATH),
+    "-c", "Release", "--",
+]
 
 # ---------------------------------------------------------------------------
 # System prompt shared by all agents
@@ -46,6 +51,94 @@ CRITICAL RULES:
 - Report results after completion, not before starting
 """
 
+
+# ---------------------------------------------------------------------------
+# Thin eval result wrapper — mirrors the API our tests expect
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _ToolCallRecord:
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class EvalResult:
+    """Lightweight result object wrapping a PydanticAI run."""
+
+    _tool_calls: list[_ToolCallRecord]
+    _responses: list[str]
+    success: bool = True
+    error: str | None = None
+
+    # Clarification detection is intentionally disabled in eval context —
+    # we measure tool choice, not verbosity.
+    asked_for_clarification: bool = False
+
+    @property
+    def all_tool_calls(self) -> list[_ToolCallRecord]:
+        return self._tool_calls
+
+    @property
+    def tool_names_called(self) -> set[str]:
+        return {c.name for c in self._tool_calls}
+
+    def tool_was_called(self, name: str) -> bool:
+        return name in self.tool_names_called
+
+    def tool_call_count(self, name: str) -> int:
+        return len(self.tool_calls_for(name))
+
+    def tool_calls_for(self, name: str) -> list[_ToolCallRecord]:
+        return [c for c in self._tool_calls if c.name == name]
+
+    @property
+    def all_responses(self) -> list[str]:
+        return self._responses
+
+    @classmethod
+    def from_pydantic(cls, run_result: Any, *, success: bool = True) -> "EvalResult":
+        tool_calls: list[_ToolCallRecord] = []
+        responses: list[str] = []
+        for msg in run_result.all_messages():
+            if isinstance(msg, ModelResponse):
+                for part in msg.parts:
+                    if isinstance(part, ToolCallPart):
+                        args = part.args_as_dict() if hasattr(part, "args_as_dict") else {}
+                        tool_calls.append(_ToolCallRecord(name=part.tool_name, arguments=args))
+                    elif hasattr(part, "content") and isinstance(part.content, str):
+                        responses.append(part.content)
+        return cls(_tool_calls=tool_calls, _responses=responses, success=success)
+
+
+# ---------------------------------------------------------------------------
+# Eval runner
+# ---------------------------------------------------------------------------
+
+async def run_eval(agent: Agent, prompt: str) -> EvalResult:
+    """Run a PydanticAI agent against a prompt and return a structured EvalResult."""
+    try:
+        async with agent.run_mcp_servers():
+            result = await agent.run(prompt)
+        return EvalResult.from_pydantic(result, success=True)
+    except Exception as exc:
+        return EvalResult(_tool_calls=[], _responses=[], success=False, error=str(exc))
+
+
+def _make_mcp_server() -> MCPServerStdio:
+    """Build the MCPServerStdio for the Windows MCP server."""
+    return MCPServerStdio(SERVER_COMMAND[0], args=SERVER_COMMAND[1:])
+
+
+def make_agent(*, system_prompt: str = SYSTEM_PROMPT) -> Agent:
+    """Create a PydanticAI agent with the Windows MCP server attached."""
+    return Agent(
+        "openai:gpt-4.1",
+        system_prompt=system_prompt,
+        mcp_servers=[_make_mcp_server()],
+    )
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -53,12 +146,7 @@ CRITICAL RULES:
 
 @pytest.fixture(scope="session", autouse=True)
 def _build_mcp_server():
-    """Build the MCP server once before any test runs.
-
-    This ensures ``--no-build`` in SERVER_COMMAND always works with the
-    latest source code.  The build is Release-mode and quiet to keep
-    output clean.
-    """
+    """Build the MCP server once before any test runs."""
     result = subprocess.run(
         ["dotnet", "build", str(PROJECT_PATH), "-c", "Release", "-v:q"],
         capture_output=True,
@@ -69,24 +157,12 @@ def _build_mcp_server():
 
 
 @pytest.fixture(scope="session")
-def windows_mcp_server():
-    """The Windows MCP Server under test."""
-    return MCPServer(command=SERVER_COMMAND)
-
-
-@pytest.fixture
-def aitest_run(eval_run):
-    """Temporary compatibility alias while migrating to pytest-skill-engineering."""
-    return eval_run
-
-
-@pytest.fixture(scope="session")
 def copilot_auth():
     """Require GitHub auth via GITHUB_TOKEN or an existing gh login.
 
-    Also configures the OpenAI-compatible GitHub Models endpoint so that
-    Provider(model="openai:gpt-4o-mini") routes through GitHub Models, which
-    supports full OpenAI-style tool calling (unlike the Copilot SDK path).
+    Configures the OpenAI-compatible GitHub Models endpoint so that
+    Agent("openai:gpt-4.1") routes through GitHub Models, which
+    supports full OpenAI-style tool calling.
     """
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -101,80 +177,26 @@ def copilot_auth():
     if not token:
         pytest.skip("GITHUB_TOKEN not set and `gh auth token` failed")
 
-    # Point the OpenAI client at GitHub Models so PydanticAI can call tools.
+    # Point PydanticAI's OpenAI client at GitHub Models.
     os.environ.setdefault("OPENAI_API_KEY", token)
     os.environ.setdefault("OPENAI_BASE_URL", "https://models.inference.ai.azure.com")
     return "gh"
 
 
-@pytest.fixture(scope="session")
-def gpt41_provider(copilot_auth):
-    """GPT-4.1 via GitHub Models (OpenAI-compatible, supports tool calling).
+@pytest.fixture
+def aitest_run(copilot_auth):
+    """Fixture that runs a PydanticAI agent and returns an EvalResult.
 
-    Rate-limited to 12 RPM / 80K TPM to stay within GitHub Models' free tier caps
-    (15 req/60s, 120K tokens/60s), giving headroom for multi-turn tests.
+    Usage::
+
+        async def test_foo(aitest_run, my_agent):
+            result = await aitest_run(my_agent, "Do the thing")
+            assert result.tool_was_called("file_save")
     """
-    return Provider(model="openai:gpt-4.1", rpm=12, tpm=80000)
+    async def _run(agent: Agent, prompt: str) -> EvalResult:
+        return await run_eval(agent, prompt)
 
-
-@pytest.fixture(scope="session")
-def gpt52_provider(copilot_auth):
-    """GPT-4o-mini via GitHub Models — fast, affordable fallback."""
-    return Provider(model="openai:gpt-4o-mini")
-
-
-@pytest.fixture(scope="session")
-def gpt41_agent(windows_mcp_server, gpt41_provider):
-    """Agent using GPT-4.1 with the Windows MCP Server."""
-    return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
-        mcp_servers=[windows_mcp_server],
-        system_prompt=SYSTEM_PROMPT,
-        max_turns=15,
-        clarification_detection=ClarificationDetection(enabled=True),
-    )
-
-
-@pytest.fixture(scope="session")
-def gpt52_agent(windows_mcp_server, gpt52_provider):
-    """Agent using GPT-5.2-chat with the Windows MCP Server."""
-    return Agent(
-        name="gpt52-agent",
-        provider=gpt52_provider,
-        mcp_servers=[windows_mcp_server],
-        system_prompt=SYSTEM_PROMPT,
-        max_turns=15,
-        clarification_detection=ClarificationDetection(enabled=True),
-    )
-
-
-def make_agents(windows_mcp_server, gpt41_provider, gpt52_provider, *, max_turns=15):
-    """Create both agents for parametrize usage."""
-    return [
-        Agent(
-            name="gpt41-agent",
-            provider=gpt41_provider,
-            mcp_servers=[windows_mcp_server],
-            system_prompt=SYSTEM_PROMPT,
-            max_turns=max_turns,
-            clarification_detection=ClarificationDetection(enabled=True),
-        ),
-        Agent(
-            name="gpt52-agent",
-            provider=gpt52_provider,
-            mcp_servers=[windows_mcp_server],
-            system_prompt=SYSTEM_PROMPT,
-            max_turns=max_turns,
-            clarification_detection=ClarificationDetection(enabled=True),
-        ),
-    ]
-
-
-@pytest.fixture(scope="session")
-def agents(windows_mcp_server, gpt41_provider, gpt52_provider):
-    """Both agents for parametrize usage."""
-    return make_agents(windows_mcp_server, gpt41_provider, gpt52_provider)
+    return _run
 
 
 @pytest.fixture(autouse=True)
@@ -208,17 +230,11 @@ def _kill_test_processes():
             )
 
 
-    """Path to the test results directory."""
-    TEST_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    return TEST_RESULTS_DIR
-
-
 @pytest.fixture
 def temp_dir():
     """Temporary directory for test artifacts (cleaned up after test)."""
     d = Path(tempfile.mkdtemp(prefix="mcp-llm-test-"))
     yield d
-    # Cleanup is best-effort
     import shutil
     shutil.rmtree(d, ignore_errors=True)
 
@@ -234,12 +250,12 @@ def run_id():
 # ---------------------------------------------------------------------------
 
 
-def assert_tool_called(result, tool_name: str):
+def assert_tool_called(result: EvalResult, tool_name: str):
     """Assert a tool was called at least once."""
     assert result.tool_was_called(tool_name), f"Expected tool '{tool_name}' to be called"
 
 
-def assert_tool_call_order(result, first: str, second: str):
+def assert_tool_call_order(result: EvalResult, first: str, second: str):
     """Assert that first tool was called before second tool."""
     names = [c.name for c in result.all_tool_calls]
     assert first in names, f"Tool '{first}' was never called"
@@ -249,7 +265,7 @@ def assert_tool_call_order(result, first: str, second: str):
     )
 
 
-def assert_output_matches(result, pattern: str):
+def assert_output_matches(result: EvalResult, pattern: str):
     """Assert final response matches regex pattern."""
     text = " ".join(result.all_responses)
     assert re.search(pattern, text, re.IGNORECASE), (
@@ -257,13 +273,13 @@ def assert_output_matches(result, pattern: str):
     )
 
 
-def assert_output_not_contains(result, value: str):
+def assert_output_not_contains(result: EvalResult, value: str):
     """Assert final response does not contain value (case-insensitive)."""
     text = " ".join(result.all_responses).lower()
     assert value.lower() not in text, f"Response should not contain '{value}'"
 
 
-def assert_tool_param_matches(result, tool_name: str, param: str, pattern: str):
+def assert_tool_param_matches(result: EvalResult, tool_name: str, param: str, pattern: str):
     """Assert a tool was called with a parameter matching a regex."""
     calls = result.tool_calls_for(tool_name)
     assert calls, f"Tool '{tool_name}' was never called"
@@ -276,7 +292,7 @@ def assert_tool_param_matches(result, tool_name: str, param: str, pattern: str):
     )
 
 
-def assert_tool_param_equals(result, tool_name: str, param: str, value):
+def assert_tool_param_equals(result: EvalResult, tool_name: str, param: str, value):
     """Assert a tool was called with an exact parameter value."""
     calls = result.tool_calls_for(tool_name)
     assert calls, f"Tool '{tool_name}' was never called"
@@ -286,7 +302,8 @@ def assert_tool_param_equals(result, tool_name: str, param: str, value):
     )
 
 
-def assert_quality(result):
+def assert_quality(result: EvalResult):
     """Standard quality assertions used across all tests."""
     assert result.success, f"Agent failed: {result.error}"
     assert not result.asked_for_clarification, "Agent asked for clarification"
+

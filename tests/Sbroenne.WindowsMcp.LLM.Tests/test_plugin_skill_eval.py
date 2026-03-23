@@ -8,22 +8,20 @@ Each scenario runs TWICE (A/B):
 The skill should steer the model toward correct tool choices.
 Failures here mean the skill text needs improvement, not the code.
 
-Uses the standard Eval + eval_run approach so tool calling works correctly
-(PydanticAI orchestration, proper OpenAI-compatible tool routing).
+Uses PydanticAI directly (openai:gpt-4.1 via GitHub Models) — no LiteLLM.
 """
 
 import pytest
 
 from conftest import (
     REPO_ROOT,
+    SKILL_DIR,
     SYSTEM_PROMPT,
     assert_quality,
     assert_tool_called,
     assert_tool_call_order,
+    make_agent,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection, load_skill
-
-SKILL_DIR = REPO_ROOT / "plugin" / "skills" / "windows-automation"
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -31,38 +29,19 @@ SKILL_DIR = REPO_ROOT / "plugin" / "skills" / "windows-automation"
 
 
 @pytest.fixture(scope="module")
-def skill():
-    return load_skill(SKILL_DIR)
-
-
-@pytest.fixture(scope="module")
-def agent_no_skill(windows_mcp_server, gpt41_provider):
+def agent_no_skill(copilot_auth):
     """Baseline: raw MCP server, no skill injected. Documents natural model behaviour."""
-    return Agent(
-        name="skill-eval-no-skill",
-        provider=gpt41_provider,
-        mcp_servers=[windows_mcp_server],
-        system_prompt=SYSTEM_PROMPT,
-        max_turns=15,
-        # Disabled: we measure tool choice, not verbosity. Reporting intermediate
-        # steps can trigger false-positive clarification detection.
-        clarification_detection=ClarificationDetection(enabled=False),
-    )
+    return make_agent(system_prompt=SYSTEM_PROMPT)
 
 
 @pytest.fixture(scope="module")
-def agent_with_skill(windows_mcp_server, gpt41_provider, skill):
+def agent_with_skill(copilot_auth):
     """Skill-injected agent. Should outperform the baseline on all scenarios."""
-    return Agent(
-        name="skill-eval-with-skill",
-        provider=gpt41_provider,
-        mcp_servers=[windows_mcp_server],
-        system_prompt=SYSTEM_PROMPT,
-        max_turns=15,
-        skill=skill,
-        # Disabled: we measure tool choice, not verbosity.
-        clarification_detection=ClarificationDetection(enabled=False),
-    )
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    # Prepend skill content before the system prompt, matching the injection order
+    # used by pytest-skill-engineering's CopilotEval.from_plugin().
+    combined = skill_text + "\n\n" + SYSTEM_PROMPT
+    return make_agent(system_prompt=combined)
 
 
 # ---------------------------------------------------------------------------

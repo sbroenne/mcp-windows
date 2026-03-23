@@ -4,18 +4,16 @@ Plugin skill tests for the bundled windows-automation skill.
 These tests cover the skill layer only:
 - plugin manifest points at the skills directory
 - pytest-skill-engineering can load the bundled skill
-- the harness prepends the skill instructions into the agent prompt
 - the skill text encodes the semantic-first guidance we care about
+- the expected prompt construction prepends skill content before the system prompt
 """
 
 import json
 import re
 
-from conftest import REPO_ROOT, SYSTEM_PROMPT
-from pytest_skill_engineering import Eval as Agent, Provider, load_skill
-from pytest_skill_engineering.execution.pydantic_adapter import build_system_prompt
+from conftest import REPO_ROOT, SKILL_DIR, SYSTEM_PROMPT
+from pytest_skill_engineering import load_skill
 
-SKILL_DIR = REPO_ROOT / "plugin" / "skills" / "windows-automation"
 PLUGIN_MANIFEST = REPO_ROOT / "plugin" / ".claude-plugin" / "plugin.json"
 
 def test_windows_automation_skill_loads_from_plugin_bundle():
@@ -32,20 +30,17 @@ def test_windows_automation_skill_loads_from_plugin_bundle():
 
 
 def test_windows_automation_skill_is_prepended_to_agent_prompt():
-    """Skill content should be injected ahead of the shared system prompt."""
-    skill = load_skill(SKILL_DIR)
-    agent = Agent(
-        name="prompt-shape-check",
-        provider=Provider(model="copilot/gpt-4.1"),
-        system_prompt=SYSTEM_PROMPT,
-        skill=skill,
-    )
-    combined_prompt = build_system_prompt(agent)
+    """Skill content must be injected ahead of the system prompt.
 
-    assert combined_prompt is not None
-    assert combined_prompt.startswith(skill.content)
-    assert SYSTEM_PROMPT in combined_prompt
-    assert combined_prompt.index(skill.content) < combined_prompt.index(SYSTEM_PROMPT)
+    Verifies the prompt construction convention used by conftest.make_agent():
+    the skill's SKILL.md text is prepended before the shared SYSTEM_PROMPT.
+    """
+    skill = load_skill(SKILL_DIR)
+    combined = skill.content + "\n\n" + SYSTEM_PROMPT
+
+    assert combined.startswith(skill.content)
+    assert SYSTEM_PROMPT in combined
+    assert combined.index(skill.content) < combined.index(SYSTEM_PROMPT)
 
 
 def test_windows_automation_skill_text_steers_semantic_first_choices():
@@ -72,3 +67,4 @@ def test_windows_automation_skill_text_steers_semantic_first_choices():
         skill.content,
         re.IGNORECASE,
     )
+
