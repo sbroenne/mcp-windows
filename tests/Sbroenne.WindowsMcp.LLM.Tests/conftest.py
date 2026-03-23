@@ -82,30 +82,45 @@ def aitest_run(eval_run):
 
 @pytest.fixture(scope="session")
 def copilot_auth():
-    """Require GitHub SDK auth via GITHUB_TOKEN or an existing gh login."""
-    if os.environ.get("GITHUB_TOKEN"):
-        return "GITHUB_TOKEN"
+    """Require GitHub auth via GITHUB_TOKEN or an existing gh login.
 
-    result = subprocess.run(
-        ["gh", "auth", "status"],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        pytest.skip("GITHUB_TOKEN not set and gh auth status failed")
+    Also configures the OpenAI-compatible GitHub Models endpoint so that
+    Provider(model="openai:gpt-4o-mini") routes through GitHub Models, which
+    supports full OpenAI-style tool calling (unlike the Copilot SDK path).
+    """
+    token = os.environ.get("GITHUB_TOKEN")
+    if not token:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            token = result.stdout.strip()
+
+    if not token:
+        pytest.skip("GITHUB_TOKEN not set and `gh auth token` failed")
+
+    # Point the OpenAI client at GitHub Models so PydanticAI can call tools.
+    os.environ.setdefault("OPENAI_API_KEY", token)
+    os.environ.setdefault("OPENAI_BASE_URL", "https://models.inference.ai.azure.com")
     return "gh"
 
 
 @pytest.fixture(scope="session")
 def gpt41_provider(copilot_auth):
-    """GitHub Copilot GPT-4.1 provider."""
-    return Provider(model="copilot/gpt-4.1")
+    """GPT-4.1 via GitHub Models (OpenAI-compatible, supports tool calling).
+
+    Rate-limited to 12 RPM / 80K TPM to stay within GitHub Models' free tier caps
+    (15 req/60s, 120K tokens/60s), giving headroom for multi-turn tests.
+    """
+    return Provider(model="openai:gpt-4.1", rpm=12, tpm=80000)
 
 
 @pytest.fixture(scope="session")
 def gpt52_provider(copilot_auth):
-    """GitHub Copilot GPT-5.2 provider."""
-    return Provider(model="copilot/gpt-5.2")
+    """GPT-4o-mini via GitHub Models — fast, affordable fallback."""
+    return Provider(model="openai:gpt-4o-mini")
 
 
 @pytest.fixture(scope="session")
@@ -162,8 +177,37 @@ def agents(windows_mcp_server, gpt41_provider, gpt52_provider):
     return make_agents(windows_mcp_server, gpt41_provider, gpt52_provider)
 
 
-@pytest.fixture
-def test_results_path():
+@pytest.fixture(autouse=True)
+def _kill_test_processes():
+    """Kill only the GUI processes spawned during a test (Notepad, Paint, etc.).
+
+    Snapshots PIDs before the test, then after the test kills only NEW processes
+    in the known test-app list. Pre-existing user windows are never touched.
+    """
+    _TEST_APPS = {"notepad", "mspaint", "calc", "wordpad"}
+
+    def _get_pids(name):
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-Command",
+             f"Get-Process -Name '{name}' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id"],
+            capture_output=True, text=True,
+        )
+        return {int(p) for p in r.stdout.split() if p.strip().isdigit()}
+
+    before = {app: _get_pids(app) for app in _TEST_APPS}
+
+    yield  # ← test runs here
+
+    for app, pre_pids in before.items():
+        new_pids = _get_pids(app) - pre_pids
+        for pid in new_pids:
+            subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f"Stop-Process -Id {pid} -Force -ErrorAction SilentlyContinue"],
+                capture_output=True,
+            )
+
+
     """Path to the test results directory."""
     TEST_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     return TEST_RESULTS_DIR

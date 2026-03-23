@@ -4,11 +4,14 @@ version = "0.1.0"
 description = "LLM integration tests for Windows MCP Server using pytest-skill-engineering"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest-skill-engineering[copilot]",
+    "pytest-skill-engineering[copilot]>=0.5.8",
     "anyio==4.11.0",
     "pytest-asyncio",
     "socksio",
     "trio",
+    "httpcore>=1.0.9",
+    "httpx>=0.28.1",
+    "pytest-env>=1.6.0",
 ]
 
 [tool.uv.sources]
@@ -17,3 +20,14 @@ pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-eng
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["."]
+markers = [
+    "llm_eval: LLM evaluation tests (skill steering A/B comparisons) — opt-in only",
+]
+# LLM eval tests are opt-in: they automate the live desktop and consume API quota.
+# Run them explicitly with: uv run pytest -m llm_eval
+addopts = "-m 'not llm_eval'"
+# Suppress LiteLLM startup noise — it's a transitive dep of pytest-skill-engineering,
+# not used directly. We route through pytest-skill-engineering's OpenAI provider only.
+env = [
+    "LITELLM_LOG=ERROR",
+]
