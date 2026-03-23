@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "LLM integration tests for Windows MCP Server using pytest-skill-engineering"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest-skill-engineering[copilot]>=0.5.8",
+    "pytest-skill-engineering>=0.5.7",
     "pydantic-ai>=0.0.50",
     "pytest-asyncio",
     "socksio",
@@ -12,9 +12,6 @@ dependencies = [
     "httpcore>=1.0.9",
     "httpx>=0.28.1",
 ]
-
-[tool.uv.sources]
-pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "4890242db42a40cc71e068b95f1541041382d813" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
