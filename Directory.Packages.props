@@ -18,7 +18,7 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     <!-- WinUI 3 / Windows App SDK - using latest 1.8.x for .NET 10 -->
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260317003" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="1.8.260416003" />
     <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.1721" />
   </ItemGroup>
 </Project>
