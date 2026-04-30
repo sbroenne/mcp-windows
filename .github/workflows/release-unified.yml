@@ -11,12 +11,7 @@ name: Release All Components
 #
 # Required GitHub Secrets:
 # - VSCE_TOKEN: VS Code Marketplace PAT
-# - AZURE_CLIENT_ID: Azure Entra ID app client ID (for LLM tests)
-# - AZURE_TENANT_ID: Azure Entra ID tenant ID (for LLM tests)
-# - AZURE_SUBSCRIPTION_ID: Azure subscription ID (for LLM tests)
-#
-# Required GitHub Variables:
-# - AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint URL (for LLM tests)
+# - COPILOT_GITHUB_TOKEN: GitHub token with Copilot access (optional, for LLM tests)
 
 on:
   workflow_dispatch:
@@ -65,8 +60,8 @@ jobs:
             VERSION="${{ inputs.custom_version }}"
             echo "Using custom version: ${VERSION}"
           else
-            # Get the latest tag matching v*
-            LATEST_TAG=$(git tag -l 'v*' --sort=-version:refname | head -n 1)
+            # Get the latest unified semantic release tag. Exclude legacy vscode-v* tags.
+            LATEST_TAG=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-version:refname | head -n 1)
             if [ -z "$LATEST_TAG" ]; then
               LATEST_TAG="v0.0.0"
             fi
@@ -75,6 +70,11 @@ jobs:
             # Remove 'v' prefix if present
             CURRENT_VERSION="${LATEST_TAG#v}"
             echo "Current version: ${CURRENT_VERSION}"
+
+            if ! [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::Latest release tag '$LATEST_TAG' is not a semantic version tag"
+              exit 1
+            fi
 
             # Parse version components
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
@@ -135,9 +135,14 @@ jobs:
 
     - name: Run LLM Integration Tests
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
         UV_LINK_MODE: copy
       run: |
+        if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
+          Write-Warning "COPILOT_GITHUB_TOKEN is not configured; skipping release LLM integration tests."
+          exit 0
+        }
+
         cd tests/Sbroenne.WindowsMcp.LLM.Tests
         dotnet build ../../src/Sbroenne.WindowsMcp -c Release -v:q
         uv sync
