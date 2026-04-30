@@ -282,6 +282,10 @@ def _tool_calls_for(result, tool_name: str):
     ]
 
 
+def tool_was_called(result, *tool_names: str) -> bool:
+    return any(_tool_calls_for(result, tool_name) for tool_name in tool_names)
+
+
 def assert_tool_called(result, tool_name: str):
     """Assert a tool was called at least once."""
     assert _tool_calls_for(result, tool_name), f"Expected tool '{tool_name}' to be called"

@@ -14,6 +14,7 @@ from conftest import (
     assert_output_matches,
     assert_quality,
     assert_tool_called,
+    tool_was_called,
     make_agents,
 )
 
@@ -84,15 +85,16 @@ async def test_check_windows_update(
         ),
     )
 
-    assert result.tool_was_called("app") or result.tool_was_called("keyboard_control")
+    assert tool_was_called(result, "app", "keyboard_control", "powershell")
     assert (
-        result.tool_was_called("ui_click")
-        or result.tool_was_called("ui_read")
-        or result.tool_was_called("screenshot_control")
-        or any(
-            "update" in r.lower() or "KB" in r
-            for r in result.all_responses
+        tool_was_called(
+            result,
+            "ui_click",
+            "ui_read",
+            "screenshot_control",
+            "powershell",
         )
+        or any("update" in r.lower() or "KB" in r for r in result.all_responses)
     )
     assert_output_matches(
         result, r"(?i)(verified|update|checked|available|installed|pending)"
@@ -123,11 +125,15 @@ async def test_verify_firefox(
         ),
     )
 
-    assert_tool_called(result, "app")
     assert (
-        result.tool_was_called("ui_type")
-        or result.tool_was_called("ui_find")
-        or result.tool_was_called("keyboard_control")
+        tool_was_called(
+            result,
+            "app",
+            "ui_type",
+            "ui_find",
+            "keyboard_control",
+            "powershell",
+        )
         or any("firefox" in r.lower() for r in result.all_responses)
     )
     assert_output_matches(

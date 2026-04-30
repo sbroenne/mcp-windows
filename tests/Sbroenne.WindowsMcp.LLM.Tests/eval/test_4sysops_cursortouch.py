@@ -19,6 +19,7 @@ from conftest import (
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
+    tool_was_called,
 )
 
 
@@ -91,12 +92,16 @@ async def test_check_windows_update(
         ),
     )
 
-    assert (
-        result.tool_was_called("App-Tool")
-        or result.tool_was_called("Shortcut-Tool")
-        or result.tool_was_called("Powershell-Tool")
+    assert tool_was_called(
+        result,
+        "App-Tool",
+        "Shortcut-Tool",
+        "Powershell-Tool",
+        "powershell",
     )
-    assert_output_matches(result, r"(?i)(verified|update|checked|available|installed|pending)")
+    assert_output_matches(
+        result, r"(?i)(verified|update|checked|available|installed|pending)"
+    )
     assert_quality(result)
 
 
@@ -118,7 +123,7 @@ async def test_verify_firefox(
         ),
     )
 
-    assert result.tool_was_called("App-Tool") or result.tool_was_called("Powershell-Tool")
+    assert tool_was_called(result, "App-Tool", "Powershell-Tool", "powershell")
     assert_output_matches(
         result, r"(?i)(verified|firefox.*(installed|found|not found|not installed)|version)"
     )

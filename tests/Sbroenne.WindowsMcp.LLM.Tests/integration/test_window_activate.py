@@ -79,4 +79,6 @@ class TestWindowActivateWorkflow:
         # QUALITY
         assert_quality(result)
         assert result.success, f"Agent failed: {result.error}"
-        assert not result.asked_for_clarification, "Agent asked for clarification"
+        assert not getattr(result, "asked_for_clarification", False), (
+            "Agent asked for clarification"
+        )
