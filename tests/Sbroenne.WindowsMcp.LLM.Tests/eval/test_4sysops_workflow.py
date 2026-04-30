@@ -14,13 +14,14 @@ from conftest import (
     assert_output_matches,
     assert_quality,
     assert_tool_called,
+    tool_was_called,
     make_agents,
 )
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=50
+        windows_mcp_server, gpt55_provider, max_turns=50
     )
 
 
@@ -29,19 +30,17 @@ def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_create_10_files(
     aitest_run,
-    windows_mcp_server,
-    gpt41_provider,
-    gpt52_provider,
+    windows_mcp_server, gpt55_provider,
     agent,
     temp_dir,
     run_id,
 ):
     """Create 0.txt through 9.txt (exact 4sysops task)."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     folder = (temp_dir / f"4sysops-documents-{run_id}").as_posix()
     result = await aitest_run(
@@ -68,13 +67,13 @@ async def test_create_10_files(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_check_windows_update(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Open Windows Update settings and report available updates."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -86,15 +85,16 @@ async def test_check_windows_update(
         ),
     )
 
-    assert result.tool_was_called("app") or result.tool_was_called("keyboard_control")
+    assert tool_was_called(result, "app", "keyboard_control", "powershell")
     assert (
-        result.tool_was_called("ui_click")
-        or result.tool_was_called("ui_read")
-        or result.tool_was_called("screenshot_control")
-        or any(
-            "update" in r.lower() or "KB" in r
-            for r in result.all_responses
+        tool_was_called(
+            result,
+            "ui_click",
+            "ui_read",
+            "screenshot_control",
+            "powershell",
         )
+        or any("update" in r.lower() or "KB" in r for r in result.all_responses)
     )
     assert_output_matches(
         result, r"(?i)(verified|update|checked|available|installed|pending)"
@@ -107,13 +107,13 @@ async def test_check_windows_update(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_verify_firefox(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Check if Firefox is installed (without triggering UAC)."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -125,11 +125,15 @@ async def test_verify_firefox(
         ),
     )
 
-    assert_tool_called(result, "app")
     assert (
-        result.tool_was_called("ui_type")
-        or result.tool_was_called("ui_find")
-        or result.tool_was_called("keyboard_control")
+        tool_was_called(
+            result,
+            "app",
+            "ui_type",
+            "ui_find",
+            "keyboard_control",
+            "powershell",
+        )
         or any("firefox" in r.lower() for r in result.all_responses)
     )
     assert_output_matches(

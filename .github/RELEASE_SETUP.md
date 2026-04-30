@@ -10,7 +10,7 @@ The workflow optionally runs LLM integration tests with real Azure OpenAI models
 
 1. **GitHub Secrets** — For VS Code Marketplace publishing (required)
 2. **Azure Entra ID App Registration** — For passwordless GitHub Actions authentication (optional, for LLM tests)
-3. **Azure OpenAI Access** — For running LLM tests with GPT-4 models (optional)
+3. **Azure OpenAI Access** — For running LLM tests with GPT-5.5 (optional)
 4. **GitHub Variables** — To connect the workflow to Azure (optional, for LLM tests)
 
 ## Architecture
@@ -55,7 +55,7 @@ The workflow optionally runs LLM integration tests with real Azure OpenAI models
          ▼                                            ▼
 ┌─────────────────────┐                      ┌─────────────────────┐
 │  Azure OpenAI       │ ◄────────────────────│  Role Assignment    │
-│  (GPT-4.1, GPT-5.2) │   "Cognitive Services│  on AI Services     │
+│  (GPT-5.5)          │   "Cognitive Services│  on AI Services     │
 └─────────────────────┘    OpenAI User"      └─────────────────────┘
 ```
 
@@ -192,8 +192,7 @@ The LLM tests require specific model deployments. In your Azure OpenAI resource:
 
 | Deployment Name | Model | Purpose |
 |-----------------|-------|---------|
-| `gpt-4.1` | GPT-4 (or gpt-4-turbo) | Primary test model |
-| `gpt-5.2-chat` | GPT-4o or GPT-5 | Secondary test model |
+| `gpt-5.5` | GPT-5.5 | Test model |
 
 **Note:** Deployment names are referenced in test YAML files under `tests/Sbroenne.WindowsMcp.LLM.Tests/Scenarios/`.
 

@@ -9,18 +9,19 @@ Tools Covered: app, window_management
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
     assert_tool_called,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -36,9 +37,9 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("calculator-via-app-tool")
 class TestCalculatorViaAppTool:
     async def test_cleanup_close_existing_calculator(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Close any existing Calculator windows that may be open.",
@@ -46,9 +47,9 @@ class TestCalculatorViaAppTool:
         assert_quality(result)
 
     async def test_launch_calculator_using_app_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             (
@@ -61,9 +62,9 @@ class TestCalculatorViaAppTool:
         assert_output_matches(result, r"(?i)(calculator|launched|success|handle|window)")
 
     async def test_verify_calculator_window_exists(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Verify that Calculator is now open by finding its window.",
@@ -73,9 +74,9 @@ class TestCalculatorViaAppTool:
         assert_output_matches(result, r"(?i)(calculator|found|open|visible)")
 
     async def test_close_calculator(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close the Calculator window.")
         assert_quality(result)
         assert_output_matches(result, r"(?i)(calculator|closed|success)")
@@ -89,18 +90,18 @@ class TestCalculatorViaAppTool:
 @pytest.mark.session("notepad-via-app-tool")
 class TestNotepadViaAppTool:
     async def test_cleanup_close_existing_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close any existing Notepad windows that may be open."
         )
         assert_quality(result)
 
     async def test_launch_notepad_using_app_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             (
@@ -113,9 +114,9 @@ class TestNotepadViaAppTool:
         assert_output_matches(result, r"(?i)(notepad|launched|success|handle|window)")
 
     async def test_verify_notepad_window_exists(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Verify that Notepad is now open by finding its window.",
@@ -125,9 +126,9 @@ class TestNotepadViaAppTool:
         assert_output_matches(result, r"(?i)(notepad|found|open|visible)")
 
     async def test_close_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close the Notepad window without saving.")
         assert_quality(result)
         assert_output_matches(result, r"(?i)(notepad|closed|success)")

@@ -15,19 +15,19 @@ from conftest import (
 )
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=25
+        windows_mcp_server, gpt55_provider, max_turns=25
     )
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_multi_window_management(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Launch Notepad and Calculator, manipulate windows, close cleanly."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,

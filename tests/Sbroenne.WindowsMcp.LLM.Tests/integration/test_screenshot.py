@@ -9,19 +9,20 @@ Tools Covered: screenshot_control, app, window_management
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
     assert_tool_called,
     assert_tool_param_equals,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -37,26 +38,26 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("annotated-screenshot")
 class TestAnnotatedScreenshot:
     async def test_cleanup_close_existing_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close all Notepad windows if any are open."
         )
         assert_quality(result)
 
     async def test_launch_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Notepad.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_annotated_screenshot_of_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Take a screenshot of the Notepad window with element labels showing all UI elements.",
@@ -69,9 +70,9 @@ class TestAnnotatedScreenshot:
         )
 
     async def test_close_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Notepad without saving.")
         assert_quality(result)
 
@@ -84,26 +85,26 @@ class TestAnnotatedScreenshot:
 @pytest.mark.session("plain-screenshot")
 class TestPlainScreenshot:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close all Paint windows if any are open."
         )
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_plain_screenshot_of_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Take a screenshot of the Paint window without any annotations or labels.",
@@ -113,9 +114,9 @@ class TestPlainScreenshot:
         assert_tool_param_equals(result, "screenshot_control", "annotate", False)
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)
 
@@ -128,9 +129,9 @@ class TestPlainScreenshot:
 @pytest.mark.session("monitor-list")
 class TestMonitorList:
     async def test_list_all_monitors(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "List all available monitors and displays on this computer.",
@@ -153,26 +154,26 @@ class TestMonitorList:
 @pytest.mark.session("window-screenshot")
 class TestWindowScreenshot:
     async def test_cleanup_close_existing_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close all Notepad windows if any are open."
         )
         assert_quality(result)
 
     async def test_launch_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Notepad.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_find_notepad_window(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Find the Notepad window and get its handle."
         )
@@ -181,9 +182,9 @@ class TestWindowScreenshot:
         assert_output_matches(result, r"(?i)(handle|notepad|found|window)")
 
     async def test_screenshot_of_notepad_window(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Take a screenshot of only the Notepad window, not the entire screen.",
@@ -192,8 +193,8 @@ class TestWindowScreenshot:
         assert_tool_called(result, "screenshot_control")
 
     async def test_close_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Notepad without saving.")
         assert_quality(result)

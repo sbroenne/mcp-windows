@@ -14,11 +14,16 @@ namespace Sbroenne.WindowsMcp.Tools;
 public static partial class WindowManagementTool
 {
     /// <summary>
-    /// Manage existing windows. Use app tool to launch applications first, then use this tool to manage the windows.
+    /// Manage existing Windows app windows. Prefer this tool over powershell or shell commands when the user asks to
+    /// find windows, check which window is foreground, activate or bring a window to front, move/resize/minimize/restore,
+    /// or close application windows.
     /// Supports: list, find, activate, minimize, maximize, restore, close, move, resize, and more.
     /// </summary>
     /// <remarks>
     /// To launch apps, use the app tool. This tool manages windows AFTER they exist.
+    /// For "close all" requests, first use find/list to get every matching window handle, then call close once per handle.
+    /// Some apps, including modern Notepad, can have multiple tabs/windows in one process; closing one handle may leave
+    /// another visible window behind.
     ///
     /// CLOSE WITHOUT SAVING: Use close action with discardChanges=true to automatically dismiss 'Save?' dialogs.
     /// NOTE: discardChanges only works on English Windows (looks for 'Don't Save' button text).

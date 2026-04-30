@@ -9,19 +9,20 @@ Tools Covered: ui_find, ui_click, mouse_control, screenshot_control, app
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
     assert_tool_called,
     assert_tool_param_equals,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -37,24 +38,24 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("tool-discovery")
 class TestToolDiscovery:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_find_pencil_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Find the pencil tool in the Paint toolbar."
         )
@@ -63,9 +64,9 @@ class TestToolDiscovery:
         assert_output_matches(result, r"(?i)(pencil|tool|found|element)")
 
     async def test_find_brush_tools(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Find the brush or brushes tool in the Paint toolbar."
         )
@@ -74,9 +75,9 @@ class TestToolDiscovery:
         assert_output_matches(result, r"(?i)(brush|tool|found|element)")
 
     async def test_find_shapes_tools(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Find the shapes or shape tools in the Paint toolbar."
         )
@@ -85,9 +86,9 @@ class TestToolDiscovery:
         assert_output_matches(result, r"(?i)(shape|tool|found|element)")
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)
 
@@ -100,24 +101,24 @@ class TestToolDiscovery:
 @pytest.mark.session("tool-selection")
 class TestToolSelection:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_click_pencil_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the pencil tool to select it."
         )
@@ -126,9 +127,9 @@ class TestToolSelection:
         assert calls, "Expected ui_click or ui_find to be called"
 
     async def test_click_brush_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the brush tool to select it."
         )
@@ -137,9 +138,9 @@ class TestToolSelection:
         assert calls, "Expected ui_click or ui_find to be called"
 
     async def test_click_eraser_tool(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the eraser tool to select it."
         )
@@ -148,9 +149,9 @@ class TestToolSelection:
         assert calls, "Expected ui_click or ui_find to be called"
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)
 
@@ -163,24 +164,24 @@ class TestToolSelection:
 @pytest.mark.session("color-selection")
 class TestColorSelection:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_select_red_color(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the red color in the color palette to select it."
         )
@@ -193,9 +194,9 @@ class TestColorSelection:
         assert calls, "Expected ui_click, ui_find, or mouse_control to be called"
 
     async def test_select_blue_color(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the blue color in the color palette to select it."
         )
@@ -208,9 +209,9 @@ class TestColorSelection:
         assert calls, "Expected ui_click, ui_find, or mouse_control to be called"
 
     async def test_select_green_color(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Click on the green color in the color palette to select it."
         )
@@ -223,9 +224,9 @@ class TestColorSelection:
         assert calls, "Expected ui_click, ui_find, or mouse_control to be called"
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)
 
@@ -238,24 +239,24 @@ class TestColorSelection:
 @pytest.mark.session("canvas-drawing")
 class TestCanvasDrawing:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_draw_diagonal_line(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Draw a diagonal line from the top-left area of the canvas to the bottom-right area.",
@@ -265,9 +266,9 @@ class TestCanvasDrawing:
         assert_tool_param_equals(result, "mouse_control", "action", "drag")
 
     async def test_draw_horizontal_line(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Draw a horizontal line across the middle of the canvas.",
@@ -277,9 +278,9 @@ class TestCanvasDrawing:
         assert_tool_param_equals(result, "mouse_control", "action", "drag")
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)
 
@@ -292,24 +293,24 @@ class TestCanvasDrawing:
 @pytest.mark.session("state-discovery")
 class TestStateDiscovery:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_annotated_screenshot_discover_elements(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Take a screenshot of Paint with element labels to discover all available UI elements and tools.",
@@ -322,8 +323,8 @@ class TestStateDiscovery:
         )
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint without saving.")
         assert_quality(result)

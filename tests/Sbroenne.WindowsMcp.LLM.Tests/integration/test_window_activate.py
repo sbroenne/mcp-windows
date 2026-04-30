@@ -10,18 +10,19 @@ Tools Covered: app, window_management (activate, get_foreground, move_and_activa
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
     assert_tool_param_matches,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=25,
@@ -37,9 +38,9 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("window-activate-workflow")
 class TestWindowActivateWorkflow:
     async def test_activate_and_bring_windows_to_foreground(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             (
@@ -78,4 +79,6 @@ class TestWindowActivateWorkflow:
         # QUALITY
         assert_quality(result)
         assert result.success, f"Agent failed: {result.error}"
-        assert not result.asked_for_clarification, "Agent asked for clarification"
+        assert not getattr(result, "asked_for_clarification", False), (
+            "Agent asked for clarification"
+        )

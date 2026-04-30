@@ -17,19 +17,19 @@ from conftest import (
 pytestmark = pytest.mark.skip(reason="Paint workflow tests disabled — environment-specific")
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=20
+        windows_mcp_server, gpt55_provider, max_turns=20
     )
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_paint_draw_shape_and_capture(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Launch Paint, find canvas, draw a shape, take screenshot, close."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -54,13 +54,13 @@ async def test_paint_draw_shape_and_capture(
     assert_quality(result)
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_paint_ui_exploration(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Launch Paint, explore UI tree, click a toolbar button."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,

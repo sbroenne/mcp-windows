@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "373ddaea012af61808e0ae5715607c34b865bd34" }
+pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "f5f452dfd8069f8ef086750ebd3b1f5cbc9b02d4" }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

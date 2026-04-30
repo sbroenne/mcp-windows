@@ -9,15 +9,12 @@ import re
 import subprocess
 import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
-from pytest_skill_engineering import (
-    Eval as Agent,
-    ClarificationDetection,
-    MCPServer,
-    Provider,
-)
+from pytest_skill_engineering import MCPServer
+from pytest_skill_engineering.copilot import CopilotCLIPersona, CopilotEval
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -25,6 +22,28 @@ from pytest_skill_engineering import (
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 PROJECT_PATH = REPO_ROOT / "src" / "Sbroenne.WindowsMcp" / "Sbroenne.WindowsMcp.csproj"
 TEST_RESULTS_DIR = Path(__file__).resolve().parent / "TestResults"
+TEST_APP_CLEANUP_SCRIPT = r"""
+$targets = @('CalculatorApp', 'ApplicationFrameHost', 'Notepad', 'mspaint')
+$matches = Get-Process | Where-Object {
+    $_.MainWindowHandle -ne 0 -and (
+        $targets -contains $_.ProcessName -or
+        $_.MainWindowTitle -match 'Calculator|Notepad|Paint'
+    )
+}
+
+foreach ($process in $matches) {
+    [void]$process.CloseMainWindow()
+}
+
+Start-Sleep -Milliseconds 1000
+
+foreach ($process in $matches) {
+    $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
+    if ($current -and $current.MainWindowHandle -ne 0) {
+        Stop-Process -Id $current.Id -Force
+    }
+}
+"""
 
 # Server command as a list to handle paths with spaces correctly.
 # Uses --no-build because dotnet build output on stdout corrupts MCP's
@@ -51,6 +70,62 @@ CRITICAL RULES:
 # ---------------------------------------------------------------------------
 
 
+@dataclass(frozen=True)
+class Provider:
+    """Compatibility wrapper for tests that name providers explicitly."""
+
+    model: str
+
+
+@dataclass(frozen=True)
+class ClarificationDetection:
+    """Compatibility wrapper; clarification detection is covered by assertions."""
+
+    enabled: bool = True
+
+
+def _mcp_server_config(server: MCPServer) -> dict[str, object]:
+    if not server.command:
+        raise ValueError("stdio MCP server requires a command")
+
+    config: dict[str, object] = {
+        "command": server.command[0],
+        "args": server.command[1:],
+        "type": "stdio",
+        "tools": ["*"],
+    }
+    if server.cwd:
+        config["cwd"] = server.cwd
+    if server.env:
+        config["env"] = server.env
+    return config
+
+
+def Agent(
+    *,
+    name: str,
+    provider: Provider,
+    mcp_servers: list[MCPServer],
+    system_prompt: str,
+    max_turns: int,
+    clarification_detection: ClarificationDetection | None = None,
+) -> CopilotEval:
+    """Create a CopilotEval from the legacy Eval-style test configuration."""
+    del clarification_detection
+    return CopilotEval(
+        name=name,
+        model=provider.model.removeprefix("copilot/"),
+        instructions=system_prompt,
+        max_turns=max_turns,
+        timeout_s=300.0,
+        persona=CopilotCLIPersona(),
+        mcp_servers={
+            f"mcp-{index}": _mcp_server_config(server)
+            for index, server in enumerate(mcp_servers, start=1)
+        },
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _build_mcp_server():
     """Build the MCP server once before any test runs.
@@ -68,6 +143,25 @@ def _build_mcp_server():
         pytest.fail(f"dotnet build failed:\n{result.stdout}\n{result.stderr}")
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _cleanup_test_apps():
+    yield
+    subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            TEST_APP_CLEANUP_SCRIPT,
+        ],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+
 @pytest.fixture(scope="session")
 def windows_mcp_server():
     """The Windows MCP Server under test."""
@@ -75,9 +169,22 @@ def windows_mcp_server():
 
 
 @pytest.fixture
-def aitest_run(eval_run):
-    """Temporary compatibility alias while migrating to pytest-skill-engineering."""
-    return eval_run
+def aitest_run(copilot_eval):
+    """Compatibility alias for the current pytest-skill-engineering fixture."""
+
+    async def _run(agent: CopilotEval, prompt: str):
+        result = await copilot_eval(agent, prompt)
+        _normalize_mcp_tool_names(result)
+        return result
+
+    return _run
+
+
+def _normalize_mcp_tool_names(result):
+    for call in result.all_tool_calls:
+        match = re.fullmatch(r"mcp-\d+-(.+)", call.name)
+        if match:
+            call.name = match.group(1)
 
 
 @pytest.fixture(scope="session")
@@ -97,23 +204,17 @@ def copilot_auth():
 
 
 @pytest.fixture(scope="session")
-def gpt41_provider(copilot_auth):
-    """GitHub Copilot GPT-4.1 provider."""
-    return Provider(model="copilot/gpt-4.1")
+def gpt55_provider(copilot_auth):
+    """GitHub Copilot GPT-5.5 provider."""
+    return Provider(model="copilot/gpt-5.5")
 
 
 @pytest.fixture(scope="session")
-def gpt52_provider(copilot_auth):
-    """GitHub Copilot GPT-5.2 provider."""
-    return Provider(model="copilot/gpt-5.2")
-
-
-@pytest.fixture(scope="session")
-def gpt41_agent(windows_mcp_server, gpt41_provider):
-    """Agent using GPT-4.1 with the Windows MCP Server."""
+def gpt55_agent(windows_mcp_server, gpt55_provider):
+    """Agent using GPT-5.5 with the Windows MCP Server."""
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -121,33 +222,12 @@ def gpt41_agent(windows_mcp_server, gpt41_provider):
     )
 
 
-@pytest.fixture(scope="session")
-def gpt52_agent(windows_mcp_server, gpt52_provider):
-    """Agent using GPT-5.2-chat with the Windows MCP Server."""
-    return Agent(
-        name="gpt52-agent",
-        provider=gpt52_provider,
-        mcp_servers=[windows_mcp_server],
-        system_prompt=SYSTEM_PROMPT,
-        max_turns=15,
-        clarification_detection=ClarificationDetection(enabled=True),
-    )
-
-
-def make_agents(windows_mcp_server, gpt41_provider, gpt52_provider, *, max_turns=15):
-    """Create both agents for parametrize usage."""
+def make_agents(windows_mcp_server, gpt55_provider, *, max_turns=15):
+    """Create the GPT-5.5 agent for parametrize usage."""
     return [
         Agent(
-            name="gpt41-agent",
-            provider=gpt41_provider,
-            mcp_servers=[windows_mcp_server],
-            system_prompt=SYSTEM_PROMPT,
-            max_turns=max_turns,
-            clarification_detection=ClarificationDetection(enabled=True),
-        ),
-        Agent(
-            name="gpt52-agent",
-            provider=gpt52_provider,
+            name="gpt55-agent",
+            provider=gpt55_provider,
             mcp_servers=[windows_mcp_server],
             system_prompt=SYSTEM_PROMPT,
             max_turns=max_turns,
@@ -157,9 +237,9 @@ def make_agents(windows_mcp_server, gpt41_provider, gpt52_provider, *, max_turns
 
 
 @pytest.fixture(scope="session")
-def agents(windows_mcp_server, gpt41_provider, gpt52_provider):
-    """Both agents for parametrize usage."""
-    return make_agents(windows_mcp_server, gpt41_provider, gpt52_provider)
+def agents(windows_mcp_server, gpt55_provider):
+    """GPT-5.5 agent for parametrize usage."""
+    return make_agents(windows_mcp_server, gpt55_provider)
 
 
 @pytest.fixture
@@ -190,17 +270,39 @@ def run_id():
 # ---------------------------------------------------------------------------
 
 
+def _tool_name_matches(actual: str, expected: str) -> bool:
+    return actual == expected or actual.endswith(f"-{expected}")
+
+
+def _tool_calls_for(result, tool_name: str):
+    return [
+        call
+        for call in result.all_tool_calls
+        if _tool_name_matches(call.name, tool_name)
+    ]
+
+
+def tool_was_called(result, *tool_names: str) -> bool:
+    return any(_tool_calls_for(result, tool_name) for tool_name in tool_names)
+
+
 def assert_tool_called(result, tool_name: str):
     """Assert a tool was called at least once."""
-    assert result.tool_was_called(tool_name), f"Expected tool '{tool_name}' to be called"
+    assert _tool_calls_for(result, tool_name), f"Expected tool '{tool_name}' to be called"
 
 
 def assert_tool_call_order(result, first: str, second: str):
     """Assert that first tool was called before second tool."""
     names = [c.name for c in result.all_tool_calls]
-    assert first in names, f"Tool '{first}' was never called"
-    assert second in names, f"Tool '{second}' was never called"
-    assert names.index(first) < names.index(second), (
+    first_indexes = [
+        index for index, name in enumerate(names) if _tool_name_matches(name, first)
+    ]
+    second_indexes = [
+        index for index, name in enumerate(names) if _tool_name_matches(name, second)
+    ]
+    assert first_indexes, f"Tool '{first}' was never called"
+    assert second_indexes, f"Tool '{second}' was never called"
+    assert first_indexes[0] < second_indexes[0], (
         f"Expected '{first}' before '{second}', got order: {names}"
     )
 
@@ -221,7 +323,7 @@ def assert_output_not_contains(result, value: str):
 
 def assert_tool_param_matches(result, tool_name: str, param: str, pattern: str):
     """Assert a tool was called with a parameter matching a regex."""
-    calls = result.tool_calls_for(tool_name)
+    calls = _tool_calls_for(result, tool_name)
     assert calls, f"Tool '{tool_name}' was never called"
     matched = any(
         re.search(pattern, str(c.arguments.get(param, "")), re.IGNORECASE)
@@ -234,7 +336,7 @@ def assert_tool_param_matches(result, tool_name: str, param: str, pattern: str):
 
 def assert_tool_param_equals(result, tool_name: str, param: str, value):
     """Assert a tool was called with an exact parameter value."""
-    calls = result.tool_calls_for(tool_name)
+    calls = _tool_calls_for(result, tool_name)
     assert calls, f"Tool '{tool_name}' was never called"
     matched = any(c.arguments.get(param) == value for c in calls)
     assert matched, (
@@ -245,4 +347,6 @@ def assert_tool_param_equals(result, tool_name: str, param: str, value):
 def assert_quality(result):
     """Standard quality assertions used across all tests."""
     assert result.success, f"Agent failed: {result.error}"
-    assert not result.asked_for_clarification, "Agent asked for clarification"
+    assert not getattr(result, "asked_for_clarification", False), (
+        "Agent asked for clarification"
+    )

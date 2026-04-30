@@ -8,6 +8,10 @@ import re
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
+    MCPServer,
+    Provider,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
@@ -15,18 +19,17 @@ from conftest import (
     assert_tool_param_matches,
     make_agents,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection, MCPServer, Provider
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=15
+        windows_mcp_server, gpt55_provider, max_turns=15
     )
 
 
 @pytest.fixture(scope="module")
-def all_agents(windows_mcp_server, gpt41_provider, gpt52_provider):
-    return _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
+def all_agents(windows_mcp_server, gpt55_provider):
+    return _agents(windows_mcp_server, gpt55_provider)
 
 
 # ---------------------------------------------------------------------------
@@ -34,13 +37,13 @@ def all_agents(windows_mcp_server, gpt41_provider, gpt52_provider):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_notepad_workflow_discard(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Open Notepad, type text, close without saving."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -86,19 +89,18 @@ async def test_notepad_workflow_discard(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_notepad_workflow_save(
     aitest_run,
     windows_mcp_server,
-    gpt41_provider,
-    gpt52_provider,
+    gpt55_provider,
     agent,
     temp_dir,
     run_id,
 ):
     """Open Notepad, type text, save to temp directory, close."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     save_path = (temp_dir / f"llm-test-{run_id}.txt").as_posix()
 
