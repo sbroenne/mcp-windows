@@ -140,6 +140,9 @@ jobs:
       run: |
         if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
           Write-Warning "COPILOT_GITHUB_TOKEN is not configured; skipping release LLM integration tests."
+          if (-not [string]::IsNullOrWhiteSpace($env:UV_CACHE_DIR)) {
+            New-Item -ItemType Directory -Path $env:UV_CACHE_DIR -Force | Out-Null
+          }
           exit 0
         }
 
