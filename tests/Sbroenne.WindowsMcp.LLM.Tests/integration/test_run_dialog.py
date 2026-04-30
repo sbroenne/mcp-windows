@@ -9,18 +9,19 @@ Tools Covered: keyboard_control, window_management, ui_type
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
     assert_tool_called,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -36,18 +37,18 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("run-dialog-launch")
 class TestRunDialogLaunch:
     async def test_cleanup_close_existing_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close all Notepad windows if any are open."
         )
         assert_quality(result)
 
     async def test_open_windows_run_dialog(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Open the Windows Run dialog using the keyboard shortcut Win+R.",
@@ -57,9 +58,9 @@ class TestRunDialogLaunch:
         assert_output_matches(result, r"(?i)(run|dialog|win.*r|opened)")
 
     async def test_type_notepad_and_launch(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             'Type "notepad" in the Run dialog and press Enter to launch it.',
@@ -68,9 +69,9 @@ class TestRunDialogLaunch:
         assert_tool_called(result, "keyboard_control")
 
     async def test_verify_notepad_launched(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Verify that Notepad is now open by finding its window.",
@@ -80,9 +81,9 @@ class TestRunDialogLaunch:
         assert_output_matches(result, r"(?i)(notepad|found|open|visible)")
 
     async def test_close_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Notepad without saving.")
         assert_quality(result)
         assert_tool_called(result, "window_management")
@@ -96,18 +97,18 @@ class TestRunDialogLaunch:
 @pytest.mark.session("run-dialog-calculator")
 class TestRunDialogCalculator:
     async def test_cleanup_close_existing_calculator(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Close all Calculator windows if any are open."
         )
         assert_quality(result)
 
     async def test_launch_calculator_via_run(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             'Open the Windows Run dialog with Win+R, type "calc", and press Enter to launch Calculator.',
@@ -116,9 +117,9 @@ class TestRunDialogCalculator:
         assert_tool_called(result, "keyboard_control")
 
     async def test_verify_calculator_launched(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a, "Verify that Calculator is now open."
         )
@@ -127,9 +128,9 @@ class TestRunDialogCalculator:
         assert_output_matches(result, r"(?i)(calculator|calc|found|open)")
 
     async def test_close_calculator(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Calculator.")
         assert_quality(result)
         assert_output_matches(

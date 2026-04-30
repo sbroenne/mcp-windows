@@ -50,8 +50,8 @@ uv run pytest test_*.py -v
 # Run a specific test file
 uv run pytest test_notepad_ui.py -v
 
-# Run a single test with a specific model
-uv run pytest test_calculator_workflow.py::test_calculator_keyboard -k "gpt41" -v
+# Run a single test
+uv run pytest test_calculator_workflow.py::test_calculator_keyboard -v
 
 # Run integration tests
 uv run pytest integration/ -v
@@ -92,7 +92,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 
 ### Scenario Tests (root directory)
 
-Multi-step workflow tests that verify end-to-end user scenarios. Run with both `gpt-4.1` and `gpt-5.2` models through GitHub Copilot.
+Multi-step workflow tests that verify end-to-end user scenarios. Run with `gpt-5.5` through GitHub Copilot.
 
 | Test File | Description |
 |-----------|-------------|
@@ -102,7 +102,7 @@ Multi-step workflow tests that verify end-to-end user scenarios. Run with both `
 
 ### Integration Tests (`integration/`)
 
-Tool-level tests that verify individual MCP tool functionality. Run with `gpt-4.1` only.
+Tool-level tests that verify individual MCP tool functionality. Run with `gpt-5.5` only.
 
 | Test File | Tools Covered |
 |-----------|---------------|
@@ -117,19 +117,19 @@ Tool-level tests that verify individual MCP tool functionality. Run with `gpt-4.
 
 ## Writing Tests
 
-Tests use `pytest-skill-engineering` via the local `aitest_run` compatibility fixture, which currently delegates to the package's `eval_run` fixture:
+Tests use `pytest-skill-engineering` through the Copilot SDK. The local `aitest_run` fixture delegates to the package's `copilot_eval` fixture and normalizes MCP-prefixed tool names such as `mcp-1-app` back to `app` for assertions.
 
 ```python
 import pytest
-from pytest_skill_engineering import Eval as Agent, MCPServer, Provider
+from conftest import assert_quality, assert_tool_called
 
 async def test_example(aitest_run):
     result = await aitest_run(
         agent=agent,
         prompt="Open Notepad and type hello",
     )
-    assert result.success
-    assert result.tool_was_called("app")
+    assert_quality(result)
+    assert_tool_called(result, "app")
 ```
 
 ### Test Prompts: Use Natural Language
@@ -148,22 +148,19 @@ prompt="I need to find that Notepad window so I can work with it."
 
 ```python
 # Tool was called
-assert result.tool_was_called("app")
+assert_tool_called(result, "app")
 
 # Tool call order
-names = [c.name for c in result.all_tool_calls]
-assert names.index("app") < names.index("keyboard_control")
+assert_tool_call_order(result, "app", "keyboard_control")
 
 # Tool parameter check
-call = result.tool_calls_for("keyboard_control")[0]
-assert re.search(r"hello", call.arguments.get("keys", ""), re.IGNORECASE)
+assert_tool_param_matches(result, "keyboard_control", "keys", r"hello")
 
 # Response content
 assert re.search(r"notepad", result.final_response, re.IGNORECASE)
 
 # Quality checks
-assert result.success
-assert not result.asked_for_clarification
+assert_quality(result)
 ```
 
 ## Test Reports
@@ -171,5 +168,5 @@ assert not result.asked_for_clarification
 HTML reports are generated when using `--aitest-html` together with an AI summary model:
 
 ```powershell
-uv run pytest test_notepad_ui.py -v --aitest-summary-model=azure/gpt-5.2-chat --aitest-html=TestResults/report.html
+uv run pytest test_notepad_ui.py -v --aitest-summary-model=azure/gpt-5.5-chat --aitest-html=TestResults/report.html
 ```

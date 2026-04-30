@@ -19,11 +19,18 @@ public static partial class AppTool
     private const int StubDetectionDelayMs = 300;
 
     /// <summary>
-    /// Launch applications. Use this to start programs like notepad.exe, calc.exe, msedge.exe, chrome.exe, winword.exe, excel.exe, etc.
-    /// Returns a window handle for use with window_management, keyboard_control, and other tools.
+    /// Launch Windows applications by semantic app name or executable path. Prefer this tool over powershell, shell,
+    /// terminal, or command-line process launchers whenever the user asks to open, start, or launch an app.
+    /// Use this to start programs like notepad.exe, calc.exe, msedge.exe, chrome.exe, winword.exe, excel.exe, etc.
+    /// Returns structured launch status plus a window handle for use with window_management, keyboard_control, and other tools.
     /// </summary>
     /// <remarks>
-    /// Examples: app(programPath='notepad.exe'), app(programPath='msedge.exe', arguments='https://example.com').
+    /// This tool is safer and more reliable than shell commands for app launch because it focuses the window,
+    /// waits for the first usable window, handles UWP/Store app stubs such as Calculator, and returns normalized
+    /// process/window metadata. Do not use powershell or shell commands to launch apps unless this tool fails or
+    /// the task explicitly requires shell execution.
+    ///
+    /// Examples: app(programPath='notepad.exe'), app(programPath='calc.exe'), app(programPath='msedge.exe', arguments='https://example.com').
     /// After launch, the window is focused and ready for input. Use the returned handle for subsequent operations.
     /// Launch a browser with a URL, then use ui_find/ui_click/ui_type with the returned handle to automate page content.
     /// Edge (msedge.exe) and Chrome (chrome.exe) page content is fully automatable: links, buttons, and form fields

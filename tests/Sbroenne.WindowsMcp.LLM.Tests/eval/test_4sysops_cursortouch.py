@@ -11,9 +11,11 @@ Key Differences:
 """
 
 import pytest
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection, MCPServer, Provider
 
 from conftest import (
+    Agent,
+    ClarificationDetection,
+    MCPServer,
     SYSTEM_PROMPT,
     assert_output_matches,
     assert_quality,
@@ -34,34 +36,26 @@ def cursortouch_server():
     )
 
 
-def _agents(cursortouch_server, gpt41_provider, gpt52_provider):
+def _agents(cursortouch_server, gpt55_provider):
     return [
         Agent(
-            name="gpt41-agent",
-            provider=gpt41_provider,
+            name="gpt55-agent",
+            provider=gpt55_provider,
             mcp_servers=[cursortouch_server],
             system_prompt=SYSTEM_PROMPT,
             max_turns=50,
             clarification_detection=ClarificationDetection(enabled=True),
-        ),
-        Agent(
-            name="gpt52-agent",
-            provider=gpt52_provider,
-            mcp_servers=[cursortouch_server],
-            system_prompt=SYSTEM_PROMPT,
-            max_turns=50,
-            clarification_detection=ClarificationDetection(enabled=True),
-        ),
+        )
     ]
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_create_10_files(
-    aitest_run, cursortouch_server, gpt41_provider, gpt52_provider, agent, temp_dir, run_id
+    aitest_run, cursortouch_server, gpt55_provider, agent, temp_dir, run_id
 ):
     """Create 0.txt through 9.txt using CursorTouch server."""
-    agents = _agents(cursortouch_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(cursortouch_server, gpt55_provider)
+    a = agents[0]
 
     folder = (temp_dir / f"4sysops-cursortouch-{run_id}").as_posix()
     result = await aitest_run(
@@ -79,13 +73,13 @@ async def test_create_10_files(
     assert_quality(result)
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_check_windows_update(
-    aitest_run, cursortouch_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, cursortouch_server, gpt55_provider, agent
 ):
     """Check Windows Update using CursorTouch server."""
-    agents = _agents(cursortouch_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(cursortouch_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -106,13 +100,13 @@ async def test_check_windows_update(
     assert_quality(result)
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_verify_firefox(
-    aitest_run, cursortouch_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, cursortouch_server, gpt55_provider, agent
 ):
     """Check if Firefox is installed using CursorTouch server."""
-    agents = _agents(cursortouch_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(cursortouch_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,

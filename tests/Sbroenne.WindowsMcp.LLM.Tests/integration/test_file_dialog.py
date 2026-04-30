@@ -10,18 +10,19 @@ import uuid
 
 import pytest
 from conftest import (
+    Agent,
+    ClarificationDetection,
     SYSTEM_PROMPT,
     assert_output_not_contains,
     assert_quality,
     assert_tool_called,
 )
-from pytest_skill_engineering import Eval as Agent, ClarificationDetection
 
 
-def _agent(windows_mcp_server, gpt41_provider):
+def _agent(windows_mcp_server, gpt55_provider):
     return Agent(
-        name="gpt41-agent",
-        provider=gpt41_provider,
+        name="gpt55-agent",
+        provider=gpt55_provider,
         mcp_servers=[windows_mcp_server],
         system_prompt=SYSTEM_PROMPT,
         max_turns=15,
@@ -37,24 +38,24 @@ def _agent(windows_mcp_server, gpt41_provider):
 @pytest.mark.session("notepad-save")
 class TestNotepadSave:
     async def test_cleanup_close_existing_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Notepad windows if any are open.")
         assert_quality(result)
 
     async def test_launch_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Notepad.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_type_some_text(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             'Type "File dialog test content - this text will be saved to a file." in Notepad.',
@@ -64,9 +65,9 @@ class TestNotepadSave:
         assert calls, "Expected ui_type or keyboard_control to be called"
 
     async def test_save_the_file(
-        self, aitest_run, windows_mcp_server, gpt41_provider, test_results_path
+        self, aitest_run, windows_mcp_server, gpt55_provider, test_results_path
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         filename = f"notepad-file-test-{uuid.uuid4()}.txt"
         save_path = test_results_path / filename
         result = await aitest_run(
@@ -83,9 +84,9 @@ class TestNotepadSave:
         assert_output_not_contains(result, "SecureDesktop")
 
     async def test_close_notepad(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Notepad.")
         assert_quality(result)
 
@@ -98,24 +99,24 @@ class TestNotepadSave:
 @pytest.mark.session("paint-save")
 class TestPaintSave:
     async def test_cleanup_close_existing_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close all Paint windows if any are open.")
         assert_quality(result)
 
     async def test_launch_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Open Microsoft Paint.")
         assert_quality(result)
         assert_tool_called(result, "app")
 
     async def test_draw_something_simple(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(
             a,
             "Draw a simple diagonal line across the canvas so there is something to save.",
@@ -124,9 +125,9 @@ class TestPaintSave:
         assert_tool_called(result, "mouse_control")
 
     async def test_save_image_as_png(
-        self, aitest_run, windows_mcp_server, gpt41_provider, test_results_path
+        self, aitest_run, windows_mcp_server, gpt55_provider, test_results_path
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         filename = f"paint-file-test-{uuid.uuid4()}.png"
         save_path = test_results_path / filename
         result = await aitest_run(
@@ -143,8 +144,8 @@ class TestPaintSave:
         assert_output_not_contains(result, "SecureDesktop")
 
     async def test_close_paint(
-        self, aitest_run, windows_mcp_server, gpt41_provider
+        self, aitest_run, windows_mcp_server, gpt55_provider
     ):
-        a = _agent(windows_mcp_server, gpt41_provider)
+        a = _agent(windows_mcp_server, gpt55_provider)
         result = await aitest_run(a, "Close Paint.")
         assert_quality(result)

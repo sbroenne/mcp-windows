@@ -18,9 +18,9 @@ from conftest import (
 )
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=20
+        windows_mcp_server, gpt55_provider, max_turns=20
     )
 
 
@@ -29,13 +29,13 @@ def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_calculator_keyboard(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Launch Calculator, type calculation using keyboard, read result."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -66,13 +66,13 @@ async def test_calculator_keyboard(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_calculator_ui_click(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Launch Calculator, click buttons to perform calculation."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,

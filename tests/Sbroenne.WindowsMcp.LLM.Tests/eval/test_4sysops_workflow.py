@@ -18,9 +18,9 @@ from conftest import (
 )
 
 
-def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
+def _agents(windows_mcp_server, gpt55_provider):
     return make_agents(
-        windows_mcp_server, gpt41_provider, gpt52_provider, max_turns=50
+        windows_mcp_server, gpt55_provider, max_turns=50
     )
 
 
@@ -29,19 +29,17 @@ def _agents(windows_mcp_server, gpt41_provider, gpt52_provider):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_create_10_files(
     aitest_run,
-    windows_mcp_server,
-    gpt41_provider,
-    gpt52_provider,
+    windows_mcp_server, gpt55_provider,
     agent,
     temp_dir,
     run_id,
 ):
     """Create 0.txt through 9.txt (exact 4sysops task)."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     folder = (temp_dir / f"4sysops-documents-{run_id}").as_posix()
     result = await aitest_run(
@@ -68,13 +66,13 @@ async def test_create_10_files(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_check_windows_update(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Open Windows Update settings and report available updates."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
@@ -107,13 +105,13 @@ async def test_check_windows_update(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("agent", ["gpt41", "gpt52"], indirect=False)
+@pytest.mark.parametrize("agent", ["gpt55"], indirect=False)
 async def test_verify_firefox(
-    aitest_run, windows_mcp_server, gpt41_provider, gpt52_provider, agent
+    aitest_run, windows_mcp_server, gpt55_provider, agent
 ):
     """Check if Firefox is installed (without triggering UAC)."""
-    agents = _agents(windows_mcp_server, gpt41_provider, gpt52_provider)
-    a = agents[0] if agent == "gpt41" else agents[1]
+    agents = _agents(windows_mcp_server, gpt55_provider)
+    a = agents[0]
 
     result = await aitest_run(
         a,
