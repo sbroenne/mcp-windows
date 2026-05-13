@@ -4,9 +4,9 @@
   </PropertyGroup>
   <ItemGroup>
     <!-- Main application packages -->
-    <PackageVersion Include="ModelContextProtocol" Version="1.2.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.7" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.7" />
+    <PackageVersion Include="ModelContextProtocol" Version="1.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.8" />
     <PackageVersion Include="Interop.UIAutomationClient" Version="10.19041.0" />
     <!-- Test packages -->
     <PackageVersion Include="Bogus" Version="35.6.5" />
