@@ -15,7 +15,7 @@
   "homepage": "https://github.com/sbroenne/mcp-windows",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.118.0"
+    "vscode": "^1.120.0"
   },
   "os": [
     "win32"
