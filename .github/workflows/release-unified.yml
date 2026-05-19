@@ -129,7 +129,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Python & uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v8
       with:
         python-version: '3.12'
         enable-cache: false
@@ -154,7 +154,7 @@ jobs:
       shell: pwsh
 
     - name: Upload LLM Test Reports
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: llm-test-reports
@@ -239,7 +239,7 @@ jobs:
       shell: pwsh
 
     - name: Upload Build Artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: standalone-${{ matrix.rid }}
         path: windows-mcp-server-*.zip
@@ -261,7 +261,7 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@v6
       with:
         node-version: ${{ env.NODE_VERSION }}
 
@@ -355,7 +355,7 @@ jobs:
       shell: pwsh
 
     - name: Upload VSIX Artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: vscode-extension
         path: vscode-extension/*.vsix
@@ -405,7 +405,7 @@ jobs:
       shell: pwsh
 
     - name: Download VS Code VSIX
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: vscode-extension
         path: vscode-vsix
@@ -439,14 +439,14 @@ jobs:
       shell: pwsh
 
     - name: Download All Artifacts
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         path: artifacts
         pattern: standalone-*
         merge-multiple: true
 
     - name: Download VSIX Artifact
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         name: vscode-extension
         path: artifacts

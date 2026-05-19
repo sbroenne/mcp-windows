@@ -44,7 +44,7 @@ jobs:
         dotnet-version: 10.0.x
 
     - name: Setup Python & uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v8
       with:
         python-version: '3.12'
 
@@ -125,7 +125,7 @@ jobs:
       shell: pwsh
 
     - name: Upload LLM Test Report
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       if: always()
       with:
         name: llm-test-report-${{ matrix.scenario }}
@@ -142,7 +142,7 @@ jobs:
 
     steps:
     - name: Download all test reports
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v8
       with:
         pattern: llm-test-report-*
         path: reports
