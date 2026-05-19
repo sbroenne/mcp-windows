@@ -129,7 +129,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Python & uv
-      uses: astral-sh/setup-uv@v8
+      uses: astral-sh/setup-uv@v8.1.0
       with:
         python-version: '3.12'
         enable-cache: false
