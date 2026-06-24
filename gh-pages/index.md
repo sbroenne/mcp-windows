@@ -19,7 +19,7 @@ canonical_url: "https://windowsmcpserver.dev/"
 <div class="badges-section">
   <div class="container">
     <div class="hero-badges">
-      <a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"><img src="https://img.shields.io/visual-studio-marketplace/i/sbroenne.windows-mcp?label=VS%20Code%20Installs" alt="VS Code Marketplace Installs"></a>
+      <a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"><img src="https://vsmarketplacebadges.dev/installs-short/sbroenne.windows-mcp.svg?label=VS%20Code%20Installs" alt="VS Code Marketplace Installs"></a>
       <a href="https://github.com/sbroenne/mcp-windows"><img src="https://img.shields.io/github/stars/sbroenne/mcp-windows?style=flat&label=GitHub%20Stars" alt="GitHub Stars"></a>
       <a href="https://github.com/sbroenne/mcp-windows/releases"><img src="https://img.shields.io/github/downloads/sbroenne/mcp-windows/total?label=GitHub%20Downloads" alt="GitHub Downloads"></a>
       <a href="https://github.com/sbroenne/mcp-windows/releases/latest"><img src="https://img.shields.io/badge/LLM%20Tests-View%20Results-blue" alt="LLM Test Results"></a>
