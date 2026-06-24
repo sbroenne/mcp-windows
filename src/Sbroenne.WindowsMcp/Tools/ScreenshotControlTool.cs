@@ -77,7 +77,7 @@ public static partial class ScreenshotControlTool
         [DefaultValue(null)] int? quality,
         [DefaultValue(null)] string? outputMode,
         [DefaultValue(null)] string? outputPath,
-        [DefaultValue(null)] bool? includeImage,
+        [DefaultValue(false)] bool includeImage,
         CancellationToken cancellationToken)
     {
         try
@@ -172,7 +172,7 @@ public static partial class ScreenshotControlTool
             {
                 // Default: don't include image for annotated screenshots (element metadata is sufficient)
                 // This saves ~100K+ tokens per screenshot
-                var shouldIncludeImage = includeImage ?? false;
+                var shouldIncludeImage = includeImage;
                 return await CaptureAnnotatedAsync(windowHandle, parsedImageFormat, parsedQuality, parsedOutputMode, outputPath, shouldIncludeImage, cancellationToken);
             }
 
