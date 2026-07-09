@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tools;
@@ -31,9 +32,9 @@ public static partial class UIReadTool
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The extracted text content from the element or screen region.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload of the extracted text content from the element or screen region. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
         [DefaultValue(null)] string? name,
         [DefaultValue(null)] string? nameContains,
@@ -51,7 +52,7 @@ public static partial class UIReadTool
 
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return WindowsToolsBase.Fail(
+            return WindowsToolsBase.FailResult(
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
@@ -88,7 +89,7 @@ public static partial class UIReadTool
             var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, cancellationToken);
             if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
             {
-                return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+                return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
             }
 
             // Fallback: try OCR on the window region
@@ -96,12 +97,12 @@ public static partial class UIReadTool
             {
                 if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
                 {
-                    return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
                 }
 
                 if (!NativeMethods.GetWindowRect(hwnd, out var rect))
                 {
-                    return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
                 }
 
                 var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
@@ -119,7 +120,7 @@ public static partial class UIReadTool
                     {
                         UsageHint = $"Text extracted via OCR (fallback). Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
                     };
-                    return WindowsToolsBase.SerializeUIResult(ocrSuccessResult, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(ocrSuccessResult, includeDiagnostics);
                 }
             }
             catch (Exception) when (!cancellationToken.IsCancellationRequested)
@@ -127,11 +128,11 @@ public static partial class UIReadTool
                 // OCR fallback failed - ignore and return original result
             }
 
-            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+            return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {
-            return WindowsToolsBase.SerializeToolError(actionName, ex);
+            return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
 }

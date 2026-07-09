@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Fixtures;
 using Sbroenne.WindowsMcp.Tools;
@@ -21,9 +22,10 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         _fixture = fixture;
     }
 
-    private static MouseControlResult DeserializeResult(string json)
+    private static MouseControlResult DeserializeResult(CallToolResult callResult)
     {
-        return JsonSerializer.Deserialize<MouseControlResult>(json, WindowsToolsBase.JsonOptions)!;
+        var text = Assert.Single(callResult.Content.OfType<TextContentBlock>()).Text;
+        return JsonSerializer.Deserialize<MouseControlResult>(text, WindowsToolsBase.JsonOptions)!;
     }
 
     [Fact]

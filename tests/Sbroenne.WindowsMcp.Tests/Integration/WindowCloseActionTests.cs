@@ -3,6 +3,7 @@
 
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -23,9 +24,15 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
 
     private const string SacrificialWindowTitle = "MCP Close Test Window";
 
-    private static WindowManagementResult DeserializeResult(string json)
+    private static WindowManagementResult DeserializeResult(CallToolResult callResult)
     {
-        return JsonSerializer.Deserialize<WindowManagementResult>(json, WindowsToolsBase.JsonOptions)!;
+        var text = Assert.Single(callResult.Content.OfType<TextContentBlock>()).Text;
+        return JsonSerializer.Deserialize<WindowManagementResult>(text, WindowsToolsBase.JsonOptions)!;
+    }
+
+    private static string GetResultText(CallToolResult callResult)
+    {
+        return Assert.Single(callResult.Content.OfType<TextContentBlock>()).Text;
     }
 
     /// <inheritdoc/>
@@ -246,7 +253,7 @@ public sealed class WindowCloseActionTests : IAsyncLifetime, IDisposable
             discardChanges: false,
             cancellationToken: CancellationToken.None);
 
-        using var listDoc = JsonDocument.Parse(listResultJson);
+        using var listDoc = JsonDocument.Parse(GetResultText(listResultJson));
         var root = listDoc.RootElement;
 
         Assert.True(root.GetProperty("success").GetBoolean());

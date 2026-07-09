@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -37,9 +38,9 @@ public static partial class UIFindTool
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result containing list of found elements with their properties and element IDs.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload listing found elements and their properties (including element IDs). <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_find", Title = "Find UI Elements", Destructive = false, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
         [DefaultValue(null)] string? name,
         [DefaultValue(null)] string? nameContains,
@@ -61,7 +62,7 @@ public static partial class UIFindTool
 
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return WindowsToolsBase.Fail(
+            return WindowsToolsBase.FailResult(
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
@@ -86,11 +87,11 @@ public static partial class UIFindTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(query, cancellationToken);
-            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+            return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {
-            return WindowsToolsBase.SerializeToolError(actionName, ex);
+            return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
 }

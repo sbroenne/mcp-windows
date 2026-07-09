@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -26,9 +27,9 @@ public static partial class UIFileTool
     /// <param name="filePath">Full path to save to (e.g., C:/Users/User/doc.txt). REQUIRED for new files. Forward/back slashes both work.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Success status.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload describing the save operation's success status. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "file_save", Title = "💾 SAVE FILE (handles Save As dialogs)", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
         [DefaultValue(null)] string? filePath,
         [DefaultValue(false)] bool includeDiagnostics,
@@ -38,18 +39,18 @@ public static partial class UIFileTool
 
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return WindowsToolsBase.Fail(
+            return WindowsToolsBase.FailResult(
                 "windowHandle is required. Get it from window_management(action='find'). Pass the APPLICATION window, not a dialog.");
         }
 
         try
         {
             var result = await WindowsToolsBase.UIAutomationService.SaveAsync(windowHandle, filePath, cancellationToken);
-            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+            return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {
-            return WindowsToolsBase.SerializeToolError(actionName, ex);
+            return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
 }

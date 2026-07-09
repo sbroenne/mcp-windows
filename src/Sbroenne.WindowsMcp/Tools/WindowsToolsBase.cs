@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
@@ -222,6 +223,53 @@ public static class WindowsToolsBase
         }
 
         return JsonSerializer.Serialize(result, JsonOptions);
+    }
+
+    /// <summary>
+    /// Converts a UI automation result into an MCP call result, stripping diagnostics unless
+    /// explicitly requested. <see cref="CallToolResult.IsError"/> mirrors <see cref="UIAutomationResult.Success"/>.
+    /// </summary>
+    /// <param name="result">The UI automation result.</param>
+    /// <param name="includeDiagnostics">Whether to include diagnostics in the response.</param>
+    /// <returns>A call result carrying the serialized JSON payload.</returns>
+    public static CallToolResult ToCallToolResult(UIAutomationResult result, bool includeDiagnostics)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = SerializeUIResult(result, includeDiagnostics) }],
+            IsError = !result.Success
+        };
+    }
+
+    /// <summary>
+    /// Wraps a failure message in a failed MCP call result.
+    /// </summary>
+    /// <param name="error">Error message.</param>
+    /// <returns>A failed call result carrying the serialized JSON error payload.</returns>
+    public static CallToolResult FailResult(string error)
+    {
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = Fail(error) }],
+            IsError = true
+        };
+    }
+
+    /// <summary>
+    /// Wraps a tool exception into a failed MCP call result with consistent structure.
+    /// </summary>
+    /// <param name="actionName">Action that failed.</param>
+    /// <param name="ex">Exception that occurred.</param>
+    /// <returns>A failed call result carrying the serialized JSON error payload.</returns>
+    public static CallToolResult ErrorCallToolResult(string actionName, Exception ex)
+    {
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = SerializeToolError(actionName, ex) }],
+            IsError = true
+        };
     }
 
     private static int GetTimeoutFromEnvironment()

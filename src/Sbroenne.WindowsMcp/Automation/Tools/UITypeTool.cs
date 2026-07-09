@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -34,9 +35,9 @@ public static partial class UITypeTool
     /// <param name="clearFirst">Clear existing text before typing (default: false).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the type operation including success status and element information.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload describing the type operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
         string text,
         [DefaultValue(null)] string? name,
@@ -54,13 +55,13 @@ public static partial class UITypeTool
 
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
-            return WindowsToolsBase.Fail(
+            return WindowsToolsBase.FailResult(
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
         if (string.IsNullOrEmpty(text))
         {
-            return WindowsToolsBase.Fail("text is required.");
+            return WindowsToolsBase.FailResult("text is required.");
         }
 
         try
@@ -78,11 +79,11 @@ public static partial class UITypeTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndTypeAsync(query, text, clearFirst, cancellationToken);
-            return WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
+            return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
         {
-            return WindowsToolsBase.SerializeToolError(actionName, ex);
+            return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
 }

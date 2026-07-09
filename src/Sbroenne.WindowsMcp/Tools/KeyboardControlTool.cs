@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Serialization;
@@ -32,9 +33,9 @@ public static partial class KeyboardControlTool
     /// <param name="interKeyDelayMs">Delay between keys in sequence (milliseconds).</param>
     /// <param name="clearFirst">For type action only: If true, clears the current field content before typing by sending Ctrl+A (select all) followed by the new text.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result includes success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload including success status, operation details, and 'target_window' (handle, title, process_name) showing which window received the input. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "keyboard_control", Title = "Keyboard Control", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
         KeyboardAction action,
         [DefaultValue(null)] string? text,
@@ -51,21 +52,19 @@ public static partial class KeyboardControlTool
             // Validate windowHandle is provided
             if (string.IsNullOrWhiteSpace(windowHandle))
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.MissingRequiredParameter,
-                        "windowHandle is required. Get it from app() or window_management(action='find')."),
-                    WindowsToolsBase.JsonOptions);
+                        "windowHandle is required. Get it from app() or window_management(action='find')."));
             }
 
             // Parse windowHandle
             if (!long.TryParse(windowHandle, out var handleValue) || handleValue == 0)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.InvalidAction,
-                        $"Invalid windowHandle '{windowHandle}'. Must be a non-zero decimal number from app() or window_management."),
-                    WindowsToolsBase.JsonOptions);
+                        $"Invalid windowHandle '{windowHandle}'. Must be a non-zero decimal number from app() or window_management."));
             }
 
             var handle = new IntPtr(handleValue);
@@ -79,11 +78,10 @@ public static partial class KeyboardControlTool
             var activationResult = await WindowsToolsBase.WindowService.ActivateWindowAsync(handle, linkedToken);
             if (!activationResult.Success)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.WrongTargetWindow,
-                        $"Failed to activate window {windowHandle}: {activationResult.Error}"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Failed to activate window {windowHandle}: {activationResult.Error}"));
             }
 
             // Small delay to let the window settle after activation
@@ -138,21 +136,41 @@ public static partial class KeyboardControlTool
                 operationResult = await AttachTargetWindowInfoAsync(operationResult, linkedToken);
             }
 
-            return JsonSerializer.Serialize(operationResult, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(operationResult);
         }
         catch (OperationCanceledException)
         {
-            return JsonSerializer.Serialize(
+            return ToCallToolResult(
                 KeyboardControlResult.CreateFailure(
                     KeyboardControlErrorCode.OperationTimeout,
-                    $"Operation timed out after {WindowsToolsBase.TimeoutMs}ms"),
-                WindowsToolsBase.JsonOptions);
+                    $"Operation timed out after {WindowsToolsBase.TimeoutMs}ms"));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return WindowsToolsBase.SerializeToolError("keyboard_control", ex);
+            return ErrorResult(WindowsToolsBase.SerializeToolError("keyboard_control", ex));
         }
     }
+
+    /// <summary>
+    /// Converts a keyboard control result into an MCP call result. <see cref="CallToolResult.IsError"/>
+    /// mirrors <see cref="KeyboardControlResult.Success"/>.
+    /// </summary>
+    private static CallToolResult ToCallToolResult(KeyboardControlResult result) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions) }],
+            IsError = !result.Success
+        };
+
+    /// <summary>
+    /// Wraps a pre-serialized JSON error payload in a failed call result.
+    /// </summary>
+    private static CallToolResult ErrorResult(string json) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = json }],
+            IsError = true
+        };
 
     private static async Task<KeyboardControlResult> HandleTypeAsync(string? text, bool clearFirst, CancellationToken cancellationToken)
     {
