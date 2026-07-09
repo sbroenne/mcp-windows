@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Removed implicit `app` parameter that made window selection decisions
   - Example: `ui_click(windowHandle='123456', name='Save')`
 - **snake_case action names** - All action parameters use snake_case (e.g., `find`, `click`, `get_foreground`)
+- **`screenshot_control` returns inline images as MCP image content blocks** - Base64 image data is now sent as a dedicated `image/jpeg` or `image/png` content block instead of a JSON `imageData` field, so clients render it as a real image
+  - The JSON text block still carries dimensions, format, file size/path, and annotated elements, with the base64 payload stripped to avoid duplicating it
+  - **`isError` now reflects tool-level failures** - Validation errors (invalid `action`/`target`/`imageFormat`/`quality`/`outputMode`, missing region params, output path errors) now set `CallToolResult.IsError=true` at the MCP protocol level, instead of only encoding the failure in the JSON body's `success`/`errorCode`/`message` fields
 - **Annotated screenshots by default** - `screenshot_control` now includes element overlays automatically
   - Element names, types, and coordinates embedded in the image
 - **Simplified workflow** - Most tasks now require fewer tool calls
