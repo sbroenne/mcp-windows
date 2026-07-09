@@ -4,6 +4,7 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -24,9 +25,10 @@ public class AppLaunchTests : IClassFixture<WindowTestFixture>
         _fixture = fixture;
     }
 
-    private static WindowManagementResult DeserializeResult(string json)
+    private static WindowManagementResult DeserializeResult(CallToolResult callResult)
     {
-        return JsonSerializer.Deserialize<WindowManagementResult>(json, WindowsToolsBase.JsonOptions)!;
+        var text = Assert.Single(callResult.Content.OfType<TextContentBlock>()).Text;
+        return JsonSerializer.Deserialize<WindowManagementResult>(text, WindowsToolsBase.JsonOptions)!;
     }
 
     [Fact]

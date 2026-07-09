@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Native;
 
@@ -48,9 +49,9 @@ public static partial class MouseControlTool
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="windowHandle">Window handle for window-relative coordinates. When provided, x/y are relative to the window's top-left corner.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result includes success status, cursor position, monitor context, and 'target_window' for click actions.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload including success status, cursor position, monitor context, and 'target_window' for click actions. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         MouseAction action,
         [DefaultValue(null)] string? target,
         [DefaultValue(null)] int? x,
@@ -80,7 +81,7 @@ public static partial class MouseControlTool
                 var targetCheckResult = await VerifyTargetWindowAsync(expectedWindowTitle, expectedProcessName, linkedToken);
                 if (!targetCheckResult.Success)
                 {
-                    return JsonSerializer.Serialize(targetCheckResult, WindowsToolsBase.JsonOptions);
+                    return ToCallToolResult(targetCheckResult);
                 }
             }
 
@@ -99,7 +100,7 @@ public static partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Invalid windowHandle: '{windowHandle}'. Expected decimal string from window_management.");
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return ToCallToolResult(result);
                 }
 
                 // Get window rect
@@ -108,7 +109,7 @@ public static partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Could not get window position for handle {windowHandle}. The window may no longer exist.");
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return ToCallToolResult(result);
                 }
 
                 windowLeft = windowRect.Left;
@@ -144,7 +145,7 @@ public static partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         $"Invalid target: '{target}'. Valid values are: 'primary_screen', 'secondary_screen'");
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return ToCallToolResult(result);
                 }
 
                 // Resolve target to monitor index
@@ -163,7 +164,7 @@ public static partial class MouseControlTool
                     var result = MouseControlResult.CreateFailure(
                         MouseControlErrorCode.InvalidCoordinates,
                         errorMessage);
-                    return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                    return ToCallToolResult(result);
                 }
 
                 // Find the index of this monitor
@@ -190,7 +191,7 @@ public static partial class MouseControlTool
                         { "valid_targets", ValidTargets },
                         { "valid_indices", availableIndices }
                     });
-                return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                return ToCallToolResult(result);
             }
 
             // Use resolved monitorIndex, windowBasedMonitorIndex, or default to 0 for coordinate-less actions
@@ -208,7 +209,7 @@ public static partial class MouseControlTool
                         { "valid_indices", availableIndices },
                         { "provided_index", targetMonitorIndex }
                     });
-                return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                return ToCallToolResult(result);
             }
 
             // Translate coordinates to absolute screen coordinates
@@ -219,7 +220,7 @@ public static partial class MouseControlTool
                 var result = MouseControlResult.CreateFailure(
                     MouseControlErrorCode.InvalidCoordinates,
                     $"Invalid monitor index: {monitorIndex}. Available monitors: 0-{WindowsToolsBase.MonitorService.MonitorCount - 1}");
-                return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                return ToCallToolResult(result);
             }
 
             if (isWindowRelativeMode)
@@ -284,7 +285,7 @@ public static partial class MouseControlTool
                                 { "valid_bounds", new { left = monitor.X, top = monitor.Y, right = monitor.X + monitor.Width, bottom = monitor.Y + monitor.Height } },
                                 { "provided_coordinates", new { x = x.Value, y = y.Value } }
                             });
-                        return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                        return ToCallToolResult(result);
                     }
                 }
 
@@ -300,7 +301,7 @@ public static partial class MouseControlTool
                                 { "valid_bounds", new { left = monitor.X, top = monitor.Y, right = monitor.X + monitor.Width, bottom = monitor.Y + monitor.Height } },
                                 { "provided_coordinates", new { x = endX.Value, y = endY.Value } }
                             });
-                        return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+                        return ToCallToolResult(result);
                     }
                 }
             }
@@ -377,20 +378,41 @@ public static partial class MouseControlTool
                 }
             }
 
-            return JsonSerializer.Serialize(operationResult, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(operationResult);
         }
         catch (OperationCanceledException)
         {
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.OperationTimeout,
                 $"Operation timed out after {WindowsToolsBase.TimeoutMs}ms");
-            return JsonSerializer.Serialize(errorResult, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(errorResult);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return WindowsToolsBase.SerializeToolError("mouse_control", ex);
+            return ErrorResult(WindowsToolsBase.SerializeToolError("mouse_control", ex));
         }
     }
+
+    /// <summary>
+    /// Converts a mouse control result into an MCP call result. <see cref="CallToolResult.IsError"/>
+    /// mirrors <see cref="MouseControlResult.Success"/>.
+    /// </summary>
+    private static CallToolResult ToCallToolResult(MouseControlResult result) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions) }],
+            IsError = !result.Success
+        };
+
+    /// <summary>
+    /// Wraps a pre-serialized JSON error payload in a failed call result.
+    /// </summary>
+    private static CallToolResult ErrorResult(string json) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = json }],
+            IsError = true
+        };
 
     private static async Task<MouseControlResult> HandleMoveAsync(int? x, int? y, CancellationToken cancellationToken)
     {

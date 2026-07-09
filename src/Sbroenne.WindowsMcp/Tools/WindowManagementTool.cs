@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Native;
 
@@ -51,9 +52,9 @@ public static partial class WindowManagementTool
     /// <param name="excludeTitle">Window title to exclude from list results (for list action).</param>
     /// <param name="discardChanges">For close action: if true, automatically dismisses 'Save?' dialogs by clicking 'Don't Save'. Only works on English Windows. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the window operation including success status and window information.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload of the window operation, including success status and window information. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "window_management", Title = "Window Management", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         WindowAction action,
         [DefaultValue(null)] string? handle,
         [DefaultValue(null)] string? title,
@@ -153,27 +154,47 @@ public static partial class WindowManagementTool
                     break;
             }
 
-            return JsonSerializer.Serialize(operationResult, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(operationResult);
         }
         catch (OperationCanceledException)
         {
-            return JsonSerializer.Serialize(
+            return ToCallToolResult(
                 WindowManagementResult.CreateFailure(
                     WindowManagementErrorCode.Timeout,
-                    "Operation was cancelled"),
-                WindowsToolsBase.JsonOptions);
+                    "Operation was cancelled"));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return WindowsToolsBase.SerializeToolError("window_management", ex);
+            return ErrorResult(WindowsToolsBase.SerializeToolError("window_management", ex));
         }
     }
+
+    /// <summary>
+    /// Converts a window management result into an MCP call result. <see cref="CallToolResult.IsError"/>
+    /// mirrors <see cref="WindowManagementResult.Success"/>.
+    /// </summary>
+    private static CallToolResult ToCallToolResult(WindowManagementResult result) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions) }],
+            IsError = !result.Success
+        };
+
+    /// <summary>
+    /// Wraps a pre-serialized JSON error payload in a failed call result.
+    /// </summary>
+    private static CallToolResult ErrorResult(string json) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = json }],
+            IsError = true
+        };
 
     /// <summary>
     /// Handles the list action, returning a slim JSON response with only
     /// handle, title, and process name per window to minimize token usage.
     /// </summary>
-    private static async Task<string> HandleListSerializedAsync(
+    private static async Task<CallToolResult> HandleListSerializedAsync(
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
@@ -184,7 +205,7 @@ public static partial class WindowManagementTool
 
         if (!result.Success)
         {
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(result);
         }
 
         var windows = result.Windows ?? [];
@@ -203,7 +224,11 @@ public static partial class WindowManagementTool
             count = windows.Count
         };
 
-        return JsonSerializer.Serialize(slimResult, WindowsToolsBase.JsonOptions);
+        return new CallToolResult
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(slimResult, WindowsToolsBase.JsonOptions) }],
+            IsError = false
+        };
     }
 
     private static async Task<WindowManagementResult> HandleFindAsync(

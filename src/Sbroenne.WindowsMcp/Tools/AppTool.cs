@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -48,9 +49,9 @@ public static partial class AppTool
     /// <param name="waitForWindow">Wait for the application window to appear before returning (default: true). Set to false for background processes.</param>
     /// <param name="timeoutMs">Timeout in milliseconds to wait for the window to appear (default: 5000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the launch operation including the window handle for subsequent operations.</returns>
+    /// <returns>A call result containing a text content block with the JSON payload of the launch operation, including the window handle for subsequent operations. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "app", Title = "Launch Application", Destructive = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         string programPath,
         [DefaultValue(null)] string? arguments,
         [DefaultValue(null)] string? workingDirectory,
@@ -63,20 +64,41 @@ public static partial class AppTool
         try
         {
             var result = await HandleLaunchAsync(programPath, arguments, workingDirectory, waitForWindow, timeoutMs, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(result);
         }
         catch (OperationCanceledException)
         {
             var errorResult = WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.Timeout,
                 "Operation was cancelled");
-            return JsonSerializer.Serialize(errorResult, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(errorResult);
         }
         catch (Exception ex)
         {
-            return WindowsToolsBase.SerializeToolError(actionName, ex);
+            return ErrorResult(WindowsToolsBase.SerializeToolError(actionName, ex));
         }
     }
+
+    /// <summary>
+    /// Converts a window management result into an MCP call result. <see cref="CallToolResult.IsError"/>
+    /// mirrors <see cref="WindowManagementResult.Success"/>.
+    /// </summary>
+    private static CallToolResult ToCallToolResult(WindowManagementResult result) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions) }],
+            IsError = !result.Success
+        };
+
+    /// <summary>
+    /// Wraps a pre-serialized JSON error payload in a failed call result.
+    /// </summary>
+    private static CallToolResult ErrorResult(string json) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = json }],
+            IsError = true
+        };
 
     private static async Task<WindowManagementResult> HandleLaunchAsync(
         string? programPath,
