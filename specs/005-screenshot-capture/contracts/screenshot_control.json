@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "screenshot_control",
   "description": "Windows screenshot capture MCP tool for capturing screens, monitors, windows, and regions",
+  "x-response-format-note": "HISTORICAL/SUPERSEDED (as of PR #130): the 'responses' section below documents an older response shape where the base64 image traveled as an 'image_data' JSON field. As of PR #130, inline image data is returned as a dedicated MCP ImageContentBlock (mimeType 'image/jpeg' or 'image/png') alongside a separate JSON text content block; the JSON metadata no longer includes an 'image_data'/'imageData' field when an image block is present. Additionally, tool-level validation errors (invalid action/target/imageFormat/quality/outputMode, missing region params, output path errors) now set CallToolResult.IsError=true at the MCP protocol level rather than only encoding the failure in the JSON body's success/errorCode/message fields. See src/Sbroenne.WindowsMcp/Tools/ScreenshotControlTool.cs for the current behavior.",
   "type": "object",
   "properties": {
     "action": {
@@ -125,13 +126,13 @@
   ],
   "responses": {
     "capture_success": {
-      "description": "Successful screenshot capture",
+      "description": "HISTORICAL/SUPERSEDED (PR #130): documents the pre-#130 response shape where the image traveled inline as an 'image_data' JSON field. As of PR #130, the CallToolResult instead contains a separate MCP ImageContentBlock (mimeType 'image/jpeg' or 'image/png') carrying the base64 bytes, plus a JSON text content block with this metadata minus the image payload (no 'image_data'/'imageData' field is emitted when an image block is present).",
       "type": "object",
       "properties": {
         "success": { "type": "boolean", "const": true },
         "error_code": { "type": "string", "const": "success" },
         "message": { "type": "string" },
-        "image_data": { "type": "string", "description": "Base64-encoded PNG image" },
+        "image_data": { "type": "string", "description": "SUPERSEDED: base64-encoded image data. Now carried by a sibling MCP ImageContentBlock instead of this JSON field; omitted from the JSON metadata when an image block is present." },
         "width": { "type": "integer" },
         "height": { "type": "integer" },
         "format": { "type": "string", "const": "png" }
