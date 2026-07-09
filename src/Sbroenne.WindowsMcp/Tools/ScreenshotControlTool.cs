@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Text.Json;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -60,9 +61,9 @@ public static partial class ScreenshotControlTool
     /// <param name="outputPath">Directory or file path for output when outputMode is 'file'. If directory, auto-generates filename. If null, uses temp directory.</param>
     /// <param name="includeImage">Include the image in the response. Default: false for annotated screenshots (element metadata is sufficient). Set true to see the actual screenshot pixels.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result containing base64-encoded image data or file path, dimensions, original dimensions (if scaled), file size, and error details if failed.</returns>
+    /// <returns>A call result containing the screenshot as an inline image content block (when returned inline) plus a JSON text block with dimensions, file size or path, annotated elements, and error details if failed.</returns>
     [McpServerTool(Name = "screenshot_control", Title = "Screenshot Capture", ReadOnly = true, Idempotent = true, OpenWorld = false)]
-    public static async partial Task<string> ExecuteAsync(
+    public static async partial Task<CallToolResult> ExecuteAsync(
         [DefaultValue(null)] string? action,
         [DefaultValue(true)] bool annotate,
         [DefaultValue(null)] string? target,
@@ -86,55 +87,50 @@ public static partial class ScreenshotControlTool
             var screenshotAction = ParseAction(action);
             if (screenshotAction == null)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.InvalidRequest,
-                        $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Invalid action: '{action}'. Valid values: 'capture', 'list_monitors'"));
             }
 
             // Parse target
             var captureTarget = ParseTarget(target);
             if (captureTarget == null && screenshotAction == ScreenshotAction.Capture)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.InvalidRequest,
-                        $"Invalid target: '{target}'. Valid values: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Invalid target: '{target}'. Valid values: 'primary_screen', 'secondary_screen', 'monitor', 'window', 'region', 'all_monitors'"));
             }
 
             // Parse and validate image format
             var parsedImageFormat = ParseImageFormat(imageFormat);
             if (parsedImageFormat == null && imageFormat != null)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.InvalidRequest,
-                        $"Invalid imageFormat: '{imageFormat}'. Valid values: 'jpeg', 'jpg', 'png'"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Invalid imageFormat: '{imageFormat}'. Valid values: 'jpeg', 'jpg', 'png'"));
             }
 
             // Validate quality
             var parsedQuality = quality ?? DefaultQuality;
             if (parsedQuality < 1 || parsedQuality > 100)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.InvalidRequest,
-                        $"Quality must be between 1 and 100, got: {parsedQuality}"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Quality must be between 1 and 100, got: {parsedQuality}"));
             }
 
             // Parse and validate output mode
             var parsedOutputMode = ParseOutputMode(outputMode);
             if (parsedOutputMode == null && outputMode != null)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.InvalidRequest,
-                        $"Invalid outputMode: '{outputMode}'. Valid values: 'inline', 'file'"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Invalid outputMode: '{outputMode}'. Valid values: 'inline', 'file'"));
             }
 
             // Validate output path if provided
@@ -143,11 +139,10 @@ public static partial class ScreenshotControlTool
                 var directory = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-                    return JsonSerializer.Serialize(
+                    return ToCallToolResult(
                         ScreenshotControlResult.Error(
                             ScreenshotErrorCode.InvalidRequest,
-                            $"Output directory does not exist: '{directory}'"),
-                        WindowsToolsBase.JsonOptions);
+                            $"Output directory does not exist: '{directory}'"));
                 }
             }
 
@@ -157,11 +152,10 @@ public static partial class ScreenshotControlTool
             {
                 if (regionX == null || regionY == null || regionWidth == null || regionHeight == null)
                 {
-                    return JsonSerializer.Serialize(
+                    return ToCallToolResult(
                         ScreenshotControlResult.Error(
                             ScreenshotErrorCode.InvalidRegion,
-                            "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters"),
-                        WindowsToolsBase.JsonOptions);
+                            "Region capture requires regionX, regionY, regionWidth, and regionHeight parameters"));
                 }
 
                 region = new CaptureRegion(regionX.Value, regionY.Value, regionWidth.Value, regionHeight.Value);
@@ -193,11 +187,11 @@ public static partial class ScreenshotControlTool
 
             // Execute and return result
             var result = await WindowsToolsBase.ScreenshotService.ExecuteAsync(request, cancellationToken);
-            return JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+            return ToCallToolResult(result);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return WindowsToolsBase.SerializeToolError("screenshot_control", ex);
+            return ErrorResult(WindowsToolsBase.SerializeToolError("screenshot_control", ex));
         }
     }
 
@@ -280,7 +274,7 @@ public static partial class ScreenshotControlTool
     /// <summary>
     /// Captures an annotated screenshot with numbered element labels.
     /// </summary>
-    private static async Task<string> CaptureAnnotatedAsync(
+    private static async Task<CallToolResult> CaptureAnnotatedAsync(
         string? windowHandle,
         Models.ImageFormat? imageFormat,
         int quality,
@@ -302,11 +296,10 @@ public static partial class ScreenshotControlTool
 
         if (!result.Success)
         {
-            return JsonSerializer.Serialize(
+            return ToCallToolResult(
                 ScreenshotControlResult.Error(
                     ScreenshotErrorCode.CaptureError,
-                    result.ErrorMessage ?? "Failed to capture annotated screenshot"),
-                WindowsToolsBase.JsonOptions);
+                    result.ErrorMessage ?? "Failed to capture annotated screenshot"));
         }
 
         // Save to file if outputPath or outputMode is file
@@ -337,11 +330,10 @@ public static partial class ScreenshotControlTool
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return JsonSerializer.Serialize(
+                return ToCallToolResult(
                     ScreenshotControlResult.Error(
                         ScreenshotErrorCode.CaptureError,
-                        $"Failed to save annotated image to '{outputPath}': {ex.Message}"),
-                    WindowsToolsBase.JsonOptions);
+                        $"Failed to save annotated image to '{outputPath}': {ex.Message}"));
             }
         }
 
@@ -349,7 +341,7 @@ public static partial class ScreenshotControlTool
         // By default, don't include image to save tokens (element metadata is sufficient for LLM)
         var returnImageInline = includeImage && outputMode != OutputMode.File && savedFilePath == null;
 
-        return JsonSerializer.Serialize(
+        return ToCallToolResult(
             ScreenshotControlResult.AnnotatedSuccess(
                 returnImageInline ? result.ImageData : null,
                 result.Width ?? 0,
@@ -358,7 +350,55 @@ public static partial class ScreenshotControlTool
                 result.Elements ?? [],
                 savedFilePath,
                 result.OriginalWidth,
-                result.OriginalHeight),
-            WindowsToolsBase.JsonOptions);
+                result.OriginalHeight));
     }
+
+    /// <summary>
+    /// Converts a screenshot result into an MCP call result. Inline image data is
+    /// emitted as a dedicated image content block so the model receives rendered
+    /// pixels instead of a base64 text blob; the remaining metadata travels as a
+    /// JSON text block with the base64 payload stripped to avoid duplicating it.
+    /// </summary>
+    private static CallToolResult ToCallToolResult(ScreenshotControlResult result)
+    {
+        var content = new List<ContentBlock>();
+
+        if (!string.IsNullOrEmpty(result.ImageData))
+        {
+            content.Add(ImageContentBlock.FromBytes(
+                Convert.FromBase64String(result.ImageData),
+                ToMimeType(result.Format)));
+        }
+
+        // Strip the base64 payload from the metadata: it now travels as the image block above.
+        var metadata = result with { ImageData = null };
+        content.Add(new TextContentBlock
+        {
+            Text = JsonSerializer.Serialize(metadata, WindowsToolsBase.JsonOptions)
+        });
+
+        return new CallToolResult
+        {
+            Content = content,
+            IsError = !result.Success
+        };
+    }
+
+    /// <summary>
+    /// Wraps a pre-serialized JSON error payload in a failed call result.
+    /// </summary>
+    private static CallToolResult ErrorResult(string json) =>
+        new()
+        {
+            Content = [new TextContentBlock { Text = json }],
+            IsError = true
+        };
+
+    /// <summary>
+    /// Maps an internal image format ("jpeg"/"png") to its MIME type.
+    /// </summary>
+    private static string ToMimeType(string? format) =>
+        string.Equals(format, "png", StringComparison.OrdinalIgnoreCase)
+            ? "image/png"
+            : "image/jpeg";
 }
