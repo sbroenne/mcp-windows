@@ -148,4 +148,11 @@ public sealed record ElementQuery
     /// The element ID of the reference element. Results will be sorted by distance from this element's center.
     /// </summary>
     public string? NearElement { get; init; }
+
+    /// <summary>
+    /// When set, controls whether off-screen (IsOffscreen) elements are excluded from results.
+    /// When null, the framework strategy decides: excluded for Chromium/Electron (which expose many
+    /// hidden/virtualized nodes), included otherwise. Set explicitly to override.
+    /// </summary>
+    public bool? VisibleOnly { get; init; }
 }

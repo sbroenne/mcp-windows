@@ -172,6 +172,8 @@ public sealed class WindowsAutomationPrompts
             new(ChatRole.System,
                 "Use the standard semantic workflow for Chromium browsers (Edge, Chrome). " +
                 "Page content — links, buttons, form fields, and text — is reliably discoverable via ui_* tools using ARIA labels and visible text. " +
+                "When you launch a Chromium browser via app(), renderer accessibility is enabled automatically so the full page tree is exposed; " +
+                "a browser that was already open by other means may expose a reduced tree until it is interacted with. " +
                 "Browser chrome (address bar, tab bar, toolbar) is best-effort: prefer keyboard shortcuts for those. " +
                 "For authenticated or SSO-only sites, check whether a signed-in browser window is already open before launching a new instance — " +
                 "Chromium launcher helpers often exit immediately when an existing session picks up the request, so that is not a failure."),

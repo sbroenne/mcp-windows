@@ -98,6 +98,14 @@ public static class ElementIdGenerator
                 element = FindByTreePath(parts.WindowHandle, parts.TreePath);
             }
 
+            // Last-resort: Locator-style re-resolution by name + control type. Chromium/Electron churn
+            // runtime IDs and tree indices on re-render, so re-find the element by its stable semantic
+            // selector when both the runtime ID and tree path have gone stale.
+            if (element == null && !string.IsNullOrEmpty(parts.Name))
+            {
+                element = FindBySelector(parts.WindowHandle, parts.ControlType, parts.Name!);
+            }
+
             return element;
         }
         catch
@@ -143,7 +151,7 @@ public static class ElementIdGenerator
             // Calculate tree path from root
             var treePath = CalculateTreePath(element, rootElement);
 
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:{treePath}";
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:{treePath}{BuildSelectorSegment(element, cached: false)}";
         }
         catch
         {
@@ -192,7 +200,7 @@ public static class ElementIdGenerator
                 : "0";
 
             // Simplified format - no tree path (expensive to calculate)
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached";
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached{BuildSelectorSegment(element, cached: true)}";
         }
         catch
         {
@@ -223,7 +231,7 @@ public static class ElementIdGenerator
                 : "0";
 
             // Simplified format - no tree path
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast";
+            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast{BuildSelectorSegment(element, cached: false)}";
         }
         catch
         {
@@ -276,26 +284,104 @@ public static class ElementIdGenerator
         return path.Count > 0 ? string.Join(".", path) : "0";
     }
 
+    /// <summary>
+    /// Builds the optional selector segment ("|sel:{controlType}~{name}") used as a Locator-style
+    /// re-resolution fallback. Returns an empty string when the element has no usable name.
+    /// </summary>
+    private static string BuildSelectorSegment(UIA.IUIAutomationElement element, bool cached)
+    {
+        try
+        {
+            var name = cached ? element.GetCachedName() : element.GetName();
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return string.Empty;
+            }
+
+            var controlType = cached ? element.GetCachedControlTypeName() : element.GetControlTypeName();
+
+            // '|' and '~' are our delimiters and newlines break the single-line id; strip them.
+            // Cap length to keep ids compact — the name only needs to be specific enough to re-find.
+            var sanitizedName = name
+                .Replace('|', ' ')
+                .Replace('~', ' ')
+                .Replace('\r', ' ')
+                .Replace('\n', ' ')
+                .Trim();
+            if (sanitizedName.Length > 120)
+            {
+                sanitizedName = sanitizedName[..120];
+            }
+
+            var sanitizedType = (controlType ?? string.Empty).Replace('|', ' ').Replace('~', ' ').Trim();
+
+            return $"|sel:{sanitizedType}~{sanitizedName}";
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     private static ElementIdParts? ParseElementId(string elementId)
     {
         try
         {
             var parts = elementId.Split('|');
-            if (parts.Length != 3)
+            if (parts.Length < 3)
             {
                 return null;
             }
 
-            var windowPart = parts[0].Replace("window:", "");
-            var runtimePart = parts[1].Replace("runtime:", "");
-            var pathPart = parts[2].Replace("path:", "");
+            string? windowPart = null;
+            string? runtimePart = null;
+            string? pathPart = null;
+            string? controlType = null;
+            string? name = null;
+
+            foreach (var part in parts)
+            {
+                if (part.StartsWith("window:", StringComparison.Ordinal))
+                {
+                    windowPart = part["window:".Length..];
+                }
+                else if (part.StartsWith("runtime:", StringComparison.Ordinal))
+                {
+                    runtimePart = part["runtime:".Length..];
+                }
+                else if (part.StartsWith("path:", StringComparison.Ordinal))
+                {
+                    pathPart = part["path:".Length..];
+                }
+                else if (part.StartsWith("sel:", StringComparison.Ordinal))
+                {
+                    var sel = part["sel:".Length..];
+                    var tilde = sel.IndexOf('~');
+                    if (tilde >= 0)
+                    {
+                        controlType = sel[..tilde];
+                        name = sel[(tilde + 1)..];
+                    }
+                    else
+                    {
+                        name = sel;
+                    }
+                }
+            }
+
+            // Require the original three segments so malformed ids (e.g., "window:0|runtime:0")
+            // still fail closed.
+            if (windowPart == null || runtimePart == null || pathPart == null)
+            {
+                return null;
+            }
 
             if (!nint.TryParse(windowPart, out var windowHandle))
             {
                 return null;
             }
 
-            return new ElementIdParts(windowHandle, runtimePart, pathPart);
+            return new ElementIdParts(windowHandle, runtimePart, pathPart, controlType, name);
         }
         catch
         {
@@ -374,7 +460,73 @@ public static class ElementIdGenerator
         }
     }
 
-    private sealed record ElementIdParts(nint WindowHandle, string RuntimeId, string TreePath);
+    /// <summary>
+    /// Locator-style fallback: re-finds an element by exact name, preferring a control-type match and
+    /// an on-screen element. Used only when runtime-id and tree-path resolution have both failed.
+    /// </summary>
+    private static UIA.IUIAutomationElement? FindBySelector(nint windowHandle, string? controlType, string name)
+    {
+        try
+        {
+            var uia = UIA3Automation.Instance;
+            var root = windowHandle != 0
+                ? uia.ElementFromHandle(windowHandle)
+                : uia.RootElement;
+
+            if (root == null)
+            {
+                return null;
+            }
+
+            var condition = uia.CreatePropertyCondition(UIA3PropertyIds.Name, name);
+            var candidates = root.FindAll(UIA.TreeScope.TreeScope_Descendants, condition);
+            if (candidates == null || candidates.Length == 0)
+            {
+                return null;
+            }
+
+            UIA.IUIAutomationElement? typeMatch = null;
+            UIA.IUIAutomationElement? firstAny = null;
+
+            for (var i = 0; i < candidates.Length; i++)
+            {
+                var candidate = candidates.GetElement(i);
+                if (candidate == null)
+                {
+                    continue;
+                }
+
+                firstAny ??= candidate;
+
+                if (string.IsNullOrEmpty(controlType) ||
+                    string.Equals(candidate.GetControlTypeName(), controlType, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Prefer an on-screen element of the right type; keep searching for a visible one.
+                    try
+                    {
+                        if (candidate.CurrentIsOffscreen == 0)
+                        {
+                            return candidate;
+                        }
+                    }
+                    catch
+                    {
+                        return candidate;
+                    }
+
+                    typeMatch ??= candidate;
+                }
+            }
+
+            return typeMatch ?? firstAny;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private sealed record ElementIdParts(nint WindowHandle, string RuntimeId, string TreePath, string? ControlType, string? Name);
 
     /// <summary>
     /// Registers a full element ID and returns a short ID.

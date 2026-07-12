@@ -82,7 +82,21 @@ public sealed partial class UIAutomationService
                         CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
                 }
 
-                return UIAutomationResult.CreateSuccessCompactTree("get_tree", [tree], CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
+                var diagnostics = CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle);
+                if (wasTruncated)
+                {
+                    diagnostics = diagnostics with
+                    {
+                        Warnings =
+                        [
+                            $"Tree truncated at {MaxElementsToScan} elements (scanned {elementsScanned}). " +
+                            "Results are incomplete — scope to a smaller parentElementId/windowHandle, add a controlTypeFilter, " +
+                            "or scroll content into view and retry."
+                        ]
+                    };
+                }
+
+                return UIAutomationResult.CreateSuccessCompactTree("get_tree", [tree], diagnostics);
             }, cancellationToken);
         }
         catch (COMException ex)

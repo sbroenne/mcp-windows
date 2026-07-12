@@ -96,19 +96,39 @@ public sealed partial class UIAutomationService
                 // Detect framework and get optimal search strategy
                 var strategy = GetFrameworkStrategy(rootElement);
 
+                // Resolve visibility filtering: explicit caller value wins; otherwise exclude
+                // off-screen nodes for Chromium/Electron (huge hidden/virtualized trees), include elsewhere.
+                var visibleOnly = query.VisibleOnly ?? strategy.UsePostHocFiltering;
+
                 // Use framework-aware depth: if caller used default (null or 20), use framework recommendation
                 // Otherwise respect explicit caller value
                 var effectiveMaxDepth = !query.MaxDepth.HasValue || query.MaxDepth.Value == 20
                     ? strategy.RecommendedMaxDepth
                     : query.MaxDepth.Value;
 
+                // Route to the cheapest correct strategy:
+                // - No advanced criteria: single FindAllBuildCache (fastest).
+                // - Advanced criteria without ExactDepth: cached bulk fetch + in-process filter.
+                //   This avoids the per-node COM storm of the raw TreeWalker, which is the dominant
+                //   cost for Chromium/Electron where nameContains/namePattern is the recommended path.
+                // - ExactDepth requires depth-aware traversal, so keep the TreeWalker.
                 if (!hasAdvancedCriteria)
                 {
                     FindElementsWithFindAll(rootElement, condition, query, elementInfos, ref elementsScanned, maxResults);
                 }
+                else if (!query.ExactDepth.HasValue)
+                {
+                    FindElementsWithCachedFilter(rootElement, condition, query, elementInfos, ref elementsScanned, ref matchCount, maxResults);
+                }
                 else
                 {
                     FindElementsWithTreeWalker(rootElement, rootElement, condition, query, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+                }
+
+                // Exclude off-screen elements when visibility filtering is in effect.
+                if (visibleOnly && elementInfos.Count > 0)
+                {
+                    elementInfos.RemoveAll(e => e.IsOffscreen);
                 }
 
                 stopwatch.Stop();
@@ -127,7 +147,12 @@ public sealed partial class UIAutomationService
                     elementsScanned = 0;
                     matchCount = 0;
 
-                    FindElementsWithTreeWalker(rootElement, rootElement, relaxedCondition, relaxedQuery, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+                    FindElementsWithCachedFilter(rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned, ref matchCount, maxResults);
+
+                    if (visibleOnly && elementInfos.Count > 0)
+                    {
+                        elementInfos.RemoveAll(e => e.IsOffscreen);
+                    }
 
                     if (elementInfos.Count > 0)
                     {
@@ -255,6 +280,125 @@ public sealed partial class UIAutomationService
         catch
         {
             // Element disappeared during search
+        }
+    }
+
+    /// <summary>
+    /// Advanced-criteria finding using a single FindAllBuildCache pass plus in-process filtering.
+    /// Pushes Name(exact)/AutomationId/ControlType down as native conditions, then filters
+    /// nameContains/namePattern/className against cached properties. This avoids the per-node
+    /// cross-process COM round-trips of the raw TreeWalker, which is the dominant cost for
+    /// Chromium/Electron content where nameContains/namePattern is the recommended query path.
+    /// </summary>
+    private void FindElementsWithCachedFilter(
+        UIA.IUIAutomationElement rootElement,
+        UIA.IUIAutomationCondition condition,
+        ElementQuery query,
+        List<UIElementInfo> results,
+        ref int elementsScanned,
+        ref int matchCount,
+        int maxResults)
+    {
+        try
+        {
+            // Single COM call fetches every element matching the native condition with all
+            // properties cached; substring/regex/className are then evaluated in-process.
+            var cacheRequest = Uia.CreateElementCacheRequest(UIA.TreeScope.TreeScope_Element);
+            var elements = rootElement.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, condition, cacheRequest);
+            if (elements == null)
+            {
+                return;
+            }
+
+            // Bound in-process work with the same budget the tree path uses.
+            var count = Math.Min(elements.Length, MaxElementsToScan);
+            for (var i = 0; i < count && results.Count < maxResults; i++)
+            {
+                elementsScanned++;
+
+                var element = elements.GetElement(i);
+                if (element == null)
+                {
+                    continue;
+                }
+
+                if (!MatchesAdvancedCriteriaCached(element, query))
+                {
+                    continue;
+                }
+
+                matchCount++;
+                if (matchCount < query.FoundIndex)
+                {
+                    continue;
+                }
+
+                var children = query.IncludeChildren ? GetChildren(element, rootElement) : null;
+                var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, children, fromCachedElement: true);
+                if (elementInfo != null)
+                {
+                    results.Add(elementInfo);
+                }
+            }
+        }
+        catch
+        {
+            // Element tree changed during search - return whatever was collected.
+        }
+    }
+
+    /// <summary>
+    /// Evaluates nameContains/namePattern/className against an element's cached properties.
+    /// </summary>
+    private static bool MatchesAdvancedCriteriaCached(UIA.IUIAutomationElement element, ElementQuery query)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(query.NameContains))
+            {
+                var name = element.GetCachedName();
+                if (string.IsNullOrEmpty(name) ||
+                    !name.Contains(query.NameContains, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(query.NamePattern))
+            {
+                var name = element.GetCachedName();
+                if (string.IsNullOrEmpty(name))
+                {
+                    return false;
+                }
+
+                try
+                {
+                    if (!Regex.IsMatch(name, query.NamePattern, RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100)))
+                    {
+                        return false;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            if (!string.IsNullOrEmpty(query.ClassName))
+            {
+                var className = element.GetCachedClassName();
+                if (!string.Equals(className, query.ClassName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

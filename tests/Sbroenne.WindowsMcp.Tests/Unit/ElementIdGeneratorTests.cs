@@ -110,6 +110,23 @@ public class ElementIdGeneratorTests
         Assert.Null(exception);
     }
 
+    [Theory]
+    [InlineData("window:12345|runtime:42.7.1|path:0.1|sel:Button~Submit")]
+    [InlineData("window:0|runtime:0|path:stale|sel:Hyperlink~Sign in")]
+    [InlineData("window:123|runtime:0|path:cached|sel:Edit~")]
+    public void ResolveToAutomationElement_SelectorSegment_DoesNotThrowAndReturnsNull(string fullId)
+    {
+        // Locator-style ids carry an optional "|sel:{controlType}~{name}" fallback segment.
+        // With a non-existent window handle nothing resolves, but parsing must not throw.
+        var exception = Record.Exception(() =>
+        {
+            var result = ElementIdGenerator.ResolveToAutomationElement(fullId);
+            Assert.Null(result);
+        });
+
+        Assert.Null(exception);
+    }
+
     #endregion
 
     #region Thread Safety Tests
