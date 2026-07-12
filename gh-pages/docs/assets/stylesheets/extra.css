@@ -1,0 +1,113 @@
+/* ---------------------------------------------------------------------------
+   Windows MCP Server — custom styling on top of the Material theme.
+   Only the marketing homepage hero needs bespoke rules; everything else uses
+   Material's built-in components (grid cards, admonitions, tables, nav).
+   --------------------------------------------------------------------------- */
+
+:root {
+  /* Windows / Fluent blue — matches the product icon and the Windows brand */
+  --md-primary-fg-color: #0078d4;
+  --md-primary-fg-color--light: #2b88d8;
+  --md-primary-fg-color--dark: #106ebe;
+  --md-accent-fg-color: #106ebe;
+
+  --mcp-hero-bg-1: #0078d4; /* Fluent blue */
+  --mcp-hero-bg-2: #2b88d8; /* Fluent blue (lighter) */
+}
+
+/* Dark mode: lift the blues slightly for contrast on the slate background */
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #2b88d8;
+  --md-primary-fg-color--light: #50a0e0;
+  --md-primary-fg-color--dark: #0078d4;
+  --md-accent-fg-color: #50a0e0;
+}
+
+/* Marketing hero on the landing page */
+.mcp-hero {
+  text-align: center;
+  padding: 1.1rem 1rem 1rem;
+  margin: -1.2rem 0 1.4rem;
+  border-radius: 0.6rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--mcp-hero-bg-1), var(--mcp-hero-bg-2));
+}
+
+.md-typeset .mcp-hero__title {
+  margin: 0.1rem 0 0.3rem;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.mcp-hero__subtitle {
+  max-width: 40rem;
+  margin: 0 auto 0.85rem;
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.mcp-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin-bottom: 0.85rem;
+}
+
+/* Reuse Material buttons but adapt colors for the dark hero */
+.mcp-hero__actions .md-button {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.mcp-hero__actions .md-button:hover {
+  background-color: #ffffff;
+  color: var(--mcp-hero-bg-1);
+  border-color: #ffffff;
+}
+
+.mcp-hero__actions .md-button--primary {
+  background-color: #ffffff;
+  color: var(--mcp-hero-bg-1);
+  border-color: #ffffff;
+}
+
+.mcp-hero__actions .md-button--primary:hover {
+  background-color: rgba(255, 255, 255, 0.85);
+  color: var(--mcp-hero-bg-1);
+}
+
+.mcp-hero__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+  margin: 0;
+}
+
+.mcp-hero__badges img {
+  height: 20px;
+}
+
+/* Grid cards: give the leading icon the accent color and tighten spacing */
+.md-typeset .grid.cards .twemoji,
+.md-typeset .grid.cards svg {
+  fill: var(--md-accent-fg-color);
+}
+
+.md-typeset .grid.cards > ul > li {
+  padding: 0.8rem 0.9rem;
+}
+
+.md-typeset .grid {
+  gap: 0.6rem;
+}
+
+@media screen and (max-width: 44.9375em) {
+  .md-typeset .mcp-hero__title {
+    font-size: 1.6rem;
+  }
+}

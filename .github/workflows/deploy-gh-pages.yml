@@ -6,9 +6,14 @@ on:
       - main
     paths:
       - 'gh-pages/**'
+      - 'FEATURES.md'
       - 'CONTRIBUTING.md'
       - 'vscode-extension/CHANGELOG.md'
-      - '.github/workflows/jekyll-gh-pages.yml'
+      - 'plugin/skills/windows-automation/SKILL.md'
+      - '.github/workflows/deploy-gh-pages.yml'
+      - 'scripts/Update-StarHistory.ps1'
+  schedule:
+    - cron: "17 3 * * *"
   workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
@@ -22,9 +27,6 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   deploy:
     environment:
@@ -33,22 +35,31 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
-      - name: Setup Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.3'
-          bundler-cache: true
-          working-directory: gh-pages
-
-      - name: Build with Jekyll
-        working-directory: gh-pages
-        run: |
-          chmod +x build.sh
-          ./build.sh production
+      - name: Generate star history chart
+        shell: pwsh
         env:
-          JEKYLL_ENV: production
+          STAR_HISTORY_TOKEN: ${{ github.token }}
+        run: >
+          ./scripts/Update-StarHistory.ps1
+          -Repository '${{ github.repository }}'
+          -Token $env:STAR_HISTORY_TOKEN
+          -OutputPath './gh-pages/docs/assets/images/star-history.svg'
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: gh-pages/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r gh-pages/requirements.txt
+
+      - name: Build with MkDocs
+        working-directory: gh-pages
+        run: mkdocs build --strict --clean
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
@@ -64,10 +75,10 @@ jobs:
 
       - name: Notify IndexNow (Bing/Yandex)
         run: |
-          # Get list of all HTML pages from the built site
+          # Get list of all HTML pages from the built site (excluding 404.html which should not be indexed)
           cd gh-pages/_site
-          URLS=$(find . -name "*.html" -type f | sed 's|^\./||' | sed 's|index\.html$||' | sed 's|^|https://windowsmcpserver.dev/|' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          
+          URLS=$(find . -name "*.html" -type f ! -name "404.html" | sed 's|^\./||' | sed 's|index\.html$||' | sed 's|^|https://windowsmcpserver.dev/|' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+
           # Submit to IndexNow API
           curl -X POST "https://api.indexnow.org/IndexNow" \
             -H "Content-Type: application/json; charset=utf-8" \
