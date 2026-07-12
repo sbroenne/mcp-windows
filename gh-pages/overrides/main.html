@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+<!--
+  Site-wide <head> additions layered on top of Material's defaults
+  (Material already emits title, description, canonical and Open Graph tags).
+-->
+{% block extrahead %}
+  <!-- Bot directives for rich snippets -->
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+  <!-- Per-page keywords (set via page front matter) -->
+  {% if page and page.meta and page.meta.keywords %}
+  <meta name="keywords" content="{{ page.meta.keywords }}">
+  {% endif %}
+
+  <!-- Social preview image -->
+  {% set og_image = "https://windowsmcpserver.dev/assets/images/icon.png" %}
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="og:image:alt" content="Windows MCP Server — automate Windows apps and browsers with AI">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ og_image }}">
+  <meta name="twitter:image:alt" content="Windows MCP Server — automate Windows apps and browsers with AI">
+
+  <!-- Structured data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Windows MCP Server",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Windows",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "Windows computer use for AI agents. Automate any Windows app, browser or website by name — not pixels — through the Windows UI Automation API. Works with GitHub Copilot, Claude Desktop and Cursor.",
+    "url": "https://windowsmcpserver.dev/",
+    "image": "https://windowsmcpserver.dev/assets/images/icon.png",
+    "programmingLanguage": "C#",
+    "downloadUrl": "https://github.com/sbroenne/mcp-windows/releases",
+    "codeRepository": "https://github.com/sbroenne/mcp-windows",
+    "license": "https://opensource.org/licenses/MIT",
+    "sameAs": [
+      "https://github.com/sbroenne/mcp-windows",
+      "https://www.youtube.com/@sbroenne",
+      "https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"
+    ],
+    "keywords": "Windows, automation, MCP, AI, UI Automation, browser automation, GitHub Copilot, Claude, Cursor",
+    "author": {
+      "@type": "Person",
+      "name": "Stefan Broenner"
+    },
+    "featureList": [
+      "Semantic UI automation",
+      "Browser automation (Edge, Chrome)",
+      "Window management",
+      "Multi-monitor support",
+      "Mouse and keyboard control",
+      "Screenshot capture with element metadata"
+    ]
+  }
+  </script>
+
+  <!-- Structured data: WebSite + Organization (publisher entity) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://windowsmcpserver.dev/#website",
+        "name": "Windows MCP Server",
+        "url": "https://windowsmcpserver.dev/",
+        "description": "Windows computer use for AI agents. Automate any Windows app, browser or website by name — not pixels.",
+        "inLanguage": "en",
+        "publisher": { "@id": "https://windowsmcpserver.dev/#author" }
+      },
+      {
+        "@type": "Person",
+        "@id": "https://windowsmcpserver.dev/#author",
+        "name": "Stefan Broenner",
+        "url": "https://github.com/sbroenne",
+        "sameAs": [
+          "https://github.com/sbroenne",
+          "https://www.youtube.com/@sbroenne"
+        ]
+      }
+    ]
+  }
+  </script>
+
+  <!-- Structured data: BreadcrumbList (interior pages only) -->
+  {% if page and not page.is_homepage %}
+  {% set crumbs = [{"name": "Home", "url": "https://windowsmcpserver.dev/"}] %}
+  {% for anc in page.ancestors | reverse %}
+    {% if anc.title and anc.canonical_url %}
+      {% set _ = crumbs.append({"name": anc.title, "url": anc.canonical_url}) %}
+    {% endif %}
+  {% endfor %}
+  {% set _ = crumbs.append({"name": page.title, "url": page.canonical_url}) %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {%- for c in crumbs %}
+      { "@type": "ListItem", "position": {{ loop.index }}, "name": {{ c.name | tojson }}, "item": {{ c.url | tojson }} }{% if not loop.last %},{% endif %}
+      {%- endfor %}
+    ]
+  }
+  </script>
+  {% endif %}
+{% endblock %}
