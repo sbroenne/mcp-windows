@@ -109,6 +109,18 @@ public sealed partial class UIAutomationService
             // Ensure window is activated before clicking
             TryActivateWindowForElement(element, activationHandle);
 
+            // Actionability gate: a disabled control cannot be clicked. Fail fast with a clear,
+            // actionable error instead of invoking a pattern that silently no-ops.
+            if (!element.IsEnabled())
+            {
+                return UIAutomationResult.CreateFailure(
+                    "click",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is disabled and cannot be clicked. " +
+                    "Wait for it to become enabled (e.g., after filling required fields) or target a different element.",
+                    CreateDiagnostics(stopwatch));
+            }
+
             var rootElement = GetRootElementForScroll(element);
             var controlType = element.GetControlTypeId();
 
@@ -341,6 +353,17 @@ public sealed partial class UIAutomationService
 
             // Ensure window is activated before typing
             TryActivateWindowForElement(element, activationHandle);
+
+            // Actionability gate: a disabled field cannot receive text. Fail fast with guidance.
+            if (!element.IsEnabled())
+            {
+                return (Success: false, Result: UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is disabled and cannot receive text. " +
+                    "Wait for it to become enabled or target a different field.",
+                    CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+            }
 
             // Try to set focus
             element.TrySetFocus();

@@ -117,6 +117,11 @@ public static partial class AppTool
 
         try
         {
+            // Chromium browsers only expose a complete accessibility tree when an assistive-technology
+            // client requests it. Force renderer accessibility on launch so ui_find/ui_read/ui_click see
+            // full page content (links, buttons, form fields) instead of a reduced/empty tree.
+            arguments = AugmentChromiumArguments(programPath, arguments);
+
             var startInfo = new ProcessStartInfo
             {
                 FileName = programPath,
@@ -267,6 +272,37 @@ public static partial class AppTool
                 WindowManagementErrorCode.SystemError,
                 $"Failed to launch '{programPath}': {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Known Chromium-based browser executables (without extension) that expose their page
+    /// accessibility tree lazily and benefit from --force-renderer-accessibility on launch.
+    /// </summary>
+    private static readonly string[] ChromiumExecutables =
+        ["msedge", "chrome", "brave", "vivaldi", "opera", "chromium"];
+
+    /// <summary>
+    /// Appends --force-renderer-accessibility when launching a Chromium browser so its page
+    /// accessibility tree is fully populated for UIA-based automation. No-op for other programs
+    /// or when the flag is already present.
+    /// </summary>
+    internal static string? AugmentChromiumArguments(string programPath, string? arguments)
+    {
+        var name = Path.GetFileNameWithoutExtension(programPath);
+        if (string.IsNullOrEmpty(name) ||
+            !ChromiumExecutables.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            return arguments;
+        }
+
+        if (arguments != null &&
+            arguments.Contains("force-renderer-accessibility", StringComparison.OrdinalIgnoreCase))
+        {
+            return arguments;
+        }
+
+        const string a11yFlag = "--force-renderer-accessibility";
+        return string.IsNullOrWhiteSpace(arguments) ? a11yFlag : $"{a11yFlag} {arguments}";
     }
 
     /// <summary>

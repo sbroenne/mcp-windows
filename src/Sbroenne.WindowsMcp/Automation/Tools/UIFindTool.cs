@@ -35,6 +35,7 @@ public static partial class UIFindTool
     /// <param name="sortByProminence">Sort results by size (largest first). Useful for disambiguation.</param>
     /// <param name="inRegion">Filter to region: 'x,y,width,height' in screen coordinates.</param>
     /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
+    /// <param name="visibleOnly">Exclude off-screen elements. Default (unset): excluded for Chromium/Edge/Electron (which expose many hidden nodes), included elsewhere. Set false to include hidden nodes.</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -54,6 +55,7 @@ public static partial class UIFindTool
         [DefaultValue(false)] bool sortByProminence,
         [DefaultValue(null)] string? inRegion,
         [DefaultValue(null)] string? nearElement,
+        [DefaultValue(null)] bool? visibleOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -83,6 +85,7 @@ public static partial class UIFindTool
                 SortByProminence = sortByProminence,
                 InRegion = inRegion,
                 NearElement = nearElement,
+                VisibleOnly = visibleOnly,
                 TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
             };
 

@@ -58,6 +58,16 @@ internal sealed class ChromiumBrowserSession : IDisposable
     public static void SkipUnlessSupported(ChromiumBrowserKind browser = ChromiumBrowserKind.Edge)
     {
         Skip.If(FindBrowserExecutable(browser) is null, $"Chromium browser smoke tests require {GetBrowserDisplayName(browser)} to be installed.");
+
+        // R9: Chrome is opt-in for the default local run to halve launch cost. Edge is the always-on
+        // baseline; enable Chrome coverage by setting MCP_TEST_CHROME=1 (e.g., in CI browser matrices).
+        if (browser == ChromiumBrowserKind.Chrome)
+        {
+            var optIn = Environment.GetEnvironmentVariable("MCP_TEST_CHROME");
+            var enabled = string.Equals(optIn, "1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(optIn, "true", StringComparison.OrdinalIgnoreCase);
+            Skip.IfNot(enabled, "Chrome coverage is opt-in. Set MCP_TEST_CHROME=1 to run Chrome smoke tests.");
+        }
     }
 
     public static ChromiumBrowserSession LaunchLocalPage(ChromiumBrowserKind browser = ChromiumBrowserKind.Edge)
@@ -99,8 +109,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
     {
         var browserExecutable = FindBrowserExecutable(browser)
             ?? throw new InvalidOperationException($"{GetBrowserDisplayName(browser)} executable was not found.");
-        var userDataDirectory = CreateUserDataDirectory();
         var browserDescriptor = GetBrowserDescriptor(browser);
+        var userDataDirectory = PrepareUserDataDirectory(browserExecutable, browserDescriptor);
 
         var existingWindows = SnapshotBrowserWindows(browserDescriptor.ProcessName);
 
@@ -185,6 +195,183 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
         Directory.CreateDirectory(directory);
         return directory;
+    }
+
+    // R7: a per-run warmed profile template. Chromium writes its first-run/baseline state (Local State,
+    // default profile) on the first launch; copying that state into each fresh, isolated session profile
+    // lets subsequent launches skip most first-run UI without sharing a live profile directory (which
+    // would collide with the still-open read-only fixture session). Warm-up is a pure optimization: any
+    // failure falls back to a cold profile, matching the previous behavior exactly.
+    private static readonly object s_templateGate = new();
+    private static readonly Dictionary<string, string?> s_warmedTemplates = new(StringComparer.OrdinalIgnoreCase);
+    private static int s_templateCleanupHooked;
+
+    private static string PrepareUserDataDirectory(string browserExecutable, BrowserDescriptor descriptor)
+    {
+        var sessionDirectory = CreateUserDataDirectory();
+
+        try
+        {
+            var template = GetOrCreateWarmedTemplate(browserExecutable, descriptor);
+            if (template is not null)
+            {
+                CopyProfileTemplate(template, sessionDirectory);
+            }
+        }
+        catch
+        {
+            // Fall back to a cold profile on any warm-up/copy failure.
+        }
+
+        return sessionDirectory;
+    }
+
+    private static string? GetOrCreateWarmedTemplate(string browserExecutable, BrowserDescriptor descriptor)
+    {
+        lock (s_templateGate)
+        {
+            if (s_warmedTemplates.TryGetValue(descriptor.ProcessName, out var existing))
+            {
+                return existing;
+            }
+
+            string? template;
+            try
+            {
+                template = BuildWarmedTemplate(browserExecutable);
+            }
+            catch
+            {
+                template = null;
+            }
+
+            s_warmedTemplates[descriptor.ProcessName] = template;
+            HookTemplateCleanup();
+            return template;
+        }
+    }
+
+    private static string? BuildWarmedTemplate(string browserExecutable)
+    {
+        var templateDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "mcp-windows-chromium-tests",
+            $"warm-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(templateDirectory);
+
+        string[] arguments =
+        [
+            "--headless=new",
+            $"--user-data-dir=\"{templateDirectory}\"",
+            "--no-first-run",
+            "--no-default-browser-check",
+            "--disable-sync",
+            "--disable-extensions",
+            "about:blank",
+        ];
+
+        using var warmProcess = Process.Start(new ProcessStartInfo
+        {
+            FileName = browserExecutable,
+            Arguments = string.Join(" ", arguments),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        });
+
+        if (warmProcess is null)
+        {
+            return null;
+        }
+
+        // Wait until Chromium has written its baseline profile state, then shut the warm-up down.
+        var localState = Path.Combine(templateDirectory, "Local State");
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && !File.Exists(localState))
+        {
+            Thread.Sleep(100);
+        }
+
+        try
+        {
+            if (!warmProcess.HasExited)
+            {
+                warmProcess.Kill(entireProcessTree: true);
+            }
+        }
+        catch
+        {
+            // Best-effort shutdown of the warm-up process.
+        }
+
+        try
+        {
+            warmProcess.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds);
+        }
+        catch
+        {
+            // Ignore — locks are released on exit regardless.
+        }
+
+        return File.Exists(localState) ? templateDirectory : null;
+    }
+
+    private static void CopyProfileTemplate(string sourceDirectory, string destinationDirectory)
+    {
+        foreach (var directory in Directory.GetDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(directory.Replace(sourceDirectory, destinationDirectory, StringComparison.Ordinal));
+        }
+
+        foreach (var file in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            var fileName = Path.GetFileName(file);
+
+            // Skip single-instance lock artifacts — they must not be shared between profiles.
+            if (fileName.StartsWith("Singleton", StringComparison.OrdinalIgnoreCase) ||
+                fileName.StartsWith("lockfile", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var target = file.Replace(sourceDirectory, destinationDirectory, StringComparison.Ordinal);
+
+            try
+            {
+                File.Copy(file, target, overwrite: true);
+            }
+            catch (IOException)
+            {
+                // Skip files still locked by the browser; they are non-essential for warm start.
+            }
+        }
+    }
+
+    private static void HookTemplateCleanup()
+    {
+        if (Interlocked.Exchange(ref s_templateCleanupHooked, 1) != 0)
+        {
+            return;
+        }
+
+        AppDomain.CurrentDomain.ProcessExit += static (_, _) =>
+        {
+            foreach (var directory in s_warmedTemplates.Values)
+            {
+                if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+                catch
+                {
+                    // Best-effort cleanup at process exit.
+                }
+            }
+        };
     }
 
     private static string FindLocalPagePath()

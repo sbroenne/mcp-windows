@@ -5,13 +5,20 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
 [Collection("ChromiumBrowser")]
 [Trait("Category", "RequiresDesktop")]
 [Trait("Category", "ChromiumBrowser")]
-public sealed class ChromiumLocalPageTests
+public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessionFixture>
 {
     private const int QueryTimeoutMs = 5000;
     private const string SearchInputName = "Docs Search";
     private const string SignInButtonName = "Sign in";
     private const string SignedOutStatus = "Signed out";
     private const string FocusedButtonMessage = "Sign in button focused";
+
+    private readonly ChromiumReadOnlySessionFixture _readOnlySessions;
+
+    public ChromiumLocalPageTests(ChromiumReadOnlySessionFixture readOnlySessions)
+    {
+        _readOnlySessions = readOnlySessions;
+    }
 
     [Theory]
     [InlineData(ChromiumBrowserKind.Edge)]
@@ -20,7 +27,7 @@ public sealed class ChromiumLocalPageTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(browser);
 
-        using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
+        var session = _readOnlySessions.GetSession(browser);
         using var harness = new ChromiumAutomationHarness();
 
         var result = await harness.AutomationService.FindElementsAsync(new ElementQuery
@@ -42,7 +49,7 @@ public sealed class ChromiumLocalPageTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(browser);
 
-        using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
+        var session = _readOnlySessions.GetSession(browser);
         using var harness = new ChromiumAutomationHarness();
 
         var result = await harness.AutomationService.FindElementsAsync(new ElementQuery
@@ -66,7 +73,7 @@ public sealed class ChromiumLocalPageTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(browser);
 
-        using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
+        var session = _readOnlySessions.GetSession(browser);
         using var harness = new ChromiumAutomationHarness();
 
         var result = await harness.AutomationService.FindElementsAsync(new ElementQuery
@@ -138,7 +145,7 @@ public sealed class ChromiumLocalPageTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(browser);
 
-        using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
+        var session = _readOnlySessions.GetSession(browser);
         using var harness = new ChromiumAutomationHarness();
 
         var statusElement = await FindSingleElementAsync(harness, session.WindowHandleString, SignedOutStatus, "Text");

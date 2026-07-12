@@ -47,6 +47,10 @@
     <PackageReference Include="Interop.UIAutomationClient" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Sbroenne.WindowsMcp.Tests" />
+  </ItemGroup>
+
   <!-- Windows Forms is enabled via UseWindowsForms; no WPF dependency needed -->
 
 </Project>
