@@ -80,9 +80,14 @@ theme:
 nav:
   - Home: index.md
   - Features: features.md
-  - Changelog: changelog.md
+  - Installation: installation.md
   - More:
+    - Architecture: architecture.md
+    - Agent Skills: skills.md
+    - Changelog: changelog.md
     - Contributing: contributing.md
+    - Security: security.md
+    - Privacy: privacy.md
     - Related projects: related-projects.md
 
 markdown_extensions:

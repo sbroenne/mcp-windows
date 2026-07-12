@@ -34,7 +34,10 @@ SITE_PAGE_MAP = {
     "FEATURES.md": "/features/",
     "vscode-extension/CHANGELOG.md": "/changelog/",
     "CONTRIBUTING.md": "/contributing/",
+    "plugin/skills/windows-automation/SKILL.md": "/skills/",
 }
+
+_FRONT_MATTER = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)\)")
 
@@ -139,4 +142,12 @@ def on_pre_build(config, **kwargs):  # noqa: D401 - MkDocs hook signature
         "contributing.md",
         "CONTRIBUTING.md",
         _read("CONTRIBUTING.md").strip() + "\n",
+    )
+
+    # plugin/skills/windows-automation/SKILL.md -> skills (drop YAML front matter;
+    # the body already starts at an H2 and the wrapper page supplies the H1).
+    _write(
+        "skills.md",
+        "plugin/skills/windows-automation/SKILL.md",
+        _FRONT_MATTER.sub("", _read("plugin/skills/windows-automation/SKILL.md")).strip() + "\n",
     )
