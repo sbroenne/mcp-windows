@@ -49,6 +49,12 @@ public sealed record UIAutomationDiagnostics
     /// Detected UI framework of the target window (e.g., "Win32", "WPF", "WinForms", "Chromium/Electron", "Qt").
     /// </summary>
     public string? DetectedFramework { get; init; }
+
+    /// <summary>
+    /// Whether the find scanned the UI Automation content view (true) rather than the full control
+    /// view (false). Null when not applicable. Used to observe the R5 content-view optimization.
+    /// </summary>
+    public bool? UsedContentView { get; init; }
 }
 
 /// <summary>
@@ -155,4 +161,13 @@ public sealed record ElementQuery
     /// hidden/virtualized nodes), included otherwise. Set explicitly to override.
     /// </summary>
     public bool? VisibleOnly { get; init; }
+
+    /// <summary>
+    /// When set, controls whether the search scans only the UI Automation content view (meaningful,
+    /// user-facing elements) instead of the full control view. When null, the framework strategy
+    /// decides: content view for Chromium/Electron (whose control view is bloated with structural
+    /// nodes), control view otherwise. Set explicitly to override. Even when content view is used,
+    /// the search automatically falls back to the control view if the content-view scan finds nothing.
+    /// </summary>
+    public bool? ContentViewOnly { get; init; }
 }

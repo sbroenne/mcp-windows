@@ -29,13 +29,23 @@ public readonly struct FrameworkStrategy
     public bool UsePostHocFiltering { get; init; }
 
     /// <summary>
+    /// Gets whether find operations should scan the UI Automation content view instead of the
+    /// full control view. True for Chromium/Electron (and unknown) frameworks, whose control view
+    /// exposes many non-interactive structural nodes that inflate candidate sets; the content view
+    /// is closer to the meaningful, user-facing elements an agent targets. False for native desktop
+    /// frameworks, where the control view is already compact and content view could hide relevant nodes.
+    /// </summary>
+    public bool UseContentView { get; init; }
+
+    /// <summary>
     /// Creates a strategy for Electron/Chromium apps (deep trees, need post-hoc filtering).
     /// </summary>
     public static FrameworkStrategy Electron => new()
     {
         FrameworkName = "Chromium/Electron",
         RecommendedMaxDepth = 15,
-        UsePostHocFiltering = true
+        UsePostHocFiltering = true,
+        UseContentView = true
     };
 
     /// <summary>
@@ -45,7 +55,8 @@ public readonly struct FrameworkStrategy
     {
         FrameworkName = "WinForms",
         RecommendedMaxDepth = 5,
-        UsePostHocFiltering = false
+        UsePostHocFiltering = false,
+        UseContentView = false
     };
 
     /// <summary>
@@ -55,7 +66,8 @@ public readonly struct FrameworkStrategy
     {
         FrameworkName = "WPF",
         RecommendedMaxDepth = 10,
-        UsePostHocFiltering = false
+        UsePostHocFiltering = false,
+        UseContentView = false
     };
 
     /// <summary>
@@ -65,7 +77,8 @@ public readonly struct FrameworkStrategy
     {
         FrameworkName = "Win32",
         RecommendedMaxDepth = 5,
-        UsePostHocFiltering = false
+        UsePostHocFiltering = false,
+        UseContentView = false
     };
 
     /// <summary>
@@ -75,7 +88,8 @@ public readonly struct FrameworkStrategy
     {
         FrameworkName = null,
         RecommendedMaxDepth = 15,
-        UsePostHocFiltering = true
+        UsePostHocFiltering = true,
+        UseContentView = true
     };
 }
 
@@ -350,7 +364,8 @@ public sealed partial class UIAutomationService
         ElementQuery? query,
         int elementsScanned,
         string? windowTitle,
-        string? windowHandle)
+        string? windowHandle,
+        bool? usedContentView = null)
     {
         return new UIAutomationDiagnostics
         {
@@ -359,7 +374,8 @@ public sealed partial class UIAutomationService
             ElementsScanned = elementsScanned,
             WindowTitle = windowTitle,
             WindowHandle = windowHandle,
-            DetectedFramework = DetectFramework(rootElement)
+            DetectedFramework = DetectFramework(rootElement),
+            UsedContentView = usedContentView
         };
     }
 

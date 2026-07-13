@@ -20,6 +20,7 @@ public sealed class UIA3Automation : IDisposable
     private readonly UIA.IUIAutomation _automation;
     private readonly UIA.IUIAutomationTreeWalker _controlViewWalker;
     private readonly UIA.IUIAutomationCondition _trueCondition;
+    private readonly UIA.IUIAutomationCondition _contentViewCondition;
     private bool _disposed;
 
     /// <summary>
@@ -41,6 +42,7 @@ public sealed class UIA3Automation : IDisposable
 
         _controlViewWalker = _automation.ControlViewWalker;
         _trueCondition = _automation.CreateTrueCondition();
+        _contentViewCondition = _automation.ContentViewCondition;
     }
 
     /// <summary>
@@ -57,6 +59,14 @@ public sealed class UIA3Automation : IDisposable
     /// Gets a cached TRUE condition.
     /// </summary>
     public UIA.IUIAutomationCondition TrueCondition => _trueCondition;
+
+    /// <summary>
+    /// Gets the predefined condition that selects only elements in the UI Automation content view.
+    /// The content view is a subset of the control view that excludes purely structural or
+    /// decorative nodes (containers, scrollbars, etc.), leaving the meaningful, user-facing
+    /// elements. Used to shrink Chromium/Electron candidate sets during find operations.
+    /// </summary>
+    public UIA.IUIAutomationCondition ContentViewCondition => _contentViewCondition;
 
     /// <summary>
     /// Gets the desktop root element.
