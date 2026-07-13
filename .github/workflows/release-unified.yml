@@ -51,7 +51,7 @@ jobs:
       version: ${{ steps.calculate_version.outputs.version }}
       tag: ${{ steps.calculate_version.outputs.tag }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0  # Fetch all history and tags
 
@@ -124,7 +124,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -181,7 +181,7 @@ jobs:
         rid: [win-x64, win-arm64]
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5
@@ -261,7 +261,7 @@ jobs:
       contents: read
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Setup Node.js
       uses: actions/setup-node@v6
@@ -374,7 +374,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -433,7 +433,7 @@ jobs:
       contents: write
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
     - name: Set Version
       run: |
