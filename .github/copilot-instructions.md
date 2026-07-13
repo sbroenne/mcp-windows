@@ -1,5 +1,24 @@
 # Copilot Instructions for mcp-windows
 
+## Sister Projects
+
+`mcp-windows` is one of a family of Windows-only MCP-server repos maintained by the same author
+(`sbroenne`). The family also includes:
+
+- **`mcp-server-excel`** (`sbroenne/mcp-server-excel`) — Excel COM automation. This is the
+  **authoritative architectural template** for the family's general server-side patterns: layered
+  architecture (Core → Service → CLI/MCP Server), the "two equal entry points" (MCP Server + CLI)
+  principle, Unified Service Architecture (shared daemon/session registry), and its support/audit
+  scripts (`scripts/*.ps1`) and CI Gate workflow. `mcp-windows` is UI-automation-focused (FlaUI/
+  pywinauto patterns) rather than COM/Office-interop-focused, so not every Excel pattern applies
+  directly — but when solving a cross-cutting problem (session lifecycle, CLI/MCP parity, daemon
+  process management, pre-commit audit tooling), check how Excel solved it first.
+- **`mcp-server-powerpoint`** (`sbroenne/mcp-server-powerpoint`) — PowerPoint COM automation,
+  structurally mirrors `mcp-server-excel`.
+
+If you fix a real bug or process/tooling gap here that likely also exists in the other repos,
+flag it so the same fix can be considered there.
+
 ## Core Principles
 
 The project follows these NON-NEGOTIABLE principles:
