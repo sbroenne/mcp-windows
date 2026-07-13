@@ -56,6 +56,12 @@ public static partial class UIReadTool
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
+        var foundIndexError = WindowsToolsBase.ValidateFoundIndex(foundIndex);
+        if (foundIndexError is not null)
+        {
+            return foundIndexError;
+        }
+
         try
         {
             var query = new ElementQuery

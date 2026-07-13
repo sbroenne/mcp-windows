@@ -962,7 +962,7 @@ public sealed partial class UIAutomationService
                     // No filePath - return hint that dialog is open
                     return UIAutomationResult.CreateSuccessWithHint(
                         "save",
-                        "Save dialog opened. Use ui_automation to interact with it or provide filePath to auto-fill.",
+                        "Save dialog opened. Provide filePath to auto-fill it, or use ui_type and ui_click to interact with the dialog manually.",
                         CreateDiagnostics(stopwatch));
                 }
             }

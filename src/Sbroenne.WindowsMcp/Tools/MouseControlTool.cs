@@ -17,8 +17,8 @@ public static partial class MouseControlTool
     private static readonly string[] ValidTargets = ["primary_screen", "secondary_screen"];
 
     /// <summary>
-    /// Low-level mouse input for canvas/drawing. AVOID for buttons/controls - use ui_automation(click) instead.
-    /// BEFORE USING: Get coordinates from ui_automation(find) bounding rects OR screenshot_control(annotate=true). Never guess positions.
+    /// Low-level mouse input for canvas/drawing. AVOID for buttons/controls - use ui_click instead.
+    /// BEFORE USING: Get coordinates from ui_find bounding rects OR screenshot_control(annotate=true). Never guess positions.
     /// USE FOR: drag operations, canvas drawing, custom controls without UIA.
     /// DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY).
     /// Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.

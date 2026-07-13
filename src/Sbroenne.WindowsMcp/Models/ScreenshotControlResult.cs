@@ -278,7 +278,7 @@ public sealed record ScreenshotControlResult
             ? $"{originalWidth}x{originalHeight} (scaled to {width}x{height})"
             : $"{width}x{height}";
         var usageHint = $"Screenshot with {elementCount} numbered elements. Reference elements by index (1-{elementCount}). " +
-                        "Each element has an elementId for ui_automation operations (click, type, toggle).";
+                        "Use each element's 'click' coordinates with mouse_control, or its name/type with ui_click and ui_type.";
         if (filePath != null)
         {
             usageHint = $"Image saved to '{filePath}'. " + usageHint;

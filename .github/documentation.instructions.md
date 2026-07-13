@@ -8,7 +8,7 @@ This document defines the purpose and content rules for each documentation file 
 >
 > Windows MCP Server uses the Windows UI Automation API — the same API screen readers use. It asks Windows directly: "What buttons exist?" Deterministic. Same command works every time.
 >
-> Tested with GPT-5.5 before every release. 54 tests, 100% pass rate required.
+> Tested with GPT-5.5 before every release. 130+ tests, 100% pass rate required.
 
 ## Three Entry Points
 
@@ -36,14 +36,14 @@ Each document is indexed by search engines and must work standalone.
 5. Tools: 2-column table (tool, purpose)
 6. Caution
 7. Testing: LLM tests + framework coverage
-8. Related Projects: pytest-aitest, Excel MCP, OBS MCP
+8. Related Projects: pytest-skill-engineering, Excel MCP, OBS MCP
 9. License / Contributing (one line each)
 
 **Must include**:
 - Code examples using correct tool names (`ui_click`, `ui_type`, etc.)
 - Tools table
 - Framework coverage (WinForms, WinUI 3, Electron)
-- Link to pytest-aitest
+- Link to pytest-skill-engineering
 - Links to FEATURES.md for details
 
 **Must NOT include**:
@@ -61,20 +61,20 @@ Each document is indexed by search engines and must work standalone.
 1. Hero + badges
 2. The Problem: Why screenshot automation fails (expanded)
 3. How It Works: UI Automation API + comparison table
-4. Tested with Real AI: Prominent, link to pytest-aitest
+4. Tested with Real AI: Prominent, link to pytest-skill-engineering
 5. What You Can Do: Natural language examples
 6. Quick Start: Both install options
 7. Tools: Full table
 8. Feature Cards: 4 max (Semantic UI, LLM-Tested, Framework Coverage, Fallback)
 9. Caution
-10. Related Projects: pytest-aitest, Excel MCP, OBS MCP
+10. Related Projects: pytest-skill-engineering, Excel MCP, OBS MCP
 11. Footer
 
 **Must include**:
 - Comparison table (reliability focus, "thousands of tokens")
 - Natural language examples
 - Feature cards (max 4)
-- Link to pytest-aitest
+- Link to pytest-skill-engineering
 - SEO keywords in frontmatter
 
 **Must NOT include**:
@@ -105,14 +105,14 @@ Each document is indexed by search engines and must work standalone.
 - Comparison tables
 - Feature bullet lists
 - Code examples
-- pytest-aitest link (not relevant to end users)
+- pytest-skill-engineering link (not relevant to end users)
 
 ## Key Differentiators
 
 Ordered by importance:
 
 1. **Reliability over speed** — Screenshot approach doesn't work, UI Automation does
-2. **LLM-tested** — 54 tests with real AI models, 100% pass required
+2. **LLM-tested** — 130+ tests with a real AI model (GPT-5.5), 100% pass required
 3. **Framework coverage** — Tested against WinForms, WinUI 3, and Electron
 4. **Token efficiency** — Text responses, not images (thousands of tokens saved)
 5. **Full fallback** — Screenshots + mouse/keyboard when accessibility unavailable
@@ -132,7 +132,7 @@ Always use the actual tool names:
 ## Related Projects
 
 **README.md and gh-pages only:**
-- [pytest-aitest](https://github.com/sbroenne/pytest-aitest) — LLM testing framework
+- [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering) — LLM testing framework
 - [Excel MCP Server](https://excelmcpserver.dev) — Excel automation
 - [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) — Streaming control
 

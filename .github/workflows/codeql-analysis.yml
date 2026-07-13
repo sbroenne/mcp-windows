@@ -11,6 +11,9 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
+# Default deny; the analyze job grants only what it needs.
+permissions: {}
+
 jobs:
   analyze:
     name: Analyze

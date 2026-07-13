@@ -14,10 +14,11 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIFindTool
 {
     /// <summary>
-    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element IDs for use with ui_click.
+    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element names, types, and coordinates for use with ui_click/ui_type/mouse_control.
     /// </summary>
     /// <remarks>
-    /// Finds UI elements by name, type, ID, or other criteria. Returns element IDs for clicking, typing, etc.
+    /// Finds UI elements by name, type, ID, or other criteria. Returns each element's name, automationId, controlType, and click coordinates.
+    /// To act on a result, pass its name/automationId/controlType to ui_click or ui_type (add foundIndex to disambiguate), or its coordinates to mouse_control.
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
     /// REQUIRED: windowHandle (from window_management tool).
     /// For Electron/Chromium, visible text and ARIA labels usually show up here as element names.
@@ -68,6 +69,12 @@ public static partial class UIFindTool
         {
             return WindowsToolsBase.FailResult(
                 "windowHandle is required. Get it from window_management(action='find').");
+        }
+
+        var foundIndexError = WindowsToolsBase.ValidateFoundIndex(foundIndex);
+        if (foundIndexError is not null)
+        {
+            return foundIndexError;
         }
 
         try

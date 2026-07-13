@@ -30,7 +30,7 @@ public static partial class ScreenshotControlTool
     /// - By default, image data is NOT included (saves ~100K+ tokens per call!)
     /// - Element metadata provides all information needed for UI automation
     /// - Set includeImage=true only if you need to visually inspect the screenshot
-    /// - Elements can be used directly with ui_automation actions using elementId
+    /// - Reference elements by name/type with ui_click and ui_type, or by their click coordinates with mouse_control
     ///
     /// **PLAIN SCREENSHOT** (annotate=false):
     /// - Returns full image data without element discovery

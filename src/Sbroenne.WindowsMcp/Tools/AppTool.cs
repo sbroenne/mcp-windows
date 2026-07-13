@@ -135,6 +135,13 @@ public static partial class AppTool
 
             if (!string.IsNullOrWhiteSpace(workingDirectory))
             {
+                if (!Directory.Exists(workingDirectory))
+                {
+                    return WindowManagementResult.CreateFailure(
+                        WindowManagementErrorCode.InvalidParameter,
+                        $"workingDirectory does not exist: '{workingDirectory}'");
+                }
+
                 startInfo.WorkingDirectory = workingDirectory;
             }
 

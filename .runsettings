@@ -2,7 +2,7 @@
 <!--
   Test Execution Configuration for .NET unit tests.
   
-  LLM integration tests use pytest-aitest and are not part of the dotnet test
+  LLM integration tests use pytest-skill-engineering and are not part of the dotnet test
   workflow. Run them separately using:
     cd tests/Sbroenne.WindowsMcp.LLM.Tests && uv run pytest -v
   

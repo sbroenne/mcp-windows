@@ -163,12 +163,12 @@ LLM integration tests verify that AI agents can correctly use the MCP tools with
 - **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps  
 - **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
 
-These tests use [pytest-aitest](https://github.com/sbroenne/pytest-aitest) and require:
-- Azure OpenAI API access (Entra ID auth or set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_API_KEY`)
+These tests use [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering) and require:
+- GitHub authentication (`GITHUB_TOKEN` or an existing `gh auth login`)
 - Windows desktop session with GUI access
 - Python 3.12+ and uv
 
-**LLM tests run automatically during every release** via GitHub Actions with Azure OIDC authentication. A 100% pass rate is required before release. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for Azure and GitHub configuration details.
+**LLM tests run automatically during every release** via GitHub Actions using the workflow `GITHUB_TOKEN`. A 100% pass rate is required before release. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for configuration details.
 
 #### Running LLM Tests
 
@@ -184,23 +184,24 @@ uv run pytest test_notepad_ui.py -v
 uv run pytest integration/ -v
 ```
 
-#### Available Test Scenarios
+#### Available Test Suites
 
-| Test File | Description | Tests | Models |
-|-----------|-------------|-------|--------|
-| `window-management-test.yaml` | Find, activate, move, resize windows | 8 | GPT-4.1, GPT-5.2 |
-| `notepad-ui-test.yaml` | Notepad UI automation (click, type, read) | 10 | GPT-4.1, GPT-5.2 |
-| `paint-ui-test.yaml` | Paint ribbon UI and canvas drawing | 16 | GPT-4.1, GPT-5.2 |
-| `file-dialog-test.yaml` | Save As dialog handling | 6 | GPT-4.1, GPT-5.2 |
-| `screenshot-test.yaml` | Screenshot capture with annotations | 6 | GPT-4.1, GPT-5.2 |
-| `keyboard-mouse-test.yaml` | Keyboard and mouse control | 8 | GPT-4.1, GPT-5.2 |
-| `real-world-workflows-test.yaml` | Multi-step workflow automation | 8 | GPT-4.1, GPT-5.2 |
+| Test File | Description |
+|-----------|-------------|
+| `integration/test_window_management.py` | Find, activate, move, resize windows |
+| `integration/test_window_activate.py` | Window activation |
+| `test_notepad_ui.py` / `integration/test_file_dialog.py` | Notepad UI automation and Save As dialogs |
+| `test_paint_workflow.py` / `integration/test_paint_ui.py` | Paint ribbon UI and canvas drawing |
+| `integration/test_screenshot.py` / `test_screenshot_workflow.py` | Screenshot capture with annotations |
+| `integration/test_keyboard_mouse.py` | Keyboard and mouse control |
+| `integration/test_run_dialog.py` / `integration/test_app_tool_uwp.py` | App launch (classic + UWP) |
+| `test_calculator_workflow.py` / `eval/` | Multi-step, real-world workflows |
 
 #### Test Design Principles
 
 - **Use well-known apps**: Tests target Notepad, Paint, Calculator (apps LLMs recognize)
 - **100% pass rate required**: All tests must pass before release
-- **Multiple models**: Each test runs against both GPT-4.1 and GPT-5.2-chat
+- **Real model**: Tests run against GPT-5.5 via GitHub Copilot
 - **Token tracking**: Tests report token usage to validate optimization
 
 #### Adding New LLM Tests

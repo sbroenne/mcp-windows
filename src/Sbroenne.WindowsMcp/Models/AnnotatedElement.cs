@@ -28,7 +28,8 @@ public sealed record AnnotatedElement
     public required string Type { get; init; }
 
     /// <summary>
-    /// The element ID for use in subsequent ui_automation operations.
+    /// The element ID. Used internally and as the <c>nearElement</c> anchor for ui_find;
+    /// to click or type, reference the element by name/type/coordinates with ui_click/ui_type/mouse_control.
     /// </summary>
     [JsonPropertyName("id")]
     public required string Id { get; init; }

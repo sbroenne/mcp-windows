@@ -25,6 +25,9 @@ public enum WindowManagementErrorCode
     /// <summary>The specified regex pattern is not valid.</summary>
     InvalidRegexPattern = 104,
 
+    /// <summary>A supplied parameter value is invalid (e.g. a path that does not exist).</summary>
+    InvalidParameter = 105,
+
     #endregion
 
     #region Window State Errors (200-299)

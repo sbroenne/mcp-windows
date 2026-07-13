@@ -52,8 +52,8 @@ flowchart LR
 
 Responses are designed for LLM efficiency: short property names, JPEG
 screenshots and automatic scaling. Annotated screenshots return element metadata
-with the image omitted by default. In practice this is roughly **60% fewer
-tokens** than standard JSON, which keeps automation loops fast and affordable.
+with the image omitted by default. In practice this substantially reduces token
+usage compared to standard JSON, which keeps automation loops fast and affordable.
 
 ## Transport
 
@@ -65,8 +65,8 @@ MCP config entry) and runs as a local process — see [Installation](installatio
 ## LLM-tested quality
 
 Because tool descriptions that read clearly to humans can still confuse a model,
-every tool is validated with **real AI models** using
-[pytest-aitest](https://github.com/sbroenne/pytest-aitest): 54 automated tests
+every tool is validated with a **real AI model** (GPT-5.5 via GitHub Copilot) using
+[pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering): 130+ automated tests
 with a 100% pass rate required for release. When the AI misuses a tool, the fix
 is to the tool — not the test prompt. See [Contributing](contributing.md) for how
 the test suites are run.

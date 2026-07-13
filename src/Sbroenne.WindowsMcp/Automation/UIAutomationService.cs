@@ -67,10 +67,16 @@ public sealed partial class UIAutomationService : IDisposable
         _coordinateConverter = new CoordinateConverter(monitorService);
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Intentional no-op. This service does not own any disposable resources:
+    /// the STA thread (<see cref="UIAutomationThread"/>) and the UIA3Automation COM
+    /// singleton are owned and disposed by their creators (see WindowsToolsBase for the
+    /// process-lifetime singletons, or the caller in tests). The interface is retained so
+    /// callers can treat the service uniformly via <see cref="IDisposable"/>.
+    /// </summary>
     public void Dispose()
     {
-        // UIA3Automation singleton handles COM cleanup
+        // No owned resources to release here; see summary.
     }
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
