@@ -36,6 +36,7 @@ public static partial class UIFindTool
     /// <param name="inRegion">Filter to region: 'x,y,width,height' in screen coordinates.</param>
     /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
     /// <param name="visibleOnly">Exclude off-screen elements. Default (unset): excluded for Chromium/Edge/Electron (which expose many hidden nodes), included elsewhere. Set false to include hidden nodes.</param>
+    /// <param name="contentViewOnly">Scan only the leaner UI Automation content view (meaningful, user-facing elements) instead of the full control view. Default (unset): content view for Chromium/Edge/Electron (whose control view is bloated with structural nodes), control view elsewhere; automatically falls back to the control view if nothing is found. Set false to force the full control view.</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -56,6 +57,7 @@ public static partial class UIFindTool
         [DefaultValue(null)] string? inRegion,
         [DefaultValue(null)] string? nearElement,
         [DefaultValue(null)] bool? visibleOnly,
+        [DefaultValue(null)] bool? contentViewOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -86,6 +88,7 @@ public static partial class UIFindTool
                 InRegion = inRegion,
                 NearElement = nearElement,
                 VisibleOnly = visibleOnly,
+                ContentViewOnly = contentViewOnly,
                 TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
             };
 

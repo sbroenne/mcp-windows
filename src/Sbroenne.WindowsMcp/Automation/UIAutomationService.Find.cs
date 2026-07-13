@@ -100,35 +100,68 @@ public sealed partial class UIAutomationService
                 // off-screen nodes for Chromium/Electron (huge hidden/virtualized trees), include elsewhere.
                 var visibleOnly = query.VisibleOnly ?? strategy.UsePostHocFiltering;
 
+                // R5: Chromium/Electron control view is bloated with structural, non-interactive nodes
+                // that inflate FindAll result sets. Scan the leaner content view instead (meaningful,
+                // user-facing elements only). Caller can force on/off via ContentViewOnly. Only applies
+                // to the FindAll/cached-filter paths - ExactDepth counts control-view depth, so it keeps
+                // the control view to preserve depth semantics.
+                var useContentView = (query.ContentViewOnly ?? strategy.UseContentView) && !query.ExactDepth.HasValue;
+
                 // Use framework-aware depth: if caller used default (null or 20), use framework recommendation
                 // Otherwise respect explicit caller value
                 var effectiveMaxDepth = !query.MaxDepth.HasValue || query.MaxDepth.Value == 20
                     ? strategy.RecommendedMaxDepth
                     : query.MaxDepth.Value;
 
-                // Route to the cheapest correct strategy:
+                // Routes to the cheapest correct strategy and applies off-screen filtering.
+                // Resets counters so it can be re-run for the content-view -> control-view fallback.
                 // - No advanced criteria: single FindAllBuildCache (fastest).
                 // - Advanced criteria without ExactDepth: cached bulk fetch + in-process filter.
                 //   This avoids the per-node COM storm of the raw TreeWalker, which is the dominant
                 //   cost for Chromium/Electron where nameContains/namePattern is the recommended path.
                 // - ExactDepth requires depth-aware traversal, so keep the TreeWalker.
-                if (!hasAdvancedCriteria)
+                void RunScan(UIA.IUIAutomationCondition scanCondition)
                 {
-                    FindElementsWithFindAll(rootElement, condition, query, elementInfos, ref elementsScanned, maxResults);
-                }
-                else if (!query.ExactDepth.HasValue)
-                {
-                    FindElementsWithCachedFilter(rootElement, condition, query, elementInfos, ref elementsScanned, ref matchCount, maxResults);
-                }
-                else
-                {
-                    FindElementsWithTreeWalker(rootElement, rootElement, condition, query, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+                    elementInfos.Clear();
+                    elementsScanned = 0;
+                    matchCount = 0;
+
+                    if (!hasAdvancedCriteria)
+                    {
+                        FindElementsWithFindAll(rootElement, scanCondition, query, elementInfos, ref elementsScanned, maxResults);
+                    }
+                    else if (!query.ExactDepth.HasValue)
+                    {
+                        FindElementsWithCachedFilter(rootElement, scanCondition, query, elementInfos, ref elementsScanned, ref matchCount, maxResults);
+                    }
+                    else
+                    {
+                        FindElementsWithTreeWalker(rootElement, rootElement, scanCondition, query, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+                    }
+
+                    // Exclude off-screen elements when visibility filtering is in effect.
+                    if (visibleOnly && elementInfos.Count > 0)
+                    {
+                        elementInfos.RemoveAll(e => e.IsOffscreen);
+                    }
                 }
 
-                // Exclude off-screen elements when visibility filtering is in effect.
-                if (visibleOnly && elementInfos.Count > 0)
+                // AND the caller's condition with the predefined content-view condition so FindAll
+                // returns only content-view elements (a strict subset of the control view).
+                var contentCondition = useContentView
+                    ? Uia.CreateAndCondition(condition, Uia.ContentViewCondition)
+                    : condition;
+
+                var usedContentView = useContentView;
+                RunScan(contentCondition);
+
+                // Guardrail: the content view can hide nodes some flows target (custom ARIA roles,
+                // decorative-but-interactive widgets). Fall back to the full control view when the
+                // content-view scan comes up empty so discoverability never regresses.
+                if (useContentView && elementInfos.Count == 0)
                 {
-                    elementInfos.RemoveAll(e => e.IsOffscreen);
+                    usedContentView = false;
+                    RunScan(condition);
                 }
 
                 stopwatch.Stop();
@@ -147,6 +180,8 @@ public sealed partial class UIAutomationService
                     elementsScanned = 0;
                     matchCount = 0;
 
+                    // Relaxation scans the control view for maximum recall.
+                    usedContentView = false;
                     FindElementsWithCachedFilter(rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned, ref matchCount, maxResults);
 
                     if (visibleOnly && elementInfos.Count > 0)
@@ -166,7 +201,7 @@ public sealed partial class UIAutomationService
                         "find",
                         UIAutomationErrorType.ElementNotFound,
                         BuildNotFoundMessage(query),
-                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
+                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
                 }
 
                 // Filter by region if specified (post-processing for FindAll path)
@@ -199,7 +234,7 @@ public sealed partial class UIAutomationService
                 }
 
                 // Always use compact format for Find to reduce token count by ~70%
-                return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle));
+                return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
             }, cancellationToken);
         }
         catch (COMException ex)

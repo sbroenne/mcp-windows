@@ -68,6 +68,7 @@ public sealed class CallToolResultMigrationSmokeTests
             inRegion: null,
             nearElement: null,
             visibleOnly: null,
+            contentViewOnly: null,
             timeoutMs: 5000,
             includeDiagnostics: false,
             cancellationToken: CancellationToken.None);
