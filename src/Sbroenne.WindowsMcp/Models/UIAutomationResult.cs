@@ -283,7 +283,7 @@ public sealed record UIAutomationResult
             Tree = compactTree,
             Elements = elements, // Keep full elements for internal use (e.g., AnnotatedScreenshotService)
             ElementCount = totalCount,
-            UsageHint = $"Tree contains {totalCount} elements. Use elementId from Tree nodes for actions. For full details: ui_automation(action='get_element_details', elementId='...')",
+            UsageHint = $"Tree contains {totalCount} elements. To act on one, call ui_click/ui_type/ui_read with its name, automationId, or controlType (add foundIndex to disambiguate). Use ui_find to fetch full details for a specific element.",
             Diagnostics = diagnostics
         };
     }
@@ -395,6 +395,13 @@ public sealed record UIAutomationResult
         var hasToggle = patterns.Any(p => p.Contains("Toggle", StringComparison.OrdinalIgnoreCase));
         var hasValue = patterns.Any(p => p.Contains("Value", StringComparison.OrdinalIgnoreCase));
 
+        // Build a selector the interaction tools actually accept (name or automationId).
+        var selector = !string.IsNullOrEmpty(element.Name)
+            ? $"name='{element.Name}'"
+            : !string.IsNullOrEmpty(element.AutomationId)
+                ? $"automationId='{element.AutomationId}'"
+                : $"controlType='{element.ControlType}'";
+
         // Primary recommendation: use clickablePoint for direct interaction
         var cp = element.ClickablePoint;
         hints.Add($"To click: mouse_control(action='click', x={cp.X}, y={cp.Y}, monitorIndex={cp.MonitorIndex})");
@@ -402,17 +409,17 @@ public sealed record UIAutomationResult
         // Add pattern-specific hints
         if (hasInvoke)
         {
-            hints.Add($"Or use: ui_automation(action='invoke', elementId='{element.ElementId}', value='Invoke')");
+            hints.Add($"Or use: ui_click(windowHandle='...', {selector})");
         }
 
         if (hasToggle)
         {
-            hints.Add($"To toggle: ui_automation(action='toggle', elementId='{element.ElementId}')");
+            hints.Add($"To toggle: ui_click(windowHandle='...', {selector})");
         }
 
         if (hasValue)
         {
-            hints.Add($"To type text: ui_automation(action='type', elementId='{element.ElementId}', text='...')");
+            hints.Add($"To type text: ui_type(windowHandle='...', {selector}, text='...')");
         }
 
         return string.Join(" | ", hints);

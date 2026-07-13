@@ -237,9 +237,14 @@ public sealed class UIA3Automation : IDisposable
             {
                 Marshal.ReleaseComObject(comObject);
             }
-            catch
+            catch (COMException ex)
             {
-                // Ignore release errors
+                // A failed release should not crash shutdown, but it may indicate a leaked reference.
+                System.Diagnostics.Debug.WriteLine($"UIA3Automation: failed to release COM object: {ex.Message}");
+            }
+            catch (InvalidComObjectException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UIA3Automation: COM object already released: {ex.Message}");
             }
         }
     }

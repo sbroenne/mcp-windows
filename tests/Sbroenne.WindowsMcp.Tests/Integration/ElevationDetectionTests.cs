@@ -20,11 +20,12 @@ public sealed class ElevationDetectionTests
         // Note: This will return true or false depending on whether
         // the window under the cursor is elevated
         var currentPos = Coordinates.FromCurrent();
-        var isElevated = detector.IsTargetElevated(currentPos.X, currentPos.Y);
+        bool? isElevated = null;
+        var exception = Record.Exception(() => isElevated = detector.IsTargetElevated(currentPos.X, currentPos.Y));
 
-        // Assert - the method should return a valid boolean
-        // We can't predict the result, but the method should not throw
-        Assert.True(isElevated == true || isElevated == false);
+        // Assert - detection must complete without throwing and produce a concrete result.
+        Assert.Null(exception);
+        Assert.NotNull(isElevated);
     }
 
     [Fact]
@@ -61,10 +62,12 @@ public sealed class ElevationDetectionTests
         var y = 50;
 
         // Act - this should work without throwing even if no window is there
-        var isElevated = detector.IsTargetElevated(x, y);
+        bool? isElevated = null;
+        var exception = Record.Exception(() => isElevated = detector.IsTargetElevated(x, y));
 
-        // Assert - method should not throw and should return a valid result
-        Assert.True(isElevated == true || isElevated == false);
+        // Assert - detection must complete without throwing and produce a concrete result.
+        Assert.Null(exception);
+        Assert.NotNull(isElevated);
     }
 
     [Fact]

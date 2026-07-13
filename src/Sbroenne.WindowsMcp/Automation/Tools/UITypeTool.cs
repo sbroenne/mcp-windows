@@ -64,6 +64,12 @@ public static partial class UITypeTool
             return WindowsToolsBase.FailResult("text is required.");
         }
 
+        var foundIndexError = WindowsToolsBase.ValidateFoundIndex(foundIndex);
+        if (foundIndexError is not null)
+        {
+            return foundIndexError;
+        }
+
         try
         {
             var query = new ElementQuery

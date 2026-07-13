@@ -3,7 +3,7 @@ title: Related projects
 description: >-
   More open-source projects by Stefan Broenner — AI automation, testing and
   cloud tooling that complement Windows MCP Server.
-keywords: "Stefan Broenner projects, Excel MCP Server, PowerPoint MCP Server, OBS MCP Server, pytest-aitest, RVToolsMerge"
+keywords: "Stefan Broenner projects, Excel MCP Server, PowerPoint MCP Server, OBS MCP Server, pytest-skill-engineering, RVToolsMerge"
 ---
 
 # Related projects
@@ -30,14 +30,14 @@ Other open-source projects by the author that pair well with Windows MCP Server:
 
     [:octicons-arrow-right-24: powerpointmcpserver.dev](https://powerpointmcpserver.dev/)
 
--   :material-test-tube:{ .lg .middle } __pytest-aitest__
+-   :material-test-tube:{ .lg .middle } __pytest-skill-engineering__
 
     ---
 
     LLM agent testing framework — the same framework used to validate this
     project's tools with real AI models.
 
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/pytest-aitest)
+    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/pytest-skill-engineering)
 
 -   :material-video:{ .lg .middle } __OBS Studio MCP Server__
 

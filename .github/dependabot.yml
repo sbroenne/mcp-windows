@@ -1,7 +1,50 @@
 version: 2
 updates:
+  # .NET dependencies (central package management via Directory.Packages.props)
   - package-ecosystem: "nuget"
     directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "sbroenne"
+    commit-message:
+      prefix: "deps"
+
+  # VS Code extension npm dependencies
+  - package-ecosystem: "npm"
+    directory: "/vscode-extension"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "sbroenne"
+    commit-message:
+      prefix: "deps"
+
+  # GitHub Actions used by workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "security"
+    reviewers:
+      - "sbroenne"
+    commit-message:
+      prefix: "ci"
+
+  # Python dependencies for the LLM integration tests
+  - package-ecosystem: "pip"
+    directory: "/tests/Sbroenne.WindowsMcp.LLM.Tests"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

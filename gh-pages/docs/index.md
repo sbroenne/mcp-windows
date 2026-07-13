@@ -115,8 +115,8 @@ It's deterministic — the same command works every time.
 Tool descriptions that seem clear to humans often confuse AI. Parameters get
 misunderstood. Actions get skipped.
 
-We test every tool with **real AI models** using
-[pytest-aitest](https://github.com/sbroenne/pytest-aitest). 54 automated tests.
+We test every tool with a **real AI model** (GPT-5.5 via GitHub Copilot) using
+[pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering). 130+ automated tests.
 **100% pass rate required for release.** If the AI can't use it correctly, we fix
 the tool — not the prompt.
 

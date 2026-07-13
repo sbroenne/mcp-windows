@@ -429,20 +429,26 @@ public sealed class ScreenshotService
                 var cursorX = cursorInfo.PtScreenPos.X - regionX;
                 var cursorY = cursorInfo.PtScreenPos.Y - regionY;
 
-                NativeMethods.DrawIcon(
-                    graphics.GetHdc(),
-                    cursorX,
-                    cursorY,
-                    cursorInfo.HCursor);
-
-                graphics.ReleaseHdc();
+                var hdc = graphics.GetHdc();
+                try
+                {
+                    NativeMethods.DrawIcon(hdc, cursorX, cursorY, cursorInfo.HCursor);
+                }
+                finally
+                {
+                    graphics.ReleaseHdc(hdc);
+                }
 
                 return new Point { X = cursorX, Y = cursorY };
             }
         }
-        catch
+        catch (Exception ex) when (
+            ex is System.Runtime.InteropServices.ExternalException
+                or InvalidOperationException
+                or ArgumentException)
         {
-            // Cursor capture is optional; ignore failures
+            // Cursor overlay is optional; ignore expected GDI/graphics failures.
+            System.Diagnostics.Debug.WriteLine($"DrawCursorAndGetPosition: cursor overlay skipped: {ex.Message}");
         }
 
         return null;

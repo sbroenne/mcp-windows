@@ -39,10 +39,10 @@ Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, the
 
 - **🧠 Semantic UI** — Find elements by name, not coordinates. Works regardless of DPI, theme, or window position.
 - **� Multi-Monitor** — Full support for multiple displays with per-monitor DPI scaling.
-- **🧪 LLM-Tested** — 54 tests with real AI models (GPT-4.1, GPT-5.2). 100% pass rate required for release.
+- **🧪 LLM-Tested** — 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). 100% pass rate required for release.
 - **💻 Broad App Support** — Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack). Chromium browser pages follow the same ARIA-driven pattern, but browser chrome remains best-effort.
 - **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls.
-- **🪙 Token Optimized** — Short property names, JPEG screenshots, auto-scaling. ~60% fewer tokens than standard JSON.
+- **🪙 Token Optimized** — Short property names, JPEG screenshots, and auto-scaling substantially reduce token usage compared to standard JSON.
 
 ## Installation
 
@@ -114,18 +114,18 @@ dotnet test --filter "FullyQualifiedName~Unit"   # Unit only
 dotnet test .\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj --filter "FullyQualifiedName~ChromiumBrowser"
 ```
 
-**LLM tests**: 54 tests with real AI models (GPT-4.1, GPT-5.2). 100% pass rate required for release.
+**LLM tests**: 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). 100% pass rate required for release.
 
 ```powershell
 cd tests/Sbroenne.WindowsMcp.LLM.Tests
 uv run pytest -v
 ```
 
-Requires Azure OpenAI access. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md).
+Requires GitHub authentication (`GITHUB_TOKEN` or an existing `gh` login) and a Windows desktop session. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md).
 
 ## Related Projects
 
-- **[pytest-aitest](https://github.com/sbroenne/pytest-aitest)** — LLM agent testing framework (powers our integration tests)
+- **[pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering)** — LLM agent testing framework (powers our integration tests)
 - **[Excel MCP Server](https://excelmcpserver.dev)** — AI-powered Excel automation
 - **[OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs)** — AI-powered streaming control
 

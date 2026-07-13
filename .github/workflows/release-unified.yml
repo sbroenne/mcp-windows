@@ -35,6 +35,9 @@ env:
   NODE_VERSION: '22'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
+# Default deny; each job grants only the permissions it needs.
+permissions: {}
+
 jobs:
   # =============================================================================
   # Job 0: Calculate Version
@@ -129,7 +132,7 @@ jobs:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
     - name: Setup Python & uv
-      uses: astral-sh/setup-uv@v8.1.0
+      uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       with:
         python-version: '3.12'
         enable-cache: false
@@ -411,7 +414,7 @@ jobs:
         path: vscode-vsix
 
     - name: Publish to VS Code Marketplace
-      uses: HaaLeo/publish-vscode-extension@v2
+      uses: HaaLeo/publish-vscode-extension@ca5561daa085dee804bf9f37fe0165785a9b14db # v2
       with:
         pat: ${{ secrets.VSCE_TOKEN }}
         registryUrl: https://marketplace.visualstudio.com
@@ -494,10 +497,26 @@ jobs:
         - window_management: Find, activate, move, resize windows
 
         See README for full documentation.
+
+        ### Verifying Downloads
+
+        Each asset's SHA256 checksum is listed in `SHA256SUMS.txt` attached to this release.
         "@
 
         $notes | Out-File -FilePath "release_notes.md" -Encoding utf8
         Write-Output "Release notes created"
+      shell: pwsh
+
+    - name: Generate SHA256 Checksums
+      run: |
+        $files = Get-ChildItem -Path "artifacts" -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" }
+        $lines = foreach ($f in $files) {
+          $hash = (Get-FileHash -Path $f.FullName -Algorithm SHA256).Hash.ToLower()
+          "$hash  $($f.Name)"
+        }
+        $lines | Out-File -FilePath "artifacts/SHA256SUMS.txt" -Encoding ascii
+        Write-Output "Generated checksums:"
+        Get-Content "artifacts/SHA256SUMS.txt"
       shell: pwsh
 
     - name: Create GitHub Release

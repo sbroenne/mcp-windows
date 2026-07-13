@@ -34,17 +34,20 @@ This reduces LLM costs by ~60% and improves response times when processing tool 
 
 ### LLM Testing & Validation
 
-Every tool is tested with **real AI models** using [pytest-aitest](https://github.com/sbroenne/pytest-aitest) to ensure LLMs understand tool descriptions and use them correctly.
+Every tool is tested with a **real AI model** (GPT-5.5 via GitHub Copilot) using [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering) to ensure LLMs understand tool descriptions and use them correctly.
 
-| Test Suite | Tests | Models | Pass Rate |
-|------------|-------|--------|-----------|
-| Window Management | 8 | GPT-4.1, GPT-5.2 | 100% |
-| Notepad UI Operations | 10 | GPT-4.1, GPT-5.2 | 100% |
-| Paint UI Operations | 16 | GPT-4.1, GPT-5.2 | 100% |
-| File Dialog Handling | 6 | GPT-4.1, GPT-5.2 | 100% |
-| Screenshot Capture | 6 | GPT-4.1, GPT-5.2 | 100% |
-| Keyboard & Mouse | 8 | GPT-4.1, GPT-5.2 | 100% |
-| Real-World Workflows | 8 | GPT-4.1, GPT-5.2 | 100% |
+| Test Suite | Focus | Pass Rate |
+|------------|-------|-----------|
+| Window Management | Find, activate, move, resize, close windows | 100% |
+| Notepad UI Operations | Semantic click, type, and read | 100% |
+| Paint UI Operations | Ribbon UI and canvas drawing | 100% |
+| File Dialog Handling | Save As dialog handling | 100% |
+| Screenshot Capture | Capture with annotations and regions | 100% |
+| Keyboard & Mouse | Keyboard and mouse control | 100% |
+| Run Dialog & App Launch | Launching classic and UWP apps | 100% |
+| Real-World Workflows | Multi-step, end-to-end scenarios | 100% |
+
+> 130+ automated LLM tests run against GPT-5.5; a 100% pass rate is required before every release.
 
 **Why LLM testing matters:**
 

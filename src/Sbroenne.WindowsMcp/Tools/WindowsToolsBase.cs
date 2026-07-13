@@ -258,6 +258,29 @@ public static class WindowsToolsBase
     }
 
     /// <summary>
+    /// Upper bound for the 1-based <c>foundIndex</c> parameter accepted by the UI tools.
+    /// Prevents a caller from forcing an unbounded element scan with an absurd index.
+    /// </summary>
+    public const int MaxFoundIndex = 1000;
+
+    /// <summary>
+    /// Validates a 1-based <c>foundIndex</c>. Returns a failed call result when the value is
+    /// out of range (less than 1 or greater than <see cref="MaxFoundIndex"/>), otherwise null.
+    /// </summary>
+    /// <param name="foundIndex">The caller-supplied index.</param>
+    /// <returns>A failed <see cref="CallToolResult"/> when invalid; null when valid.</returns>
+    public static CallToolResult? ValidateFoundIndex(int foundIndex)
+    {
+        if (foundIndex < 1 || foundIndex > MaxFoundIndex)
+        {
+            return FailResult(
+                $"foundIndex must be between 1 and {MaxFoundIndex} (got {foundIndex}).");
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Wraps a tool exception into a failed MCP call result with consistent structure.
     /// </summary>
     /// <param name="actionName">Action that failed.</param>
