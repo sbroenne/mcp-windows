@@ -5,7 +5,7 @@ description = "LLM integration tests for Windows MCP Server using pytest-skill-e
 requires-python = ">=3.12"
 dependencies = [
     "pytest-skill-engineering",
-    "anyio==4.11.0",
+    "anyio==4.14.2",
     "pytest-asyncio",
     "socksio",
     "trio",
