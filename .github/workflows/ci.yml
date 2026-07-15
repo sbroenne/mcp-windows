@@ -45,3 +45,25 @@ jobs:
 
     - name: Run Tests
       run: dotnet test --no-build --configuration Release --filter "Category!=RequiresDesktop&Category!=RequiresDisplay" --verbosity normal
+
+    # Coverage runs in Debug so PDBs are available for coverlet instrumentation
+    # (Release strips symbols via DebugType=none). Scoped to the deterministic Unit
+    # subset so hosted CI stays fast and flake-free; the Release run above is the full gate.
+    - name: Collect Code Coverage
+      run: >
+        dotnet test tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj
+        --configuration Debug
+        --filter "FullyQualifiedName~Unit"
+        --collect:"XPlat Code Coverage"
+        --settings .runsettings
+        --results-directory TestResults
+        --verbosity minimal
+
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: code-coverage
+        path: TestResults/**/coverage.cobertura.xml
+        retention-days: 14
+        if-no-files-found: warn
