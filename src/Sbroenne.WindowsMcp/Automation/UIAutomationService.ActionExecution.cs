@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 
 public sealed partial class UIAutomationService
 {
-    private static readonly TimeSpan ActionVerificationTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan ActionVerificationTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActionVerificationPollInterval = TimeSpan.FromMilliseconds(25);
 
     private readonly record struct ElementActionOutcome(

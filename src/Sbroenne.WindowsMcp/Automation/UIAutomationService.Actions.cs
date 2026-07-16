@@ -1108,49 +1108,25 @@ public sealed partial class UIAutomationService
             TimeSpan.FromMilliseconds(25),
             cancellationToken: cancellationToken);
 
-        // Find the filename edit field.
-        // FileNameControlHost is a ComboBox — we need its INNER Edit child for reliable text entry.
-        // Setting Value Pattern on the ComboBox updates display text but NOT the dialog's internal path state.
-        var editField = await _staThread.ExecuteAsync(() =>
-        {
-            // First try to find FileNameControlHost (ComboBox) and get its inner Edit
-            var fileNameHost = dialog.FindFirst(
-                UIA.TreeScope.TreeScope_Descendants,
-                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost"));
-            if (fileNameHost != null)
+        // The shell dialog can publish its top-level window before the filename control's
+        // accessibility provider is stable. Retry the observable control discovery.
+        UIA.IUIAutomationElement? editField = null;
+        var editFieldFound = await DeterministicWait.UntilAsync(
+            async () =>
             {
-                // Look for inner Edit control within the ComboBox
-                var editCondition = Uia.CreatePropertyCondition(
-                    UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
-                var innerEdit = fileNameHost.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
-                if (innerEdit != null)
-                {
-                    return innerEdit;
-                }
+                editField = await _staThread.ExecuteAsync(
+                    () => FindSaveDialogEditField(dialog),
+                    cancellationToken);
+                return editField != null;
+            },
+            SaveDialogTimeout,
+            SaveDialogPollInterval,
+            transientException: exception =>
+                exception is COMException comException &&
+                COMExceptionHelper.IsTransientProviderFailure(comException),
+            cancellationToken: cancellationToken);
 
-                // If no inner Edit, the host itself may be an Edit
-                if (fileNameHost.CurrentControlType == UIA3ControlTypeIds.Edit)
-                {
-                    return fileNameHost;
-                }
-            }
-
-            // Try AutomationId "1001" (some dialog variants)
-            var field1001 = dialog.FindFirst(
-                UIA.TreeScope.TreeScope_Descendants,
-                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1001"));
-            if (field1001 != null)
-            {
-                return field1001;
-            }
-
-            // Fallback: find any Edit control
-            var editFallback = Uia.CreatePropertyCondition(
-                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
-            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, editFallback);
-        }, cancellationToken);
-
-        if (editField == null)
+        if (!editFieldFound || editField == null)
         {
             return UIAutomationResult.CreateFailure(
                 "save",
@@ -1243,6 +1219,42 @@ public sealed partial class UIAutomationService
         await HandleOverwriteConfirmationAsync(cancellationToken);
 
         return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
+    }
+
+    private static UIA.IUIAutomationElement? FindSaveDialogEditField(UIA.IUIAutomationElement dialog)
+    {
+        // FileNameControlHost is a ComboBox — use its inner Edit so the shell updates
+        // its internal path state rather than only changing the displayed text.
+        var fileNameHost = dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost"));
+        if (fileNameHost != null)
+        {
+            var editCondition = Uia.CreatePropertyCondition(
+                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+            var innerEdit = fileNameHost.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
+            if (innerEdit != null)
+            {
+                return innerEdit;
+            }
+
+            if (fileNameHost.CurrentControlType == UIA3ControlTypeIds.Edit)
+            {
+                return fileNameHost;
+            }
+        }
+
+        var field1001 = dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1001"));
+        if (field1001 != null)
+        {
+            return field1001;
+        }
+
+        return dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit));
     }
 
     /// <summary>
