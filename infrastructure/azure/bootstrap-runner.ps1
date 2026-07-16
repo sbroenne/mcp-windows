@@ -108,20 +108,16 @@ $qualifiedUser = "$env:COMPUTERNAME\$WindowsUser"
 $action = New-ScheduledTaskAction `
     -Execute "powershell.exe" `
     -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$bootstrapPath`""
-$principal = New-ScheduledTaskPrincipal `
-    -UserId $qualifiedUser `
-    -LogonType Password `
-    -RunLevel Highest
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 45)
 Register-ScheduledTask `
     -TaskName $taskName `
     -Action $action `
-    -Principal $principal `
     -Settings $settings `
     -User $qualifiedUser `
     -Password $windowsPassword `
+    -RunLevel Highest `
     -Force | Out-Null
 Start-ScheduledTask -TaskName $taskName
 
