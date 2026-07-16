@@ -91,6 +91,7 @@ jobs:
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: '1'
       DOTNET_NOLOGO: '1'
+      MCP_TEST_CHROME: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -146,8 +147,21 @@ jobs:
           --no-restore
 
       - name: Install Electron harness
+        shell: pwsh
         working-directory: tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness
-        run: npm ci --no-audit --no-fund
+        run: |
+          npm ci --no-audit --no-fund --ignore-scripts=false --foreground-scripts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install the Electron harness."
+          }
+
+          $electron = "node_modules\electron\dist\electron.exe"
+          if (-not (Test-Path $electron)) {
+            npm rebuild electron --foreground-scripts
+          }
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $electron)) {
+            throw "Electron installation did not produce $electron."
+          }
 
       - name: Run desktop integration tests
         shell: pwsh
