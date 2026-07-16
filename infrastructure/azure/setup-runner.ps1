@@ -208,7 +208,7 @@ function Configure-InteractiveRunner {
     if (-not (Test-Path $autologon)) {
         $archive = Join-Path $env:TEMP "Autologon.zip"
         $extract = Join-Path $env:TEMP "Autologon"
-        Invoke-WebRequest "https://download.sysinternals.com/files/Autologon.zip" -OutFile $archive
+        Invoke-WebRequest "https://download.sysinternals.com/files/AutoLogon.zip" -OutFile $archive
         Remove-Item $extract -Recurse -Force -ErrorAction SilentlyContinue
         Expand-Archive $archive -DestinationPath $extract -Force
         Copy-Item (Join-Path $extract "Autologon64.exe") $autologon -Force
