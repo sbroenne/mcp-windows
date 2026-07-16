@@ -157,7 +157,7 @@ jobs:
 
           $electron = "node_modules\electron\dist\electron.exe"
           if (-not (Test-Path $electron)) {
-            npm rebuild electron --foreground-scripts
+            node node_modules/electron/install.js
           }
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path $electron)) {
             throw "Electron installation did not produce $electron."
