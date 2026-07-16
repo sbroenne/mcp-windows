@@ -69,6 +69,15 @@ internal static partial class NativeMethods
     internal static partial nint GetAncestor(nint hwnd, uint gaFlags);
 
     /// <summary>
+    /// Retrieves a window related to the specified window.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <param name="uCmd">The relationship between the specified and retrieved windows.</param>
+    /// <returns>The related window handle, or NULL.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint GetWindow(nint hWnd, uint uCmd);
+
+    /// <summary>
     /// Retrieves the thread and process IDs for the specified window.
     /// </summary>
     /// <param name="hWnd">Handle to the window.</param>

@@ -55,7 +55,6 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
             throw new TimeoutException("Test window did not appear within timeout");
         }
 
-        await Task.Delay(200); // Let window settle
     }
 
     private void RunMessageLoop()
@@ -65,7 +64,7 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 
         _testWindow = new UnsavedChangesWindowForm(TestWindowTitle, _dialogAppeared);
-        _testWindow.Load += (s, e) => _formReady.Set();
+        _testWindow.Shown += (s, e) => _formReady.Set();
         _testWindow.FormClosed += (s, e) => _formClosed.Set();
 
         Application.Run(_testWindow);
@@ -176,8 +175,9 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
 
         // Wait for window to close after dialog is dismissed
         var windowClosed = await Task.Run(() => _formClosed.Wait(TimeSpan.FromSeconds(5)));
-        Assert.True(windowClosed, "Window should be closed after discardChanges dismisses the dialog");
-
+        Assert.True(
+            windowClosed,
+            $"Window should be closed after discardChanges dismisses the dialog. Close result: {closeResult.Error}");
         Assert.True(closeResult.Success, $"Close with discardChanges should succeed but got: {closeResult.Error}");
     }
 
@@ -241,14 +241,12 @@ public sealed class WindowCloseDiscardChangesTests : IAsyncLifetime, IDisposable
             discardChanges: false,
             cancellationToken: CancellationToken.None);
 
-        _ = DeserializeResult(closeResultJson);
+        var closeResult = DeserializeResult(closeResultJson);
 
         // Wait a moment for the dialog to appear
         var dialogShown = await Task.Run(() => _dialogAppeared.Wait(TimeSpan.FromSeconds(3)));
         Assert.True(dialogShown, "Save confirmation dialog should have appeared");
-
-        // Give some time for the window to potentially close (it shouldn't)
-        await Task.Delay(500);
+        Assert.False(closeResult.Success, "Close should report failure while the save dialog remains open");
 
         // Assert - Window should still exist because dialog was not dismissed
         Assert.False(_formClosed.IsSet, "Window should NOT be closed when discardChanges is false");
