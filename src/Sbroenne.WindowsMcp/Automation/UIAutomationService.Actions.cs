@@ -1260,30 +1260,42 @@ public sealed partial class UIAutomationService
     /// </summary>
     private async Task<bool> ClickSaveButtonAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
     {
-        var saveButton = await _staThread.ExecuteAsync(() =>
-        {
-            // Standard Save button names (includes accelerator variants)
-            string[] saveButtonNames = ["Save", "&Save"];
-            foreach (var name in saveButtonNames)
+        UIA.IUIAutomationElement? saveButton = null;
+        var saveButtonFound = await DeterministicWait.UntilAsync(
+            async () =>
             {
-                var condition = Uia.CreateAndCondition(
-                    Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                    Uia.CreatePropertyCondition(UIA3PropertyIds.Name, name));
-                var button = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
-                if (button != null)
+                saveButton = await _staThread.ExecuteAsync(() =>
                 {
-                    return button;
-                }
-            }
+                    // Standard Save button names (includes accelerator variants)
+                    string[] saveButtonNames = ["Save", "&Save"];
+                    foreach (var name in saveButtonNames)
+                    {
+                        var condition = Uia.CreateAndCondition(
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, name));
+                        var button = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
+                        if (button != null)
+                        {
+                            return button;
+                        }
+                    }
 
-            // Fallback: search by AutomationId "1" (common for Save button in file dialogs)
-            var idCondition = Uia.CreateAndCondition(
-                Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
-            return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, idCondition);
-        }, cancellationToken);
+                    // Fallback: search by AutomationId "1" (common for Save button in file dialogs)
+                    var idCondition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
+                    return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, idCondition);
+                }, cancellationToken);
+                return saveButton != null;
+            },
+            SaveDialogTimeout,
+            SaveDialogPollInterval,
+            transientException: exception =>
+                exception is COMException comException &&
+                COMExceptionHelper.IsTransientProviderFailure(comException),
+            cancellationToken: cancellationToken);
 
-        if (saveButton == null)
+        if (!saveButtonFound || saveButton == null)
         {
             return false;
         }
@@ -1358,60 +1370,69 @@ public sealed partial class UIAutomationService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var errorInfo = await _staThread.ExecuteAsync(() =>
+            (UIA.IUIAutomationElement? dialog, UIA.IUIAutomationElement? okButton, string? errorText) errorInfo;
+            try
             {
-                // CRITICAL: Only check the FOREGROUND window to avoid false positives
-                // from other applications (e.g., VS Code chat showing "does not exist" text)
-                var foregroundHwnd = NativeMethods.GetForegroundWindow();
-                if (foregroundHwnd == IntPtr.Zero)
+                errorInfo = await _staThread.ExecuteAsync(() =>
                 {
-                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                }
-
-                var window = Uia.ElementFromHandle(foregroundHwnd);
-                if (window == null)
-                {
-                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                }
-
-                var windowName = window.CurrentName ?? "";
-
-                // Error dialogs from Save must have "Save" in the title
-                if (!windowName.Contains("Save", StringComparison.OrdinalIgnoreCase))
-                {
-                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                }
-
-                // Look for error text in the dialog
-                var textCondition = Uia.CreatePropertyCondition(
-                    UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Text);
-                var textElements = window.FindAll(UIA.TreeScope.TreeScope_Descendants, textCondition);
-
-                if (textElements != null)
-                {
-                    for (int j = 0; j < textElements.Length; j++)
+                    // CRITICAL: Only check the FOREGROUND window to avoid false positives
+                    // from other applications (e.g., VS Code chat showing "does not exist" text)
+                    var foregroundHwnd = NativeMethods.GetForegroundWindow();
+                    if (foregroundHwnd == IntPtr.Zero)
                     {
-                        var textElement = textElements.GetElement(j);
-                        var text = textElement.CurrentName ?? "";
+                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                    }
 
-                        foreach (var pattern in errorPatterns)
+                    var window = Uia.ElementFromHandle(foregroundHwnd);
+                    if (window == null)
+                    {
+                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                    }
+
+                    var windowName = window.CurrentName ?? "";
+
+                    // Error dialogs from Save must have "Save" in the title
+                    if (!windowName.Contains("Save", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                    }
+
+                    // Look for error text in the dialog
+                    var textCondition = Uia.CreatePropertyCondition(
+                        UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Text);
+                    var textElements = window.FindAll(UIA.TreeScope.TreeScope_Descendants, textCondition);
+
+                    if (textElements != null)
+                    {
+                        for (int j = 0; j < textElements.Length; j++)
                         {
-                            if (text.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                            {
-                                // Found error - now find the OK button
-                                var buttonCondition = Uia.CreateAndCondition(
-                                    Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                                    Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "OK"));
-                                var okBtn = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
+                            var textElement = textElements.GetElement(j);
+                            var text = textElement.CurrentName ?? "";
 
-                                return (dialog: (UIA.IUIAutomationElement?)window, okButton: (UIA.IUIAutomationElement?)okBtn, errorText: (string?)text);
+                            foreach (var pattern in errorPatterns)
+                            {
+                                if (text.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // Found error - now find the OK button
+                                    var buttonCondition = Uia.CreateAndCondition(
+                                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "OK"));
+                                    var okBtn = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
+
+                                    return (dialog: (UIA.IUIAutomationElement?)window, okButton: (UIA.IUIAutomationElement?)okBtn, errorText: (string?)text);
+                                }
                             }
                         }
                     }
-                }
 
-                return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-            }, cancellationToken);
+                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                }, cancellationToken);
+            }
+            catch (COMException exception) when (COMExceptionHelper.IsTransientProviderFailure(exception))
+            {
+                await Task.Delay(SaveDialogPollInterval, cancellationToken);
+                continue;
+            }
 
             if (errorInfo.dialog != null)
             {
