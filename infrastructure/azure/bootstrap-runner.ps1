@@ -42,7 +42,7 @@ function Get-KeyVaultSecret {
     )
 
     $headers = @{ Authorization = "Bearer $AccessToken" }
-    $uri = "https://$KeyVaultName.vault.azure.net/secrets/$Name?api-version=7.4"
+    $uri = "https://$KeyVaultName.vault.azure.net/secrets/${Name}?api-version=7.4"
     (Invoke-RestMethod -Headers $headers -Uri $uri).value
 }
 
@@ -63,7 +63,7 @@ function Get-KeyVaultSecret {
         "?api-version=2018-02-01&resource=https%3A%2F%2Fvault.azure.net"
     $accessToken = (Invoke-RestMethod -Headers @{ Metadata = "true" } -Uri $tokenUri).access_token
     $headers = @{ Authorization = "Bearer $accessToken" }
-    $uri = "https://__KEY_VAULT__.vault.azure.net/secrets/$Name?api-version=7.4"
+    $uri = "https://__KEY_VAULT__.vault.azure.net/secrets/${Name}?api-version=7.4"
     (Invoke-RestMethod -Headers $headers -Uri $uri).value
 }
 
