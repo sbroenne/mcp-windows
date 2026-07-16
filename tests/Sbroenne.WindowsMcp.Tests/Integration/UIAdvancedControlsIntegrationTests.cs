@@ -26,7 +26,6 @@ public sealed class UIAdvancedControlsIntegrationTests : IDisposable
         _fixture = fixture;
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
         _staThread = new UIAutomationThread();

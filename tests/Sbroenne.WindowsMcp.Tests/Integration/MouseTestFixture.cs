@@ -88,9 +88,6 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
                 _form.Height);
         });
 
-        // Increased settle time for Windows to fully process the window
-        await Task.Delay(200);
-
         // Perform initial focus acquisition with verification
         await EnsureTestWindowForegroundAsync();
 
@@ -190,37 +187,22 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
             return;
         }
 
-        for (int attempt = 0; attempt < maxRetries; attempt++)
-        {
-            // Allow any process to set foreground window
-            AllowSetForegroundWindow(ASFW_ANY);
-
-            _form.Invoke(() =>
+        await TestWait.RetryUntilAsync(
+            attempt: () =>
             {
-                _form.Activate();
-                _form.BringToFront();
-            });
+                AllowSetForegroundWindow(ASFW_ANY);
 
-            // Also try SetForegroundWindow directly
-            SetForegroundWindow(TestWindowHandle);
+                _form.Invoke(() =>
+                {
+                    _form.Activate();
+                    _form.BringToFront();
+                });
 
-            // Wait for focus to settle
-            await Task.Delay(delayMs);
-
-            // Verify we got focus
-            if (GetForegroundWindow() == TestWindowHandle)
-            {
-                return; // Success!
-            }
-        }
-
-        // Final attempt - just proceed and hope for the best
-        _form.Invoke(() =>
-        {
-            _form.Activate();
-            _form.BringToFront();
-        });
-        await Task.Delay(delayMs);
+                SetForegroundWindow(TestWindowHandle);
+            },
+            condition: () => GetForegroundWindow() == TestWindowHandle,
+            timeout: TimeSpan.FromMilliseconds(maxRetries * delayMs),
+            pollInterval: TimeSpan.FromMilliseconds(delayMs));
     }
 
     /// <summary>
@@ -246,7 +228,12 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
         // Move mouse to window center to "wake up" the input system
         var center = GetTestWindowCenter();
         await MouseInputService.MoveAsync(center.X, center.Y);
-        await Task.Delay(50);
+        var moved = await TestWait.UntilAsync(() =>
+            Cursor.Position.X == center.X && Cursor.Position.Y == center.Y);
+        if (!moved)
+        {
+            throw new TimeoutException($"Mouse did not reach test window center {center}.");
+        }
 
         _isWarmedUp = true;
     }

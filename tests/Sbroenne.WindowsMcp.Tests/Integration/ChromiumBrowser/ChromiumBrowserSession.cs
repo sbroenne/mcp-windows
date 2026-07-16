@@ -33,6 +33,9 @@ internal sealed class ChromiumBrowserSession : IDisposable
     private static extern bool AllowSetForegroundWindow(int dwProcessId);
 
     [DllImport("user32.dll")]
+    private static extern nint GetForegroundWindow();
+
+    [DllImport("user32.dll")]
     private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
     private const uint WmClose = 0x0010;
@@ -139,18 +142,15 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     public void BringToFront()
     {
-        AllowSetForegroundWindow(-1);
-
-        for (var attempt = 0; attempt < 10; attempt++)
-        {
-            if (SetForegroundWindow(WindowHandle))
+        TestWait.RetryUntil(
+            attempt: () =>
             {
-                Thread.Sleep(50);
-                return;
-            }
-
-            Thread.Sleep(50);
-        }
+                AllowSetForegroundWindow(-1);
+                SetForegroundWindow(WindowHandle);
+            },
+            condition: () => GetForegroundWindow() == WindowHandle,
+            timeout: TimeSpan.FromSeconds(1),
+            pollInterval: TimeSpan.FromMilliseconds(50));
     }
 
     public void Dispose()
@@ -285,11 +285,10 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
         // Wait until Chromium has written its baseline profile state, then shut the warm-up down.
         var localState = Path.Combine(templateDirectory, "Local State");
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        while (DateTime.UtcNow < deadline && !File.Exists(localState))
-        {
-            Thread.Sleep(100);
-        }
+        TestWait.Until(
+            () => File.Exists(localState),
+            timeout: TimeSpan.FromSeconds(10),
+            pollInterval: TimeSpan.FromMilliseconds(100));
 
         try
         {
@@ -402,21 +401,18 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
         PostMessage(WindowHandle, WmClose, nint.Zero, nint.Zero);
 
-        var deadline = DateTime.UtcNow.AddSeconds(5);
         var enumerator = new WindowEnumerator(new ElevationDetector());
-        while (DateTime.UtcNow < deadline)
-        {
-            var windows = enumerator.EnumerateWindowsAsync(cancellationToken: CancellationToken.None)
-                .GetAwaiter()
-                .GetResult();
-
-            if (!windows.Any(window => string.Equals(window.Handle, WindowHandleString, StringComparison.OrdinalIgnoreCase)))
+        TestWait.Until(
+            condition: () =>
             {
-                return;
-            }
-
-            Thread.Sleep(100);
-        }
+                var windows = enumerator.EnumerateWindowsAsync(cancellationToken: CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                return !windows.Any(window =>
+                    string.Equals(window.Handle, WindowHandleString, StringComparison.OrdinalIgnoreCase));
+            },
+            timeout: TimeSpan.FromSeconds(5),
+            pollInterval: TimeSpan.FromMilliseconds(100));
     }
 
     private void EnsureBrowserExited()
@@ -456,23 +452,25 @@ internal sealed class ChromiumBrowserSession : IDisposable
             return;
         }
 
-        var deadline = DateTime.UtcNow.Add(ProfileCleanupTimeout);
-        while (DateTime.UtcNow < deadline)
-        {
-            try
+        TestWait.Until(
+            condition: () =>
             {
-                Directory.Delete(_userDataDirectory, recursive: true);
-                return;
-            }
-            catch (IOException)
-            {
-                Thread.Sleep(100);
-            }
-            catch (UnauthorizedAccessException)
-            {
-                Thread.Sleep(100);
-            }
-        }
+                try
+                {
+                    Directory.Delete(_userDataDirectory, recursive: true);
+                    return true;
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return false;
+                }
+            },
+            timeout: ProfileCleanupTimeout,
+            pollInterval: TimeSpan.FromMilliseconds(100));
     }
 
     private static HashSet<string> SnapshotBrowserWindows(string browserProcessName)
@@ -520,25 +518,25 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new ElevationDetector(),
             NullLogger<UIAutomationService>.Instance);
 
-        var deadline = DateTime.UtcNow.Add(target.ReadyTimeout);
-        while (DateTime.UtcNow < deadline)
+        var ready = TestWait.Until(
+            condition: () =>
+            {
+                if (IsReady(target, automationService, windowHandle))
+                {
+                    return true;
+                }
+
+                TryDismissKnownPopup(automationService, windowHandle);
+                return false;
+            },
+            timeout: target.ReadyTimeout,
+            pollInterval: ReadyPollInterval);
+
+        if (!ready)
         {
-            if (IsReady(target, automationService, windowHandle))
-            {
-                Thread.Sleep(250);
-                return;
-            }
-
-            if (TryDismissKnownPopup(automationService, windowHandle))
-            {
-                Thread.Sleep(500);
-                continue;
-            }
-
-            Thread.Sleep(ReadyPollInterval);
+            throw new InvalidOperationException(
+                $"Timed out waiting for Chromium target '{target.Name}' to become ready without Edge first-run UI interference.");
         }
-
-        throw new InvalidOperationException($"Timed out waiting for Chromium target '{target.Name}' to become ready without Edge first-run UI interference.");
     }
 
     private static bool IsReady(BrowserTarget target, UIAutomationService automationService, string windowHandle)
@@ -614,35 +612,40 @@ internal sealed class ChromiumBrowserSession : IDisposable
     private static nint WaitForWindow(int processId, string titleFragment, HashSet<string> existingWindows, string browserProcessName)
     {
         var enumerator = new WindowEnumerator(new ElevationDetector());
-        var deadline = DateTime.UtcNow.Add(LaunchTimeout);
 
-        while (DateTime.UtcNow < deadline)
+        nint foundHandle = nint.Zero;
+        var found = TestWait.Until(
+            condition: () =>
+            {
+                var windows = enumerator.EnumerateWindowsAsync(cancellationToken: CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+
+                var match = windows.FirstOrDefault(window =>
+                    window.ProcessId == processId &&
+                    string.Equals(window.ProcessName, browserProcessName, StringComparison.OrdinalIgnoreCase) &&
+                    window.Title.Contains(titleFragment, StringComparison.OrdinalIgnoreCase))
+                    ?? windows.FirstOrDefault(window =>
+                        string.Equals(window.ProcessName, browserProcessName, StringComparison.OrdinalIgnoreCase) &&
+                        window.Title.Contains(titleFragment, StringComparison.OrdinalIgnoreCase) &&
+                        !existingWindows.Contains(window.Handle));
+
+                if (match is null ||
+                    !WindowHandleParser.TryParse(match.Handle, out foundHandle) ||
+                    foundHandle == nint.Zero)
+                {
+                    foundHandle = nint.Zero;
+                    return false;
+                }
+
+                return true;
+            },
+            timeout: LaunchTimeout,
+            pollInterval: TimeSpan.FromMilliseconds(200));
+
+        if (found)
         {
-            var windows = enumerator.EnumerateWindowsAsync(cancellationToken: CancellationToken.None)
-                .GetAwaiter()
-                .GetResult();
-
-            var directMatch = windows.FirstOrDefault(window =>
-                window.ProcessId == processId &&
-                string.Equals(window.ProcessName, browserProcessName, StringComparison.OrdinalIgnoreCase) &&
-                window.Title.Contains(titleFragment, StringComparison.OrdinalIgnoreCase));
-
-            if (directMatch is not null && WindowHandleParser.TryParse(directMatch.Handle, out var handle) && handle != nint.Zero)
-            {
-                return handle;
-            }
-
-            var reusedProfileMatch = windows.FirstOrDefault(window =>
-                string.Equals(window.ProcessName, browserProcessName, StringComparison.OrdinalIgnoreCase) &&
-                window.Title.Contains(titleFragment, StringComparison.OrdinalIgnoreCase) &&
-                !existingWindows.Contains(window.Handle));
-
-            if (reusedProfileMatch is not null && WindowHandleParser.TryParse(reusedProfileMatch.Handle, out handle) && handle != nint.Zero)
-            {
-                return handle;
-            }
-
-            Thread.Sleep(200);
+            return foundHandle;
         }
 
         throw new InvalidOperationException($"Timed out waiting for Chromium browser test window '{titleFragment}'.");

@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
@@ -43,7 +44,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up - restore the window for other tests
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100); // Give window time to restore
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -63,7 +64,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up - restore the window for other tests
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100); // Give window time to restore
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -74,7 +75,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         var minimizeResult = await _windowService.MinimizeWindowAsync(handle);
         Assert.True(minimizeResult.Success, $"Setup minimize failed: {minimizeResult.Error}");
-        await Task.Delay(100); // Give window time to minimize
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Minimized));
 
         // Act
         var result = await _windowService.RestoreWindowAsync(handle);
@@ -94,7 +95,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         var maximizeResult = await _windowService.MaximizeWindowAsync(handle);
         Assert.True(maximizeResult.Success, $"Setup maximize failed: {maximizeResult.Error}");
-        await Task.Delay(100); // Give window time to maximize
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Maximized));
 
         // Act
         var result = await _windowService.RestoreWindowAsync(handle);
@@ -228,7 +229,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // First ensure window is in normal state
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
 
         // Act
         var result = await _windowService.GetWindowStateAsync(handle);
@@ -247,7 +248,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.MinimizeWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Minimized));
 
         // Act
         var result = await _windowService.GetWindowStateAsync(handle);
@@ -260,7 +261,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -270,7 +271,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.MaximizeWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Maximized));
 
         // Act
         var result = await _windowService.GetWindowStateAsync(handle);
@@ -283,7 +284,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -325,7 +326,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
 
         // Act
         var result = await _windowService.WaitForStateAsync(handle, WindowState.Normal, 1000);
@@ -344,13 +345,12 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
 
         // Start waiting for minimized state
         var waitTask = _windowService.WaitForStateAsync(handle, WindowState.Minimized, 5000);
 
-        // Minimize while waiting
-        await Task.Delay(100);
+        // Minimize while waiting; the waiter observes the state regardless of scheduling order.
         await _windowService.MinimizeWindowAsync(handle);
 
         // Act
@@ -364,7 +364,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -374,13 +374,12 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
 
         // Start waiting for maximized state
         var waitTask = _windowService.WaitForStateAsync(handle, WindowState.Maximized, 5000);
 
-        // Maximize while waiting
-        await Task.Delay(100);
+        // Maximize while waiting; the waiter observes the state regardless of scheduling order.
         await _windowService.MaximizeWindowAsync(handle);
 
         // Act
@@ -394,7 +393,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
 
         // Clean up
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
     }
 
     [Fact]
@@ -404,7 +403,7 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         nint handle = _fixture.TestWindowHandle;
 
         await _windowService.RestoreWindowAsync(handle);
-        await Task.Delay(100);
+        Assert.True(await WaitForNativeStateAsync(handle, WindowState.Normal));
 
         // Act - Wait for minimized but don't minimize
         var result = await _windowService.WaitForStateAsync(handle, WindowState.Minimized, 500);
@@ -443,6 +442,16 @@ public class WindowStateTests : IClassFixture<WindowTestFixture>
         Assert.NotNull(result.Error);
     }
 
+    private static Task<bool> WaitForNativeStateAsync(nint handle, WindowState state)
+    {
+        return TestWait.UntilAsync(() => state switch
+        {
+            WindowState.Minimized => NativeMethods.IsIconic(handle),
+            WindowState.Maximized => NativeMethods.IsZoomed(handle),
+            WindowState.Normal => !NativeMethods.IsIconic(handle) && !NativeMethods.IsZoomed(handle),
+            _ => throw new ArgumentOutOfRangeException(nameof(state), state, null),
+        });
+    }
+
     #endregion
 }
-

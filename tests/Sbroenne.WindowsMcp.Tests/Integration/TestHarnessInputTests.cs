@@ -23,13 +23,9 @@ public class TestHarnessInputTests : IDisposable
         _keyboardInputService = new KeyboardInputService();
         _originalPosition = Coordinates.FromCurrent();
 
-        // Reset and bring harness to front before each test
-        // Use multiple attempts to ensure window activation succeeds
+        // Reset and bring the harness to front before each test. BringToFront verifies focus.
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(150);
-        _fixture.BringToFront(); // Second attempt in case first one failed
-        Thread.Sleep(100);
     }
 
     public void Dispose()
@@ -49,11 +45,9 @@ public class TestHarnessInputTests : IDisposable
         // Act
         var result = await _mouseInputService.ClickAsync(buttonCenter.X, buttonCenter.Y);
 
-        // Small delay for UI to process
-        await Task.Delay(50);
-
         // Assert
         Assert.True(result.Success, $"Click failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.ButtonClickCount == initialCount + 1));
         var newCount = _fixture.GetValue(f => f.ButtonClickCount);
         Assert.Equal(initialCount + 1, newCount);
     }
@@ -67,10 +61,10 @@ public class TestHarnessInputTests : IDisposable
 
         // Act
         var result = await _mouseInputService.ClickAsync(buttonCenter.X, buttonCenter.Y);
-        await Task.Delay(50);
 
         // Assert
         Assert.True(result.Success, $"Click failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.Button2ClickCount == initialCount + 1));
         var newCount = _fixture.GetValue(f => f.Button2ClickCount);
         Assert.Equal(initialCount + 1, newCount);
     }
@@ -88,10 +82,10 @@ public class TestHarnessInputTests : IDisposable
 
         // Act
         var result = await _mouseInputService.DoubleClickAsync(buttonCenter.X, buttonCenter.Y);
-        await Task.Delay(50);
 
         // Assert
         Assert.True(result.Success, $"Double-click failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.ButtonClickCount >= initialCount + 1));
 
         // Double-click on button should register as 2 clicks (WinForms button behavior)
         var newCount = _fixture.GetValue(f => f.ButtonClickCount);
@@ -103,16 +97,16 @@ public class TestHarnessInputTests : IDisposable
     {
         // Arrange
         _fixture.FocusTextBox();
-        await Task.Delay(50);
+        Assert.True(await _fixture.WaitForAsync(f => f.IsInputTextBoxFocused));
 
         var testText = "Hello";
 
         // Act
         var result = await _keyboardInputService.TypeTextAsync(testText);
-        await Task.Delay(100);
 
         // Assert
         Assert.True(result.Success, $"Type failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.InputText == testText));
         var inputText = _fixture.GetValue(f => f.InputText);
         Assert.Equal(testText, inputText);
     }
@@ -122,14 +116,14 @@ public class TestHarnessInputTests : IDisposable
     {
         // Arrange
         _fixture.FocusTextBox();
-        await Task.Delay(50);
+        Assert.True(await _fixture.WaitForAsync(f => f.IsInputTextBoxFocused));
 
         // Act
         var result = await _keyboardInputService.PressKeyAsync("enter");
-        await Task.Delay(50);
 
         // Assert
         Assert.True(result.Success, $"Key press failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.LastKeyPressed == Keys.Return));
         var lastKey = _fixture.GetValue(f => f.LastKeyPressed);
         Assert.Equal(System.Windows.Forms.Keys.Return, lastKey);
     }
@@ -145,16 +139,16 @@ public class TestHarnessInputTests : IDisposable
 
         // Act - Click on text box first
         var clickResult = await _mouseInputService.ClickAsync(textBoxCenter.X, textBoxCenter.Y);
-        await Task.Delay(50);
 
         Assert.True(clickResult.Success, $"Click failed: {clickResult.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.IsInputTextBoxFocused));
 
         // Act - Type text
         var typeResult = await _keyboardInputService.TypeTextAsync(testText);
-        await Task.Delay(100);
 
         // Assert
         Assert.True(typeResult.Success, $"Type failed: {typeResult.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.InputText == testText));
         var inputText = _fixture.GetValue(f => f.InputText);
         Assert.Equal(testText, inputText);
     }
@@ -168,16 +162,16 @@ public class TestHarnessInputTests : IDisposable
 
         // Act - Click button 1 twice, button 2 three times
         await _mouseInputService.ClickAsync(button1Center.X, button1Center.Y);
-        await Task.Delay(30);
+        Assert.True(await _fixture.WaitForAsync(f => f.ButtonClickCount == 1));
         await _mouseInputService.ClickAsync(button1Center.X, button1Center.Y);
-        await Task.Delay(30);
+        Assert.True(await _fixture.WaitForAsync(f => f.ButtonClickCount == 2));
 
         await _mouseInputService.ClickAsync(button2Center.X, button2Center.Y);
-        await Task.Delay(30);
+        Assert.True(await _fixture.WaitForAsync(f => f.Button2ClickCount == 1));
         await _mouseInputService.ClickAsync(button2Center.X, button2Center.Y);
-        await Task.Delay(30);
+        Assert.True(await _fixture.WaitForAsync(f => f.Button2ClickCount == 2));
         await _mouseInputService.ClickAsync(button2Center.X, button2Center.Y);
-        await Task.Delay(50);
+        Assert.True(await _fixture.WaitForAsync(f => f.Button2ClickCount == 3));
 
         // Assert
         var button1Count = _fixture.GetValue(f => f.ButtonClickCount);
@@ -192,11 +186,13 @@ public class TestHarnessInputTests : IDisposable
     {
         // Arrange - First put some text in the box
         _fixture.BringToFront();
-        _fixture.FocusTextBox();
-        await Task.Delay(100);
+        var textBoxCenter = _fixture.GetValue(f => f.TextBoxCenter);
+        var focusResult = await _mouseInputService.ClickAsync(textBoxCenter.X, textBoxCenter.Y);
+        Assert.True(focusResult.Success, $"Focus click failed: {focusResult.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.IsInputTextBoxFocused));
 
         await _keyboardInputService.TypeTextAsync("Select me");
-        await Task.Delay(100);
+        Assert.True(await _fixture.WaitForAsync(f => f.InputText == "Select me"));
 
         // Verify text was typed
         var inputText = _fixture.GetValue(f => f.InputText);
@@ -207,10 +203,10 @@ public class TestHarnessInputTests : IDisposable
 
         // Act - Press Ctrl+A
         var result = await _keyboardInputService.PressKeyAsync("a", Models.ModifierKey.Ctrl);
-        await Task.Delay(100);
 
         // Assert - Verify the combo was sent
         Assert.True(result.Success, $"Key combo failed: {result.Error}");
+        Assert.True(await _fixture.WaitForAsync(f => f.KeysPressed.Count > keysBefore));
 
         // Verify the 'A' key was pressed with Ctrl modifier
         var keysAfter = _fixture.GetValue(f => f.KeysPressed.Count);

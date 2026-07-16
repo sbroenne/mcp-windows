@@ -24,7 +24,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         _fixture = fixture;
         _fixture.Reset();
         _fixture.EnsureTestWindowFocused();
-        Thread.Sleep(200);
     }
 
     public void Dispose()
@@ -52,7 +51,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         // Arrange - ensure harness is focused with multiple retries
         _fixture.Reset();
         await _fixture.EnsureTestWindowFocusedAsync(maxRetries: 5, delayMs: 200);
-        await Task.Delay(200);
 
         var testText = "CorrectWindow";
 
@@ -78,7 +76,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         // Arrange - ensure harness is focused with multiple retries
         _fixture.Reset();
         await _fixture.EnsureTestWindowFocusedAsync(maxRetries: 5, delayMs: 200);
-        await Task.Delay(200);
 
         var testText = "ABC123xyz";
 
@@ -103,7 +100,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         // Arrange - ensure harness is focused with multiple retries
         _fixture.Reset();
         await _fixture.EnsureTestWindowFocusedAsync(maxRetries: 5, delayMs: 200);
-        await Task.Delay(200);
 
         var testText = "Hello, World!";
 
@@ -128,7 +124,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         // Arrange - ensure harness is focused with multiple retries
         _fixture.Reset();
         await _fixture.EnsureTestWindowFocusedAsync(maxRetries: 5, delayMs: 200);
-        await Task.Delay(200);
 
         // Act - press the 'a' key
         var result = await _fixture.KeyboardInputService.PressKeyAsync("a", ModifierKey.None, 1);
@@ -151,7 +146,6 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
         // Arrange - ensure harness is focused with multiple retries
         _fixture.Reset();
         await _fixture.EnsureTestWindowFocusedAsync(maxRetries: 5, delayMs: 200);
-        await Task.Delay(200);
 
         // Act - type in parts
         var result1 = await _fixture.KeyboardInputService.TypeTextAsync("First");

@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Native;
+using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.ElectronHarness;
 
@@ -103,11 +105,16 @@ public sealed class ElectronHarnessFixture : IDisposable
         // Ensure npm packages are installed
         EnsureNodeModulesInstalled();
 
-        // Start the Electron app
-        StartElectronApp();
-
-        // Wait for the window to appear
-        WaitForWindow();
+        try
+        {
+            StartElectronApp();
+            WaitForWindow();
+        }
+        catch
+        {
+            CloseElectronApp();
+            throw;
+        }
     }
 
     private void EnsureNodeModulesInstalled()
@@ -225,29 +232,35 @@ public sealed class ElectronHarnessFixture : IDisposable
 
     private void WaitForWindow()
     {
-        var deadline = DateTime.UtcNow.AddSeconds(MAX_WAIT_SECONDS);
+        var appeared = TestWait.Until(
+            condition: () =>
+            {
+                _windowHandle = FindWindow(null, ELECTRON_HARNESS_TITLE);
+                if (_electronProcess?.HasExited == true)
+                {
+                    throw new InvalidOperationException(
+                        $"Electron process exited unexpectedly (exit code {_electronProcess.ExitCode})");
+                }
 
-        while (DateTime.UtcNow < deadline)
+                return _windowHandle != nint.Zero;
+            },
+            timeout: TimeSpan.FromSeconds(MAX_WAIT_SECONDS),
+            pollInterval: TimeSpan.FromMilliseconds(100));
+
+        if (!appeared)
         {
-            _windowHandle = FindWindow(null, ELECTRON_HARNESS_TITLE);
-            if (_windowHandle != nint.Zero)
-            {
-                // Give the window time to fully initialize (Chromium UIA tree needs extra time)
-                // Increased from 1000ms to 3000ms due to Chromium accessibility tree initialization timing
-                Thread.Sleep(3000);
-                return;
-            }
-
-            // Check if process exited unexpectedly
-            if (_electronProcess?.HasExited == true)
-            {
-                throw new InvalidOperationException($"Electron process exited unexpectedly (exit code {_electronProcess.ExitCode})");
-            }
-
-            Thread.Sleep(100);
+            throw new InvalidOperationException(
+                $"Electron harness window did not appear within {MAX_WAIT_SECONDS} seconds");
         }
 
-        throw new InvalidOperationException($"Electron harness window did not appear within {MAX_WAIT_SECONDS} seconds");
+        var automationReady = TestWait.Until(
+            condition: IsAutomationTreeReady,
+            timeout: TimeSpan.FromSeconds(10),
+            pollInterval: TimeSpan.FromMilliseconds(100));
+        if (!automationReady)
+        {
+            throw new TimeoutException("Electron harness UI Automation tree did not become ready.");
+        }
     }
 
     /// <summary>
@@ -260,18 +273,15 @@ public sealed class ElectronHarnessFixture : IDisposable
             return;
         }
 
-        AllowSetForegroundWindow(-1);
-
-        for (int attempt = 0; attempt < 10; attempt++)
-        {
-            SetForegroundWindow(_windowHandle);
-            Thread.Sleep(50);
-
-            if (GetForegroundWindow() == _windowHandle)
+        TestWait.RetryUntil(
+            attempt: () =>
             {
-                return;
-            }
-        }
+                AllowSetForegroundWindow(-1);
+                SetForegroundWindow(_windowHandle);
+            },
+            condition: () => GetForegroundWindow() == _windowHandle,
+            timeout: TimeSpan.FromSeconds(1),
+            pollInterval: TimeSpan.FromMilliseconds(50));
     }
 
     /// <summary>
@@ -290,8 +300,29 @@ public sealed class ElectronHarnessFixture : IDisposable
             if (dialogHwnd != nint.Zero)
             {
                 PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
-                Thread.Sleep(200);
+                TestWait.Until(
+                    () => FindWindow(null, title) == nint.Zero,
+                    timeout: TimeSpan.FromSeconds(2));
             }
+        }
+    }
+
+    private bool IsAutomationTreeReady()
+    {
+        try
+        {
+            var automation = UIA3Automation.Instance;
+            var root = automation.ElementFromHandle(_windowHandle);
+            var navigationButton = automation.CreatePropertyCondition(
+                UIA3PropertyIds.Name,
+                "Navigate Home");
+            return root?.FindFirst(
+                UIA.TreeScope.TreeScope_Descendants,
+                navigationButton) != null;
+        }
+        catch (COMException)
+        {
+            return false;
         }
     }
 
@@ -313,7 +344,11 @@ public sealed class ElectronHarnessFixture : IDisposable
         }
 
         _disposed = true;
+        CloseElectronApp();
+    }
 
+    private void CloseElectronApp()
+    {
         try
         {
             // Dismiss any leftover dialogs before closing
@@ -335,6 +370,8 @@ public sealed class ElectronHarnessFixture : IDisposable
             }
 
             _electronProcess?.Dispose();
+            _electronProcess = null;
+            _windowHandle = nint.Zero;
         }
         catch
         {

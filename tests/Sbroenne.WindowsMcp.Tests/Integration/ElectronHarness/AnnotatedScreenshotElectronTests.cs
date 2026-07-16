@@ -27,7 +27,6 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     {
         _fixture = fixture;
         _fixture.BringToFront();
-        Thread.Sleep(300);
 
         _windowHandleString = _fixture.WindowHandleString;
 

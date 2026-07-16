@@ -30,7 +30,6 @@ public sealed class SaveTests : IDisposable
         _fixture = fixture;
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
         _testOutputDir = Path.Combine(Path.GetTempPath(), "mcp-windows-tests");
@@ -298,7 +297,9 @@ public sealed class SaveTests : IDisposable
             if (dialogHwnd != nint.Zero)
             {
                 PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
-                Thread.Sleep(200);
+                TestWait.Until(
+                    () => FindWindow(null, title) == nint.Zero,
+                    timeout: TimeSpan.FromSeconds(2));
             }
         }
     }

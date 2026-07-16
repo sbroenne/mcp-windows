@@ -79,6 +79,12 @@ public sealed class TestHarnessForm : Form
     /// </summary>
     public string InputText => _inputTextBox.Text;
 
+    /// <summary>Gets whether the input text box currently owns keyboard focus.</summary>
+    public bool IsInputTextBoxFocused => _inputTextBox.Focused;
+
+    /// <summary>Gets the number of selected characters in the input text box.</summary>
+    public int InputSelectionLength => _inputTextBox.SelectionLength;
+
     /// <summary>
     /// Gets the last key pressed in the text box.
     /// </summary>

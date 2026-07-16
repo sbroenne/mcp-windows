@@ -36,7 +36,6 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
         _output = output;
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
 

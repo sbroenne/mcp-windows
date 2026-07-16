@@ -26,7 +26,6 @@ public sealed class UIAutomationElectronTests : IDisposable
     {
         _fixture = fixture;
         _fixture.BringToFront();
-        Thread.Sleep(300);
 
         _windowHandle = _fixture.WindowHandleString;
 

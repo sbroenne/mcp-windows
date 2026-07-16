@@ -26,7 +26,6 @@ public sealed class ElectronSaveTests : IDisposable
     {
         _fixture = fixture;
         _fixture.Reset();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.WindowHandleString;
         _testOutputDir = Path.Combine(Path.GetTempPath(), "mcp-windows-tests-electron");

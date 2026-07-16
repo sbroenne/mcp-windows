@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Native;
+using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 
@@ -64,7 +66,15 @@ public sealed class ModernTestHarnessFixture : IDisposable
                 HarnessPath);
         }
 
-        LaunchHarness();
+        try
+        {
+            LaunchHarness();
+        }
+        catch
+        {
+            CloseHarness();
+            throw;
+        }
     }
 
     private static string FindHarnessExecutable()
@@ -134,31 +144,36 @@ public sealed class ModernTestHarnessFixture : IDisposable
             throw new InvalidOperationException($"Failed to start modern test harness: {HarnessPath}");
         }
 
-        // Wait for the window to appear
-        var stopwatch = Stopwatch.StartNew();
         var timeout = TimeSpan.FromSeconds(30); // WinUI apps can take longer to start
+        var appeared = TestWait.Until(
+            condition: () =>
+            {
+                _windowHandle = FindWindow(null, HarnessWindowTitle);
+                if (_harnessProcess.HasExited)
+                {
+                    throw new InvalidOperationException(
+                        $"Modern test harness exited with code {_harnessProcess.ExitCode}");
+                }
 
-        while (stopwatch.Elapsed < timeout)
+                return _windowHandle != nint.Zero;
+            },
+            timeout: timeout,
+            pollInterval: TimeSpan.FromMilliseconds(100));
+
+        if (!appeared)
         {
-            _windowHandle = FindWindow(null, HarnessWindowTitle);
-            if (_windowHandle != nint.Zero)
-            {
-                // Give the window a moment to fully initialize
-                Thread.Sleep(500);
-                return;
-            }
-
-            if (_harnessProcess.HasExited)
-            {
-                throw new InvalidOperationException(
-                    $"Modern test harness exited with code {_harnessProcess.ExitCode}");
-            }
-
-            Thread.Sleep(100);
+            throw new TimeoutException(
+                $"Modern test harness window did not appear within {timeout.TotalSeconds} seconds");
         }
 
-        throw new TimeoutException(
-            $"Modern test harness window did not appear within {timeout.TotalSeconds} seconds");
+        var automationReady = TestWait.Until(
+            condition: IsAutomationTreeReady,
+            timeout: TimeSpan.FromSeconds(10),
+            pollInterval: TimeSpan.FromMilliseconds(100));
+        if (!automationReady)
+        {
+            throw new TimeoutException("Modern test harness UI Automation tree did not become ready.");
+        }
     }
 
     /// <summary>
@@ -171,20 +186,15 @@ public sealed class ModernTestHarnessFixture : IDisposable
             return;
         }
 
-        const int maxRetries = 3;
-        const int delayMs = 100;
-
-        for (int attempt = 0; attempt < maxRetries; attempt++)
-        {
-            AllowSetForegroundWindow(ASFW_ANY);
-            SetForegroundWindow(_windowHandle);
-            Thread.Sleep(delayMs);
-
-            if (GetForegroundWindow() == _windowHandle)
+        TestWait.RetryUntil(
+            attempt: () =>
             {
-                return;
-            }
-        }
+                AllowSetForegroundWindow(ASFW_ANY);
+                SetForegroundWindow(_windowHandle);
+            },
+            condition: () => GetForegroundWindow() == _windowHandle,
+            timeout: TimeSpan.FromSeconds(1),
+            pollInterval: TimeSpan.FromMilliseconds(100));
     }
 
     /// <summary>
@@ -219,6 +229,25 @@ public sealed class ModernTestHarnessFixture : IDisposable
         _harnessProcess?.Dispose();
         _harnessProcess = null;
         _windowHandle = nint.Zero;
+    }
+
+    private bool IsAutomationTreeReady()
+    {
+        try
+        {
+            var automation = UIA3Automation.Instance;
+            var root = automation.ElementFromHandle(_windowHandle);
+            var navigationView = automation.CreatePropertyCondition(
+                UIA3PropertyIds.AutomationId,
+                "MainNavView");
+            return root?.FindFirst(
+                UIA.TreeScope.TreeScope_Descendants,
+                navigationView) != null;
+        }
+        catch (COMException)
+        {
+            return false;
+        }
     }
 
     public void Dispose()
