@@ -116,14 +116,16 @@ function Install-Prerequisites {
     Refresh-Path
     if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
         Write-SetupLog "Installing the current Node.js LTS release."
-        $nodeReleases = @(Invoke-RestMethod "https://nodejs.org/dist/index.json")
-        $nodeRelease = $nodeReleases |
-            Where-Object {
-                $_.lts -is [string] -and
-                $_.lts.Length -gt 0 -and
-                $_.files -contains "win-x64-msi"
-            } |
-            Select-Object -First 1
+        $nodeReleases = Invoke-RestMethod "https://nodejs.org/dist/index.json"
+        $nodeRelease = $null
+        foreach ($release in $nodeReleases) {
+            if ($release.lts -is [string] -and
+                $release.lts.Length -gt 0 -and
+                $release.files -contains "win-x64-msi") {
+                $nodeRelease = $release
+                break
+            }
+        }
         if (-not $nodeRelease) {
             throw "Could not resolve the current Node.js LTS release."
         }
