@@ -235,26 +235,26 @@ public sealed class UITestHarnessForm : Form
         };
         buttonsGroup.Controls.Add(_submitButton);
 
-        var physicalFallbackTarget = new Label
+        var physicalFallbackTarget = new Panel
         {
-            Text = "Physical fallback",
             Location = new Point(10, 375),
             Size = new Size(300, 40),
             Name = "PhysicalFallbackTarget",
             BorderStyle = BorderStyle.FixedSingle,
-            TextAlign = ContentAlignment.MiddleCenter,
+            AccessibleName = "Physical fallback",
+            BackColor = Color.AliceBlue,
         };
         physicalFallbackTarget.Click += (_, _) => UpdateStatus("Physical fallback clicked");
         formControlsTab.Controls.Add(physicalFallbackTarget);
 
-        var inertTarget = new Label
+        var inertTarget = new Panel
         {
-            Text = "Inert target",
             Location = new Point(320, 375),
             Size = new Size(300, 40),
             Name = "InertTarget",
             BorderStyle = BorderStyle.FixedSingle,
-            TextAlign = ContentAlignment.MiddleCenter,
+            AccessibleName = "Inert target",
+            BackColor = Color.WhiteSmoke,
         };
         formControlsTab.Controls.Add(inertTarget);
 

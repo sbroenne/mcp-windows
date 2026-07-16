@@ -116,7 +116,6 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         {
             WindowHandle = _windowHandle,
             AutomationId = "PhysicalFallbackTarget",
-            ControlType = "Text",
         });
         Assert.Single(target.Items!);
 
@@ -124,7 +123,6 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         {
             WindowHandle = _windowHandle,
             AutomationId = "PhysicalFallbackTarget",
-            ControlType = "Text",
         });
 
         Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
@@ -146,7 +144,6 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         {
             WindowHandle = _windowHandle,
             AutomationId = "InertTarget",
-            ControlType = "Text",
         });
         Assert.Single(target.Items!);
 
@@ -167,7 +164,6 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         {
             WindowHandle = _windowHandle,
             AutomationId = "PhysicalFallbackTarget",
-            ControlType = "Text",
         });
         var clickPoint = Assert.Single(probeTarget.Items!).Click;
         var click = await _mouseService.ClickAsync(clickPoint[0], clickPoint[1]);
