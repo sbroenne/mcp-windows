@@ -32,6 +32,8 @@ concurrency:
 env:
   AZURE_RESOURCE_GROUP: rg-windows-mcp-runner
   AZURE_VM_NAME: vm-windows-mcp-runner
+  AZURE_NSG_NAME: vm-windows-mcp-runner-nsg
+  AZURE_PUBLIC_IP_NAME: vm-windows-mcp-runner-ip
 
 jobs:
   start-runner:
@@ -51,11 +53,23 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: Checkout runner scripts
+        uses: actions/checkout@v6
+
       - name: Start VM
         run: >-
           az vm start
           --resource-group "$AZURE_RESOURCE_GROUP"
           --name "$AZURE_VM_NAME"
+
+      - name: Initialize interactive desktop
+        shell: pwsh
+        run: |
+          infrastructure/azure/initialize-desktop.ps1 `
+            -ResourceGroup $env:AZURE_RESOURCE_GROUP `
+            -VmName $env:AZURE_VM_NAME `
+            -NetworkSecurityGroupName $env:AZURE_NSG_NAME `
+            -PublicIpName $env:AZURE_PUBLIC_IP_NAME
 
       - name: Set four-hour shutdown watchdog
         shell: pwsh

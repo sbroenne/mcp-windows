@@ -253,7 +253,7 @@ Set-Location "$runnerDirectory"
     $principal = New-ScheduledTaskPrincipal `
         -UserId $qualifiedAccount `
         -LogonType Interactive `
-        -RunLevel Highest
+        -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet `
         -StartWhenAvailable `
         -RestartCount 3 `

@@ -15,7 +15,7 @@ repository-scoped runner registration. There is no scheduled or nightly workflow
 | Disk | 128 GB Standard SSD |
 | Runner label | `windows-ui` |
 | Browsers | Microsoft Edge and Google Chrome |
-| Desktop | Secure automatic logon; runner starts interactively at logon |
+| Desktop | Secure automatic logon; workflow initializes an RDP display and transfers it to the console |
 | Cost control | VM starts for ready same-repository PRs or manual runs, then deallocates |
 | Backstop | Workflow sets auto-shutdown four hours ahead |
 
@@ -37,6 +37,7 @@ $resourceGroup = "rg-windows-mcp-runner"
 $location = "eastus2"
 $adminIp = (Invoke-RestMethod "https://api.ipify.org?format=json").ip
 $deployerObjectId = az ad signed-in-user show --query id -o tsv
+$workflowPrincipalObjectId = "<GitHub OIDC service-principal-object-id>"
 
 az group create --name $resourceGroup --location $location
 
@@ -47,12 +48,14 @@ az deployment group create `
   --parameters infrastructure\azure\azure-runner.parameters.json `
   adminPassword="<strong-password>" `
   deployerObjectId="$deployerObjectId" `
+  workflowPrincipalObjectId="$workflowPrincipalObjectId" `
   rdpSourceAddressPrefix="$adminIp/32"
 ```
 
 The template creates the VM, network, static public IP, RDP rule restricted to the
 specified CIDR, auto-shutdown schedule, and a Key Vault containing the generated
-administrator password. It does not register the runner.
+administrator password. The workflow principal receives read-only access to that one
+vault so it can initialize the Azure display. It does not register the runner.
 
 Retrieve the password without placing it in source control:
 
@@ -94,7 +97,8 @@ RDP to the VM, apply Windows Update, then run this from an elevated PowerShell w
 The script installs .NET 10, Git, PowerShell 7, Node.js LTS, Chrome, and the latest
 GitHub Actions runner. It registers the `windows-ui` label, configures en-US locale,
 stores the Windows password as an LSA secret with Sysinternals Autologon, and starts
-the runner from an interactive scheduled task. The secrets are not written to the log.
+the runner from a non-elevated interactive scheduled task. The secrets are not written
+to the log.
 
 Reboot once. Confirm the desktop signs in, Explorer starts, and the runner appears:
 
@@ -138,6 +142,10 @@ Grant the service principal `Contributor` only on:
 /subscriptions/<subscription-id>/resourceGroups/rg-windows-mcp-runner
 ```
 
+Pass that service principal's object ID as `workflowPrincipalObjectId` when deploying
+the Bicep template. This grants only `get` permission for the Key Vault secret used to
+open the temporary RDP session.
+
 ## Workflow behavior
 
 `.github/workflows/integration-tests.yml` has no schedule. It runs when:
@@ -149,6 +157,16 @@ Grant the service principal `Contributor` only on:
 Pull requests run the full desktop integration namespace. Manual runs can select all,
 keyboard, mouse, window, UI Automation, WinUI, Electron, or Chromium tests. Fork pull
 requests never start the VM or execute code on the self-hosted runner.
+
+Azure autologon creates a user session but does not initialize a display that accepts
+native `SendInput`. Before assigning the self-hosted job, the hosted start job:
+
+1. adds a temporary NSG rule restricted to that hosted runner's public `/32`;
+2. opens an RDP session using the password retrieved from Key Vault;
+3. transfers that session to the VM console with `tscon`; and
+4. removes the temporary NSG rule in a `finally` block.
+
+The password is masked and never written to workflow output.
 
 ```powershell
 gh workflow run integration-tests.yml `
