@@ -35,7 +35,6 @@ and uses a supported Generation 2 Windows 11 image.
 ```powershell
 $resourceGroup = "rg-windows-mcp-runner"
 $location = "eastus2"
-$adminIp = (Invoke-RestMethod "https://api.ipify.org?format=json").ip
 $deployerObjectId = az ad signed-in-user show --query id -o tsv
 $workflowPrincipalObjectId = "<GitHub OIDC service-principal-object-id>"
 
@@ -48,14 +47,14 @@ az deployment group create `
   --parameters infrastructure\azure\azure-runner.parameters.json `
   adminPassword="<strong-password>" `
   deployerObjectId="$deployerObjectId" `
-  workflowPrincipalObjectId="$workflowPrincipalObjectId" `
-  rdpSourceAddressPrefix="$adminIp/32"
+  workflowPrincipalObjectId="$workflowPrincipalObjectId"
 ```
 
-The template creates the VM, network, static public IP, RDP rule restricted to the
-specified CIDR, auto-shutdown schedule, and a Key Vault containing the generated
-administrator password. The workflow principal receives read-only access to that one
-vault so it can initialize the Azure display. It does not register the runner.
+The template creates the VM, network, static public IP, unrestricted inbound RDP rule,
+auto-shutdown schedule, and a Key Vault containing the generated administrator
+password. NLA and the strong VM credential protect RDP access. The workflow principal
+receives read-only access to that one vault so it can initialize the Azure display. It
+does not register the runner.
 
 Retrieve the password without placing it in source control:
 
@@ -161,10 +160,8 @@ requests never start the VM or execute code on the self-hosted runner.
 Azure autologon creates a user session but does not initialize a display that accepts
 native `SendInput`. Before assigning the self-hosted job, the hosted start job:
 
-1. adds a temporary NSG rule restricted to that hosted runner's public `/32`;
-2. opens an RDP session using the password retrieved from Key Vault;
-3. transfers that session to the VM console with `tscon`; and
-4. removes the temporary NSG rule in a `finally` block.
+1. opens an RDP session using the password retrieved from Key Vault; and
+2. transfers that session to the VM console with `tscon`.
 
 The password is masked and never written to workflow output.
 

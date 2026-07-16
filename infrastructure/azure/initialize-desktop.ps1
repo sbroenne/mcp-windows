@@ -9,9 +9,6 @@ param(
     [string]$VmName,
 
     [Parameter(Mandatory = $true)]
-    [string]$NetworkSecurityGroupName,
-
-    [Parameter(Mandatory = $true)]
     [string]$PublicIpName,
 
     [string]$RunnerUsername = "azureuser",
@@ -20,8 +17,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ruleSuffix = if ($env:GITHUB_RUN_ID) { $env:GITHUB_RUN_ID } else { [Guid]::NewGuid().ToString("N") }
-$ruleName = "AllowRdpFromGitHub-$ruleSuffix"
 $rdpProcess = $null
 $runnerPassword = $null
 
@@ -55,19 +50,6 @@ try {
         throw "The runner desktop credential is empty."
     }
     Write-Output "::add-mask::$runnerPassword"
-
-    $hostedRunnerIp = (Invoke-RestMethod "https://api.ipify.org?format=json").ip
-    Invoke-AzureCli network nsg rule create `
-        --resource-group $ResourceGroup `
-        --nsg-name $NetworkSecurityGroupName `
-        --name $ruleName `
-        --priority 1002 `
-        --source-address-prefixes "$hostedRunnerIp/32" `
-        --destination-port-ranges 3389 `
-        --access Allow `
-        --protocol Tcp `
-        --direction Inbound `
-        --output none
 
     & sudo apt-get update --quiet
     if ($LASTEXITCODE -ne 0) {
@@ -140,10 +122,4 @@ finally {
     if ($rdpProcess -and -not $rdpProcess.HasExited) {
         Stop-Process -Id $rdpProcess.Id -Force
     }
-
-    & az network nsg rule delete `
-        --resource-group $ResourceGroup `
-        --nsg-name $NetworkSecurityGroupName `
-        --name $ruleName `
-        --output none 2>$null
 }

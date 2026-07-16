@@ -11,9 +11,6 @@ param adminUsername string = 'azureuser'
 @secure()
 param adminPassword string
 
-@description('Source IPv4 CIDR allowed to connect over RDP.')
-param rdpSourceAddressPrefix string
-
 @description('Object ID allowed to retrieve the generated VM password from Key Vault.')
 param deployerObjectId string
 
@@ -42,13 +39,13 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
   properties: {
     securityRules: [
       {
-        name: 'AllowRdpFromAdmin'
+        name: 'AllowRdp'
         properties: {
           priority: 1000
           protocol: 'Tcp'
           access: 'Allow'
           direction: 'Inbound'
-          sourceAddressPrefix: rdpSourceAddressPrefix
+          sourceAddressPrefix: '*'
           sourcePortRange: '*'
           destinationAddressPrefix: '*'
           destinationPortRange: '3389'

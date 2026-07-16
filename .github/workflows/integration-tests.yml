@@ -32,7 +32,6 @@ concurrency:
 env:
   AZURE_RESOURCE_GROUP: rg-windows-mcp-runner
   AZURE_VM_NAME: vm-windows-mcp-runner
-  AZURE_NSG_NAME: vm-windows-mcp-runner-nsg
   AZURE_PUBLIC_IP_NAME: vm-windows-mcp-runner-ip
 
 jobs:
@@ -68,7 +67,6 @@ jobs:
           infrastructure/azure/initialize-desktop.ps1 `
             -ResourceGroup $env:AZURE_RESOURCE_GROUP `
             -VmName $env:AZURE_VM_NAME `
-            -NetworkSecurityGroupName $env:AZURE_NSG_NAME `
             -PublicIpName $env:AZURE_PUBLIC_IP_NAME
 
       - name: Set four-hour shutdown watchdog
