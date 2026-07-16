@@ -632,20 +632,17 @@ public sealed partial class UIAutomationService
     {
         try
         {
-            if (element.TryGetClickablePoint(out var clickableX, out var clickableY))
-            {
-                return new Point(clickableX, clickableY);
-            }
-
             var rect = element.CurrentBoundingRectangle;
-            if (rect.right <= rect.left || rect.bottom <= rect.top)
+            if (rect.right > rect.left && rect.bottom > rect.top)
             {
-                return null;
+                return new Point(
+                    rect.left + (rect.right - rect.left) / 2,
+                    rect.top + (rect.bottom - rect.top) / 2);
             }
 
-            var x = rect.left + (rect.right - rect.left) / 2;
-            var y = rect.top + (rect.bottom - rect.top) / 2;
-            return new Point(x, y);
+            return element.TryGetClickablePoint(out var clickableX, out var clickableY)
+                ? new Point(clickableX, clickableY)
+                : null;
         }
         catch
         {

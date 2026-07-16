@@ -151,7 +151,6 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         {
             WindowHandle = _windowHandle,
             AutomationId = "InertTarget",
-            ControlType = "Text",
         });
 
         Assert.False(result.Success);
