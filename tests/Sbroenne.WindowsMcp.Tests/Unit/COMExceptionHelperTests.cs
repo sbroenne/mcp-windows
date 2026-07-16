@@ -14,6 +14,7 @@ public sealed class COMExceptionHelperTests
     private const int E_ELEMENTNOTFOUND = unchecked((int)0x8002802B);
     private const int E_HANDLE = unchecked((int)0x80070006);
     private const int E_INVALIDOPERATION = unchecked((int)0x80131509);
+    private const int E_UNEXPECTED = unchecked((int)0x8000FFFF);
     private const int RPC_E_DISCONNECTED = unchecked((int)0x80010108);
     private const int RPC_E_SERVER_DIED_DNE = unchecked((int)0x80010012);
     private const int UIA_E_ELEMENTNOTENABLED = unchecked((int)0x80040200);
@@ -87,6 +88,16 @@ public sealed class COMExceptionHelperTests
     public void IsInvalidState_ClassifiesStateHResults(int hresult, bool expected)
     {
         Assert.Equal(expected, COMExceptionHelper.IsInvalidState(MakeException(hresult)));
+    }
+
+    [Theory]
+    [InlineData(E_UNEXPECTED, true)]
+    [InlineData(RPC_E_DISCONNECTED, true)]
+    [InlineData(UIA_E_ELEMENTNOTAVAILABLE, true)]
+    [InlineData(E_ACCESSDENIED, false)]
+    public void IsTransientProviderFailure_ClassifiesRetryableHResults(int hresult, bool expected)
+    {
+        Assert.Equal(expected, COMExceptionHelper.IsTransientProviderFailure(MakeException(hresult)));
     }
 
     [Fact]

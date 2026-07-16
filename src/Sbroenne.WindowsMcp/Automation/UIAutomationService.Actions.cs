@@ -340,6 +340,16 @@ public sealed partial class UIAutomationService
                 return staResult.Result!;
             }
 
+            var isPassword = await _staThread.ExecuteAsync(
+                () => staResult.Element.CurrentIsPassword != 0,
+                cancellationToken);
+            if (isPassword)
+            {
+                // UIA intentionally does not expose password values. The successful provider
+                // SetValue call is the strongest observable completion signal available.
+                return staResult.Result!;
+            }
+
             var verified = await WaitForElementConditionAsync(
                 staResult.Element,
                 () => string.Equals(staResult.Element.TryGetValue(), text, StringComparison.Ordinal),
@@ -980,64 +990,72 @@ public sealed partial class UIAutomationService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var result = await _staThread.ExecuteAsync(() =>
+            (UIA.IUIAutomationElement element, string name)? result;
+            try
             {
-                // First, check for modal windows of the parent (FlaUI pattern: window.ModalWindows)
-                var parentElement = Uia.ElementFromHandle(parentHwnd);
-                if (parentElement != null)
+                result = await _staThread.ExecuteAsync(() =>
                 {
-                    // Search for modal windows
-                    var windowCondition = Uia.CreatePropertyCondition(
-                        UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
-                    var children = parentElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
-
-                    if (children != null)
+                    // First, check for modal windows of the parent (FlaUI pattern: window.ModalWindows)
+                    var parentElement = Uia.ElementFromHandle(parentHwnd);
+                    if (parentElement != null)
                     {
-                        for (int i = 0; i < children.Length; i++)
+                        // Search for modal windows
+                        var windowCondition = Uia.CreatePropertyCondition(
+                            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
+                        var children = parentElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
+
+                        if (children != null)
                         {
-                            var child = children.GetElement(i);
-                            var windowPattern = child.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
-                            if (windowPattern != null)
+                            for (int i = 0; i < children.Length; i++)
                             {
-                                try
+                                var child = children.GetElement(i);
+                                var windowPattern = child.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
+                                if (windowPattern != null)
                                 {
-                                    if (windowPattern.CurrentIsModal != 0)
+                                    try
                                     {
-                                        var name = child.CurrentName ?? "";
-                                        // Check if it matches any dialog pattern
-                                        foreach (var pattern in dialogPatterns)
+                                        if (windowPattern.CurrentIsModal != 0)
                                         {
-                                            if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                            var name = child.CurrentName ?? "";
+                                            // Check if it matches any dialog pattern
+                                            foreach (var pattern in dialogPatterns)
                                             {
-                                                return (element: child, name: name);
+                                                if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                                {
+                                                    return (element: child, name: name);
+                                                }
                                             }
                                         }
                                     }
-                                }
-                                catch
-                                {
-                                    // Skip this element
+                                    catch
+                                    {
+                                        // Skip this element
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                // Fallback: search top-level windows (for system dialogs)
-                foreach (var pattern in dialogPatterns)
-                {
-                    var condition = Uia.CreateAndCondition(
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
-                    var dialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, condition);
-                    if (dialog != null)
+                    // Fallback: search top-level windows (for system dialogs)
+                    foreach (var pattern in dialogPatterns)
                     {
-                        return (element: dialog, name: pattern);
+                        var condition = Uia.CreateAndCondition(
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
+                        var dialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, condition);
+                        if (dialog != null)
+                        {
+                            return (element: dialog, name: pattern);
+                        }
                     }
-                }
 
-                return ((UIA.IUIAutomationElement element, string name)?)null;
-            }, cancellationToken);
+                    return ((UIA.IUIAutomationElement element, string name)?)null;
+                }, cancellationToken);
+            }
+            catch (COMException exception) when (COMExceptionHelper.IsTransientProviderFailure(exception))
+            {
+                result = null;
+            }
 
             if (result.HasValue)
             {

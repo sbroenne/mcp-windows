@@ -22,6 +22,7 @@ internal static class COMExceptionHelper
     // Known HRESULT values
     private const int E_ACCESSDENIED = unchecked((int)0x80070005);
     private const int E_FAIL = unchecked((int)0x80004005);
+    private const int E_UNEXPECTED = unchecked((int)0x8000FFFF);
     private const int E_ELEMENTNOTFOUND = unchecked((int)0x8002802B);
     private const int E_HANDLE = unchecked((int)0x80070006);
     private const int E_OUTOFMEMORY = unchecked((int)0x8007000E);
@@ -93,6 +94,15 @@ internal static class COMExceptionHelper
     public static bool IsInvalidState(COMException ex)
     {
         return ex.HResult is E_INVALIDOPERATION or UIA_E_ELEMENTNOTENABLED;
+    }
+
+    /// <summary>
+    /// Determines if the provider failed while its accessibility tree was transitioning.
+    /// These failures are safe to retry only inside an already bounded observation loop.
+    /// </summary>
+    public static bool IsTransientProviderFailure(COMException ex)
+    {
+        return ex.HResult == E_UNEXPECTED || IsElementStale(ex);
     }
 
     /// <summary>
