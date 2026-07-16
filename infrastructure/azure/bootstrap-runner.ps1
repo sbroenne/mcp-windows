@@ -24,7 +24,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$taskName = "WindowsMcp-Bootstrap-Runner"
 $bootstrapPath = "C:\windows-mcp-runner-bootstrap-user.ps1"
 $successMarker = "C:\windows-mcp-runner-bootstrap.success"
 $failureMarker = "C:\windows-mcp-runner-bootstrap.failure"
@@ -103,39 +102,39 @@ foreach ($replacement in $replacements.GetEnumerator()) {
 }
 Set-Content $bootstrapPath -Value $userScript -Encoding UTF8
 
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 $qualifiedUser = "$env:COMPUTERNAME\$WindowsUser"
-$action = New-ScheduledTaskAction `
-    -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$bootstrapPath`""
-$settings = New-ScheduledTaskSettingsSet `
-    -StartWhenAvailable `
-    -ExecutionTimeLimit (New-TimeSpan -Minutes 45)
-Register-ScheduledTask `
-    -TaskName $taskName `
-    -Action $action `
-    -Settings $settings `
-    -User $qualifiedUser `
-    -Password $windowsPassword `
-    -RunLevel Highest `
-    -Force | Out-Null
-Start-ScheduledTask -TaskName $taskName
+$securePassword = ConvertTo-SecureString $windowsPassword -AsPlainText -Force
+$credential = [pscredential]::new($qualifiedUser, $securePassword)
+$process = Start-Process `
+    -FilePath "powershell.exe" `
+    -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$bootstrapPath`"" `
+    -Credential $credential `
+    -WorkingDirectory "C:\" `
+    -LoadUserProfile `
+    -PassThru
 
-$deadline = (Get-Date).AddMinutes(40)
-while ((Get-Date) -lt $deadline) {
-    if (Test-Path $successMarker) {
-        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-        Remove-Item $bootstrapPath -Force
-        Write-Host "Runner bootstrap completed successfully."
-        exit 0
-    }
-
-    if (Test-Path $failureMarker) {
-        $failure = Get-Content $failureMarker -Raw
-        throw "Runner bootstrap failed:`n$failure"
-    }
-
-    Start-Sleep -Seconds 10
+try {
+    Wait-Process -Id $process.Id -Timeout 2400 -ErrorAction Stop
+}
+catch {
+    Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+    throw "Runner bootstrap did not complete within 40 minutes."
 }
 
-throw "Runner bootstrap did not complete within 40 minutes."
+$process.Refresh()
+if ($process.ExitCode -ne 0 -or (Test-Path $failureMarker)) {
+    $failure = if (Test-Path $failureMarker) {
+        Get-Content $failureMarker -Raw
+    }
+    else {
+        "Setup process exited with code $($process.ExitCode)."
+    }
+    throw "Runner bootstrap failed:`n$failure"
+}
+
+if (-not (Test-Path $successMarker)) {
+    throw "Runner bootstrap exited without writing its success marker."
+}
+
+Remove-Item $bootstrapPath -Force
+Write-Host "Runner bootstrap completed successfully."
