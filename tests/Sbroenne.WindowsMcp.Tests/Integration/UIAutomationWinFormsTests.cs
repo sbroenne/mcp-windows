@@ -192,6 +192,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
         var newStates = _fixture.Form?.CheckboxStates ?? (false, false, false);
         Assert.NotEqual(initialStates.Option1, newStates.Option1);
+        Assert.Equal(0, _fixture.Form?.SemanticControlMouseInputCount);
     }
 
     #endregion
@@ -232,6 +233,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         await Task.Delay(100);
 
         Assert.Equal("Large", _fixture.Form?.SelectedSize);
+        Assert.Equal(0, _fixture.Form?.SemanticControlMouseInputCount);
     }
 
     #endregion

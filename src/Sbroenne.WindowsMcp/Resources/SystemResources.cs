@@ -177,7 +177,7 @@ public sealed class SystemResources
 
             ### 5. Verify Results
             ```
-            window_management(action="wait_for_close", handle="<dialog>") // wait for dialog to close
+            window_management(action="list", filter="Save") // confirm a closed dialog is absent
             screenshot_control(target="window", windowHandle="<handle>") // visual check
             ```
 

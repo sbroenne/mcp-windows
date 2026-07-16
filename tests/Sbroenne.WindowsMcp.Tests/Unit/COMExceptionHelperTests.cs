@@ -14,6 +14,8 @@ public sealed class COMExceptionHelperTests
     private const int E_ELEMENTNOTFOUND = unchecked((int)0x8002802B);
     private const int E_HANDLE = unchecked((int)0x80070006);
     private const int E_INVALIDOPERATION = unchecked((int)0x80131509);
+    private const int RPC_E_DISCONNECTED = unchecked((int)0x80010108);
+    private const int RPC_E_SERVER_DIED_DNE = unchecked((int)0x80010012);
     private const int UIA_E_ELEMENTNOTENABLED = unchecked((int)0x80040200);
     private const int UIA_E_ELEMENTNOTAVAILABLE = unchecked((int)0x80040201);
     private const int UIA_E_NOCLICKABLEPOINT = unchecked((int)0x80040202);
@@ -59,6 +61,8 @@ public sealed class COMExceptionHelperTests
     [InlineData(E_ELEMENTNOTFOUND, true)]
     [InlineData(E_HANDLE, true)]
     [InlineData(UIA_E_ELEMENTNOTAVAILABLE, true)]
+    [InlineData(RPC_E_DISCONNECTED, true)]
+    [InlineData(RPC_E_SERVER_DIED_DNE, true)]
     [InlineData(E_ACCESSDENIED, false)]
     [InlineData(E_INVALIDOPERATION, false)]
     public void IsElementStale_ClassifiesStaleHResults(int hresult, bool expected)

@@ -20,6 +20,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     private readonly UIAutomationThread _staThread;
     private readonly WindowEnumerator _windowEnumerator;
     private readonly WindowService _windowService;
+    private readonly MouseInputService _mouseService;
     private readonly string _windowHandle;
 
     public UIClickToolIntegrationTests(UITestHarnessFixture fixture)
@@ -44,13 +45,13 @@ public sealed class UIClickToolIntegrationTests : IDisposable
             monitorService,
             secureDesktopDetector);
 
-        var mouseService = new MouseInputService();
+        _mouseService = new MouseInputService();
         var keyboardService = new KeyboardInputService();
 
         _automationService = new UIAutomationService(
             _staThread,
             monitorService,
-            mouseService,
+            _mouseService,
             keyboardService,
             windowActivator,
             elevationDetector,
@@ -86,6 +87,109 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task FindAndClick_Button_PrefersSemanticInvoke()
+    {
+        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+
+        Assert.True(clickResult.Success, $"FindAndClick failed: {clickResult.ErrorMessage}");
+        var mouseInput = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitMouseInputLabel",
+        });
+
+        Assert.True(mouseInput.Success, $"Read failed: {mouseInput.ErrorMessage}");
+        Assert.Equal("0", Assert.Single(mouseInput.Items!).Name);
+    }
+
+    [SkippableFact]
+    public async Task FindAndClick_WhenSemanticPatternIsUnavailable_UsesPhysicalFallback()
+    {
+        EnsureHarnessOnPrimaryMonitor();
+        await SkipWhenPhysicalClickUnavailableAsync();
+        var target = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "PhysicalFallbackTarget",
+            ControlType = "Text",
+        });
+        Assert.Single(target.Items!);
+
+        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "PhysicalFallbackTarget",
+            ControlType = "Text",
+        });
+
+        Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
+        var status = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "StatusLabel",
+        });
+        Assert.True(status.Success, $"Status read failed: {status.ErrorMessage}");
+        Assert.Equal("Physical fallback clicked", Assert.Single(status.Items!).Name);
+    }
+
+    [SkippableFact]
+    public async Task FindAndClick_WhenActionHasNoObservableEffect_ReturnsFailure()
+    {
+        EnsureHarnessOnPrimaryMonitor();
+        await SkipWhenPhysicalClickUnavailableAsync();
+        var target = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "InertTarget",
+            ControlType = "Text",
+        });
+        Assert.Single(target.Items!);
+
+        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "InertTarget",
+            ControlType = "Text",
+        });
+
+        Assert.False(result.Success);
+        Assert.Contains("observable", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task SkipWhenPhysicalClickUnavailableAsync()
+    {
+        var probeTarget = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "PhysicalFallbackTarget",
+            ControlType = "Text",
+        });
+        var clickPoint = Assert.Single(probeTarget.Items!).Click;
+        var click = await _mouseService.ClickAsync(clickPoint[0], clickPoint[1]);
+        var received = TestWait.Until(
+            () => _fixture.Form is not null &&
+                  (bool)_fixture.Form.Invoke(() =>
+                      string.Equals(_fixture.Form.StatusText, "Physical fallback clicked", StringComparison.Ordinal)));
+
+        _fixture.Reset();
+        _fixture.BringToFront();
+        Skip.If(
+            !click.Success || !received,
+            "The current desktop does not permit physical click injection.");
+    }
+
+    private void EnsureHarnessOnPrimaryMonitor()
+    {
+        _fixture.Form?.Invoke(() => _fixture.Form.Location = new System.Drawing.Point(100, 100));
+        _fixture.BringToFront();
+    }
+
+    [Fact]
     public async Task FindAndClick_TabControl_SwitchesTab()
     {
         // Act - Click on the List View tab
@@ -98,7 +202,13 @@ public sealed class UIClickToolIntegrationTests : IDisposable
 
         // Assert
         Assert.True(clickResult.Success, $"FindAndClick failed: {clickResult.ErrorMessage}");
-        await Task.Delay(100); // Allow UI to update
+        var selectedTabContent = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "ItemsListView",
+        });
+        Assert.True(selectedTabContent.Success, $"Selected tab content was not found: {selectedTabContent.ErrorMessage}");
+        Assert.Single(selectedTabContent.Items!);
     }
 
     [Fact]
@@ -111,17 +221,22 @@ public sealed class UIClickToolIntegrationTests : IDisposable
             Name = "Form Controls",
             ControlType = "TabItem",
         });
-        await Task.Delay(100);
-
         // Find and click a checkbox to toggle it
         var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
+            AutomationId = "NotificationsCheckbox",
             ControlType = "CheckBox",
         });
 
-        // Assert - just verify the click action succeeded
         Assert.True(clickResult.Success, $"Click on checkbox failed: {clickResult.ErrorMessage}");
+        var status = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "StatusLabel",
+            Name = "Notifications: False",
+        });
+        Assert.True(status.Success, $"Toggle state was not observed: {status.ErrorMessage}");
     }
 
     [Fact]

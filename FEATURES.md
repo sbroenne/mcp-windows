@@ -147,7 +147,8 @@ Find and discover UI elements by name, type, or automation ID.
 | `namePattern` | Regex pattern for name | No |
 | `automationId` | Automation ID (most reliable) | No |
 | `controlType` | Control type (Button, Edit, CheckBox, etc.) | No |
-| `maxResults` | Maximum elements to return | No |
+| `foundIndex` | Return the Nth match (1-based) | No |
+| `timeoutMs` | Bounded search timeout in milliseconds | No |
 | `sortByProminence` | Sort by bounding box area | No |
 
 ### Capabilities
@@ -170,12 +171,13 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
-| `elementId` | Element ID from ui_find | No* |
 | `name` / `nameContains` | Element name/partial match | No* |
+| `namePattern` | Regex pattern for element name | No* |
 | `automationId` | Automation ID | No* |
 | `controlType` | Control type filter | No |
+| `foundIndex` | Click the Nth match (1-based) | No |
 
-*One of elementId, name, nameContains, or automationId required.
+*Selectors are optional; without one, the first actionable match in the target window is used.
 
 ### Capabilities
 
@@ -196,16 +198,16 @@ Type text into edit controls and text fields.
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
 | `text` | Text to type | Yes |
-| `elementId` | Element ID from ui_find | No* |
 | `name` / `nameContains` | Element name/partial match | No* |
+| `namePattern` | Regex pattern for element name | No* |
 | `automationId` | Automation ID | No* |
 | `controlType` | Control type (default: Edit) | No |
-| `clearFirst` | Clear existing text before typing | No (default: true) |
+| `clearFirst` | Clear existing text before typing | No (default: false) |
 
 ### Capabilities
 
 - Type text into any editable control
-- Clear existing content before typing (clearFirst)
+- Clear existing content before typing with `clearFirst=true`
 - Append text to existing content
 - Unicode support for any language
 
@@ -256,7 +258,7 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 
 ---
 
-## 🖱️ Mouse Control
+## 🖱️ Mouse Control (`mouse_control`)
 
 Control mouse input on Windows with full multi-monitor and DPI awareness.
 
@@ -286,7 +288,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 
 ---
 
-## ⌨️ Keyboard Control
+## ⌨️ Keyboard Control (`keyboard_control`)
 
 Control keyboard input on Windows with Unicode support.
 
@@ -298,7 +300,7 @@ Control keyboard input on Windows with Unicode support.
 | `press` | Press and release a key (with optional modifiers) | `key`, optional `modifiers` |
 | `key_down` | Hold a key down | `key` |
 | `key_up` | Release a held key | `key` |
-| `sequence` | Multiple keys in order | `keys` |
+| `sequence` | Multiple keys in order | `sequence` |
 | `release_all` | Release all held keys | none |
 | `get_keyboard_layout` | Query current layout | none |
 | `wait_for_idle` | Wait for keyboard input to be processed | none |
@@ -340,7 +342,7 @@ Control keyboard input on Windows with Unicode support.
 
 ---
 
-## 🪟 Window Management
+## 🪟 Window Management (`window_management`)
 
 Control windows on the Windows desktop. Use `app` tool to launch applications, then use this tool to manage the windows.
 
@@ -363,7 +365,7 @@ Control windows on the Windows desktop. Use `app` tool to launch applications, t
 | `wait_for` | Wait for window to appear | `title` |
 | `wait_for_state` | Wait for window to reach a specific state | `handle`, `state`, `timeoutMs` |
 | `move_to_monitor` | Move window to a specific monitor | `handle`, `target` or `monitorIndex` |
-| `move_and_activate` | Move to monitor and activate atomically | `handle`, `target` or `monitorIndex` |
+| `move_and_activate` | Move to position and activate atomically | `handle`, optional `x`, `y` |
 | `ensure_visible` | Ensure window is visible (restore if minimized, activate) | `handle` |
 
 ### Close with discardChanges
@@ -391,7 +393,7 @@ window_management(action='close', handle='123456', discardChanges=true)
 
 ---
 
-## 📸 Screenshot Capture
+## 📸 Screenshot Capture (`screenshot_control`)
 
 Capture screenshots on Windows with LLM-optimized defaults. **By default, screenshots include annotated element overlays** with numbered labels and structured element data — perfect for UI discovery.
 
@@ -399,14 +401,13 @@ Capture screenshots on Windows with LLM-optimized defaults. **By default, screen
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `capture` | Capture screenshot (with element annotations by default) | `target` or `app` |
+| `capture` | Capture screenshot (with element annotations by default) | optional `target` |
 | `list_monitors` | List all connected monitors | none |
 
 ### Capture Targets
 
 | Target | Description | Additional Parameters |
 |--------|-------------|----------------------|
-| `app` | **Recommended** — Capture specific app window by name | Partial title match |
 | `primary_screen` | Capture primary monitor (default) | none |
 | `secondary_screen` | Capture secondary monitor (2-monitor setups) | none |
 | `monitor` | Capture specific monitor | `monitorIndex` |
@@ -418,7 +419,10 @@ Capture screenshots on Windows with LLM-optimized defaults. **By default, screen
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `app` | string | `null` | **Recommended.** Application name (partial title match). Auto-finds and activates window. |
+| `action` | string | `"capture"` | `capture` or `list_monitors` |
+| `target` | string | `"primary_screen"` | Screen, monitor, window, region, or all-monitors target |
+| `monitorIndex` | integer | `null` | Monitor index when target is `monitor` |
+| `windowHandle` | string | `null` | Window handle when target is `window` |
 | `annotate` | boolean | `true` | Include numbered element overlays and structured element data |
 | `includeCursor` | boolean | `false` | Include mouse cursor in capture |
 | `imageFormat` | string | `"jpeg"` | Output format: "jpeg", "png" |
@@ -465,7 +469,7 @@ For simple screenshots without element discovery:
 - **Capture regions** - Screenshot an arbitrary rectangular area
 - **Capture all monitors** - Composite screenshot of entire virtual desktop
 - **Format options** - JPEG (default) or PNG with configurable quality (1-100)
-- **Auto-scaling** - Defaults to 1568px width (LLM vision model native limit); disable with `maxWidth: 0`
+- **Auto-scaling** - Large captures are scaled to the model-friendly output size
 - **Output modes** - Inline base64 (default) or file path for zero-overhead file workflows
 - **Cursor inclusion** - Optionally include mouse cursor in captures
 - **Multi-monitor aware** - Supports extended desktop configurations

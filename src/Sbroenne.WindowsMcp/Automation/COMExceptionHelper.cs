@@ -26,6 +26,8 @@ internal static class COMExceptionHelper
     private const int E_HANDLE = unchecked((int)0x80070006);
     private const int E_OUTOFMEMORY = unchecked((int)0x8007000E);
     private const int E_INVALIDOPERATION = unchecked((int)0x80131509);
+    private const int RPC_E_DISCONNECTED = unchecked((int)0x80010108);
+    private const int RPC_E_SERVER_DIED_DNE = unchecked((int)0x80010012);
     private const int UIA_E_ELEMENTNOTENABLED = unchecked((int)0x80040200);
     private const int UIA_E_ELEMENTNOTAVAILABLE = unchecked((int)0x80040201);
     private const int UIA_E_NOCLICKABLEPOINT = unchecked((int)0x80040202);
@@ -70,7 +72,11 @@ internal static class COMExceptionHelper
     /// </summary>
     public static bool IsElementStale(COMException ex)
     {
-        return ex.HResult is E_ELEMENTNOTFOUND or E_HANDLE or UIA_E_ELEMENTNOTAVAILABLE;
+        return ex.HResult is E_ELEMENTNOTFOUND or
+            E_HANDLE or
+            UIA_E_ELEMENTNOTAVAILABLE or
+            RPC_E_DISCONNECTED or
+            RPC_E_SERVER_DIED_DNE;
     }
 
     /// <summary>

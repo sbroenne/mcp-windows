@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Utilities;
 
 namespace Sbroenne.WindowsMcp.Input;
 
@@ -14,14 +15,6 @@ public sealed class KeyboardInputService : IDisposable
 
     /// <summary>Default delay between text chunks in milliseconds.</summary>
     private const int DefaultChunkDelayMs = 50;
-
-    /// <summary>
-    /// Delay in milliseconds after typing completes to allow the target application
-    /// to process the input queue. Based on FlaUI's Wait.UntilInputIsProcessed() pattern.
-    /// Increased from 100ms to 200ms to handle fast LLM agents that call ui_read immediately.
-    /// See: https://github.com/FlaUI/FlaUI/blob/main/src/FlaUI.Core/Input/Wait.cs
-    /// </summary>
-    private const int PostInputProcessingDelayMs = 200;
 
     /// <summary>Maximum number of characters to type in a single chunk.</summary>
     private const int TextChunkSize = 1000;
@@ -91,10 +84,8 @@ public sealed class KeyboardInputService : IDisposable
             }
         }
 
-        // Allow target application to process the input queue before returning.
-        // This prevents race conditions when the caller immediately reads text after typing.
-        // Pattern based on FlaUI's Wait.UntilInputIsProcessed().
-        await Task.Delay(PostInputProcessingDelayMs, cancellationToken).ConfigureAwait(false);
+        // Wait for the target process to consume the input queue before returning.
+        _ = await WaitForIdleAsync(cancellationToken).ConfigureAwait(false);
 
         return KeyboardControlResult.CreateTypeSuccess(totalCharacters);
     }
@@ -524,55 +515,57 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public Task<KeyboardControlResult> WaitForIdleAsync(CancellationToken cancellationToken = default)
+    public async Task<KeyboardControlResult> WaitForIdleAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var foregroundWindow = NativeMethods.GetForegroundWindow();
         if (foregroundWindow == IntPtr.Zero)
         {
-            return Task.FromResult(KeyboardControlResult.CreateFailure(
+            return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.InvalidKey,
-                "No foreground window available to wait for idle."));
+                "No foreground window available to wait for idle.");
         }
 
         _ = NativeMethods.GetWindowThreadProcessId(foregroundWindow, out var processId);
         if (processId == 0)
         {
-            return Task.FromResult(KeyboardControlResult.CreateFailure(
+            return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.InvalidKey,
-                "Could not get process ID for foreground window."));
+                "Could not get process ID for foreground window.");
         }
 
         try
         {
             using var process = System.Diagnostics.Process.GetProcessById((int)processId);
 
-            // WaitForInputIdle with a timeout of 5 seconds (5000 ms)
-            // Returns true if the process has entered idle state, false if timeout
-            var result = process.WaitForInputIdle(5000);
+            var result = await DeterministicWait.UntilAsync(
+                () => process.WaitForInputIdle(0),
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromMilliseconds(25),
+                cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (result)
             {
-                return Task.FromResult(KeyboardControlResult.CreateWaitForIdleSuccess(
-                    $"Foreground window process '{process.ProcessName}' is idle and ready for input."));
+                return KeyboardControlResult.CreateWaitForIdleSuccess(
+                    $"Foreground window process '{process.ProcessName}' is idle and ready for input.");
             }
-            else
-            {
-                return Task.FromResult(KeyboardControlResult.CreateFailure(
-                    KeyboardControlErrorCode.OperationTimeout,
-                    $"Timeout waiting for process '{process.ProcessName}' to become idle."));
-            }
+
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.OperationTimeout,
+                $"Timeout waiting for process '{process.ProcessName}' to become idle.");
         }
         catch (ArgumentException)
         {
-            return Task.FromResult(KeyboardControlResult.CreateFailure(
+            return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.InvalidKey,
-                $"Process with ID {processId} not found or has exited."));
+                $"Process with ID {processId} not found or has exited.");
         }
         catch (InvalidOperationException ex)
         {
             // Process doesn't have a graphical interface or has exited
-            return Task.FromResult(KeyboardControlResult.CreateWaitForIdleSuccess(
-                $"Process idle check completed: {ex.Message}"));
+            return KeyboardControlResult.CreateWaitForIdleSuccess(
+                $"Process idle check completed: {ex.Message}");
         }
     }
 
