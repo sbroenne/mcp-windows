@@ -522,7 +522,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
 
     #region Focus Tests
 
-    [SkippableFact]
+    [Fact]
     public async Task Focus_TextBox_SetsFocus()
     {
         var findResult = await _automationService.FindElementsAsync(new ElementQuery
@@ -536,10 +536,6 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.NotNull(findResult.Items);
 
         var focusResult = await _automationService.FocusElementAsync(findResult.Items![0].Id);
-
-        // Skip if elevation prevents focus (common in CI environments)
-        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
-            "Focus requires same elevation level - skipping in CI environment");
 
         Assert.True(focusResult.Success, $"Focus failed: {focusResult.ErrorMessage}");
     }

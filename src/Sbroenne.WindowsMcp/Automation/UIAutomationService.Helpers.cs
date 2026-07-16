@@ -501,7 +501,7 @@ public sealed partial class UIAutomationService
             var centerX = rect.left + (rect.right - rect.left) / 2;
             var centerY = rect.top + (rect.bottom - rect.top) / 2;
 
-            if (_elevationDetector.IsTargetElevated(centerX, centerY))
+            if (_elevationDetector.IsTargetAtHigherIntegrity(centerX, centerY))
             {
                 LogElevatedTargetWarning(_logger, centerX, centerY);
                 return UIAutomationResult.CreateFailure(

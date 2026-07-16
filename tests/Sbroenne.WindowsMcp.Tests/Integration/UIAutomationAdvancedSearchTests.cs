@@ -310,7 +310,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
     #region GetFocusedElement Tests
 
-    [SkippableFact]
+    [Fact]
     public async Task GetFocusedElement_ReturnsCurrentlyFocusedElement()
     {
         // Focus on the text box first
@@ -325,20 +325,15 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         // Focus the element
         var focusResult = await _automationService.FocusElementAsync(textboxResult.Items![0].Id);
 
-        // Skip if elevation prevents focus (common in CI environments)
-        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
-            "Focus requires same elevation level - skipping in CI environment");
-
         Assert.True(focusResult.Success, "Failed to focus element");
 
-        // Longer delay for focus to take effect (can be slow in CI)
-        await Task.Delay(300);
+        UIAutomationResult? result = null;
+        var focused = await TestWait.RetryUntilAsync(
+            attempt: async () => result = await _automationService.GetFocusedElementAsync(),
+            condition: () => result is { Success: true, Items.Length: > 0 });
 
-        // Now get the focused element
-        var result = await _automationService.GetFocusedElementAsync();
-
-        // Assert - just verify that we can get a focused element
-        // The actual focused element may vary depending on system state
+        Assert.True(focused, "Focused element did not become observable.");
+        Assert.NotNull(result);
         Assert.True(result.Success, $"GetFocusedElement failed: {result.ErrorMessage}");
         Assert.NotNull(result.Items);
         Assert.True(result.Items!.Length >= 1, "Should return at least one focused element");

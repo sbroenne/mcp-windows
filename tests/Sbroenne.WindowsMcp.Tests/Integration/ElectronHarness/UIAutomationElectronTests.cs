@@ -342,7 +342,7 @@ public sealed class UIAutomationElectronTests : IDisposable
 
     #region Focus Tests
 
-    [SkippableFact]
+    [Fact]
     public async Task Focus_TextInput_SetsFocus()
     {
         // Try finding the password input - this may fail in CI due to timing
@@ -353,12 +353,9 @@ public sealed class UIAutomationElectronTests : IDisposable
             ControlType = "Edit",
         });
 
-        // Skip if element not found (CI environment timing issues)
-        if (!findResult.Success || findResult.Items == null || findResult.Items!.Length == 0)
-        {
-            // Element not available in this run - skip gracefully
-            return;
-        }
+        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.NotNull(findResult.Items);
+        Assert.NotEmpty(findResult.Items);
 
         var inputId = findResult.Items![0].Id;
         Assert.NotNull(inputId);
@@ -366,11 +363,6 @@ public sealed class UIAutomationElectronTests : IDisposable
         // Act
         var focusResult = await _automationService.FocusElementAsync(inputId);
 
-        // Skip if elevation prevents focus (common in CI environments)
-        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
-            "Focus requires same elevation level - skipping in CI environment");
-
-        // Assert
         Assert.True(focusResult.Success, $"Focus failed: {focusResult.ErrorMessage}");
     }
 

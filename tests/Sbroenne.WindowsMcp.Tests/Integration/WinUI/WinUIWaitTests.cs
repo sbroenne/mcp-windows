@@ -108,7 +108,7 @@ public sealed class WinUIWaitTests : IDisposable
         Assert.NotEmpty(result.Items!);
     }
 
-    [SkippableFact]
+    [Fact]
     public async Task Focus_TextBox_SetsFocus()
     {
         // Navigate to Form Controls page where text boxes exist
@@ -138,11 +138,6 @@ public sealed class WinUIWaitTests : IDisposable
         // Act - try to focus using the element ID
         var focusResult = await _automationService.FocusElementAsync(textBoxId);
 
-        // Skip if elevation prevents focus (common in CI environments)
-        Skip.If(focusResult.ErrorMessage?.Contains("elevated", StringComparison.OrdinalIgnoreCase) == true,
-            "Focus requires same elevation level - skipping in CI environment");
-
-        // Assert
         Assert.True(focusResult.Success, $"Focus failed: {focusResult.ErrorMessage}. ElementId was: {textBoxId}");
     }
 }
