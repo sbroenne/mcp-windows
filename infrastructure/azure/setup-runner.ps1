@@ -188,18 +188,13 @@ function Configure-InteractiveRunner {
     $username = if ($accountParts.Count -eq 2) { $accountParts[1] } else { $accountParts[0] }
     $qualifiedAccount = "$domain\$username"
 
-    Write-SetupLog "Configuring en-US locale for $qualifiedAccount."
+    Write-SetupLog "Configuring system locale and interactive profile startup for $qualifiedAccount."
     Set-WinSystemLocale -SystemLocale "en-US"
-    Set-Culture -CultureInfo "en-US"
-    Set-WinUserLanguageList -LanguageList "en-US" -Force
     Get-LocalUser -Name $username | Set-LocalUser -PasswordNeverExpires $true
 
-    Write-SetupLog "Disabling sleep and screen locking for the runner session."
+    Write-SetupLog "Disabling machine sleep for the runner session."
     & powercfg.exe /change standby-timeout-ac 0
     & powercfg.exe /change monitor-timeout-ac 0
-    New-Item "HKCU:\Control Panel\Desktop" -Force | Out-Null
-    Set-ItemProperty "HKCU:\Control Panel\Desktop" -Name ScreenSaveActive -Value "0"
-    Set-ItemProperty "HKCU:\Control Panel\Desktop" -Name ScreenSaverIsSecure -Value "0"
 
     New-Item $toolsDirectory -ItemType Directory -Force | Out-Null
     $autologon = Join-Path $toolsDirectory "Autologon64.exe"
@@ -230,10 +225,22 @@ function Configure-InteractiveRunner {
     Remove-Item (Join-Path $runnerDirectory ".service") -Force -ErrorAction SilentlyContinue
 
     $taskName = "WindowsMcp-GitHub-Runner"
+    $launcherPath = Join-Path $runnerDirectory "start-interactive-runner.ps1"
+    @"
+`$ErrorActionPreference = "Stop"
+Set-Culture -CultureInfo "en-US"
+Set-WinUserLanguageList -LanguageList "en-US" -Force
+New-Item "HKCU:\Control Panel\Desktop" -Force | Out-Null
+Set-ItemProperty "HKCU:\Control Panel\Desktop" -Name ScreenSaveActive -Value "0"
+Set-ItemProperty "HKCU:\Control Panel\Desktop" -Name ScreenSaverIsSecure -Value "0"
+Set-Location "$runnerDirectory"
+& "$runnerDirectory\run.cmd"
+"@ | Set-Content $launcherPath -Encoding UTF8
+
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
     $action = New-ScheduledTaskAction `
-        -Execute "cmd.exe" `
-        -Argument "/c `"`"$runnerDirectory\run.cmd`"`"" `
+        -Execute "powershell.exe" `
+        -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$launcherPath`"" `
         -WorkingDirectory $runnerDirectory
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $qualifiedAccount
     $principal = New-ScheduledTaskPrincipal `
