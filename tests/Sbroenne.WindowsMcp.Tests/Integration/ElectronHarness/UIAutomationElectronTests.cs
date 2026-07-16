@@ -151,6 +151,7 @@ public sealed class UIAutomationElectronTests : IDisposable
             WindowHandle = _windowHandle,
             Name = "Priority Selection",
             ControlType = "ComboBox",
+            VisibleOnly = false,
         });
 
         // Assert
@@ -313,6 +314,7 @@ public sealed class UIAutomationElectronTests : IDisposable
             WindowHandle = _windowHandle,
             Name = "Apply Priority",
             ControlType = "Button",
+            VisibleOnly = false,
         });
 
         Assert.True(findResult.Success);
