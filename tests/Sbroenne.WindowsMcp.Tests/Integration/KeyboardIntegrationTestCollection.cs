@@ -26,6 +26,7 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     private TestHarnessForm? _form;
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
+    private readonly MouseInputService _mouseInputService = new();
     private bool _isWarmedUp;
 
     // P/Invoke for foreground window verification
@@ -163,20 +164,39 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
         }
 
         await TestWait.RetryUntilAsync(
-            attempt: () =>
+            attempt: async () =>
             {
                 AllowSetForegroundWindow(ASFW_ANY);
 
                 _form.Invoke(() =>
                 {
+                    if (_form.WindowState == FormWindowState.Minimized)
+                    {
+                        _form.WindowState = FormWindowState.Normal;
+                    }
+
+                    _form.Show();
                     _form.Activate();
                     _form.BringToFront();
                     _form.FocusTextBox();
                 });
 
                 SetForegroundWindow(TestWindowHandle);
+
+                if (!GetValue(form => form.IsInputTextBoxFocused))
+                {
+                    var textBoxCenter = GetValue(form => form.TextBoxCenter);
+                    var clickResult = await _mouseInputService.ClickAsync(textBoxCenter.X, textBoxCenter.Y);
+                    if (!clickResult.Success)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to focus the keyboard test harness by clicking it: {clickResult.Error}");
+                    }
+                }
             },
-            condition: () => GetForegroundWindow() == TestWindowHandle,
+            condition: () =>
+                GetForegroundWindow() == TestWindowHandle &&
+                GetValue(form => form.IsInputTextBoxFocused),
             timeout: TimeSpan.FromMilliseconds(maxRetries * delayMs),
             pollInterval: TimeSpan.FromMilliseconds(delayMs));
     }
