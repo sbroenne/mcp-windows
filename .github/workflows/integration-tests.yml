@@ -70,7 +70,7 @@ jobs:
           }
 
   integration-tests:
-    name: ${{ (github.event_name == 'pull_request' || inputs.scope == 'all') && 'Full Windows UI integration suite' || 'Scoped Windows UI integration tests' }}
+    name: Windows UI integration suite
     needs: start-runner
     runs-on: [self-hosted, windows, x64, windows-ui]
     timeout-minutes: 180

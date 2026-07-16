@@ -157,7 +157,7 @@ gh workflow run integration-tests.yml `
 ```
 
 The existing hosted `CI` workflow remains the fast build, non-desktop test, and coverage
-gate. Consider requiring `Full Windows UI integration suite` only after the runner has
+gate. Consider requiring `Windows UI integration suite` only after the runner has
 proven stable.
 
 ## Operations
