@@ -24,6 +24,8 @@ public sealed class UITestHarnessForm : Form
     private readonly ComboBox _comboBox;
     private readonly TrackBar _slider;
     private readonly ProgressBar _progressBar;
+    private readonly Panel _physicalFallbackTarget;
+    private int _physicalFallbackClickCount;
 
     // List View Tab
     private readonly ListView _listView;
@@ -235,7 +237,7 @@ public sealed class UITestHarnessForm : Form
         };
         buttonsGroup.Controls.Add(_submitButton);
 
-        var physicalFallbackTarget = new Panel
+        _physicalFallbackTarget = new Panel
         {
             Location = new Point(10, 375),
             Size = new Size(300, 40),
@@ -244,8 +246,13 @@ public sealed class UITestHarnessForm : Form
             AccessibleName = "Physical fallback",
             BackColor = Color.AliceBlue,
         };
-        physicalFallbackTarget.Click += (_, _) => UpdateStatus("Physical fallback clicked");
-        formControlsTab.Controls.Add(physicalFallbackTarget);
+        _physicalFallbackTarget.Click += (_, _) =>
+        {
+            _physicalFallbackClickCount++;
+            _physicalFallbackTarget.AccessibleName = $"Physical fallback clicked {_physicalFallbackClickCount}";
+            UpdateStatus("Physical fallback clicked");
+        };
+        formControlsTab.Controls.Add(_physicalFallbackTarget);
 
         var inertTarget = new Panel
         {
@@ -659,6 +666,8 @@ public sealed class UITestHarnessForm : Form
         SubmitClickCount = 0;
         SubmitMouseInputCount = 0;
         SemanticControlMouseInputCount = 0;
+        _physicalFallbackClickCount = 0;
+        _physicalFallbackTarget.AccessibleName = "Physical fallback";
         _submitMouseInputLabel.Text = "0";
         CancelClickCount = 0;
         _usernameInput.Clear();

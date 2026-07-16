@@ -18,6 +18,7 @@ public sealed partial class UIAutomationService
         int ControlType,
         UIA.ToggleState? ToggleState,
         bool? IsSelected,
+        ObservableElementState ElementState,
         int RootFingerprint);
 
     private readonly record struct ObservableElementState(
@@ -38,6 +39,7 @@ public sealed partial class UIAutomationService
                 element.GetControlTypeId(),
                 GetToggleStateValue(element),
                 GetSelectionState(element),
+                GetElementState(element),
                 GetObservableFingerprint(rootElement)),
             cancellationToken);
 
@@ -128,6 +130,7 @@ public sealed partial class UIAutomationService
             element,
             () =>
                 HasObservableStateChanged(element, initial.ToggleState, initial.IsSelected) ||
+                GetElementState(element) != initial.ElementState ||
                 GetObservableFingerprint(rootElement) != initial.RootFingerprint,
             cancellationToken);
 

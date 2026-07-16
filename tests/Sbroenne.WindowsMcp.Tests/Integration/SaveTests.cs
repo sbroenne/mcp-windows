@@ -201,7 +201,7 @@ public sealed class SaveTests : IDisposable
     public async Task Save_NonExistentDirectory_ReturnsPathError()
     {
         // This test verifies that saving to a non-existent directory returns an error
-        // It uses real Notepad to trigger the actual Windows "Path does not exist" dialog
+        // before interacting with the application.
 
         // Record existing Notepad PIDs before launching so we only kill ours
         var preExistingPids = Process.GetProcessesByName("Notepad")

@@ -876,6 +876,15 @@ public sealed partial class UIAutomationService
             if (!string.IsNullOrWhiteSpace(filePath))
             {
                 filePath = Path.GetFullPath(filePath);
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save",
+                        UIAutomationErrorType.PathError,
+                        $"Save failed: directory '{directory}' does not exist.",
+                        CreateDiagnostics(stopwatch));
+                }
             }
 
             // Step 1: Focus the target window (FlaUI/White pattern)
@@ -913,7 +922,14 @@ public sealed partial class UIAutomationService
                     }
 
                     // Wait for dialog to close (completion detection - White pattern)
-                    await WaitForDialogCloseAsync(dialog.Value.element, cancellationToken);
+                    if (!await WaitForDialogCloseAsync(dialog.Value.element, cancellationToken))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "save",
+                            UIAutomationErrorType.Timeout,
+                            "Save could not be verified because the Save dialog remained open.",
+                            CreateDiagnostics(stopwatch));
+                    }
                 }
                 else
                 {
@@ -1311,7 +1327,7 @@ public sealed partial class UIAutomationService
     /// <summary>
     /// Waits for a dialog to close (White Framework pattern: WaitWhileBusy).
     /// </summary>
-    private async Task WaitForDialogCloseAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    private async Task<bool> WaitForDialogCloseAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
     {
         var deadline = DateTime.UtcNow + SaveDialogTimeout;
 
@@ -1337,11 +1353,13 @@ public sealed partial class UIAutomationService
 
             if (!stillExists)
             {
-                return;
+                return true;
             }
 
             await Task.Delay(SaveDialogPollInterval, cancellationToken);
         }
+
+        return false;
     }
 
     /// <summary>
@@ -1446,7 +1464,7 @@ public sealed partial class UIAutomationService
                         cancellationToken);
                 }
 
-                await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken);
+                _ = await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken);
 
                 // Press Escape to close the Save As dialog
                 await _keyboardService.PressKeyAsync("Escape", cancellationToken: cancellationToken);
