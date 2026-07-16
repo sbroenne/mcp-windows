@@ -96,40 +96,21 @@ public sealed class TestHarnessFixture : IDisposable
             return;
         }
 
-        const int maxRetries = 3;
-        const int delayMs = 100;
-
-        for (int attempt = 0; attempt < maxRetries; attempt++)
-        {
-            // Allow any process to set foreground window
-            AllowSetForegroundWindow(ASFW_ANY);
-
-            _form.Invoke(() =>
+        TestWait.RetryUntil(
+            attempt: () =>
             {
-                _form.Activate();
-                _form.BringToFront();
-            });
+                AllowSetForegroundWindow(ASFW_ANY);
 
-            // Also try SetForegroundWindow directly with the handle
-            SetForegroundWindow(TestWindowHandle);
+                _form.Invoke(() =>
+                {
+                    _form.Activate();
+                    _form.BringToFront();
+                });
 
-            // Wait for focus to settle
-            Thread.Sleep(delayMs);
-
-            // Verify we got focus
-            if (GetForegroundWindow() == TestWindowHandle)
-            {
-                return; // Success!
-            }
-        }
-
-        // Final attempt - just proceed
-        _form.Invoke(() =>
-        {
-            _form.Activate();
-            _form.BringToFront();
-        });
-        Thread.Sleep(delayMs);
+                SetForegroundWindow(TestWindowHandle);
+            },
+            condition: () => GetForegroundWindow() == TestWindowHandle,
+            timeout: TimeSpan.FromSeconds(1));
     }
 
     /// <summary>
@@ -164,6 +145,17 @@ public sealed class TestHarnessFixture : IDisposable
         }
 
         return (T)_form.Invoke(() => getter(_form));
+    }
+
+    /// <summary>
+    /// Waits until an observable harness condition becomes true.
+    /// </summary>
+    public Task<bool> WaitForAsync(
+        Func<TestHarnessForm, bool> condition,
+        TimeSpan? timeout = null)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+        return TestWait.UntilAsync(() => GetValue(condition), timeout);
     }
 
     private void RunMessageLoop()

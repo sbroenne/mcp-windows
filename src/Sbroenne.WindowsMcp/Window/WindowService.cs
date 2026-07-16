@@ -258,18 +258,24 @@ public sealed class WindowService
         }
 
         // If discardChanges is true, wait for and dismiss any save confirmation dialogs
-        if (discardChanges && _automationService != null)
+        string? dismissError = null;
+        if (discardChanges)
         {
-            await DismissSaveDialogAsync(handle, cancellationToken);
+            dismissError = await DismissSaveDialogAsync(handle, cancellationToken);
             // DismissSaveDialogAsync waits for dialog and clicks "Don't Save"
             // The window will close naturally when the dialog is dismissed
         }
 
         // Wait for the window to actually close (prevents race conditions with subsequent operations)
         // This follows FlaUI's pattern where Application.Close() waits for the process to exit
-        // Note: If a save dialog is shown (and discardChanges=false), we'll timeout and return
-        // which is the expected behavior - the window is still open waiting for user input
-        await WaitForWindowToCloseAsync(handle, cancellationToken);
+        // If the window remains open, report failure rather than claiming that the close succeeded.
+        if (!await WaitForWindowToCloseAsync(handle, cancellationToken))
+        {
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.CloseFailed,
+                $"Window {handle} did not close within {WindowCloseTimeout.TotalMilliseconds:F0}ms" +
+                (dismissError is null ? string.Empty : $". {dismissError}"));
+        }
 
         return WindowManagementResult.CreateWindowSuccess(windowInfo);
     }
@@ -278,131 +284,171 @@ public sealed class WindowService
     /// Waits for a window to close after WM_CLOSE has been sent.
     /// Returns when the window no longer exists or timeout is reached.
     /// </summary>
-    private static async Task WaitForWindowToCloseAsync(nint handle, CancellationToken cancellationToken)
+    private static async Task<bool> WaitForWindowToCloseAsync(nint handle, CancellationToken cancellationToken)
     {
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
-        while (stopwatch.Elapsed < WindowCloseTimeout && !cancellationToken.IsCancellationRequested)
+        while (stopwatch.Elapsed < WindowCloseTimeout)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Check if window still exists
             if (!NativeMethods.IsWindow(handle))
             {
-                return; // Window has closed
+                return true;
             }
 
             await Task.Delay(WindowClosePollIntervalMs, cancellationToken);
         }
 
-        // Timeout reached - window may still be open (e.g., showing save dialog with discardChanges=false)
-        // This is okay, we just wanted to give it a chance to close
+        return !NativeMethods.IsWindow(handle);
     }
 
     /// <summary>
-    /// Attempts to dismiss a save confirmation dialog by clicking "Don't Save" button.
+    /// Attempts to dismiss a save confirmation dialog by activating its "Don't Save" button.
     /// </summary>
-    private async Task DismissSaveDialogAsync(nint parentHandle, CancellationToken cancellationToken)
+    private async Task<string?> DismissSaveDialogAsync(nint parentHandle, CancellationToken cancellationToken)
     {
         // If automation service is not available, we can't dismiss dialogs
         if (_automationService == null)
         {
-            return;
+            return "UI Automation is unavailable to dismiss the save dialog";
         }
 
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        string? lastError = null;
+        var foundDialog = false;
 
-        // Give the dialog time to appear
-        await Task.Delay(SaveDialogPollInterval, cancellationToken);
-
-        while (stopwatch.Elapsed < SaveDialogTimeout && !cancellationToken.IsCancellationRequested)
+        while (stopwatch.Elapsed < SaveDialogTimeout)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // Check if the parent window is still valid (it may have closed without a dialog)
             if (!NativeMethods.IsWindow(parentHandle))
             {
-                return;
+                return null;
             }
+
+            var dialogHandle = NativeMethods.GetWindow(parentHandle, NativeConstants.GW_ENABLEDPOPUP);
+            if (dialogHandle == 0 || dialogHandle == parentHandle)
+            {
+                await Task.Delay(SaveDialogPollInterval, cancellationToken);
+                continue;
+            }
+
+            foundDialog = true;
+            var dialogWindowHandle = dialogHandle.ToString();
 
             // Try to find and click "Don't Save" button using UI Automation
             // We search for common "Don't Save" button patterns:
             // - Windows 11: Button with AutomationId "SecondaryButton"
             // - Windows 10: Button with AutomationId "CommandButton_7"
             // - Generic: Button with name containing "Don't Save" or "No"
-            //
-            // Note: We do NOT pass WindowHandle because the save dialog is a separate
-            // modal window (not a child of the parent in UI Automation terms).
-            // By omitting WindowHandle, the search uses the foreground window which
-            // will be the dialog when it appears (FlaUI/pywinauto pattern).
 
             // Try Windows 11 pattern first (SecondaryButton)
-            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            var result = await FindAndActivateDialogButtonAsync(new ElementQuery
             {
+                WindowHandle = dialogWindowHandle,
                 AutomationId = "SecondaryButton",
                 ControlType = "Button",
                 TimeoutMs = 0
             }, cancellationToken);
 
-            if (result.Success)
+            if (result.Success && await WaitForWindowToCloseAsync(dialogHandle, cancellationToken))
             {
-                return;
+                return null;
             }
+            lastError = result.ErrorMessage;
 
             // Try Windows 10 pattern (CommandButton_7)
-            result = await _automationService.FindAndClickAsync(new ElementQuery
+            result = await FindAndActivateDialogButtonAsync(new ElementQuery
             {
+                WindowHandle = dialogWindowHandle,
                 AutomationId = "CommandButton_7",
                 ControlType = "Button",
                 TimeoutMs = 0
             }, cancellationToken);
 
-            if (result.Success)
+            if (result.Success && await WaitForWindowToCloseAsync(dialogHandle, cancellationToken))
             {
-                return;
+                return null;
             }
+            lastError = result.ErrorMessage;
 
             // Try generic pattern: button containing "Don't" (handles "Don't Save", "Don't save", etc.)
             // Note: We use "t save" to avoid apostrophe encoding issues (Unicode ' vs ASCII ')
-            result = await _automationService.FindAndClickAsync(new ElementQuery
+            result = await FindAndActivateDialogButtonAsync(new ElementQuery
             {
+                WindowHandle = dialogWindowHandle,
                 NameContains = "t save",
                 ControlType = "Button",
                 TimeoutMs = 0
             }, cancellationToken);
 
-            if (result.Success)
+            if (result.Success && await WaitForWindowToCloseAsync(dialogHandle, cancellationToken))
             {
-                return;
+                return null;
             }
+            lastError = result.ErrorMessage;
 
             // Also try "No" button (common in some dialogs)
             // Note: MessageBox buttons use "&No" with ampersand accelerator key
-            result = await _automationService.FindAndClickAsync(new ElementQuery
+            result = await FindAndActivateDialogButtonAsync(new ElementQuery
             {
+                WindowHandle = dialogWindowHandle,
                 Name = "&No",
                 ControlType = "Button",
                 TimeoutMs = 0
             }, cancellationToken);
 
-            if (result.Success)
+            if (result.Success && await WaitForWindowToCloseAsync(dialogHandle, cancellationToken))
             {
-                return;
+                return null;
             }
+            lastError = result.ErrorMessage;
 
             // Also try without ampersand for non-MessageBox dialogs
-            result = await _automationService.FindAndClickAsync(new ElementQuery
+            result = await FindAndActivateDialogButtonAsync(new ElementQuery
             {
+                WindowHandle = dialogWindowHandle,
                 Name = "No",
                 ControlType = "Button",
                 TimeoutMs = 0
             }, cancellationToken);
 
-            if (result.Success)
+            if (result.Success && await WaitForWindowToCloseAsync(dialogHandle, cancellationToken))
             {
-                return;
+                return null;
             }
+            lastError = result.ErrorMessage;
 
             await Task.Delay(SaveDialogPollInterval, cancellationToken);
         }
 
-        // If we reach here, no dialog was found or dismissed - that's okay, the window may have closed normally
+        return foundDialog
+            ? $"Save dialog {lastError ?? "could not be dismissed"}"
+            : "No enabled save dialog was found";
+    }
+
+    private async Task<UIAutomationResult> FindAndActivateDialogButtonAsync(
+        ElementQuery query,
+        CancellationToken cancellationToken)
+    {
+        var findResult = await _automationService!.FindElementsAsync(query, cancellationToken);
+        var element = findResult.Items?.FirstOrDefault();
+        if (!findResult.Success || element is null)
+        {
+            return findResult;
+        }
+
+        var invokeResult = await _automationService.InvokePatternAsync(
+            element.Id,
+            "Invoke",
+            value: null,
+            cancellationToken);
+        return invokeResult.Success
+            ? invokeResult
+            : await _automationService.FindAndClickAsync(query, cancellationToken);
     }
 
     /// <inheritdoc/>

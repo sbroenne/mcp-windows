@@ -66,8 +66,14 @@ public sealed class UITestHarnessFixture : IDisposable
             throw new TimeoutException("UI Test harness form did not start within timeout.");
         }
 
-        // Give the form a moment to fully render
-        Thread.Sleep(500);
+        var rendered = TestWait.Until(() =>
+            _form != null &&
+            !_form.IsDisposed &&
+            (bool)_form.Invoke(() => _form.IsHandleCreated && _form.Visible));
+        if (!rendered)
+        {
+            throw new TimeoutException("UI Test harness form did not become visible.");
+        }
     }
 
     /// <summary>
@@ -88,11 +94,19 @@ public sealed class UITestHarnessFixture : IDisposable
     {
         if (_form != null && !_form.IsDisposed)
         {
-            _form.Invoke(() =>
-            {
-                _form.Activate();
-                _form.BringToFront();
-            });
+            TestWait.RetryUntil(
+                attempt: () =>
+                {
+                    NativeMethods.AllowSetForegroundWindow(-1);
+                    _form.Invoke(() =>
+                    {
+                        _form.Activate();
+                        _form.BringToFront();
+                    });
+                    NativeMethods.SetForegroundWindow(TestWindowHandle);
+                },
+                condition: () => NativeMethods.GetForegroundWindow() == TestWindowHandle,
+                timeout: TimeSpan.FromSeconds(1));
         }
     }
 

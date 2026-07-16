@@ -14,4 +14,17 @@
     <!-- Default parallelization for unit tests -->
     <MaxCpuCount>0</MaxCpuCount>
   </RunConfiguration>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <!-- Exclude test assemblies, generated code, and third-party interop from coverage math. -->
+          <Exclude>[Sbroenne.WindowsMcp.Tests]*,[Interop.UIAutomationClient]*</Exclude>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+          <SkipAutoProps>true</SkipAutoProps>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
 </RunSettings>

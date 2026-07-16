@@ -16,7 +16,7 @@
 
     <!-- Project Options -->
     <Nullable>enable</Nullable>
-    <LangVersion>12.0</LangVersion>
+    <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Sbroenne.WindowsMcp.ModernHarness</RootNamespace>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

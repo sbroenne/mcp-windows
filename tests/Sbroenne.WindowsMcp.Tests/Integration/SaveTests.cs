@@ -30,7 +30,6 @@ public sealed class SaveTests : IDisposable
         _fixture = fixture;
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
         _testOutputDir = Path.Combine(Path.GetTempPath(), "mcp-windows-tests");
@@ -220,14 +219,20 @@ public sealed class SaveTests : IDisposable
 
         try
         {
-            await Task.Delay(2000); // Wait for Notepad to fully launch
+            Sbroenne.WindowsMcp.Models.WindowInfo? notepadWindow = null;
+            var windowAppeared = await TestWait.RetryUntilAsync(
+                attempt: async () =>
+                {
+                    var windows = await _windowEnumerator.EnumerateWindowsAsync();
+                    notepadWindow = windows.FirstOrDefault(w =>
+                        w.ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) &&
+                        w.Title.Contains("Notepad", StringComparison.OrdinalIgnoreCase));
+                },
+                condition: () => notepadWindow != null,
+                timeout: TimeSpan.FromSeconds(10),
+                pollInterval: TimeSpan.FromMilliseconds(100));
 
-            // Find the Notepad window
-            var windows = await _windowEnumerator.EnumerateWindowsAsync();
-            var notepadWindow = windows.FirstOrDefault(w =>
-                w.ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) &&
-                w.Title.Contains("Notepad"));
-
+            Assert.True(windowAppeared, "Notepad window did not appear within 10 seconds.");
             Assert.NotNull(notepadWindow);
             var notepadHandle = notepadWindow.Handle.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -298,7 +303,9 @@ public sealed class SaveTests : IDisposable
             if (dialogHwnd != nint.Zero)
             {
                 PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
-                Thread.Sleep(200);
+                TestWait.Until(
+                    () => FindWindow(null, title) == nint.Zero,
+                    timeout: TimeSpan.FromSeconds(2));
             }
         }
     }

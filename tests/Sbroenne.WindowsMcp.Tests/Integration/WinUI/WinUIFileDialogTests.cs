@@ -27,7 +27,6 @@ public sealed class WinUIFileDialogTests : IDisposable
     {
         _fixture = fixture;
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
 

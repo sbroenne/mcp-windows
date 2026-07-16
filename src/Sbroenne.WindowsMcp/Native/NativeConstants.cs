@@ -651,6 +651,13 @@ internal static class NativeConstants
 
     #endregion
 
+    #region GetWindow Commands (GW_*)
+
+    /// <summary>Retrieves the enabled popup window owned by the specified window.</summary>
+    public const uint GW_ENABLEDPOPUP = 6;
+
+    #endregion
+
     #region Desktop Access Rights (additional)
 
     /// <summary>Required to read objects on the desktop.</summary>

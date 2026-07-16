@@ -37,7 +37,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -60,7 +59,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key, ModifierKey.Shift);
@@ -89,7 +87,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -114,7 +111,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("space");
@@ -139,7 +135,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange - first type some text
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
         await _fixture.KeyboardInputService.TypeTextAsync("abc");
         await _fixture.WaitForInputTextAsync("abc");
 
@@ -162,7 +157,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange - first type some text
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
         await _fixture.KeyboardInputService.TypeTextAsync("abcde");
         await _fixture.WaitForInputTextAsync("abcde");
 
@@ -194,7 +188,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -215,7 +208,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -242,7 +234,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -259,13 +250,13 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange - type some text
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
         await _fixture.KeyboardInputService.TypeTextAsync("Hello");
         await _fixture.WaitForInputTextAsync("Hello");
 
         // Act - press Home, then type 'X'
         await _fixture.KeyboardInputService.PressKeyAsync("home");
-        await Task.Delay(50);
+        Assert.True(await TestWait.UntilAsync(
+            () => _fixture.GetLastKeyPressed() == Keys.Home));
         await _fixture.KeyboardInputService.PressKeyAsync("x");
 
         // Assert - X should be at the beginning
@@ -281,11 +272,11 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange - type text and move cursor to beginning
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
         await _fixture.KeyboardInputService.TypeTextAsync("Hello");
         await _fixture.WaitForInputTextAsync("Hello");
         await _fixture.KeyboardInputService.PressKeyAsync("home");
-        await Task.Delay(50);
+        Assert.True(await TestWait.UntilAsync(
+            () => _fixture.GetLastKeyPressed() == Keys.Home));
 
         // Act - press Delete to remove 'H'
         var result = await _fixture.KeyboardInputService.PressKeyAsync("delete");
@@ -321,7 +312,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -350,7 +340,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -371,7 +360,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("tab");
@@ -394,7 +382,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("tab", repeat: repeatCount);
@@ -415,7 +402,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("escape");
@@ -432,7 +418,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("esc");
@@ -453,7 +438,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("enter");
@@ -470,7 +454,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("return");
@@ -495,7 +478,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -520,7 +502,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -541,7 +522,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("numpaddecimal");
@@ -573,7 +553,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("a", repeat: repeatCount);
@@ -594,7 +573,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act - repeat=0 should be clamped to 1
         var result = await _fixture.KeyboardInputService.PressKeyAsync("a", repeat: 0);
@@ -622,7 +600,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -641,7 +618,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync("");
@@ -662,7 +638,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.PressKeyAsync(key);
@@ -685,7 +660,6 @@ public class KeyboardPressTests : IDisposable
     {
         // Arrange - type some text first
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
         await _fixture.KeyboardInputService.TypeTextAsync("Hello");
         await _fixture.WaitForInputTextAsync("Hello");
 
@@ -694,7 +668,8 @@ public class KeyboardPressTests : IDisposable
         Assert.True(result.Success, $"Expected success for Ctrl+A, got: {result.Error}");
 
         // Now type 'X' to replace selected text
-        await Task.Delay(50);
+        Assert.True(await TestWait.UntilAsync(
+            () => _fixture.GetValue(f => f.InputSelectionLength) == "Hello".Length));
         await _fixture.KeyboardInputService.PressKeyAsync("x");
 
         // Assert - text should be replaced

@@ -27,7 +27,6 @@ public sealed class UIReadToolIntegrationTests : IDisposable
         _fixture = fixture;
         _fixture.Reset();
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
 

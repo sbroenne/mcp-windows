@@ -26,6 +26,7 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     private TestHarnessForm? _form;
     private readonly ManualResetEventSlim _formReady = new(false);
     private readonly ManualResetEventSlim _formClosed = new(false);
+    private readonly MouseInputService _mouseInputService = new();
     private bool _isWarmedUp;
 
     // P/Invoke for foreground window verification
@@ -86,9 +87,6 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
         {
             TestWindowHandle = _form.Handle;
         });
-
-        // Increased settle time for Windows to fully process the window
-        await Task.Delay(200);
 
         // Perform initial focus acquisition with verification
         await EnsureTestWindowFocusedAsync();
@@ -165,39 +163,42 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
             return;
         }
 
-        for (int attempt = 0; attempt < maxRetries; attempt++)
-        {
-            // Allow any process to set foreground window
-            AllowSetForegroundWindow(ASFW_ANY);
-
-            _form.Invoke(() =>
+        await TestWait.RetryUntilAsync(
+            attempt: async () =>
             {
-                _form.Activate();
-                _form.BringToFront();
-                _form.FocusTextBox();
-            });
+                AllowSetForegroundWindow(ASFW_ANY);
 
-            // Also try SetForegroundWindow directly
-            SetForegroundWindow(TestWindowHandle);
+                _form.Invoke(() =>
+                {
+                    if (_form.WindowState == FormWindowState.Minimized)
+                    {
+                        _form.WindowState = FormWindowState.Normal;
+                    }
 
-            // Wait for focus to settle
-            await Task.Delay(delayMs);
+                    _form.Show();
+                    _form.Activate();
+                    _form.BringToFront();
+                    _form.FocusTextBox();
+                });
 
-            // Verify we got focus
-            if (GetForegroundWindow() == TestWindowHandle)
-            {
-                return; // Success!
-            }
-        }
+                SetForegroundWindow(TestWindowHandle);
 
-        // Final attempt - just proceed and hope for the best
-        _form.Invoke(() =>
-        {
-            _form.Activate();
-            _form.BringToFront();
-            _form.FocusTextBox();
-        });
-        await Task.Delay(delayMs);
+                if (!GetValue(form => form.IsInputTextBoxFocused))
+                {
+                    var textBoxCenter = GetValue(form => form.TextBoxCenter);
+                    var clickResult = await _mouseInputService.ClickAsync(textBoxCenter.X, textBoxCenter.Y);
+                    if (!clickResult.Success)
+                    {
+                        throw new InvalidOperationException(
+                            $"Failed to focus the keyboard test harness by clicking it: {clickResult.Error}");
+                    }
+                }
+            },
+            condition: () =>
+                GetForegroundWindow() == TestWindowHandle &&
+                GetValue(form => form.IsInputTextBoxFocused),
+            timeout: TimeSpan.FromMilliseconds(maxRetries * delayMs),
+            pollInterval: TimeSpan.FromMilliseconds(delayMs));
     }
 
     /// <summary>
@@ -220,15 +221,20 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
             return;
         }
 
-        // Type a character and verify it was received
-        Reset();
-        await EnsureTestWindowFocusedAsync();
-
-        var result = await KeyboardInputService.TypeTextAsync("x");
-        if (result.Success)
+        // Verify readiness through the observable outcome that the tests depend on: input receipt.
+        var inputReady = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                Reset();
+                await EnsureTestWindowFocusedAsync();
+                await KeyboardInputService.TypeTextAsync("x");
+            },
+            condition: () => GetInputText() == "x",
+            timeout: TimeSpan.FromSeconds(5),
+            pollInterval: TimeSpan.FromMilliseconds(100));
+        if (!inputReady)
         {
-            // Wait for the character to appear
-            await WaitForInputTextAsync("x", TimeSpan.FromSeconds(1));
+            throw new TimeoutException("Keyboard input did not reach the test harness.");
         }
 
         // Clear for actual tests
@@ -245,6 +251,11 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     {
         if (_form != null && !_form.IsDisposed)
         {
+            // Drain any input queued by the previous test before clearing observable state.
+            TestWait.UntilStable(
+                () => GetValue(f => f.EventHistory.Count),
+                stableFor: TimeSpan.FromMilliseconds(75),
+                timeout: TimeSpan.FromSeconds(1));
             _form.Invoke(() => _form.Reset());
         }
     }
@@ -292,20 +303,9 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     /// </summary>
     public async Task<bool> WaitForInputTextAsync(string expectedText, TimeSpan? timeout = null)
     {
-        var maxWait = timeout ?? TimeSpan.FromSeconds(2);
-        var start = DateTime.UtcNow;
-
-        while (DateTime.UtcNow - start < maxWait)
-        {
-            if (GetInputText() == expectedText)
-            {
-                return true;
-            }
-
-            await Task.Delay(50);
-        }
-
-        return GetInputText() == expectedText;
+        return await TestWait.UntilAsync(
+            () => GetInputText() == expectedText,
+            timeout ?? TimeSpan.FromSeconds(2));
     }
 
     /// <summary>
@@ -313,20 +313,9 @@ public class KeyboardTestFixture : IAsyncLifetime, IDisposable
     /// </summary>
     public async Task<bool> WaitForInputTextContainsAsync(string expectedText, TimeSpan? timeout = null)
     {
-        var maxWait = timeout ?? TimeSpan.FromSeconds(2);
-        var start = DateTime.UtcNow;
-
-        while (DateTime.UtcNow - start < maxWait)
-        {
-            if (GetInputText().Contains(expectedText, StringComparison.Ordinal))
-            {
-                return true;
-            }
-
-            await Task.Delay(50);
-        }
-
-        return GetInputText().Contains(expectedText, StringComparison.Ordinal);
+        return await TestWait.UntilAsync(
+            () => GetInputText().Contains(expectedText, StringComparison.Ordinal),
+            timeout ?? TimeSpan.FromSeconds(2));
     }
 
     /// <summary>

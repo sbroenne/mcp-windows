@@ -1,0 +1,237 @@
+name: Windows UI Integration Tests
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Desktop tests to run
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - keyboard
+          - mouse
+          - window
+          - ui-automation
+          - winui
+          - electron
+          - chromium
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: windows-ui-integration-tests
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-windows-mcp-runner
+  AZURE_VM_NAME: vm-windows-mcp-runner
+  AZURE_PUBLIC_IP_NAME: vm-windows-mcp-runner-ip
+
+jobs:
+  start-runner:
+    name: Start Windows UI runner
+    if: >-
+      vars.WINDOWS_UI_RUNNER_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false))
+    runs-on: ubuntu-latest
+    environment: windows-ui-runner
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Checkout runner scripts
+        uses: actions/checkout@v6
+
+      - name: Start VM
+        run: >-
+          az vm start
+          --resource-group "$AZURE_RESOURCE_GROUP"
+          --name "$AZURE_VM_NAME"
+
+      - name: Initialize interactive desktop
+        shell: pwsh
+        run: |
+          infrastructure/azure/initialize-desktop.ps1 `
+            -ResourceGroup $env:AZURE_RESOURCE_GROUP `
+            -VmName $env:AZURE_VM_NAME `
+            -PublicIpName $env:AZURE_PUBLIC_IP_NAME
+
+      - name: Set four-hour shutdown watchdog
+        shell: pwsh
+        run: |
+          $shutdownTime = (Get-Date).ToUniversalTime().AddHours(4).ToString("HHmm")
+          az vm auto-shutdown `
+            --resource-group $env:AZURE_RESOURCE_GROUP `
+            --name $env:AZURE_VM_NAME `
+            --time $shutdownTime
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set the VM auto-shutdown watchdog."
+          }
+
+  integration-tests:
+    name: Windows UI integration suite
+    needs: start-runner
+    runs-on: [self-hosted, windows, x64, windows-ui]
+    timeout-minutes: 180
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      MCP_TEST_CHROME: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/package-lock.json
+
+      - name: Verify interactive desktop prerequisites
+        shell: pwsh
+        run: |
+          if (-not [Environment]::UserInteractive) {
+            throw "The runner is not attached to an interactive Windows session."
+          }
+
+          $explorer = Get-Process explorer -ErrorAction SilentlyContinue |
+            Where-Object SessionId -eq (Get-Process -Id $PID).SessionId |
+            Select-Object -First 1
+          if (-not $explorer) {
+            throw "Explorer is not running in the runner session."
+          }
+
+          $edge = Join-Path ${env:ProgramFiles(x86)} "Microsoft\Edge\Application\msedge.exe"
+          $chrome = Join-Path $env:ProgramFiles "Google\Chrome\Application\chrome.exe"
+          foreach ($browser in @($edge, $chrome)) {
+            if (-not (Test-Path $browser)) {
+              throw "Required browser not found: $browser"
+            }
+          }
+
+      - name: Restore
+        run: dotnet restore Sbroenne.WindowsMcp.sln
+
+      - name: Build test project
+        run: >-
+          dotnet build tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj
+          --configuration Debug
+          --no-restore
+
+      - name: Publish self-contained WinUI harness
+        run: >-
+          dotnet publish tests/Sbroenne.WindowsMcp.ModernHarness/Sbroenne.WindowsMcp.ModernHarness.csproj
+          --configuration Debug
+          --runtime win-x64
+          --no-restore
+
+      - name: Install Electron harness
+        shell: pwsh
+        working-directory: tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness
+        run: |
+          npm ci --no-audit --no-fund --ignore-scripts=false --foreground-scripts
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to install the Electron harness."
+          }
+
+          $electron = "node_modules\electron\dist\electron.exe"
+          if (-not (Test-Path $electron)) {
+            node node_modules/electron/install.js
+          }
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $electron)) {
+            throw "Electron installation did not produce $electron."
+          }
+
+      - name: Run desktop integration tests
+        shell: pwsh
+        env:
+          TEST_SCOPE: ${{ github.event_name == 'pull_request' && 'all' || inputs.scope }}
+        run: |
+          $filters = @{
+            all = "FullyQualifiedName~Integration"
+            keyboard = "FullyQualifiedName~Integration.Keyboard"
+            mouse = "FullyQualifiedName~Integration.Mouse|FullyQualifiedName~Integration.DpiAwareness|FullyQualifiedName~Integration.ModifierKey|FullyQualifiedName~Integration.MultiMonitor"
+            window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"
+            "ui-automation" = "FullyQualifiedName~Integration.UI|FullyQualifiedName~Integration.AnnotatedScreenshot|FullyQualifiedName~Integration.CaptureAnnotated|FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.TestHarnessInput"
+            winui = "FullyQualifiedName~Integration.WinUI"
+            electron = "FullyQualifiedName~Integration.ElectronHarness"
+            chromium = "FullyQualifiedName~Integration.ChromiumBrowser"
+          }
+
+          $filter = $filters[$env:TEST_SCOPE]
+          if (-not $filter) {
+            throw "Unsupported test scope: $env:TEST_SCOPE"
+          }
+
+          dotnet test tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj `
+            --configuration Debug `
+            --no-build `
+            --filter $filter `
+            --logger "trx;LogFileName=windows-ui-$($env:TEST_SCOPE).trx" `
+            --blame-hang-timeout 15m `
+            --nologo `
+            -- RunConfiguration.MaxCpuCount=1
+          if ($LASTEXITCODE -ne 0) {
+            throw "Windows UI integration tests failed."
+          }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-ui-results-${{ github.run_number }}
+          path: '**/TestResults/*.trx'
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Clean up test applications
+        if: always()
+        shell: pwsh
+        run: |
+          Get-Process electron, chrome, msedge, notepad, calculatorapp -ErrorAction SilentlyContinue |
+            Where-Object SessionId -eq (Get-Process -Id $PID).SessionId |
+            ForEach-Object { Stop-Process -Id $_.Id -Force }
+
+  deallocate-runner:
+    name: Deallocate Windows UI runner
+    if: >-
+      always() &&
+      vars.WINDOWS_UI_RUNNER_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false))
+    needs: [start-runner, integration-tests]
+    runs-on: ubuntu-latest
+    environment: windows-ui-runner
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deallocate VM
+        run: >-
+          az vm deallocate
+          --resource-group "$AZURE_RESOURCE_GROUP"
+          --name "$AZURE_VM_NAME"

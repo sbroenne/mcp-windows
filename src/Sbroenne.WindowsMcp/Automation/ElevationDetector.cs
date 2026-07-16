@@ -37,6 +37,15 @@ public class ElevationDetector
     }
 
     /// <summary>
+    /// Checks whether the window at the specified coordinates runs at a higher integrity level
+    /// than the current process.
+    /// </summary>
+    public bool IsTargetAtHigherIntegrity(int x, int y)
+    {
+        return !IsProcessElevated((uint)Environment.ProcessId) && IsTargetElevated(x, y);
+    }
+
+    /// <summary>
     /// Checks if the specified process is elevated (running as administrator).
     /// </summary>
     /// <param name="processId">The process ID to check.</param>

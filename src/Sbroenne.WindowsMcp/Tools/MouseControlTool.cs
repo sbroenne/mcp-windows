@@ -448,7 +448,7 @@ public static partial class MouseControlTool
             targetY = currentPos.Y;
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(targetX, targetY))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(targetX, targetY))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,
@@ -481,7 +481,7 @@ public static partial class MouseControlTool
             targetY = currentPos.Y;
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(targetX, targetY))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(targetX, targetY))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,
@@ -514,7 +514,7 @@ public static partial class MouseControlTool
             targetY = currentPos.Y;
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(targetX, targetY))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(targetX, targetY))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,
@@ -547,7 +547,7 @@ public static partial class MouseControlTool
             targetY = currentPos.Y;
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(targetX, targetY))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(targetX, targetY))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,
@@ -580,7 +580,7 @@ public static partial class MouseControlTool
                 "Cannot perform drag operation: secure desktop (UAC, lock screen) is active");
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(startX.Value, startY.Value))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(startX.Value, startY.Value))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,
@@ -628,7 +628,7 @@ public static partial class MouseControlTool
             targetY = currentPos.Y;
         }
 
-        if (WindowsToolsBase.ElevationDetector.IsTargetElevated(targetX, targetY))
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(targetX, targetY))
         {
             return MouseControlResult.CreateFailure(
                 MouseControlErrorCode.ElevatedProcessTarget,

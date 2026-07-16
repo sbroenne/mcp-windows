@@ -77,16 +77,16 @@ public class MouseClickTests : IDisposable
 
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public void ElevationDetector_CanDetectElevatedProcessTarget()
+    public void ElevationDetector_AllowsSameIntegrityTarget()
     {
         // Arrange - test against the known non-elevated test window
         var (testX, testY) = _fixture.GetTestWindowCenter();
 
         // Act
-        var isElevated = _elevationDetector.IsTargetElevated(testX, testY);
+        var isHigherIntegrity = _elevationDetector.IsTargetAtHigherIntegrity(testX, testY);
 
-        // Assert - test harness window is not elevated
-        Assert.False(isElevated, "Test harness window should not be detected as elevated");
+        // Assert - the harness runs in the test process, so its integrity cannot be higher.
+        Assert.False(isHigherIntegrity);
     }
 
     [Fact]

@@ -127,8 +127,12 @@ dotnet test --filter "Category=Integration"
 # Specific test class
 dotnet test --filter "FullyQualifiedName~MouseInputServiceTests"
 
-# With code coverage
-dotnet test /p:CollectCoverage=true /p:CoverageFormat=opencover
+# With code coverage (Debug config so PDBs exist for instrumentation;
+# Release strips symbols via DebugType=none, which yields empty coverage)
+dotnet test tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj `
+  --configuration Debug --collect:"XPlat Code Coverage" --settings .runsettings
+# Cobertura reports land under TestResults/<guid>/coverage.cobertura.xml
+# CI collects the same report and uploads it as the "code-coverage" artifact.
 ```
 
 ### Writing Tests

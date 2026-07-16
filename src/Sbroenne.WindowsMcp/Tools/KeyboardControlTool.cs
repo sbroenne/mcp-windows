@@ -182,8 +182,8 @@ public static partial class KeyboardControlTool
                 "Cannot send keyboard input when secure desktop (UAC prompt, lock screen) is active");
         }
 
-        // Check for elevated foreground window
-        if (IsForegroundWindowElevated())
+        // Check whether the foreground window is above our integrity level.
+        if (IsForegroundWindowAtHigherIntegrity())
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
@@ -227,7 +227,7 @@ public static partial class KeyboardControlTool
                 "Cannot send keyboard input when secure desktop (UAC prompt, lock screen) is active");
         }
 
-        if (IsForegroundWindowElevated())
+        if (IsForegroundWindowAtHigherIntegrity())
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
@@ -286,7 +286,7 @@ public static partial class KeyboardControlTool
                 "Cannot send keyboard input when secure desktop (UAC prompt, lock screen) is active");
         }
 
-        if (IsForegroundWindowElevated())
+        if (IsForegroundWindowAtHigherIntegrity())
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
@@ -324,7 +324,7 @@ public static partial class KeyboardControlTool
                 "Cannot send keyboard input when secure desktop (UAC prompt, lock screen) is active");
         }
 
-        if (IsForegroundWindowElevated())
+        if (IsForegroundWindowAtHigherIntegrity())
         {
             return KeyboardControlResult.CreateFailure(
                 KeyboardControlErrorCode.ElevatedProcessTarget,
@@ -430,10 +430,10 @@ public static partial class KeyboardControlTool
         return result;
     }
 
-    private static bool IsForegroundWindowElevated()
+    private static bool IsForegroundWindowAtHigherIntegrity()
     {
         NativeMethods.GetCursorPos(out var cursorPos);
-        return WindowsToolsBase.ElevationDetector.IsTargetElevated(cursorPos.X, cursorPos.Y);
+        return WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(cursorPos.X, cursorPos.Y);
     }
 
     private static async Task<KeyboardControlResult> AttachTargetWindowInfoAsync(KeyboardControlResult result, CancellationToken cancellationToken)

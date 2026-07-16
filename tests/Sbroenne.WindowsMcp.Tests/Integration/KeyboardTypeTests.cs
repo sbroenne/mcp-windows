@@ -33,8 +33,7 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         ArgumentNullException.ThrowIfNull(text);
-        _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50); // Let focus settle
+        _fixture.EnsureTestWindowFocused(); // Let focus settle
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -81,7 +80,6 @@ public class KeyboardTypeTests : IDisposable
         // Arrange
         ArgumentNullException.ThrowIfNull(text);
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -104,7 +102,6 @@ public class KeyboardTypeTests : IDisposable
         // Arrange
         var text = "Hello World";
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -128,7 +125,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -152,7 +148,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -176,7 +171,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -197,7 +191,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act - type "Hello" then " World"
         var result1 = await _fixture.KeyboardInputService.TypeTextAsync("Hello");
@@ -222,7 +215,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -248,7 +240,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -274,7 +265,6 @@ public class KeyboardTypeTests : IDisposable
     {
         // Arrange
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);
@@ -296,7 +286,6 @@ public class KeyboardTypeTests : IDisposable
         // Arrange
         var text = "Hello, World! 123";
         _fixture.EnsureTestWindowFocused();
-        await Task.Delay(50);
 
         // Act
         var result = await _fixture.KeyboardInputService.TypeTextAsync(text);

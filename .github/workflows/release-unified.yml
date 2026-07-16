@@ -11,7 +11,7 @@ name: Release All Components
 #
 # Required GitHub Secrets:
 # - VSCE_TOKEN: VS Code Marketplace PAT
-# - COPILOT_GITHUB_TOKEN: GitHub token with Copilot access (optional, for LLM tests)
+# - COPILOT_GITHUB_TOKEN: GitHub token with Copilot access (required for release LLM tests)
 
 on:
   workflow_dispatch:
@@ -143,11 +143,8 @@ jobs:
         UV_LINK_MODE: copy
       run: |
         if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
-          Write-Warning "COPILOT_GITHUB_TOKEN is not configured; skipping release LLM integration tests."
-          if (-not [string]::IsNullOrWhiteSpace($env:UV_CACHE_DIR)) {
-            New-Item -ItemType Directory -Path $env:UV_CACHE_DIR -Force | Out-Null
-          }
-          exit 0
+          Write-Error "COPILOT_GITHUB_TOKEN is required to run the release LLM integration tests. A release must not ship without AI validation. Configure the COPILOT_GITHUB_TOKEN secret and re-run."
+          exit 1
         }
 
         cd tests/Sbroenne.WindowsMcp.LLM.Tests

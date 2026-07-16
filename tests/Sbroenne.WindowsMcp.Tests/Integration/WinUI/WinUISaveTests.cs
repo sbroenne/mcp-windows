@@ -27,7 +27,6 @@ public sealed class WinUISaveTests : IDisposable
     {
         _fixture = fixture;
         _fixture.BringToFront();
-        Thread.Sleep(200);
 
         _windowHandle = _fixture.TestWindowHandleString;
         _testOutputDir = Path.Combine(Path.GetTempPath(), "mcp-windows-tests-winui");
