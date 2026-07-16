@@ -84,9 +84,10 @@ public class MouseClickTests : IDisposable
 
         // Act
         var isElevated = _elevationDetector.IsTargetElevated(testX, testY);
+        var currentProcessIsElevated = _elevationDetector.IsProcessElevated((uint)Environment.ProcessId);
 
-        // Assert - test harness window is not elevated
-        Assert.False(isElevated, "Test harness window should not be detected as elevated");
+        // Assert - the harness runs in the test process and should report the same elevation state.
+        Assert.Equal(currentProcessIsElevated, isElevated);
     }
 
     [Fact]

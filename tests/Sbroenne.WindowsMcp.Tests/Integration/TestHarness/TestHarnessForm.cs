@@ -255,7 +255,7 @@ public sealed class TestHarnessForm : Form
         Controls.Add(_rightClickPanel);
 
         // Scroll test area
-        _scrollPanel = new Panel
+        _scrollPanel = new FocusablePanel
         {
             Location = new Point(360, 105),
             Size = new Size(110, 40),
@@ -274,8 +274,8 @@ public sealed class TestHarnessForm : Form
         _scrollPanel.MouseWheel += OnScrollPanelMouseWheel;
         scrollLabel.MouseWheel += OnScrollPanelMouseWheel;
         // Also handle middle-click on scroll panel
-        _scrollPanel.MouseDown += OnPanelMouseDown;
-        scrollLabel.MouseDown += OnPanelMouseDown;
+        _scrollPanel.MouseDown += OnScrollPanelMouseDown;
+        scrollLabel.MouseDown += OnScrollPanelMouseDown;
         Controls.Add(_scrollPanel);
 
         // Drag test area - a large panel for testing drag operations
@@ -548,6 +548,12 @@ public sealed class TestHarnessForm : Form
         }
     }
 
+    private void OnScrollPanelMouseDown(object? sender, MouseEventArgs e)
+    {
+        _scrollPanel.Focus();
+        OnPanelMouseDown(sender, e);
+    }
+
     private void OnScrollPanelMouseWheel(object? sender, MouseEventArgs e)
     {
         TotalScrollDelta += e.Delta;
@@ -562,6 +568,15 @@ public sealed class TestHarnessForm : Form
         ScrollEventCount++;
         var direction = e.Delta > 0 ? "up" : "down";
         LogEvent($"Form scroll {direction} (delta: {e.Delta}, total: {TotalScrollDelta})");
+    }
+
+    private sealed class FocusablePanel : Panel
+    {
+        public FocusablePanel()
+        {
+            SetStyle(ControlStyles.Selectable, true);
+            TabStop = true;
+        }
     }
 
     private bool _isDragging;

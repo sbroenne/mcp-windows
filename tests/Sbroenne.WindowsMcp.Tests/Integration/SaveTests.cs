@@ -219,14 +219,20 @@ public sealed class SaveTests : IDisposable
 
         try
         {
-            await Task.Delay(2000); // Wait for Notepad to fully launch
+            Sbroenne.WindowsMcp.Models.WindowInfo? notepadWindow = null;
+            var windowAppeared = await TestWait.RetryUntilAsync(
+                attempt: async () =>
+                {
+                    var windows = await _windowEnumerator.EnumerateWindowsAsync();
+                    notepadWindow = windows.FirstOrDefault(w =>
+                        w.ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) &&
+                        w.Title.Contains("Notepad", StringComparison.OrdinalIgnoreCase));
+                },
+                condition: () => notepadWindow != null,
+                timeout: TimeSpan.FromSeconds(10),
+                pollInterval: TimeSpan.FromMilliseconds(100));
 
-            // Find the Notepad window
-            var windows = await _windowEnumerator.EnumerateWindowsAsync();
-            var notepadWindow = windows.FirstOrDefault(w =>
-                w.ProcessName.Equals("Notepad", StringComparison.OrdinalIgnoreCase) &&
-                w.Title.Contains("Notepad"));
-
+            Assert.True(windowAppeared, "Notepad window did not appear within 10 seconds.");
             Assert.NotNull(notepadWindow);
             var notepadHandle = notepadWindow.Handle.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
