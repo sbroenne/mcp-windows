@@ -26,7 +26,7 @@ public sealed class AnnotatedScreenshotElectronTests : IDisposable
     public AnnotatedScreenshotElectronTests(ElectronHarnessFixture fixture)
     {
         _fixture = fixture;
-        _fixture.BringToFront();
+        _fixture.Reset();
 
         _windowHandleString = _fixture.WindowHandleString;
 

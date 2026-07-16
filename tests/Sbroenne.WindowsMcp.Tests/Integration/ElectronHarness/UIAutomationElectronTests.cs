@@ -25,7 +25,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     public UIAutomationElectronTests(ElectronHarnessFixture fixture)
     {
         _fixture = fixture;
-        _fixture.BringToFront();
+        _fixture.Reset();
 
         _windowHandle = _fixture.WindowHandleString;
 

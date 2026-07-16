@@ -311,14 +311,7 @@ public sealed class ElectronHarnessFixture : IDisposable
     {
         try
         {
-            var automation = UIA3Automation.Instance;
-            var root = automation.ElementFromHandle(_windowHandle);
-            var navigationButton = automation.CreatePropertyCondition(
-                UIA3PropertyIds.Name,
-                "Navigate Home");
-            return root?.FindFirst(
-                UIA.TreeScope.TreeScope_Descendants,
-                navigationButton) != null;
+            return FindNavigationButton() != null;
         }
         catch (COMException)
         {
@@ -334,6 +327,37 @@ public sealed class ElectronHarnessFixture : IDisposable
     {
         DismissDialogs();
         BringToFront();
+
+        var restored = TestWait.RetryUntil(
+            attempt: RestoreInitialViewport,
+            condition: IsInitialViewportVisible,
+            timeout: TimeSpan.FromSeconds(2),
+            pollInterval: TimeSpan.FromMilliseconds(50));
+        if (!restored)
+        {
+            throw new TimeoutException("Electron harness did not restore its initial viewport.");
+        }
+    }
+
+    private void RestoreInitialViewport()
+    {
+        FindNavigationButton()?.TryScrollIntoView();
+    }
+
+    private bool IsInitialViewportVisible()
+    {
+        var navigationButton = FindNavigationButton();
+        return navigationButton != null && !navigationButton.IsOffscreen();
+    }
+
+    private UIA.IUIAutomationElement? FindNavigationButton()
+    {
+        var automation = UIA3Automation.Instance;
+        var root = automation.ElementFromHandle(_windowHandle);
+        var condition = automation.CreatePropertyCondition(
+            UIA3PropertyIds.Name,
+            "Navigate Home");
+        return root?.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
     }
 
     public void Dispose()
