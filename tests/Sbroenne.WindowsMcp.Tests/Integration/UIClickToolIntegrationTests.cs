@@ -162,14 +162,14 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var probeTarget = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
-            AutomationId = "PhysicalFallbackTarget",
+            AutomationId = "SubmitButton",
         });
         var clickPoint = Assert.Single(probeTarget.Items!).Click;
         var click = await _mouseService.ClickAsync(clickPoint[0], clickPoint[1]);
         var received = TestWait.Until(
             () => _fixture.Form is not null &&
                   (bool)_fixture.Form.Invoke(() =>
-                      string.Equals(_fixture.Form.StatusText, "Physical fallback clicked", StringComparison.Ordinal)));
+                      _fixture.Form.SubmitMouseInputCount > 0));
 
         _fixture.Reset();
         _fixture.BringToFront();
