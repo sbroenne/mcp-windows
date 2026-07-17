@@ -106,6 +106,20 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `mouse_control` | Coordinate-based mouse input (fallback) |
 | `window_management` | Window control and management |
 
+### Two ways to call these tools
+
+Every tool listed above is available through **two equal entry points that share one implementation**:
+
+- **MCP server** — the tool schemas documented in this file (for MCP hosts).
+- **`wincli` CLI** — the same tools as shell commands (for coding agents with terminal access).
+  The CLI calls the exact same tool methods, so its JSON output is byte-for-byte identical to the
+  MCP tools. It is the token-efficient path: discover everything via `wincli --help` / `wincli tools`
+  / `wincli guidance` instead of loading every MCP schema. Command mapping mirrors the tool names,
+  e.g. `ui_click` → `wincli ui click`, `window_management` → `wincli window <action>`,
+  `screenshot_control` → `wincli screenshot`. See
+  [`src/Sbroenne.WindowsMcp.Cli/README.md`](src/Sbroenne.WindowsMcp.Cli/README.md) for the full
+  command reference.
+
 ---
 
 ## � App (`app`)
