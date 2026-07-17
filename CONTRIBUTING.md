@@ -172,7 +172,7 @@ These tests use [pytest-skill-engineering](https://github.com/sbroenne/pytest-sk
 - Windows desktop session with GUI access
 - Python 3.12+ and uv
 
-**LLM tests run automatically during every release** via GitHub Actions using the workflow `GITHUB_TOKEN`. A 100% pass rate is required before release. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for configuration details.
+**LLM tests are intentionally manual-only.** They never run as part of PR, CI, or release workflows. Run them from the dedicated **LLM Integration Tests** workflow in GitHub Actions, or locally as described below. See [.github/RELEASE_SETUP.md](.github/RELEASE_SETUP.md) for details.
 
 #### Running LLM Tests
 
@@ -204,7 +204,7 @@ uv run pytest integration/ -v
 #### Test Design Principles
 
 - **Use well-known apps**: Tests target Notepad, Paint, Calculator (apps LLMs recognize)
-- **100% pass rate required**: All tests must pass before release
+- **Manual-only execution**: Run the suite explicitly through the dedicated workflow or locally
 - **Real model**: Tests run against GPT-5.5 via GitHub Copilot
 - **Token tracking**: Tests report token usage to validate optimization
 

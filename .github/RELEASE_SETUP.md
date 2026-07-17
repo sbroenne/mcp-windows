@@ -6,10 +6,9 @@ This document explains how to configure the GitHub infrastructure for the Window
 
 The release workflow (`.github/workflows/release-unified.yml`) is a unified workflow that builds and publishes all Windows MCP Server components (standalone binaries and VS Code extension) with a single version number.
 
-The workflow optionally runs LLM integration tests with a real AI model (GPT-5.5 via GitHub Copilot) before building and publishing releases (if a Copilot-enabled token is configured). This requires:
+LLM integration tests are intentionally manual-only. They are never invoked by PR, CI, or release workflows; run them separately through the dedicated **LLM Integration Tests** workflow when needed.
 
-1. **GitHub Secrets** — For VS Code Marketplace publishing (required)
-2. **`COPILOT_GITHUB_TOKEN` secret** — A GitHub token with Copilot access, for running LLM tests (optional)
+The release workflow requires the **GitHub Secrets** configuration for VS Code Marketplace publishing described below.
 
 ## Architecture
 
@@ -42,21 +41,6 @@ The workflow optionally runs LLM integration tests with a real AI model (GPT-5.5
                  └─────────────────────┘
 ```
 
-**Optional LLM Tests** (if `COPILOT_GITHUB_TOKEN` is configured):
-```
-┌─────────────────────┐   COPILOT_GITHUB_TOKEN   ┌─────────────────────┐
-│   GitHub Actions    │ ───────────────────────► │  GitHub Copilot     │
-│   (windows-latest)  │                          │  (GPT-5.5)          │
-└─────────────────────┘                          └─────────────────────┘
-         │
-         │ pytest-skill-engineering drives the MCP server
-         ▼
-┌─────────────────────┐
-│  Windows MCP Server │
-│  (UI automation)    │
-└─────────────────────┘
-```
-
 ## Step 1: Configure GitHub Secrets
 
 Go to your GitHub repository → Settings → Secrets and variables → Actions.
@@ -66,14 +50,6 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions.
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
 | `VSCE_TOKEN` | `xxxxxxxx...` | VS Code Marketplace Personal Access Token (required for publishing) |
-
-### Optional Secrets (for LLM tests)
-
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `COPILOT_GITHUB_TOKEN` | `ghp_xxxx...` / `gho_xxxx...` | A GitHub token with Copilot access. If unset, the release LLM test job is skipped. |
-
-**Note:** LLM tests are automatically skipped if `COPILOT_GITHUB_TOKEN` is not configured.
 
 ### Getting a VSCE Token
 
@@ -85,9 +61,9 @@ Go to your GitHub repository → Settings → Secrets and variables → Actions.
    - **Scopes**: Marketplace → Manage
 4. Copy the token (shown only once!)
 
-## Step 2: LLM Test Model
+## Manual LLM Tests
 
-The release LLM tests run against **GPT-5.5 via GitHub Copilot**. No Azure resources or model deployments are required — authentication is handled entirely through the `COPILOT_GITHUB_TOKEN` secret. The model is configured in `tests/Sbroenne.WindowsMcp.LLM.Tests/conftest.py`.
+LLM tests run against **GPT-5.5 via GitHub Copilot**. They are intentionally isolated from releases and all automatic workflows. To run them, open GitHub Actions, select **LLM Integration Tests**, choose **Run workflow**, and optionally specify one scenario. The model is configured in `tests/Sbroenne.WindowsMcp.LLM.Tests/conftest.py`.
 
 ## How to Release
 
@@ -104,12 +80,11 @@ The new release process uses a unified workflow that is triggered manually via w
 
 The workflow will:
 1. Calculate the next version from the latest `v*` tag
-2. (Optional) Run LLM integration tests if `COPILOT_GITHUB_TOKEN` is configured
-3. Build standalone binaries (win-x64, win-arm64)
-4. Build VS Code extension (VSIX)
-5. Create and push the git tag (e.g., `v1.2.4`)
-6. Publish to VS Code Marketplace
-7. Create GitHub release with all artifacts
+2. Build standalone binaries (win-x64, win-arm64)
+3. Build VS Code extension (VSIX)
+4. Create and push the git tag (e.g., `v1.2.4`)
+5. Publish to VS Code Marketplace
+6. Create GitHub release with all artifacts
 
 ### Test a Release (Dry Run)
 
@@ -146,13 +121,9 @@ uv run pytest -v
 
 ## Troubleshooting
 
-### LLM tests are skipped in the release
-
-The `COPILOT_GITHUB_TOKEN` secret is not configured, or is empty. The release workflow logs a warning and continues. Add the secret to enable the LLM test job.
-
 ### LLM tests fail to authenticate
 
-Verify the token has Copilot access. Locally, confirm `gh auth status` succeeds or that `GITHUB_TOKEN` is set to a Copilot-enabled token.
+For local runs, confirm `gh auth status` succeeds or that `GITHUB_TOKEN` is set to a Copilot-enabled token. For GitHub-hosted runs, use the dedicated manual **LLM Integration Tests** workflow.
 
 ### LLM Tests Fail with "No GUI session"
 
@@ -163,8 +134,8 @@ GitHub Actions `windows-latest` runners have a desktop session by default. If te
 ## Security Considerations
 
 1. **No secrets in code** — All credentials are in GitHub Secrets
-2. **Scoped token** — `COPILOT_GITHUB_TOKEN` is only exposed to the LLM test job
-3. **Manual approval** — Releases are triggered manually via workflow_dispatch, not automatically on push
+2. **Manual approval** — Releases are triggered manually via workflow_dispatch, not automatically on push
+3. **Test isolation** — LLM tests can only be started through their dedicated workflow_dispatch trigger
 
 ## Migration from Old Release Process
 

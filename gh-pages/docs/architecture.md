@@ -67,6 +67,6 @@ MCP config entry) and runs as a local process — see [Installation](installatio
 Because tool descriptions that read clearly to humans can still confuse a model,
 every tool is validated with a **real AI model** (GPT-5.5 via GitHub Copilot) using
 [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering): 130+ automated tests
-with a 100% pass rate required for release. When the AI misuses a tool, the fix
-is to the tool — not the test prompt. See [Contributing](contributing.md) for how
-the test suites are run.
+run through a dedicated manual workflow. They never run as part of PR, CI, or release
+workflows. When the AI misuses a tool, the fix is to the tool — not the test prompt.
+See [Contributing](contributing.md) for how the test suites are run.
