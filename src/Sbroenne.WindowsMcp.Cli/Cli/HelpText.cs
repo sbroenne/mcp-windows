@@ -37,7 +37,7 @@ internal static class HelpText
         GROUPS
           app          Launch an application.
           window       Manage windows (find, list, activate, move, close, ...).
-          ui           UI automation (snapshot, find, click, type, select, read, wait, batch).
+          ui           UI automation (snapshot, find, click, type, select, read, read-table, wait, batch).
           keyboard     Send keystrokes (type, press, sequence, ...).
           mouse        Mouse input (move, click, drag, scroll, ...).
           screenshot   Capture screens/windows/regions (annotated element discovery by default).
@@ -70,6 +70,7 @@ internal static class HelpText
         ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first] [--with-snapshot]
         ui select   --window <h> --value <s> [selectors] [--with-snapshot]
         ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>]
+        ui read-table --window <h> [selectors|--element-id <id>] [--max-rows <n>] [--max-columns <n>]
         ui wait     [--window <h>] [--mode appear|disappear|...] [--element-id <id>]
                      [--desired-state <s>] [selectors] [--timeout-ms <n>]
         ui batch    --window <h> --steps '<json>' | --steps-file <path>

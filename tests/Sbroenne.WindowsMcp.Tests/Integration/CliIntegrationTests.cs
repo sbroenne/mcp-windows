@@ -158,6 +158,29 @@ public sealed class CliIntegrationTests
         Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
     }
 
+    [Trait("Category", "RequiresDesktop")]
+    [Fact]
+    public async Task Cli_UiReadTable_MatchesMcpServerOutputExactly()
+    {
+        // Ensure the Data Grid tab is realized so the grid exposes its rows.
+        await RunAsync("ui", "click", "--window", _windowHandle, "--name", "Data Grid", "--control-type", "TabItem");
+        await Task.Delay(150);
+
+        var direct = await UIReadTableTool.ExecuteAsync(
+            _windowHandle, name: null, nameContains: null, namePattern: null,
+            controlType: null, automationId: "ProductsDataGrid", className: null, elementId: null,
+            foundIndex: 1, maxRows: 200, maxColumns: 50, includeDiagnostics: false, CancellationToken.None);
+        var directText = direct.Content
+            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .Single().Text;
+
+        var (code, stdout, _) = await RunAsync(
+            "ui", "read-table", "--window", _windowHandle, "--automation-id", "ProductsDataGrid");
+
+        Assert.Equal(0, code);
+        Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
+    }
+
     [Fact]
     public void Cli_HelpAndTools_AreNonEmptyAndCoverAllGroups()
     {

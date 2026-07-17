@@ -305,6 +305,25 @@ internal static class CommandDispatcher
                     return Emit.Result(result);
                 }
 
+            case "read-table":
+                {
+                    var result = await UIReadTableTool.ExecuteAsync(
+                        window,
+                        a.GetString("name"),
+                        a.GetString("name-contains"),
+                        a.GetString("name-pattern"),
+                        a.GetString("control-type"),
+                        a.GetString("automation-id"),
+                        a.GetString("class-name"),
+                        a.GetString("element-id"),
+                        a.GetInt("found-index", "index") ?? 1,
+                        a.GetInt("max-rows", "rows") ?? 200,
+                        a.GetInt("max-columns", "cols") ?? 50,
+                        diag,
+                        ct);
+                    return Emit.Result(result);
+                }
+
             case "wait":
                 {
                     var result = await UIWaitTool.ExecuteAsync(
@@ -354,7 +373,7 @@ internal static class CommandDispatcher
 
             default:
                 return Emit.Usage(
-                    "ui requires an operation: snapshot, find, click, type, select, read, wait, or batch.");
+                    "ui requires an operation: snapshot, find, click, type, select, read, read-table, wait, or batch.");
         }
     }
 }

@@ -14,8 +14,9 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
 
 1. Use `window_management` to find or activate the target window.
 2. Use `ui_find`, `ui_read`, `ui_click`, and `ui_type` for normal controls.
-3. Use `file_save` for Save / Save As flows instead of sending raw keyboard shortcuts.
-4. Only fall back to `screenshot_control`, `mouse_control`, or `keyboard_control` when the UI Automation tree is missing or the target is a custom canvas.
+3. Use `ui_read_table` to extract a grid, table, or details-view list into structured rows + headers in one call instead of scraping cells with repeated `ui_read`.
+4. Use `file_save` for Save / Save As flows instead of sending raw keyboard shortcuts.
+5. Only fall back to `screenshot_control`, `mouse_control`, or `keyboard_control` when the UI Automation tree is missing or the target is a custom canvas.
 
 ## Patterns
 

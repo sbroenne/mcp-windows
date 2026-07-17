@@ -25,8 +25,9 @@ so there is no server session to keep alive).
 1. `wincli window find --title <part>` (or `wincli app --path <exe>`) to get a **window handle**.
 2. `wincli ui snapshot --window <handle>` to see the accessible element tree.
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
-4. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
-5. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
+4. `wincli ui read-table --window <handle> --automation-id <grid>` to pull a grid/table/details-list into structured rows + headers in one call.
+5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
+6. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
 
 ## Patterns
 

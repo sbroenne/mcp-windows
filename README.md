@@ -78,6 +78,7 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `ui_type` | Type into text fields |
 | `ui_select` | Pick a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (with OCR fallback) |
+| `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/key) in one call |
 | `file_save` | Save files via Save As dialog |

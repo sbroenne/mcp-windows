@@ -74,6 +74,14 @@ public sealed record UIAutomationResult
     public string? Text { get; init; }
 
     /// <summary>
+    /// Structured tabular data (for read_table action). Rows/columns extracted from a
+    /// grid/table/list control via the UIA Grid and Table patterns.
+    /// </summary>
+    [JsonPropertyName("table")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UITableData? Table { get; init; }
+
+    /// <summary>
     /// Error type if failed.
     /// </summary>
     [JsonPropertyName("errorType")]
@@ -325,6 +333,31 @@ public sealed record UIAutomationResult
             Success = true,
             Action = action,
             Text = text,
+            Diagnostics = diagnostics
+        };
+    }
+
+    /// <summary>
+    /// Creates a success result with structured table data.
+    /// </summary>
+    /// <param name="action">The action performed.</param>
+    /// <param name="table">The extracted tabular data.</param>
+    /// <param name="diagnostics">Optional diagnostics.</param>
+    /// <returns>A success result carrying the table payload.</returns>
+    public static UIAutomationResult CreateSuccessWithTable(string action, UITableData table, UIAutomationDiagnostics? diagnostics = null)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var hint = table.Truncated == true
+            ? $"Extracted {table.Rows.Length} of {table.RowCount} rows x {table.ColumnCount} columns (truncated). Increase maxRows/maxColumns to read the rest."
+            : $"Extracted {table.Rows.Length} rows x {table.ColumnCount} columns.";
+
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            Table = table,
+            UsageHint = hint,
             Diagnostics = diagnostics
         };
     }

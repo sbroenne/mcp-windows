@@ -62,7 +62,7 @@ Three moats:
 
 ### 4. Windows-native moat (the differentiator)
 - Structured data extraction via GridPattern/TablePattern/Selection → grids/tables/trees/lists
-  as JSON rows/columns instead of OCR.
+  as JSON rows/columns instead of OCR. ✅ done (`ui_read_table`)
 - Clipboard read/write — often the fastest bulk text IO in/out of apps.
 - Generalized dialog handling — extend the Save-As handling to Open/Print/common dialogs.
 - Whole-desktop orchestration across windows; toast/notification reading.
@@ -97,7 +97,7 @@ that parity is structurally guaranteed by reusing the tool methods directly.
 |-------|-------|----------|--------|
 | **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
 | **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
-| **2** | Windows moat | Structured grid/table extraction, clipboard, generalized dialogs, UIA event waits | The unbeatable part |
+| **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard, generalized dialogs, UIA event waits | The unbeatable part |
 | **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill | Strategic ✅ CLI + Skill done (shared-tool adapter; generator refactor deferred) |
 | **4** | Deterministic macros | Workflow record & replay, Win32 fallback | Long tail |
 

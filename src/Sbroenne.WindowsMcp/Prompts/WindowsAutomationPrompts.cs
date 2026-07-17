@@ -41,6 +41,7 @@ public sealed class WindowsAutomationPrompts
                 "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
                 "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
                 "• Read: ui_read(windowHandle='<handle>', nameContains='...') — get text content\n" +
+                "• Read table: ui_read_table(windowHandle='<handle>', automationId='...') — extract a grid/table/details-list into structured rows + headers in one call\n" +
 
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "\n" +

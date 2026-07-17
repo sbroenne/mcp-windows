@@ -67,6 +67,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Click a button by name | `ui_click` | Semantic, works at any DPI/theme |
 | Type text into a field | `ui_type` | Direct text input with clear option |
 | Read text from elements | `ui_read` | Get text via UIA or OCR |
+| Extract a table/grid to structured rows | `ui_read_table` | Rows + headers as JSON, no OCR/screenshot parsing |
 | Wait for windows | `window_management` | Use `wait_for` action for new windows |
 | Save files | `file_save` | Handle Save As dialogs automatically |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
@@ -98,6 +99,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `ui_type` | Type text into edit controls |
 | `ui_select` | Select a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (UIA + OCR) |
+| `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key) in one call |
 | `file_save` | Save files via Save As dialog (English Windows only) |
@@ -252,6 +254,56 @@ Read text from elements using UI Automation or OCR.
 - Automatic OCR fallback for custom-rendered text
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
+
+---
+
+## 🧮 UI Read Table (`ui_read_table`)
+
+Extract a grid, table, or details-view list into structured rows — no OCR, screenshot parsing, or
+cell-by-cell `ui_read` loops. Uses the native UIA Grid/Table patterns, so WinForms `DataGridView`,
+WPF `DataGrid`, and Win32 `ListView` (Details view) all return clean row/column data.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | No |
+| `name` / `nameContains` / `namePattern` | Locate the grid by name | No |
+| `automationId` | Locate the grid by automation id | No |
+| `controlType` / `className` | Additional selectors | No |
+| `elementId` | Grid element id from a prior snapshot/find | No |
+| `foundIndex` | Nth match when selectors are ambiguous (1-based) | No (default: 1) |
+| `maxRows` | Cap rows returned (protects token budget) | No (default: 200) |
+| `maxColumns` | Cap columns returned | No (default: 50) |
+| `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
+
+If no selector matches an element that exposes the Grid pattern, the first grid-capable descendant
+of the target (or window root) is used automatically.
+
+### Response shape
+
+```json
+{
+  "success": true,
+  "table": {
+    "rowCount": 5,
+    "columnCount": 5,
+    "headers": ["ID", "Product Name", "Price", "Stock", "Available"],
+    "rows": [["P001", "Laptop Pro 15", "1299.99", "12", "True"]],
+    "truncated": true
+  }
+}
+```
+
+`headers` is omitted when the grid exposes no Table pattern; `truncated` is present only when
+`rowCount` exceeds the returned rows (raise `maxRows` to fetch the rest).
+
+### Capabilities
+
+- One call instead of N×M `ui_read` calls to scrape a grid
+- Column headers via the UIA Table pattern when available
+- Row/column caps keep large grids within an agent's token budget
+- Fails cleanly with a recovery hint when the target isn't a grid
 
 ---
 

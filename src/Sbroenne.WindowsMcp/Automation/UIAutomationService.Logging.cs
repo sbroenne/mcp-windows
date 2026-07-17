@@ -34,6 +34,9 @@ public sealed partial class UIAutomationService
     [LoggerMessage(Level = LogLevel.Error, Message = "Error in GetTextAsync for element {ElementId}")]
     private static partial void LogGetTextError(ILogger logger, string? elementId, Exception ex);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Error in ReadTableAsync for element {ElementId}")]
+    private static partial void LogReadTableError(ILogger logger, string? elementId, Exception ex);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "Error clicking element {ElementName}")]
     private static partial void LogFindAndClickError(ILogger logger, string elementName, Exception ex);
 
