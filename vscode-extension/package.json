@@ -62,12 +62,13 @@
     "vscode:prepublish": "npm run build:mcp-server && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "npm run build:mcp-server && vsce package",
+    "test": "node --test test/*.test.js",
+    "package": "npm test && npm run build:mcp-server && vsce package",
     "lint": "oxlint src"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "1.120.0",
     "@vscode/vsce": "^3.9.2",
     "oxlint": "^1.74.0",
     "typescript": "^7.0.2"
