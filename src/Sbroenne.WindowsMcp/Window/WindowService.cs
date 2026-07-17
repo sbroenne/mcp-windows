@@ -24,9 +24,11 @@ public sealed class WindowService
     private const int DefaultWaitForTimeoutMs = 30000;
 
     /// <summary>
-    /// Timeout for waiting for save dialogs to appear after WM_CLOSE.
+    /// Timeout for waiting for save dialogs to appear after WM_CLOSE. Set generously so the tool
+    /// tolerates apps that are slow to raise their "Save changes?" prompt under system load; the
+    /// wait exits early as soon as the dialog is found or the parent window closes on its own.
     /// </summary>
-    private static readonly TimeSpan SaveDialogTimeout = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan SaveDialogTimeout = TimeSpan.FromSeconds(5);
 
     /// <summary>
     /// Polling interval for dialog detection retry loop.
@@ -34,9 +36,11 @@ public sealed class WindowService
     private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
-    /// Timeout for waiting for window to close after WM_CLOSE.
+    /// Timeout for waiting for window to close after WM_CLOSE (and after any save dialog is
+    /// dismissed). Generous enough to absorb teardown latency under load; the wait returns as soon
+    /// as the window is gone, so a successful close is still reported promptly.
     /// </summary>
-    private static readonly TimeSpan WindowCloseTimeout = TimeSpan.FromMilliseconds(500);
+    private static readonly TimeSpan WindowCloseTimeout = TimeSpan.FromSeconds(3);
 
     /// <summary>
     /// Polling interval for checking if window has closed.
