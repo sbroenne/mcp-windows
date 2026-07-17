@@ -39,6 +39,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp\Sbroenne.WindowsMcp.csproj" />
+    <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp.Cli\Sbroenne.WindowsMcp.Cli.csproj" />
   </ItemGroup>
 
   <ItemGroup>

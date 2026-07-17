@@ -71,13 +71,19 @@ Three moats:
 
 ### 5. Dual entry point: MCP + CLI + Skills
 The desktop itself is the shared state and window handles are OS-global, so a CLI call such as
-`windows-mcp ui click --handle 123 --name Save` is naturally **stateless and idempotent** — no
+`wincli ui click --window 123 --name Save` is naturally **stateless and idempotent** — no
 server session to keep alive (unlike Playwright). The CLI fits Windows automation perfectly.
 
-Mirror the Excel pattern: refactor to `WindowsMcp.Core` + `WindowsMcp.Service` (mostly
-extraction of today's `Automation/`, `Window/`, `Input/`), with `McpServer` and `CLI` as thin
-twin entry points, and adopt source generators so each operation is defined once and emits both
-the MCP tool and the CLI verb. Ship `skills/windows-cli` and `skills/windows-mcp`.
+**Shipped (Phase 3):** `wincli` — a twin command-line entry point in `Sbroenne.WindowsMcp.Cli`.
+Rather than the full Excel-style generator refactor, the CLI is a thin argument→tool adapter that
+calls the **exact same tool `ExecuteAsync` methods** the MCP server registers. This guarantees
+MCP/CLI parity from a single source of truth with zero business-logic duplication (an integration
+test asserts the CLI and MCP JSON outputs are byte-for-byte equal). Ships with a `windows-cli`
+plugin skill and `wincli guidance`/`tools`/`--help` discovery.
+
+**Deferred:** the `Core`/`Service` extraction and source generators (define each op once, emit both
+the MCP tool and the CLI verb) remain a future refactor — valuable for scaling, but not required now
+that parity is structurally guaranteed by reusing the tool methods directly.
 
 ### 6. Trust: safety, observability, testing
 - Consistent, real recovery hints (no references to non-existent tools).
@@ -92,7 +98,7 @@ the MCP tool and the CLI verb. Ship `skills/windows-cli` and `skills/windows-mcp
 | **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
 | **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
 | **2** | Windows moat | Structured grid/table extraction, clipboard, generalized dialogs, UIA event waits | The unbeatable part |
-| **3** | Dual entry point | Core/Service refactor + CLI + Skills + generators (Excel pattern) | Strategic, larger |
+| **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill | Strategic ✅ CLI + Skill done (shared-tool adapter; generator refactor deferred) |
 | **4** | Deterministic macros | Workflow record & replay, Win32 fallback | Long tail |
 
 Phase 0 is almost entirely wiring code already written and tested in the service layer —

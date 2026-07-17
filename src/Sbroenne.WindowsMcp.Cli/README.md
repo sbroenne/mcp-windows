@@ -1,0 +1,80 @@
+# wincli — Windows automation CLI
+
+`wincli` is the **command-line entry point** for the Windows MCP server. It exposes the same
+Windows UI-automation capabilities (UI Automation, mouse, keyboard, window management, screenshots)
+as a single, compact command surface.
+
+It is the **token-efficient path for coding agents**: instead of loading ~14 MCP tool schemas into
+context, an agent with shell access discovers everything through `wincli --help`, `wincli tools`,
+and `wincli guidance`, then issues one command per action.
+
+## Two equal entry points, one implementation
+
+The CLI and the MCP server are **twins**. Every `wincli` command calls the exact same tool
+`ExecuteAsync` method the MCP server registers, so:
+
+- behavior is identical across both surfaces,
+- the JSON written to stdout is byte-for-byte the same payload the MCP tool returns,
+- there is a single source of truth — no duplicated business logic to drift.
+
+This is verified by an integration test (`Cli_UiFind_MatchesMcpServerOutputExactly`) that asserts
+the CLI and MCP outputs are equal for the same call.
+
+## Usage
+
+```
+wincli <group> [<action>] [--option value] [--flag]
+```
+
+### Discovery
+
+| Command | Purpose |
+| --- | --- |
+| `wincli --help` | Command map + common workflow |
+| `wincli tools` | Every command with its options |
+| `wincli guidance` | The full automation guide (same text the MCP host receives) |
+| `wincli --version` | Version |
+
+### Command groups
+
+| Group | Purpose |
+| --- | --- |
+| `app` | Launch an application and return its window handle |
+| `window` | Manage windows (find, list, activate, move, close, …) |
+| `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `wait`, `batch`) |
+| `keyboard` | Send keystrokes (`type`, `press`, `sequence`, …) |
+| `mouse` | Mouse input (`move`, `click`, `drag`, `scroll`, …) |
+| `screenshot` | Capture screens/windows/regions (annotated element discovery by default) |
+| `file-save` | Save the active document (handles the Save As dialog) |
+
+## Typical workflow
+
+```powershell
+# 1. Find a window -> get a handle
+wincli window find --title Notepad
+
+# 2. Inspect the accessible element tree
+wincli ui snapshot --window 12345
+
+# 3. Act on controls semantically; --with-snapshot returns the updated tree in the same call
+wincli ui type  --window 12345 --automation-id UsernameInput --text "me" --clear-first
+wincli ui click --window 12345 --name Submit --with-snapshot
+
+# Run an ordered sequence in one invocation
+wincli ui batch --window 12345 --steps '[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]'
+```
+
+## Output & exit codes
+
+- **stdout** — the tool's JSON payload (parse it directly). Add `--include-diagnostics` to any
+  command for timing/diagnostic detail.
+- **exit code** — `0` success, `1` tool error (see the JSON `error` field), `2` usage error.
+
+## Notes
+
+- Window handles are OS-global, so each call is stateless and idempotent — no server session to keep
+  alive.
+- Action tokens match the MCP vocabulary (e.g. `mouse double_click`, `window get_foreground`); both
+  `snake_case` and `kebab-case` are accepted.
+- The CLI ships with the same DPI-awareness manifest as the server, so screen coordinates are correct
+  on high-DPI and multi-monitor setups.

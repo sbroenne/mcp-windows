@@ -89,6 +89,28 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 
 Full reference: [FEATURES.md](FEATURES.md)
 
+## Command-line interface (`wincli`)
+
+The server ships with a **twin command-line entry point**, `wincli`, in
+[`src/Sbroenne.WindowsMcp.Cli`](src/Sbroenne.WindowsMcp.Cli/README.md). It exposes the exact same
+capabilities as the MCP server — every command calls the same underlying tool, so the JSON output is
+byte-for-byte identical to the MCP tools (verified by a parity test).
+
+`wincli` is the **token-efficient path for coding agents**: instead of loading every MCP tool schema
+into context, an agent with shell access discovers the whole surface through `--help` / `tools` /
+`guidance` and issues one command per action. Because window handles are OS-global, each call is
+stateless — there is no server session to keep alive.
+
+```powershell
+wincli window find --title Notepad           # -> window handle
+wincli ui snapshot --window 12345            # accessible element tree
+wincli ui click --window 12345 --name Submit --with-snapshot
+wincli guidance                              # full automation guide
+```
+
+Exit codes: `0` success, `1` tool error, `2` usage error. See the
+[CLI README](src/Sbroenne.WindowsMcp.Cli/README.md) for the full command reference.
+
 ## ⚠️ Caution
 
 This MCP server controls your Windows desktop. Use responsibly.
