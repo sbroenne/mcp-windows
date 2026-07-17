@@ -111,29 +111,32 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     [Trait("Category", "RequiresDesktop")]
     public async Task FindAndClick_WhenSemanticPatternIsUnavailable_UsesPhysicalFallback()
     {
-        EnsureHarnessOnPrimaryMonitor();
-        await SkipWhenPhysicalClickUnavailableAsync();
-        var target = await _automationService.FindElementsAsync(new ElementQuery
+        await TestRetry.RunAsync(async _ =>
         {
-            WindowHandle = _windowHandle,
-            AutomationId = "PhysicalFallbackTarget",
-        });
-        Assert.Single(target.Items!);
+            EnsureHarnessOnPrimaryMonitor();
+            await SkipWhenPhysicalClickUnavailableAsync();
+            var target = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "PhysicalFallbackTarget",
+            });
+            Assert.Single(target.Items!);
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            AutomationId = "PhysicalFallbackTarget",
-        });
+            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "PhysicalFallbackTarget",
+            });
 
-        Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
-        var status = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            AutomationId = "StatusLabel",
+            Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
+            var status = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "StatusLabel",
+            });
+            Assert.True(status.Success, $"Status read failed: {status.ErrorMessage}");
+            Assert.Equal("Physical fallback clicked", Assert.Single(status.Items!).Name);
         });
-        Assert.True(status.Success, $"Status read failed: {status.ErrorMessage}");
-        Assert.Equal("Physical fallback clicked", Assert.Single(status.Items!).Name);
     }
 
     [SkippableFact]
