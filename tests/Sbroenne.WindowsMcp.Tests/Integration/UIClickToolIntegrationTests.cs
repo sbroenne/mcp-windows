@@ -137,6 +137,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     }
 
     [SkippableFact]
+    [Trait("Category", "RequiresDesktop")]
     public async Task FindAndClick_WhenActionHasNoObservableEffect_ReturnsFailure()
     {
         EnsureHarnessOnPrimaryMonitor();
