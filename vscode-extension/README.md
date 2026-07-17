@@ -30,7 +30,7 @@ For games and custom controls without accessibility data, full screenshot + mous
 - **📺 Multi-Monitor** — Full support for multiple displays with per-monitor DPI scaling.
 - **💻 Broad App Support** — Works with classic Windows apps, modern Windows 11 apps, and Electron apps.
 - **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls.
-- **🧪 LLM-Tested** — Every tool tested with real AI models before release.
+- **🧪 LLM-Tested** — Every tool tested with real AI models through a dedicated manual workflow.
 
 ---
 

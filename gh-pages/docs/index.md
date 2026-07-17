@@ -117,10 +117,10 @@ misunderstood. Actions get skipped.
 
 We test every tool with a **real AI model** (GPT-5.5 via GitHub Copilot) using
 [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering). 130+ automated tests.
-**100% pass rate required for release.** If the AI can't use it correctly, we fix
-the tool — not the prompt.
+The tests are intentionally manual-only and isolated from PR, CI, and release workflows.
+If the AI can't use a tool correctly, we fix the tool — not the prompt.
 
-[View latest LLM test results :material-arrow-right:](https://github.com/sbroenne/mcp-windows/releases/latest){ .md-button }
+[Run the LLM Integration Tests workflow :material-arrow-right:](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml){ .md-button }
 
 ## Quick start
 

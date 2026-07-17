@@ -9,6 +9,8 @@ on:
       - '*.sln'
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/release-unified.yml'
+      - '.github/workflows/llm-tests.yml'
   pull_request:
     branches: [main]
     paths:
@@ -17,6 +19,8 @@ on:
       - '*.sln'
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
+      - '.github/workflows/release-unified.yml'
+      - '.github/workflows/llm-tests.yml'
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'

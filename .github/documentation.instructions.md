@@ -8,7 +8,7 @@ This document defines the purpose and content rules for each documentation file 
 >
 > Windows MCP Server uses the Windows UI Automation API — the same API screen readers use. It asks Windows directly: "What buttons exist?" Deterministic. Same command works every time.
 >
-> Tested with GPT-5.5 before every release. 130+ tests, 100% pass rate required.
+> Tested with GPT-5.5 through a dedicated manual workflow. 130+ tests, isolated from PR, CI, and release workflows.
 
 ## Three Entry Points
 

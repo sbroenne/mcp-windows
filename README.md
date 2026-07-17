@@ -6,7 +6,7 @@
 [![CI](https://github.com/sbroenne/mcp-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/sbroenne/mcp-windows/actions/workflows/ci.yml)
 [![LLM Tests](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml/badge.svg)](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml)
 
-**Windows automation that actually works.** Uses the Windows UI Automation API to find buttons by name, not pixels. Tested with real AI models before every release.
+**Windows automation that actually works.** Uses the Windows UI Automation API to find buttons by name, not pixels. Tested with real AI models through a dedicated manual workflow.
 
 ## Why This Exists
 
@@ -39,7 +39,7 @@ Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, the
 
 - **🧠 Semantic UI** — Find elements by name, not coordinates. Works regardless of DPI, theme, or window position.
 - **� Multi-Monitor** — Full support for multiple displays with per-monitor DPI scaling.
-- **🧪 LLM-Tested** — 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). 100% pass rate required for release.
+- **🧪 LLM-Tested** — 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot), run intentionally through a dedicated manual workflow.
 - **💻 Broad App Support** — Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack). Chromium browser pages follow the same ARIA-driven pattern, but browser chrome remains best-effort.
 - **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls.
 - **🪙 Token Optimized** — Short property names, JPEG screenshots, and auto-scaling substantially reduce token usage compared to standard JSON.
@@ -114,7 +114,7 @@ dotnet test --filter "FullyQualifiedName~Unit"   # Unit only
 dotnet test .\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj --filter "FullyQualifiedName~ChromiumBrowser"
 ```
 
-**LLM tests**: 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). 100% pass rate required for release.
+**LLM tests**: 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). They are intentionally manual-only and never run as part of PR, CI, or release workflows. Run them from the dedicated **LLM Integration Tests** workflow in GitHub Actions.
 
 ```powershell
 cd tests/Sbroenne.WindowsMcp.LLM.Tests

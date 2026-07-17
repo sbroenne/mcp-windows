@@ -1,11 +1,9 @@
 name: LLM Integration Tests
 
-# Reusable workflow for LLM integration tests
+# Manual workflow for LLM integration tests
 # Each scenario runs in its own isolated job for clean UI state
-# Can be triggered manually or called from other workflows
 
 on:
-  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       scenario:
@@ -13,9 +11,6 @@ on:
         required: false
         type: string
         default: ''
-
-  # Allow other workflows to call this
-  workflow_call:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'

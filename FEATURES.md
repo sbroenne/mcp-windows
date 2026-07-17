@@ -47,7 +47,7 @@ Every tool is tested with a **real AI model** (GPT-5.5 via GitHub Copilot) using
 | Run Dialog & App Launch | Launching classic and UWP apps | 100% |
 | Real-World Workflows | Multi-step, end-to-end scenarios | 100% |
 
-> 130+ automated LLM tests run against GPT-5.5; a 100% pass rate is required before every release.
+> 130+ LLM tests run against GPT-5.5 through the dedicated manual **LLM Integration Tests** workflow.
 
 **Why LLM testing matters:**
 
@@ -55,7 +55,7 @@ Every tool is tested with a **real AI model** (GPT-5.5 via GitHub Copilot) using
 - **Response formats affect reasoning** — Structured hints guide the LLM to correct next steps
 - **Edge cases surface quickly** — Real models find ambiguities that unit tests miss
 
-LLM tests run as part of every release. See [CONTRIBUTING.md](CONTRIBUTING.md#llm-integration-tests) for how to run them yourself.
+LLM tests are intentionally manual-only and never run as part of PR, CI, or release workflows. See [CONTRIBUTING.md](CONTRIBUTING.md#llm-integration-tests) for how to run them.
 
 ---
 

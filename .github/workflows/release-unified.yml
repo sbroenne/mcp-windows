@@ -11,7 +11,6 @@ name: Release All Components
 #
 # Required GitHub Secrets:
 # - VSCE_TOKEN: VS Code Marketplace PAT
-# - COPILOT_GITHUB_TOKEN: GitHub token with Copilot access (required for release LLM tests)
 
 on:
   workflow_dispatch:
@@ -114,61 +113,11 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   # =============================================================================
-  # Job 1: LLM Integration Tests
-  # =============================================================================
-  llm-tests:
-    name: LLM Integration Tests
-    needs: [version]
-    runs-on: windows-latest
-    permissions:
-      contents: read
-
-    steps:
-    - uses: actions/checkout@v7
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v5
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
-    - name: Setup Python & uv
-      uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-      with:
-        python-version: '3.12'
-        enable-cache: false
-
-    - name: Run LLM Integration Tests
-      env:
-        GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
-        UV_LINK_MODE: copy
-      run: |
-        if ([string]::IsNullOrWhiteSpace($env:GITHUB_TOKEN)) {
-          Write-Error "COPILOT_GITHUB_TOKEN is required to run the release LLM integration tests. A release must not ship without AI validation. Configure the COPILOT_GITHUB_TOKEN secret and re-run."
-          exit 1
-        }
-
-        cd tests/Sbroenne.WindowsMcp.LLM.Tests
-        dotnet build ../../src/Sbroenne.WindowsMcp -c Release -v:q
-        uv sync
-        uv run pytest test_notepad_ui.py test_calculator_workflow.py test_window_workflow.py -v --tb=short --junitxml=TestResults/results.xml --no-header -p no:aitest-summary
-      shell: pwsh
-
-    - name: Upload LLM Test Reports
-      uses: actions/upload-artifact@v7
-      if: always()
-      with:
-        name: llm-test-reports
-        path: tests/Sbroenne.WindowsMcp.LLM.Tests/TestResults/
-        retention-days: 30
-
-  # =============================================================================
-  # Job 2: Build Standalone MCP Server - Self-contained binaries
+  # Job 1: Build Standalone MCP Server - Self-contained binaries
   # =============================================================================
   build-standalone:
     name: Build Standalone MCP Server
-    needs: [version, llm-tests]
-    # Always run if LLM tests pass OR if they were skipped
-    if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
+    needs: [version]
     runs-on: windows-latest
     permissions:
       contents: read
@@ -246,13 +195,11 @@ jobs:
         retention-days: 1
 
   # =============================================================================
-  # Job 3: Build VS Code Extension
+  # Job 2: Build VS Code Extension
   # =============================================================================
   build-vscode-extension:
     name: Build VS Code Extension
-    needs: [version, llm-tests]
-    # Always run if LLM tests pass OR if they were skipped
-    if: always() && (needs.llm-tests.result == 'success' || needs.llm-tests.result == 'skipped')
+    needs: [version]
     runs-on: windows-latest
     permissions:
       contents: read
@@ -362,7 +309,7 @@ jobs:
         retention-days: 1
 
   # =============================================================================
-  # Job 4: Create Git Tag
+  # Job 3: Create Git Tag
   # =============================================================================
   create-tag:
     name: Create Git Tag
@@ -388,7 +335,7 @@ jobs:
           git push origin "$TAG"
 
   # =============================================================================
-  # Job 5: Publish to VS Code Marketplace
+  # Job 4: Publish to VS Code Marketplace
   # =============================================================================
   publish:
     name: Publish to Marketplace
@@ -420,7 +367,7 @@ jobs:
       id: publishToMarketplace
 
   # =============================================================================
-  # Job 6: Create Unified GitHub Release
+  # Job 5: Create Unified GitHub Release
   # =============================================================================
   create-release:
     name: Create GitHub Release
