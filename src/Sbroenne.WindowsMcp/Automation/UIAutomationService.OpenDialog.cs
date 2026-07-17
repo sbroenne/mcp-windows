@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Sbroenne.WindowsMcp.Clipboard;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Utilities;
 using UIA = Interop.UIAutomationClient;
@@ -283,41 +284,60 @@ public sealed partial class UIAutomationService
 
         var normalizedPath = filePath.Replace('/', '\\');
 
-        // Unlike Save, the Open dialog validates that the file exists (CheckFileExists), so a single
-        // dropped keystroke on a busy desktop leaves a path that either fails to resolve (the dialog
-        // refuses to close) or autocompletes to the wrong file. Retype until the field holds the exact
-        // path before confirming, which makes the operation deterministic under load.
-        var pathEntered = await DeterministicWait.UntilAsync(
-            async () =>
-            {
-                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
-                await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+        // Enter the path atomically via clipboard paste rather than per-character typing. Unlike Save,
+        // the Open dialog auto-completes against files that already exist in the target directory and
+        // validates existence (CheckFileExists). Character-by-character typing can have an intermediate
+        // autocomplete suggestion committed - truncating the directory so the file no longer resolves
+        // and the dialog refuses to close - and a single dropped keystroke on a busy desktop has the
+        // same effect. Pasting the whole string in one gesture bypasses per-keystroke autocomplete and
+        // dropped-keystroke garbling, making path entry deterministic.
+        var clipboard = new ClipboardService(_staThread);
+        var savedClipboard = (await clipboard.GetTextAsync(cancellationToken)).Text;
 
-                return await _staThread.ExecuteAsync(
-                    () =>
-                    {
-                        var currentValue = editField.TryGetValue();
-                        return currentValue != null &&
-                            string.Equals(currentValue.Trim(), normalizedPath, StringComparison.OrdinalIgnoreCase);
-                    },
-                    cancellationToken);
-            },
-            TimeSpan.FromSeconds(5),
-            TimeSpan.FromMilliseconds(100),
-            transientException: exception => exception is COMException,
-            cancellationToken: cancellationToken);
-
-        if (!pathEntered)
+        try
         {
-            return UIAutomationResult.CreateFailure(
-                "open",
-                UIAutomationErrorType.Timeout,
-                $"Could not enter '{normalizedPath}' into the Open dialog's File name field reliably. " +
-                "Open the dialog manually with ui_click, type the path with ui_type, then confirm.",
-                CreateDiagnostics(stopwatch));
+            var pathEntered = await DeterministicWait.UntilAsync(
+                async () =>
+                {
+                    if (!(await clipboard.SetTextAsync(normalizedPath, cancellationToken)).Success)
+                    {
+                        return false;
+                    }
+
+                    await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                    _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+                    await _keyboardService.PressKeyAsync("v", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                    _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+                    return await _staThread.ExecuteAsync(
+                        () =>
+                        {
+                            var currentValue = editField.TryGetValue();
+                            return currentValue != null &&
+                                (string.Equals(currentValue.Trim(), normalizedPath, StringComparison.OrdinalIgnoreCase) ||
+                                 currentValue.EndsWith(Path.GetFileName(normalizedPath), StringComparison.OrdinalIgnoreCase));
+                        },
+                        cancellationToken);
+                },
+                TimeSpan.FromSeconds(5),
+                TimeSpan.FromMilliseconds(100),
+                transientException: exception => exception is COMException,
+                cancellationToken: cancellationToken);
+
+            if (!pathEntered)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open",
+                    UIAutomationErrorType.Timeout,
+                    $"Could not enter '{normalizedPath}' into the Open dialog's File name field reliably. " +
+                    "Open the dialog manually with ui_click, type the path with ui_type, then confirm.",
+                    CreateDiagnostics(stopwatch));
+            }
+        }
+        finally
+        {
+            // Restore whatever the user had on the clipboard before the operation.
+            _ = await clipboard.SetTextAsync(savedClipboard ?? string.Empty, cancellationToken);
         }
 
         var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
