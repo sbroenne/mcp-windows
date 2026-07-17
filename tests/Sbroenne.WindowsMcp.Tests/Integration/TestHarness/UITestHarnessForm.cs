@@ -60,6 +60,11 @@ public sealed class UITestHarnessForm : Form
     public int SemanticControlMouseInputCount { get; private set; }
 
     /// <summary>
+    /// Gets the number of times the physical-fallback target panel was clicked.
+    /// </summary>
+    public int PhysicalFallbackClickCount => _physicalFallbackClickCount;
+
+    /// <summary>
     /// Gets the number of times the cancel button was clicked.
     /// </summary>
     public int CancelClickCount { get; private set; }

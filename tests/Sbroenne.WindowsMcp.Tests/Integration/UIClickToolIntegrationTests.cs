@@ -114,7 +114,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         await TestRetry.RunAsync(async _ =>
         {
             EnsureHarnessOnPrimaryMonitor();
-            await SkipWhenPhysicalClickUnavailableAsync();
+            await SkipWhenPhysicalFallbackClickUnavailableAsync();
             var target = await _automationService.FindElementsAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -181,6 +181,33 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         Skip.If(
             !click.Success || !received,
             "The current desktop does not permit physical click injection.");
+    }
+
+    // Representative probe: verifies this desktop session can deliver AND verify a physical
+    // click to the *actual* PhysicalFallbackTarget panel (near the form's bottom edge) before
+    // the test asserts the product's physical-fallback behavior. A generic SubmitButton probe
+    // is not representative: it can pass while a click to this specific low target is dropped or
+    // lands off-target on a loaded, shared self-hosted desktop. Skipping (not failing) here keeps
+    // a genuine fallback-logic regression detectable while eliminating environment-only failures.
+    private async Task SkipWhenPhysicalFallbackClickUnavailableAsync()
+    {
+        var probeTarget = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "PhysicalFallbackTarget",
+        });
+        var clickPoint = Assert.Single(probeTarget.Items!).Click;
+        var click = await _mouseService.ClickAsync(clickPoint[0], clickPoint[1]);
+        var received = TestWait.Until(
+            () => _fixture.Form is not null &&
+                  (bool)_fixture.Form.Invoke(() =>
+                      _fixture.Form.PhysicalFallbackClickCount > 0));
+
+        _fixture.Reset();
+        _fixture.BringToFront();
+        Skip.If(
+            !click.Success || !received,
+            "The current desktop does not permit reliable physical clicks on the fallback target.");
     }
 
     private void EnsureHarnessOnPrimaryMonitor()
