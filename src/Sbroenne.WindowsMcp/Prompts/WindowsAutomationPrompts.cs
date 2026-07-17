@@ -40,7 +40,7 @@ public sealed class WindowsAutomationPrompts
                 "• Find: ui_find(windowHandle='<handle>', nameContains='...') — discover elements\n" +
                 "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
                 "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
-                "• Read: ui_read(windowHandle='<handle>', elementId='...') — get text content\n" +
+                "• Read: ui_read(windowHandle='<handle>', nameContains='...') — get text content\n" +
 
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "\n" +
@@ -214,9 +214,9 @@ public sealed class WindowsAutomationPrompts
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
                 "Verification options (choose the most deterministic):\n" +
-                "1) window_management(action='wait_for_close', handle=...) — verify window/dialog closed.\n" +
+                "1) window_management(action='list', filter='...') — verify a closed window/dialog is absent.\n" +
                 "2) ui_find(windowHandle='<handle>', nameContains='...') — verify element exists (has built-in timeout).\n" +
-                "4) ui_read(windowHandle='<handle>', elementId=...) — check text content changed.\n" +
+                "3) ui_read(windowHandle='<handle>', nameContains='...') — check text content changed.\n" +
                 "5) screenshot_control(target='window', windowHandle='<handle>', annotate=true) — visual element discovery.\n" +
                 "6) ui_read(windowHandle='<handle>') — for custom-rendered text (uses OCR fallback).")
         ];
@@ -294,7 +294,7 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 "MANUAL WORKFLOW if file_save fails:\n" +
                 "1) keyboard_control(action='press', key='s', modifiers='ctrl') — trigger Ctrl+S\n" +
-                "2) window_management(action='get_modal_windows', handle='<parent_handle>') — discover Save As dialog\n" +
+                "2) window_management(action='find', title='Save As') — discover Save As dialog\n" +
                 "3) Use modal window handle with ui_type, ui_click:\n" +
                 "   - ui_type(windowHandle='<modal_handle>', controlType='Edit', text='<filename>')\n" +
                 "   - ui_click(windowHandle='<modal_handle>', nameContains='Save')\n" +
@@ -327,8 +327,8 @@ public sealed class WindowsAutomationPrompts
                 $"First: window_management(action='find', title='{windowTitle}') → get handle\n" +
                 "\n" +
                 "Choose the appropriate wait approach:\n" +
-                "• window_disappear: window_management(action='wait_for_close', handle='...')\n" +
-                "  Use for: dialogs closing, popups dismissing.\n" +
+                "• window_disappear: window_management(action='list', filter='...') and confirm the handle is absent.\n" +
+                "  Use for: dialogs closing and popups dismissing; wait_for_state is only for state changes on a window that still exists.\n" +
                 "\n" +
                 "• element_appear: ui_find(windowHandle='<handle>', nameContains='...', timeoutMs=5000)\n" +
                 "  Use for: waiting for elements to appear (built-in retry with timeout).\n" +

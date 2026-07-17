@@ -84,8 +84,18 @@ public static partial class KeyboardControlTool
                         $"Failed to activate window {windowHandle}: {activationResult.Error}"));
             }
 
-            // Small delay to let the window settle after activation
-            await Task.Delay(50, linkedToken);
+            var activated = await DeterministicWait.UntilAsync(
+                () => NativeMethods.GetForegroundWindow() == handle,
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(25),
+                cancellationToken: linkedToken);
+            if (!activated)
+            {
+                return ToCallToolResult(
+                    KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        $"Window {windowHandle} did not become the foreground window."));
+            }
 
             KeyboardControlResult operationResult;
 
@@ -201,8 +211,7 @@ public static partial class KeyboardControlTool
                     $"Failed to select all before typing: {selectAllResult.Error}");
             }
 
-            // Small delay to ensure selection is complete
-            await Task.Delay(50, cancellationToken);
+            _ = await WindowsToolsBase.KeyboardInputService.WaitForIdleAsync(cancellationToken);
         }
 
         // Normalize Windows file paths: convert forward slashes to backslashes

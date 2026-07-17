@@ -2,6 +2,7 @@ using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Utilities;
 
 namespace Sbroenne.WindowsMcp.Window;
 
@@ -659,8 +660,17 @@ public sealed class WindowService
 
         NativeMethods.ShowWindow(handle, showCommand);
 
-        // Brief delay to allow window to settle
-        await Task.Delay(50, cancellationToken);
+        _ = await DeterministicWait.UntilAsync(
+            () => action switch
+            {
+                WindowAction.Minimize => NativeMethods.IsIconic(handle),
+                WindowAction.Maximize => NativeMethods.IsZoomed(handle),
+                WindowAction.Restore => !NativeMethods.IsIconic(handle) && !NativeMethods.IsZoomed(handle),
+                _ => true
+            },
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromMilliseconds(25),
+            cancellationToken: cancellationToken);
 
         // Get updated window info
         var updatedInfo = await _enumerator.GetWindowInfoAsync(handle, cancellationToken);

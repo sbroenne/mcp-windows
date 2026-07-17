@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Native;
+using Sbroenne.WindowsMcp.Utilities;
 
 namespace Sbroenne.WindowsMcp.Window;
 
@@ -42,7 +43,11 @@ public sealed class WindowActivator
         if (NativeMethods.IsIconic(handle))
         {
             NativeMethods.ShowWindow(handle, NativeConstants.SW_RESTORE);
-            await Task.Delay(50, cancellationToken);
+            _ = await DeterministicWait.UntilAsync(
+                () => !NativeMethods.IsIconic(handle),
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(25),
+                cancellationToken: cancellationToken);
 
             // Restore saved bounds since SW_RESTORE may have moved the window
             if (hasSavedBounds)
@@ -211,9 +216,17 @@ public sealed class WindowActivator
     {
         // This is a last-resort strategy that briefly minimizes the window
         NativeMethods.ShowWindow(handle, NativeConstants.SW_MINIMIZE);
-        await Task.Delay(50, cancellationToken);
+        _ = await DeterministicWait.UntilAsync(
+            () => NativeMethods.IsIconic(handle),
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromMilliseconds(25),
+            cancellationToken: cancellationToken);
         NativeMethods.ShowWindow(handle, NativeConstants.SW_RESTORE);
-        await Task.Delay(50, cancellationToken);
+        _ = await DeterministicWait.UntilAsync(
+            () => !NativeMethods.IsIconic(handle),
+            TimeSpan.FromMilliseconds(500),
+            TimeSpan.FromMilliseconds(25),
+            cancellationToken: cancellationToken);
 
         // Restore the original bounds if we saved them
         // This is critical for multi-monitor setups

@@ -14,6 +14,7 @@ public sealed class UITestHarnessForm : Form
     private readonly TextBox _passwordInput;
     private readonly Button _submitButton;
     private readonly Button _cancelButton;
+    private readonly Label _submitMouseInputLabel;
     private readonly CheckBox _checkBox1;
     private readonly CheckBox _checkBox2;
     private readonly CheckBox _checkBox3;
@@ -23,6 +24,8 @@ public sealed class UITestHarnessForm : Form
     private readonly ComboBox _comboBox;
     private readonly TrackBar _slider;
     private readonly ProgressBar _progressBar;
+    private readonly Panel _physicalFallbackTarget;
+    private int _physicalFallbackClickCount;
 
     // List View Tab
     private readonly ListView _listView;
@@ -47,9 +50,24 @@ public sealed class UITestHarnessForm : Form
     public int SubmitClickCount { get; private set; }
 
     /// <summary>
+    /// Gets the number of physical mouse-up events received by the submit button.
+    /// </summary>
+    public int SubmitMouseInputCount { get; private set; }
+
+    /// <summary>
+    /// Gets the number of physical mouse-up events received by semantic state controls.
+    /// </summary>
+    public int SemanticControlMouseInputCount { get; private set; }
+
+    /// <summary>
     /// Gets the number of times the cancel button was clicked.
     /// </summary>
     public int CancelClickCount { get; private set; }
+
+    /// <summary>
+    /// Gets the current status text.
+    /// </summary>
+    public string StatusText => _statusLabel.Text;
 
     /// <summary>
     /// Gets the current text in the username input.
@@ -128,6 +146,7 @@ public sealed class UITestHarnessForm : Form
             Size = new Size(660, 25),
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
             ForeColor = Color.DarkGreen,
+            Name = "StatusLabel",
         };
         Controls.Add(_statusLabel);
 
@@ -190,7 +209,7 @@ public sealed class UITestHarnessForm : Form
         {
             Text = "Actions",
             Location = new Point(320, 10),
-            Size = new Size(310, 100),
+            Size = new Size(310, 110),
             Name = "ActionsGroup",
         };
         formControlsTab.Controls.Add(buttonsGroup);
@@ -202,8 +221,49 @@ public sealed class UITestHarnessForm : Form
             Size = new Size(90, 35),
             Name = "SubmitButton",
         };
+        _submitMouseInputLabel = new Label
+        {
+            Text = "0",
+            Location = new Point(10, 72),
+            Size = new Size(30, 20),
+            Name = "SubmitMouseInputLabel",
+        };
+        buttonsGroup.Controls.Add(_submitMouseInputLabel);
         _submitButton.Click += (_, _) => { SubmitClickCount++; UpdateStatus($"Submit clicked ({SubmitClickCount} times)"); };
+        _submitButton.MouseUp += (_, _) =>
+        {
+            SubmitMouseInputCount++;
+            _submitMouseInputLabel.Text = SubmitMouseInputCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        };
         buttonsGroup.Controls.Add(_submitButton);
+
+        _physicalFallbackTarget = new Panel
+        {
+            Location = new Point(10, 375),
+            Size = new Size(300, 40),
+            Name = "PhysicalFallbackTarget",
+            BorderStyle = BorderStyle.FixedSingle,
+            AccessibleName = "Physical fallback",
+            BackColor = Color.AliceBlue,
+        };
+        _physicalFallbackTarget.Click += (_, _) =>
+        {
+            _physicalFallbackClickCount++;
+            _physicalFallbackTarget.AccessibleName = $"Physical fallback clicked {_physicalFallbackClickCount}";
+            UpdateStatus("Physical fallback clicked");
+        };
+        formControlsTab.Controls.Add(_physicalFallbackTarget);
+
+        var inertTarget = new Panel
+        {
+            Location = new Point(320, 375),
+            Size = new Size(300, 40),
+            Name = "InertTarget",
+            BorderStyle = BorderStyle.FixedSingle,
+            AccessibleName = "Inert target",
+            BackColor = Color.WhiteSmoke,
+        };
+        formControlsTab.Controls.Add(inertTarget);
 
         _cancelButton = new Button
         {
@@ -244,6 +304,7 @@ public sealed class UITestHarnessForm : Form
             Checked = true,
         };
         _checkBox1.CheckedChanged += (_, _) => UpdateStatus($"Notifications: {_checkBox1.Checked}");
+        _checkBox1.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         optionsGroup.Controls.Add(_checkBox1);
 
         _checkBox2 = new CheckBox
@@ -254,6 +315,7 @@ public sealed class UITestHarnessForm : Form
             Name = "AutosaveCheckbox",
         };
         _checkBox2.CheckedChanged += (_, _) => UpdateStatus($"Auto-save: {_checkBox2.Checked}");
+        _checkBox2.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         optionsGroup.Controls.Add(_checkBox2);
 
         _checkBox3 = new CheckBox
@@ -264,6 +326,7 @@ public sealed class UITestHarnessForm : Form
             Name = "DarkModeCheckbox",
         };
         _checkBox3.CheckedChanged += (_, _) => UpdateStatus($"Dark Mode: {_checkBox3.Checked}");
+        _checkBox3.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         optionsGroup.Controls.Add(_checkBox3);
 
         // Size Selection group (radio buttons + nested Priority group)
@@ -290,6 +353,7 @@ public sealed class UITestHarnessForm : Form
                 UpdateStatus("Size: Small");
             }
         };
+        _radioSmall.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         sizeGroup.Controls.Add(_radioSmall);
 
         _radioMedium = new RadioButton
@@ -307,6 +371,7 @@ public sealed class UITestHarnessForm : Form
                 UpdateStatus("Size: Medium");
             }
         };
+        _radioMedium.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         sizeGroup.Controls.Add(_radioMedium);
 
         _radioLarge = new RadioButton
@@ -323,6 +388,7 @@ public sealed class UITestHarnessForm : Form
                 UpdateStatus("Size: Large");
             }
         };
+        _radioLarge.MouseUp += (_, _) => SemanticControlMouseInputCount++;
         sizeGroup.Controls.Add(_radioLarge);
 
         // Nested Priority group
@@ -598,6 +664,11 @@ public sealed class UITestHarnessForm : Form
     public void Reset()
     {
         SubmitClickCount = 0;
+        SubmitMouseInputCount = 0;
+        SemanticControlMouseInputCount = 0;
+        _physicalFallbackClickCount = 0;
+        _physicalFallbackTarget.AccessibleName = "Physical fallback";
+        _submitMouseInputLabel.Text = "0";
         CancelClickCount = 0;
         _usernameInput.Clear();
         _passwordInput.Clear();

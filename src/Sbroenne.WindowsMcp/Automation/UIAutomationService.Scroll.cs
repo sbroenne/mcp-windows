@@ -66,44 +66,41 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            return await _staThread.ExecuteAsync(() =>
+            var rootElement = await _staThread.ExecuteAsync(
+                () => GetRootElementForScroll(element),
+                cancellationToken);
+
+            var scrollResult = await _staThread.ExecuteAsync(
+                () => TryScrollItemPattern(element),
+                cancellationToken);
+            if (scrollResult.success)
             {
-                var rootElement = GetRootElementForScroll(element);
-
-                var scrollResult = TryScrollItemPattern(element);
-                if (scrollResult.success)
+                var verified = await WaitForElementConditionAsync(
+                    element,
+                    () => !element.IsOffscreen(),
+                    cancellationToken,
+                    TimeSpan.FromMilliseconds(Math.Min(timeoutMs, 500)));
+                if (verified.Observed)
                 {
-                    var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
-                    if (elementInfo == null)
-                    {
-                        // Scroll succeeded but element became unavailable (e.g., dialog closed).
-                        // This is expected behavior for elements that close their parent window.
-                        return UIAutomationResult.CreateSuccessWithHint("scroll_into_view", "Scroll succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
-                    }
-
-                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
+                    return await CreateScrollSuccessAsync(element, rootElement, stopwatch, cancellationToken);
                 }
+            }
 
-                var scrollResult2 = TryScrollParentToElement(element, stopwatch.ElapsedMilliseconds, timeoutMs);
-                if (scrollResult2.success)
-                {
-                    var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
-                    if (elementInfo == null)
-                    {
-                        // Scroll succeeded but element became unavailable (e.g., dialog closed).
-                        // This is expected behavior for elements that close their parent window.
-                        return UIAutomationResult.CreateSuccessWithHint("scroll_into_view", "Scroll succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
-                    }
+            var parentScrollResult = await TryScrollParentToElementAsync(
+                element,
+                stopwatch.ElapsedMilliseconds,
+                timeoutMs,
+                cancellationToken);
+            if (parentScrollResult.success)
+            {
+                return await CreateScrollSuccessAsync(element, rootElement, stopwatch, cancellationToken);
+            }
 
-                    return UIAutomationResult.CreateSuccessCompact("scroll_into_view", [elementInfo], CreateDiagnostics(stopwatch));
-                }
-
-                return UIAutomationResult.CreateFailure(
-                    "scroll_into_view",
-                    UIAutomationErrorType.PatternNotSupported,
-                    scrollResult2.errorMessage ?? "Element does not support scrolling and no scrollable parent was found.",
-                    CreateDiagnostics(stopwatch));
-            }, cancellationToken);
+            return UIAutomationResult.CreateFailure(
+                "scroll_into_view",
+                UIAutomationErrorType.PatternNotSupported,
+                parentScrollResult.errorMessage ?? scrollResult.errorMessage ?? "Element does not support scrolling and no scrollable parent was found.",
+                CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
         {
@@ -149,76 +146,106 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private static (bool success, string? errorMessage) TryScrollParentToElement(UIA.IUIAutomationElement element, long elapsedMs, int timeoutMs)
+    private async Task<(bool success, string? errorMessage)> TryScrollParentToElementAsync(
+        UIA.IUIAutomationElement element,
+        long elapsedMs,
+        int timeoutMs,
+        CancellationToken cancellationToken)
     {
         try
         {
-            var parent = element.GetParent();
+            var remainingTimeout = TimeSpan.FromMilliseconds(Math.Max(1, timeoutMs - elapsedMs));
+            var stopwatch = Stopwatch.StartNew();
+            var parent = await _staThread.ExecuteAsync(() => element.GetParent(), cancellationToken);
 
             while (parent != null)
             {
-                var scrollPattern = parent.GetPattern<UIA.IUIAutomationScrollPattern>(UIA3PatternIds.Scroll);
+                var scrollPattern = await _staThread.ExecuteAsync(
+                    () => parent.GetPattern<UIA.IUIAutomationScrollPattern>(UIA3PatternIds.Scroll),
+                    cancellationToken);
                 if (scrollPattern != null)
                 {
-                    if (!element.IsOffscreen())
+                    if (await _staThread.ExecuteAsync(() => !element.IsOffscreen(), cancellationToken))
                     {
                         return (true, null);
                     }
 
-                    var elementRect = element.GetBoundingRectangle();
-                    var parentRect = parent.GetBoundingRectangle();
+                    var rectangles = await _staThread.ExecuteAsync(
+                        () => (Element: element.GetBoundingRectangle(), Parent: parent.GetBoundingRectangle()),
+                        cancellationToken);
+                    var elementRect = rectangles.Element;
+                    var parentRect = rectangles.Parent;
 
                     if (elementRect.Width == 0 || parentRect.Width == 0)
                     {
-                        scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeIncrement);
-                        Thread.Sleep(100);
-                        return (!element.IsOffscreen(), null);
+                        var previousPercent = await _staThread.ExecuteAsync(
+                            () =>
+                            {
+                                var percent = scrollPattern.CurrentVerticalScrollPercent;
+                                scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeIncrement);
+                                return percent;
+                            },
+                            cancellationToken);
+                        _ = await WaitForElementConditionAsync(
+                            element,
+                            () =>
+                                !element.IsOffscreen() ||
+                                scrollPattern.CurrentVerticalScrollPercent != previousPercent,
+                            cancellationToken,
+                            Min(remainingTimeout, TimeSpan.FromMilliseconds(250)));
+                        return (await _staThread.ExecuteAsync(() => !element.IsOffscreen(), cancellationToken), null);
                     }
 
                     var scrollAttempts = 0;
                     const int MaxAttempts = 50;
 
-                    while (scrollAttempts < MaxAttempts && elapsedMs < timeoutMs)
+                    while (scrollAttempts < MaxAttempts && stopwatch.Elapsed < remainingTimeout)
                     {
-                        if (!element.IsOffscreen())
+                        if (await _staThread.ExecuteAsync(() => !element.IsOffscreen(), cancellationToken))
                         {
                             return (true, null);
                         }
 
-                        elementRect = element.GetBoundingRectangle();
-                        parentRect = parent.GetBoundingRectangle();
-
-                        if (elementRect.Y < parentRect.Y)
+                        var scrollStep = await _staThread.ExecuteAsync(() =>
                         {
-                            if (scrollPattern.CurrentVerticalScrollPercent <= 0)
+                            elementRect = element.GetBoundingRectangle();
+                            parentRect = parent.GetBoundingRectangle();
+                            var previous = scrollPattern.CurrentVerticalScrollPercent;
+                            if (elementRect.Y < parentRect.Y && previous > 0)
                             {
-                                break;
+                                scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeDecrement);
+                                return (Scrolled: true, PreviousPercent: previous);
                             }
-
-                            scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeDecrement);
-                        }
-                        else if (elementRect.Y + elementRect.Height > parentRect.Y + parentRect.Height)
-                        {
-                            if (scrollPattern.CurrentVerticalScrollPercent >= 100)
+                            if (elementRect.Y + elementRect.Height > parentRect.Y + parentRect.Height && previous < 100)
                             {
-                                break;
+                                scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeIncrement);
+                                return (Scrolled: true, PreviousPercent: previous);
                             }
-
-                            scrollPattern.Scroll(UIA.ScrollAmount.ScrollAmount_NoAmount, UIA.ScrollAmount.ScrollAmount_LargeIncrement);
-                        }
-                        else
+                            return (Scrolled: false, PreviousPercent: previous);
+                        }, cancellationToken);
+                        if (!scrollStep.Scrolled)
                         {
                             break;
                         }
 
-                        Thread.Sleep(50);
+                        var waitBudget = remainingTimeout - stopwatch.Elapsed;
+                        if (waitBudget > TimeSpan.Zero)
+                        {
+                            _ = await WaitForElementConditionAsync(
+                                element,
+                                () =>
+                                    !element.IsOffscreen() ||
+                                    scrollPattern.CurrentVerticalScrollPercent != scrollStep.PreviousPercent,
+                                cancellationToken,
+                                Min(waitBudget, TimeSpan.FromMilliseconds(250)));
+                        }
                         scrollAttempts++;
                     }
 
-                    return (!element.IsOffscreen(), null);
+                    return (await _staThread.ExecuteAsync(() => !element.IsOffscreen(), cancellationToken), null);
                 }
 
-                parent = parent.GetParent();
+                parent = await _staThread.ExecuteAsync(() => parent.GetParent(), cancellationToken);
             }
 
             return (false, "No scrollable parent found.");
@@ -232,6 +259,28 @@ public sealed partial class UIAutomationService
             return (false, $"Parent scroll failed: {ex.Message}");
         }
     }
+
+    private async Task<UIAutomationResult> CreateScrollSuccessAsync(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken) =>
+        await _staThread.ExecuteAsync(() =>
+        {
+            var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null);
+            return elementInfo == null
+                ? UIAutomationResult.CreateSuccessWithHint(
+                    "scroll_into_view",
+                    "Scroll succeeded. Element closed its parent window.",
+                    CreateDiagnostics(stopwatch))
+                : UIAutomationResult.CreateSuccessCompact(
+                    "scroll_into_view",
+                    [elementInfo],
+                    CreateDiagnostics(stopwatch));
+        }, cancellationToken);
+
+    private static TimeSpan Min(TimeSpan left, TimeSpan right) =>
+        left < right ? left : right;
 
     private static UIA.IUIAutomationElement GetRootElementForScroll(UIA.IUIAutomationElement element)
     {

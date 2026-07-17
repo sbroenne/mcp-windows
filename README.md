@@ -27,7 +27,7 @@ ui_click(windowHandle='123456', nameContains='Save')
 ui_type(windowHandle='123456', controlType='Edit', text='Hello World')
 
 # 4. Fallback for games/canvas — screenshot + mouse
-screenshot_control(windowHandle='123456') → element coordinates
+screenshot_control(target='window', windowHandle='123456') → element coordinates
 mouse_control(action='click', x=450, y=300)
 ```
 

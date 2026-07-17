@@ -4,6 +4,7 @@ using System.Runtime.Versioning;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Sbroenne.WindowsMcp.Utilities;
 
 namespace Sbroenne.WindowsMcp.Tools;
 
@@ -164,9 +165,16 @@ public static partial class AppTool
                 var timeout = timeoutMs ?? WindowsToolsBase.TimeoutMs;
                 var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
 
-                // First, give the process a brief moment to see if it's a stub
-                // UWP stubs like calc.exe exit almost immediately (< 100ms)
-                await Task.Delay(StubDetectionDelayMs, cancellationToken);
+                // Observe early process/window state to detect UWP launcher stubs.
+                _ = await DeterministicWait.UntilAsync(
+                    () =>
+                    {
+                        process.Refresh();
+                        return process.HasExited || process.MainWindowHandle != IntPtr.Zero;
+                    },
+                    TimeSpan.FromMilliseconds(StubDetectionDelayMs),
+                    TimeSpan.FromMilliseconds(20),
+                    cancellationToken: cancellationToken);
                 process.Refresh();
 
                 // Check early if this is a stub pattern (process exited quickly with success)
@@ -209,8 +217,6 @@ public static partial class AppTool
                                 windowInfo,
                                 $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
                         }
-
-                        await Task.Delay(50, cancellationToken);
                     }
 
                     // Fallback: Search for any visible window owned by this process

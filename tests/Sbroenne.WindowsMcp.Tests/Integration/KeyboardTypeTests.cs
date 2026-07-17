@@ -351,5 +351,3 @@ public class KeyboardTypeTests : IDisposable
 
     #endregion
 }
-
-

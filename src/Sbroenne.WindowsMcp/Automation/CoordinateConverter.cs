@@ -98,4 +98,5 @@ public sealed class CoordinateConverter
         var primary = _monitorService.GetPrimaryMonitor();
         return new Capture.Point { X = primary.X, Y = primary.Y };
     }
+
 }

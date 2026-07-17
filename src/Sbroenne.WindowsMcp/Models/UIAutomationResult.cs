@@ -254,10 +254,10 @@ public sealed record UIAutomationResult
         // For find actions, provide element usage guidance
         if (elements.Length == 1)
         {
-            return $"Use elementId='{elements[0].ElementId}' for subsequent actions. Always use ui_click/ui_find for UI operations.";
+            return "Use the returned name, automationId, and controlType with ui_click or ui_type. Always use ui_click/ui_find for UI operations.";
         }
 
-        return $"Found {elements.Length} elements. Use elementId from Items for actions. Always use ui_click/ui_find for UI operations.";
+        return $"Found {elements.Length} elements. Use their selectors and foundIndex with ui_click or ui_type. Always use ui_click/ui_find for UI operations.";
     }
 
     /// <summary>
@@ -359,7 +359,7 @@ public sealed record UIAutomationResult
             "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",
 
         UIAutomationErrorType.ElementStale =>
-            "Element reference expired. Use find action to get a fresh elementId.",
+            "Element reference expired. Run ui_find again and use the refreshed selectors.",
 
         UIAutomationErrorType.ElevatedTarget =>
             "Target window runs as Administrator. Run MCP server elevated or target a non-admin window.",
