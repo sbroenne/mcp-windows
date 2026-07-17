@@ -8,6 +8,7 @@ tsconfig.json
 # Development files
 .vscode/**
 node_modules/**
+test/**
 *.ts
 *.map
 eslint.config.mjs

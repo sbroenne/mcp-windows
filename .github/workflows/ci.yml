@@ -6,6 +6,7 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'vscode-extension/**'
       - '*.sln'
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
@@ -16,6 +17,7 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
+      - 'vscode-extension/**'
       - '*.sln'
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
@@ -30,6 +32,35 @@ permissions:
   contents: read
 
 jobs:
+  vscode-extension:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v7
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: vscode-extension/package-lock.json
+
+    - name: Install Dependencies
+      working-directory: vscode-extension
+      run: npm ci --no-audit --no-fund
+
+    - name: Check Manifest Compatibility
+      working-directory: vscode-extension
+      run: npm test
+
+    - name: Lint
+      working-directory: vscode-extension
+      run: npm run lint
+
+    - name: Compile
+      working-directory: vscode-extension
+      run: npm run compile
+
   build-and-test:
     runs-on: windows-latest
 
