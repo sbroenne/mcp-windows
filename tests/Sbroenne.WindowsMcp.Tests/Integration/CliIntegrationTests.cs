@@ -181,11 +181,170 @@ public sealed class CliIntegrationTests
         Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
     }
 
+    [Trait("Category", "RequiresDesktop")]
+    [Fact]
+    public async Task Cli_Clipboard_SetGetClear_RoundTrips()
+    {
+        var payload = $"wincli-clip-{Guid.NewGuid():N}";
+
+        var (setCode, setOut, _) = await RunAsync("clipboard", "set", "--text", payload);
+        Assert.Equal(0, setCode);
+        Assert.True(SuccessOf(setOut), setOut);
+
+        var (getCode, getOut, _) = await RunAsync("clipboard", "get");
+        Assert.Equal(0, getCode);
+        using (var doc = JsonDocument.Parse(getOut))
+        {
+            Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), getOut);
+            Assert.Equal(payload, doc.RootElement.GetProperty("text").GetString());
+        }
+
+        var (clearCode, clearOut, _) = await RunAsync("clipboard", "clear");
+        Assert.Equal(0, clearCode);
+        Assert.True(SuccessOf(clearOut), clearOut);
+
+        var (_, afterClear, _) = await RunAsync("clipboard", "get");
+        using (var doc = JsonDocument.Parse(afterClear))
+        {
+            Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), afterClear);
+            Assert.False(doc.RootElement.GetProperty("hasText").GetBoolean(), afterClear);
+        }
+    }
+
+    [Trait("Category", "RequiresDesktop")]
+    [Fact]
+    public async Task Cli_ClipboardGet_MatchesMcpServerOutputExactly()
+    {
+        // Seed a deterministic value so both entry points observe the same clipboard state.
+        await Sbroenne.WindowsMcp.Clipboard.Tools.ClipboardTool.ExecuteAsync(
+            Sbroenne.WindowsMcp.Models.ClipboardAction.Set, "parity-probe", CancellationToken.None);
+
+        var direct = await Sbroenne.WindowsMcp.Clipboard.Tools.ClipboardTool.ExecuteAsync(
+            Sbroenne.WindowsMcp.Models.ClipboardAction.Get, text: null, CancellationToken.None);
+        var directText = direct.Content
+            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .Single().Text;
+
+        var (code, stdout, _) = await RunAsync("clipboard", "get");
+
+        Assert.Equal(0, code);
+        Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
+    }
+
+    [Trait("Category", "RequiresDesktop")]
+    [Fact]
+    public async Task Cli_FileOpen_DrivesOpenDialog()
+    {
+        var testFilePath = Path.Combine(Path.GetTempPath(), $"wincli-open-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(testFilePath, "cli open content");
+        try
+        {
+            _fixture.BringToFront();
+            await Task.Delay(500);
+
+            var (code, stdout, _) = await RunAsync("file-open", "--window", _windowHandle, "--path", testFilePath);
+
+            Assert.Equal(0, code);
+            Assert.True(SuccessOf(stdout), stdout);
+
+            await Task.Delay(300);
+            var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
+            Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+        }
+        finally
+        {
+            if (File.Exists(testFilePath))
+            {
+                File.Delete(testFilePath);
+            }
+        }
+    }
+
+    [Trait("Category", "RequiresDesktop")]
+    [Fact]
+    public async Task Cli_FileOpen_MatchesMcpServerOutputExactly()
+    {
+        var testFilePath = Path.Combine(Path.GetTempPath(), $"wincli-open-parity-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(testFilePath, "parity");
+        try
+        {
+            // Both entry points must reject a nonexistent window handle identically.
+            var direct = await UIOpenFileTool.ExecuteAsync("0", testFilePath, includeDiagnostics: false, CancellationToken.None);
+            var directText = direct.Content
+                .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+                .Single().Text;
+
+            var (_, stdout, _) = await RunAsync("file-open", "--window", "0", "--path", testFilePath);
+
+            Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
+        }
+        finally
+        {
+            if (File.Exists(testFilePath))
+            {
+                File.Delete(testFilePath);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Cli_Macro_SaveListGetDelete_RoundTrips()
+    {
+        var name = "cli-macro-" + Guid.NewGuid().ToString("N");
+        const string steps = "[{\"action\":\"click\",\"name\":\"Submit\"}]";
+        try
+        {
+            var (saveCode, saveOut, _) = await RunAsync("macro", "save", "--name", name, "--steps", steps);
+            Assert.Equal(0, saveCode);
+            Assert.True(SuccessOf(saveOut), saveOut);
+
+            var (listCode, listOut, _) = await RunAsync("macro", "list");
+            Assert.Equal(0, listCode);
+            Assert.Contains(name, listOut, StringComparison.Ordinal);
+
+            var (getCode, getOut, _) = await RunAsync("macro", "get", "--name", name);
+            Assert.Equal(0, getCode);
+            using (var doc = JsonDocument.Parse(getOut))
+            {
+                Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), getOut);
+                Assert.Equal(1, doc.RootElement.GetProperty("stepCount").GetInt32());
+                Assert.Equal(JsonValueKind.Array, doc.RootElement.GetProperty("steps").ValueKind);
+            }
+
+            var (delCode, delOut, _) = await RunAsync("macro", "delete", "--name", name);
+            Assert.Equal(0, delCode);
+            Assert.True(SuccessOf(delOut), delOut);
+        }
+        finally
+        {
+            await RunAsync("macro", "delete", "--name", name);
+        }
+    }
+
+    [Fact]
+    public async Task Cli_MacroRun_MissingMacro_MatchesMcpServerOutputExactly()
+    {
+        var name = "missing-" + Guid.NewGuid().ToString("N");
+
+        // Both entry points must produce identical output for a run against a nonexistent macro.
+        var direct = await Sbroenne.WindowsMcp.Macros.Tools.UIMacroTool.ExecuteAsync(
+            Sbroenne.WindowsMcp.Models.MacroAction.Run, name, steps: null, windowHandle: _windowHandle,
+            stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+        var directText = direct.Content
+            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
+            .Single().Text;
+
+        var (code, stdout, _) = await RunAsync("macro", "run", "--name", name, "--window", _windowHandle);
+
+        Assert.Equal(1, code);
+        Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
+    }
+
     [Fact]
     public void Cli_HelpAndTools_AreNonEmptyAndCoverAllGroups()
     {
         Assert.Contains("wincli", HelpText.Usage, StringComparison.Ordinal);
-        foreach (var group in new[] { "app", "window", "ui", "keyboard", "mouse", "screenshot", "file-save" })
+        foreach (var group in new[] { "app", "window", "ui", "keyboard", "mouse", "screenshot", "clipboard", "macro", "file-save", "file-open" })
         {
             Assert.Contains(group, HelpText.Usage, StringComparison.Ordinal);
             Assert.Contains(group, HelpText.Tools, StringComparison.Ordinal);

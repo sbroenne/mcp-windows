@@ -41,11 +41,14 @@ wincli <group> [<action>] [--option value] [--flag]
 | --- | --- |
 | `app` | Launch an application and return its window handle |
 | `window` | Manage windows (find, list, activate, move, close, …) |
-| `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `wait`, `batch`) |
+| `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `read-table`, `wait`, `batch`) |
 | `keyboard` | Send keystrokes (`type`, `press`, `sequence`, …) |
 | `mouse` | Mouse input (`move`, `click`, `drag`, `scroll`, …) |
 | `screenshot` | Capture screens/windows/regions (annotated element discovery by default) |
+| `clipboard` | Read/write the Windows clipboard (`get`, `set`, `clear`) |
+| `macro` | Record & replay UI workflows (`save`, `run`, `list`, `get`, `delete`) |
 | `file-save` | Save the active document (handles the Save As dialog) |
+| `file-open` | Open an existing file (handles the Open dialog) |
 
 ## Typical workflow
 
@@ -62,6 +65,10 @@ wincli ui click --window 12345 --name Submit --with-snapshot
 
 # Run an ordered sequence in one invocation
 wincli ui batch --window 12345 --steps '[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]'
+
+# Save that sequence as a macro, then replay it later against any window
+wincli macro save --name login --steps '[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]'
+wincli macro run --name login --window 12345
 ```
 
 ## Output & exit codes

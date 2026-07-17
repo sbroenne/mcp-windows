@@ -27,7 +27,10 @@ so there is no server session to keep alive).
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
 4. `wincli ui read-table --window <handle> --automation-id <grid>` to pull a grid/table/details-list into structured rows + headers in one call.
 5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
-6. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
+   Use `wincli file-open --window <handle> --path <file>` for Open flows.
+6. `wincli clipboard get|set|clear` for fast bulk text IO; `wincli macro save|run|list|get|delete`
+   to persist a `ui batch` sequence and replay it by name.
+7. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
 
 ## Patterns
 
@@ -42,6 +45,15 @@ so there is no server session to keep alive).
 ### Waiting
 - Use `ui wait --window <h> --name <x>` (or `--mode disappear`) instead of sleeping, so automation
   stays fast and deterministic after dialogs, navigation, or tab switches.
+
+### Macros (record & replay)
+- Save a proven `ui batch` sequence once: `wincli macro save --name login --steps '<json>'`.
+- Replay it against any window: `wincli macro run --name login --window <h>`.
+- Manage saved macros with `wincli macro list|get --name <x>|delete --name <x>`.
+
+### Clipboard
+- `wincli clipboard set --text "<value>"` then paste with `wincli keyboard press --key v --modifiers ctrl`.
+- Copy in the app (`wincli keyboard press --key c --modifiers ctrl`) then `wincli clipboard get` to read it.
 
 ### Exit codes (script on these)
 - `0` success, `1` tool error (inspect the JSON `error` field), `2` usage error (bad arguments).

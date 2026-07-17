@@ -1,4 +1,6 @@
 using Sbroenne.WindowsMcp.Automation.Tools;
+using Sbroenne.WindowsMcp.Clipboard.Tools;
+using Sbroenne.WindowsMcp.Macros.Tools;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -28,10 +30,20 @@ internal static class CommandDispatcher
                 return await ScreenshotAsync(args, ct);
             case "ui":
                 return await UiAsync(args, ct);
+            case "clipboard":
+            case "clip":
+                return await ClipboardAsync(args, ct);
+            case "macro":
+            case "ui-macro":
+                return await MacroAsync(args, ct);
             case "file-save":
             case "filesave":
             case "save":
                 return await FileSaveAsync(args, ct);
+            case "file-open":
+            case "fileopen":
+            case "open":
+                return await FileOpenAsync(args, ct);
             default:
                 return Emit.Usage($"unknown command '{args.Group}'.");
         }
@@ -170,6 +182,62 @@ internal static class CommandDispatcher
         var result = await UIFileTool.ExecuteAsync(
             Window(a) ?? string.Empty,
             a.GetString("path", "file-path", "file"),
+            a.GetFlag("include-diagnostics", "diagnostics"),
+            ct);
+        return Emit.Result(result);
+    }
+
+    private static async Task<int> FileOpenAsync(ParsedArgs a, CancellationToken ct)
+    {
+        var result = await UIOpenFileTool.ExecuteAsync(
+            Window(a) ?? string.Empty,
+            a.GetString("path", "file-path", "file") ?? string.Empty,
+            a.GetFlag("include-diagnostics", "diagnostics"),
+            ct);
+        return Emit.Result(result);
+    }
+
+    private static async Task<int> ClipboardAsync(ParsedArgs a, CancellationToken ct)
+    {
+        if (!EnumHelper.TryParse<ClipboardAction>(a.Action, out var action))
+        {
+            return Emit.Usage(
+                $"clipboard requires a valid action. One of: {string.Join(", ", EnumHelper.Tokens<ClipboardAction>())}.");
+        }
+
+        var result = await ClipboardTool.ExecuteAsync(
+            action,
+            a.GetString("text"),
+            ct);
+        return Emit.Result(result);
+    }
+
+    private static async Task<int> MacroAsync(ParsedArgs a, CancellationToken ct)
+    {
+        if (!EnumHelper.TryParse<MacroAction>(a.Action, out var action))
+        {
+            return Emit.Usage(
+                $"macro requires a valid action. One of: {string.Join(", ", EnumHelper.Tokens<MacroAction>())}.");
+        }
+
+        var steps = a.GetString("steps");
+        var stepsFile = a.GetString("steps-file");
+        if (steps is null && stepsFile is not null && File.Exists(stepsFile))
+        {
+            steps = await File.ReadAllTextAsync(stepsFile, ct);
+        }
+
+        var stopOnError = a.Has("continue-on-error") || a.Has("no-stop-on-error")
+            ? false
+            : a.GetBool("stop-on-error", true);
+
+        var result = await UIMacroTool.ExecuteAsync(
+            action,
+            a.GetString("name"),
+            steps,
+            Window(a),
+            stopOnError,
+            a.GetFlag("with-snapshot", "snapshot"),
             a.GetFlag("include-diagnostics", "diagnostics"),
             ct);
         return Emit.Result(result);

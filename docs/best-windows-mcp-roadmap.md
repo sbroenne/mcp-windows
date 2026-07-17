@@ -54,20 +54,36 @@ Three moats:
   scrollIntoView, RangeValue (sliders).
 
 ### 3. Reliability: event-driven, self-healing
-- `ui_wait` — wait for an element to appear/disappear/reach a state.
+- `ui_wait` — wait for an element to appear/disappear/reach a state. ✅ done (`ui_wait`)
 - UIA event subscriptions (window-open, focus-change, structure/property-changed) instead of
   polling — a genuine Windows superpower for deterministic waiting.
+  **Deferred (with rationale):** `ui_wait` and the auto-wait inside `ui_batch` already give
+  deterministic waits via short, bounded polling loops that are proven stable across Win32 / WinUI3 /
+  Electron on the CI desktop. Native `IUIAutomation.AddAutomationEventHandler` subscriptions must be
+  created and disposed on the STA thread, marshal callbacks back across threads, and are notoriously
+  leaky/racy with virtualized providers — a large, high-risk change for a latency win measured in tens
+  of milliseconds. We keep the reliable polling and revisit event subscriptions only if a concrete
+  workload shows polling latency as a real bottleneck.
 - Auto-wait inside actions (retry until actionable) and self-healing selectors (auto re-find on
   `ElementStale`).
 
 ### 4. Windows-native moat (the differentiator)
 - Structured data extraction via GridPattern/TablePattern/Selection → grids/tables/trees/lists
   as JSON rows/columns instead of OCR. ✅ done (`ui_read_table`)
-- Clipboard read/write — often the fastest bulk text IO in/out of apps.
+- Clipboard read/write — often the fastest bulk text IO in/out of apps. ✅ done (`clipboard`)
 - Generalized dialog handling — extend the Save-As handling to Open/Print/common dialogs.
+  ✅ done (`file_open`, sharing the Save-As dialog engine)
 - Whole-desktop orchestration across windows; toast/notification reading.
 - Win32/MSAA fallback for legacy apps with no UIA tree.
-- Workflow record & replay (à la terminator).
+  **Deferred (with rationale):** UIA already bridges MSAA automatically, so the vast majority of
+  legacy Win32/MFC apps surface a usable UIA tree today (the harness includes Win32 controls that the
+  existing tools drive). A *separate* raw MSAA/`IAccessible` path would duplicate the entire
+  find/click/type/read surface against a second, weaker accessibility API for a shrinking set of apps,
+  and physical-input fallback (`mouse`/`keyboard` by coordinates) already covers controls with no
+  automation provider. Not worth the surface-area and maintenance cost now; revisit if a concrete
+  must-support app has no UIA tree at all.
+- Workflow record & replay (à la terminator). ✅ done (`ui_macro` — save/run/list/get/delete,
+  replayed through the identical `ui_batch` engine)
 
 ### 5. Dual entry point: MCP + CLI + Skills
 The desktop itself is the shared state and window handles are OS-global, so a CLI call such as
@@ -97,9 +113,9 @@ that parity is structurally guaranteed by reusing the tool methods directly.
 |-------|-------|----------|--------|
 | **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
 | **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
-| **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard, generalized dialogs, UIA event waits | The unbeatable part |
+| **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard ✅ (`clipboard`), generalized dialogs ✅ (`file_open`); UIA event waits deferred (polling proven, see pillar 3) | The unbeatable part |
 | **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill | Strategic ✅ CLI + Skill done (shared-tool adapter; generator refactor deferred) |
-| **4** | Deterministic macros | Workflow record & replay, Win32 fallback | Long tail |
+| **4** | Deterministic macros | Workflow record & replay ✅ (`ui_macro`); Win32/MSAA fallback deferred (UIA bridges MSAA; physical-input fallback covers the gap — see pillar 4) | Long tail |
 
 Phase 0 is almost entirely wiring code already written and tested in the service layer —
 highest ROI, lowest risk. Phases 1–2 make us the best *Windows* automation experience for

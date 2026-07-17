@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
+using Sbroenne.WindowsMcp.Clipboard;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Macros;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -41,6 +43,8 @@ public static class WindowsToolsBase
     private static readonly AnnotatedScreenshotService _annotatedScreenshotService = new(
         _uiAutomationService, _screenshotService, _imageProcessor);
     private static readonly LegacyOcrService _legacyOcrService = new(NullLogger<LegacyOcrService>.Instance);
+    private static readonly ClipboardService _clipboardService = new(_uiAutomationThread);
+    private static readonly MacroService _macroService = new();
 
     /// <summary>Gets the monitor service.</summary>
     public static MonitorService MonitorService => _monitorService;
@@ -83,6 +87,12 @@ public static class WindowsToolsBase
 
     /// <summary>Gets the legacy OCR service.</summary>
     public static LegacyOcrService LegacyOcrService => _legacyOcrService;
+
+    /// <summary>Gets the clipboard service.</summary>
+    public static ClipboardService ClipboardService => _clipboardService;
+
+    /// <summary>Gets the macro (record &amp; replay) service.</summary>
+    public static MacroService MacroService => _macroService;
 
     /// <summary>
     /// JSON serializer options for tool response serialization, optimized for LLM token efficiency.

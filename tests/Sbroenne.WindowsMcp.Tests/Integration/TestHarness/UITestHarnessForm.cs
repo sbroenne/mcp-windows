@@ -40,6 +40,9 @@ public sealed class UITestHarnessForm : Form
     private readonly Button _saveAsButton = null!;
     private readonly Label _lastSavePathLabel = null!;
     private string? _lastSavePath;
+    private readonly Button _openButton = null!;
+    private readonly Label _lastOpenPathLabel = null!;
+    private string? _lastOpenPath;
 
     // Status
     private readonly Label _statusLabel;
@@ -128,6 +131,11 @@ public sealed class UITestHarnessForm : Form
     /// Gets the last file path that was saved via the Save As dialog.
     /// </summary>
     public string? LastSavePath => _lastSavePath;
+
+    /// <summary>
+    /// Gets the last file path that was opened via the Open dialog.
+    /// </summary>
+    public string? LastOpenPath => _lastOpenPath;
 
     public UITestHarnessForm()
     {
@@ -650,6 +658,25 @@ public sealed class UITestHarnessForm : Form
             Name = "LastSavePathLabel",
         };
         saveDialogGroup.Controls.Add(_lastSavePathLabel);
+
+        _openButton = new Button
+        {
+            Text = "Open...",
+            Location = new Point(140, 30),
+            Size = new Size(120, 35),
+            Name = "OpenButton",
+        };
+        _openButton.Click += (_, _) => ShowOpenDialog();
+        saveDialogGroup.Controls.Add(_openButton);
+
+        _lastOpenPathLabel = new Label
+        {
+            Text = "Last opened: (none)",
+            Location = new Point(10, 110),
+            Size = new Size(600, 25),
+            Name = "LastOpenPathLabel",
+        };
+        saveDialogGroup.Controls.Add(_lastOpenPathLabel);
     }
 
     /// <summary>
@@ -690,6 +717,8 @@ public sealed class UITestHarnessForm : Form
         _tabControl.SelectedIndex = 0;
         _lastSavePath = null;
         _lastSavePathLabel.Text = "Last saved: (none)";
+        _lastOpenPath = null;
+        _lastOpenPathLabel.Text = "Last opened: (none)";
         UpdateStatus("UI Test Harness Reset");
     }
 
@@ -722,6 +751,11 @@ public sealed class UITestHarnessForm : Form
         {
             e.SuppressKeyPress = true; // Prevent the beep
             ShowSaveDialog();
+        }
+        else if (e.Control && e.KeyCode == Keys.O)
+        {
+            e.SuppressKeyPress = true; // Prevent the beep
+            ShowOpenDialog();
         }
     }
 
@@ -758,6 +792,31 @@ public sealed class UITestHarnessForm : Form
         else
         {
             UpdateStatus("Save cancelled");
+        }
+    }
+
+    /// <summary>
+    /// Shows the Open dialog and records the chosen file (like a real application).
+    /// Called by Ctrl+O or by the Open button.
+    /// </summary>
+    private void ShowOpenDialog()
+    {
+        using var openDialog = new OpenFileDialog
+        {
+            Title = "Open",
+            Filter = "All files (*.*)|*.*|Text files (*.txt)|*.txt",
+            CheckFileExists = true,
+        };
+
+        if (openDialog.ShowDialog(this) == DialogResult.OK)
+        {
+            _lastOpenPath = openDialog.FileName;
+            _lastOpenPathLabel.Text = $"Last opened: {_lastOpenPath}";
+            UpdateStatus($"Opened: {_lastOpenPath}");
+        }
+        else
+        {
+            UpdateStatus("Open cancelled");
         }
     }
 }

@@ -41,7 +41,10 @@ internal static class HelpText
           keyboard     Send keystrokes (type, press, sequence, ...).
           mouse        Mouse input (move, click, drag, scroll, ...).
           screenshot   Capture screens/windows/regions (annotated element discovery by default).
+          clipboard    Read/write the Windows clipboard (get, set, clear).
+          macro        Record & replay UI workflows (save, run, list, get, delete).
           file-save    Save the active document (handles the Save As dialog).
+          file-open    Open an existing file (handles the Open dialog).
 
         Run 'wincli tools' for the full option reference.
         """;
@@ -95,6 +98,20 @@ internal static class HelpText
 
         file-save --window <h> [--path <file>]
             Save the active document; drives the Save As dialog when needed.
+
+        file-open --window <h> --path <file>
+            Open an existing file; drives the Open dialog (Ctrl+O, types the path, clicks Open).
+
+        clipboard <action> [--text <s>]
+            actions: get (read clipboard text), set (write --text), clear
+            Fast bulk text IO. Pair with keyboard copy/paste: focus app, keyboard c --modifiers ctrl,
+            then clipboard get; or clipboard set --text '...' then keyboard v --modifiers ctrl.
+
+        macro <action> [options]
+            actions: save (--name --steps '<json>'|--steps-file <path>), run (--name --window <h>
+                     [--continue-on-error] [--with-snapshot]), list, get (--name), delete (--name)
+            Persist a ui_batch steps array under a name, then replay it later against any window.
+            Replay uses the identical batch engine, so a macro run == the equivalent ui batch call.
 
         Global: add --include-diagnostics to any command for timing/diagnostic details.
         """;

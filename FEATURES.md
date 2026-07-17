@@ -70,6 +70,9 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Extract a table/grid to structured rows | `ui_read_table` | Rows + headers as JSON, no OCR/screenshot parsing |
 | Wait for windows | `window_management` | Use `wait_for` action for new windows |
 | Save files | `file_save` | Handle Save As dialogs automatically |
+| Open an existing file | `file_open` | Handle Open dialogs automatically |
+| Move bulk text in/out of an app | `clipboard` | Fastest text IO; pair with copy/paste hotkeys |
+| Record & replay a workflow | `ui_macro` | Save a `ui_batch` sequence by name, replay it later |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
@@ -102,7 +105,10 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key) in one call |
+| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog (English Windows only) |
+| `file_open` | Open an existing file via the Open dialog (English Windows only) |
+| `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
@@ -435,6 +441,72 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 - Fill in filename automatically
 - Handle overwrite confirmation dialogs
 - Works with Office apps, Notepad, and more
+
+---
+
+## 📂 File Open (`file_open`)
+
+Open an existing file via the standard Windows Open dialog — the counterpart to `file_save`. Sends Ctrl+O, waits for the Open dialog, types the path into the File name field, and clicks Open. **English Windows only**; the file must already exist so the operation is deterministic and never hangs on a "file not found" prompt.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
+| `filePath` | Absolute path of an existing file to open (forward/back slashes both work) | Yes |
+| `includeDiagnostics` | Include timing/diagnostic details in the response (default: false) | No |
+
+### Capabilities
+
+- Trigger Ctrl+O to open
+- Auto-detect Open dialog appearance (shares the Save-As dialog engine)
+- Fill in the file path and click Open
+- Validates the file exists up front for deterministic behavior
+
+---
+
+## 📋 Clipboard (`clipboard`)
+
+Read and write the Windows text clipboard — often the fastest way to move bulk text in and out of desktop apps, far cheaper than typing character-by-character or OCR.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | `get` (read text), `set` (write text), or `clear` | Yes |
+| `text` | Text to place on the clipboard. Required for `set`; an empty string clears | For `set` |
+
+### Capabilities
+
+- Pull text OUT of an app: focus it, `keyboard_control(key='c', modifiers='ctrl')`, then `clipboard(action='get')`
+- Push text INTO an app: `clipboard(action='set', text='...')` then `keyboard_control(key='v', modifiers='ctrl')`
+- `get` returns `text`, `length`, and `hasText`
+- Uses the raw Win32 clipboard API on a dedicated STA thread (no message-pump dependency)
+
+---
+
+## 🔁 UI Macro (`ui_macro`)
+
+Record and replay reusable UI workflows. A macro is a saved `ui_batch` steps array; running one replays it through the identical batch engine, so a macro run behaves exactly like the equivalent inline `ui_batch` call. Macros persist on disk across sessions.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | `save`, `run`, `get`, `list`, or `delete` | Yes |
+| `name` | Macro name (letters, digits, `-`, `_`, `.`) | For save/run/get/delete |
+| `steps` | A `ui_batch` steps JSON array | For save |
+| `windowHandle` | Target window handle for replay | For run |
+| `stopOnError` | For run: stop at the first failing step (default: true) | No |
+| `withSnapshot` | For run: attach the window's element tree after replay (default: false) | No |
+| `includeDiagnostics` | Reserved for parity (default: false) | No |
+
+### Capabilities
+
+- `save`: build and verify a sequence with `ui_batch`, then persist it under a name
+- `run`: replay a saved macro against any window (same `$prev` chaining and `stopOnError` semantics as `ui_batch`)
+- `list` / `get` / `delete`: manage saved macros
+- Turns a repeated multi-step task (open a form, fill fields, submit) into a single named call
 
 ---
 

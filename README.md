@@ -81,7 +81,10 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/key) in one call |
+| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog |
+| `file_open` | Open an existing file via the Open dialog |
+| `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |
 | `mouse_control` | Coordinate-based clicks (fallback for games) |
@@ -106,6 +109,8 @@ stateless — there is no server session to keep alive.
 wincli window find --title Notepad           # -> window handle
 wincli ui snapshot --window 12345            # accessible element tree
 wincli ui click --window 12345 --name Submit --with-snapshot
+wincli clipboard set --text "hello"          # write the clipboard
+wincli macro run --name login --window 12345 # replay a saved workflow
 wincli guidance                              # full automation guide
 ```
 
