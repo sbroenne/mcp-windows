@@ -283,24 +283,42 @@ public sealed partial class UIAutomationService
 
         var normalizedPath = filePath.Replace('/', '\\');
 
-        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-        _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+        // Unlike Save, the Open dialog validates that the file exists (CheckFileExists), so a single
+        // dropped keystroke on a busy desktop leaves a path that either fails to resolve (the dialog
+        // refuses to close) or autocompletes to the wrong file. Retype until the field holds the exact
+        // path before confirming, which makes the operation deterministic under load.
+        var pathEntered = await DeterministicWait.UntilAsync(
+            async () =>
+            {
+                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
+                await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
 
-        _ = await DeterministicWait.UntilAsync(
-            async () => await _staThread.ExecuteAsync(
-                () =>
-                {
-                    var currentValue = editField.TryGetValue();
-                    return currentValue != null &&
-                        (string.Equals(currentValue, normalizedPath, StringComparison.OrdinalIgnoreCase) ||
-                         currentValue.EndsWith(Path.GetFileName(normalizedPath), StringComparison.OrdinalIgnoreCase));
-                },
-                cancellationToken),
-            TimeSpan.FromMilliseconds(750),
-            TimeSpan.FromMilliseconds(25),
+                return await _staThread.ExecuteAsync(
+                    () =>
+                    {
+                        var currentValue = editField.TryGetValue();
+                        return currentValue != null &&
+                            string.Equals(currentValue.Trim(), normalizedPath, StringComparison.OrdinalIgnoreCase);
+                    },
+                    cancellationToken);
+            },
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromMilliseconds(100),
             transientException: exception => exception is COMException,
             cancellationToken: cancellationToken);
+
+        if (!pathEntered)
+        {
+            return UIAutomationResult.CreateFailure(
+                "open",
+                UIAutomationErrorType.Timeout,
+                $"Could not enter '{normalizedPath}' into the Open dialog's File name field reliably. " +
+                "Open the dialog manually with ui_click, type the path with ui_type, then confirm.",
+                CreateDiagnostics(stopwatch));
+        }
 
         var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
         if (!openClicked)
@@ -310,12 +328,20 @@ public sealed partial class UIAutomationService
 
         if (!await WaitForDialogCloseAsync(dialog, cancellationToken))
         {
-            return UIAutomationResult.CreateFailure(
-                "open",
-                UIAutomationErrorType.Timeout,
-                "Open could not be verified because the Open dialog remained open. " +
-                "The path may be invalid or the app rejected the file.",
-                CreateDiagnostics(stopwatch));
+            // The path is verified-correct at this point, so a still-open dialog means the confirm
+            // gesture did not register (e.g. an autocomplete popup swallowed the click). Retry with a
+            // direct Enter on the filename field before giving up.
+            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+
+            if (!await WaitForDialogCloseAsync(dialog, cancellationToken))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open",
+                    UIAutomationErrorType.Timeout,
+                    "Open could not be verified because the Open dialog remained open. " +
+                    "The path may be invalid or the app rejected the file.",
+                    CreateDiagnostics(stopwatch));
+            }
         }
 
         return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
