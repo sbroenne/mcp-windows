@@ -287,84 +287,65 @@ public sealed partial class UIAutomationService
         // Enter the path atomically via clipboard paste rather than per-character typing. Unlike Save,
         // the Open dialog auto-completes against files that already exist in the target directory and
         // validates existence (CheckFileExists). Character-by-character typing can have an intermediate
-        // autocomplete suggestion committed - truncating the directory so the file no longer resolves
-        // and the dialog refuses to close - and a single dropped keystroke on a busy desktop has the
-        // same effect. Pasting the whole string in one gesture bypasses per-keystroke autocomplete and
-        // dropped-keystroke garbling, making path entry deterministic.
+        // autocomplete suggestion committed - truncating the directory so the file no longer resolves -
+        // and a single dropped keystroke on a busy desktop has the same effect. Pasting the whole string
+        // in one gesture bypasses per-keystroke autocomplete and dropped-keystroke garbling.
+        //
+        // The only reliable success signal is the dialog closing: the Open dialog stays open when the
+        // field is empty or the path does not resolve. So paste, confirm, and check for close; if it
+        // stays open, re-focus, re-paste and retry. This is robust even when the filename control's
+        // UIA Value pattern does not echo the pasted text back.
         var clipboard = new ClipboardService(_staThread);
         var savedClipboard = (await clipboard.GetTextAsync(cancellationToken)).Text;
+        string? lastObservedValue = null;
 
         try
         {
-            var pathEntered = await DeterministicWait.UntilAsync(
-                async () =>
-                {
-                    if (!(await clipboard.SetTextAsync(normalizedPath, cancellationToken)).Success)
-                    {
-                        return false;
-                    }
+            _ = await clipboard.SetTextAsync(normalizedPath, cancellationToken);
 
-                    await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                    _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                    await _keyboardService.PressKeyAsync("v", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                    _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-
-                    return await _staThread.ExecuteAsync(
-                        () =>
-                        {
-                            var currentValue = editField.TryGetValue();
-                            return currentValue != null &&
-                                (string.Equals(currentValue.Trim(), normalizedPath, StringComparison.OrdinalIgnoreCase) ||
-                                 currentValue.EndsWith(Path.GetFileName(normalizedPath), StringComparison.OrdinalIgnoreCase));
-                        },
-                        cancellationToken);
-                },
-                TimeSpan.FromSeconds(5),
-                TimeSpan.FromMilliseconds(100),
-                transientException: exception => exception is COMException,
-                cancellationToken: cancellationToken);
-
-            if (!pathEntered)
+            for (var attempt = 0; attempt < 3; attempt++)
             {
-                return UIAutomationResult.CreateFailure(
-                    "open",
-                    UIAutomationErrorType.Timeout,
-                    $"Could not enter '{normalizedPath}' into the Open dialog's File name field reliably. " +
-                    "Open the dialog manually with ui_click, type the path with ui_type, then confirm.",
-                    CreateDiagnostics(stopwatch));
+                await _staThread.ExecuteAsync(() => { editField.TrySetFocus(); return true; }, cancellationToken);
+                if (editFieldCenter is { Length: 2 })
+                {
+                    await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
+                }
+
+                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
+                await _keyboardService.PressKeyAsync("v", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+                lastObservedValue = await _staThread.ExecuteAsync(
+                    () => editField.TryGetValue(), cancellationToken);
+
+                var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
+                if (!openClicked)
+                {
+                    await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+                }
+
+                if (await WaitForDialogCloseAsync(dialog, cancellationToken))
+                {
+                    return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
+                }
             }
+
+            return UIAutomationResult.CreateFailure(
+                "open",
+                UIAutomationErrorType.Timeout,
+                "Open could not be verified because the Open dialog remained open after entering " +
+                $"'{normalizedPath}'. Last File name value observed: '{lastObservedValue ?? "<null>"}'. " +
+                "The path may be invalid or the app rejected the file; open the dialog manually with " +
+                "ui_click, type the path with ui_type, then confirm.",
+                CreateDiagnostics(stopwatch));
         }
         finally
         {
             // Restore whatever the user had on the clipboard before the operation.
             _ = await clipboard.SetTextAsync(savedClipboard ?? string.Empty, cancellationToken);
         }
-
-        var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
-        if (!openClicked)
-        {
-            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
-        }
-
-        if (!await WaitForDialogCloseAsync(dialog, cancellationToken))
-        {
-            // The path is verified-correct at this point, so a still-open dialog means the confirm
-            // gesture did not register (e.g. an autocomplete popup swallowed the click). Retry with a
-            // direct Enter on the filename field before giving up.
-            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
-
-            if (!await WaitForDialogCloseAsync(dialog, cancellationToken))
-            {
-                return UIAutomationResult.CreateFailure(
-                    "open",
-                    UIAutomationErrorType.Timeout,
-                    "Open could not be verified because the Open dialog remained open. " +
-                    "The path may be invalid or the app rejected the file.",
-                    CreateDiagnostics(stopwatch));
-            }
-        }
-
-        return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
     }
 
     /// <summary>
