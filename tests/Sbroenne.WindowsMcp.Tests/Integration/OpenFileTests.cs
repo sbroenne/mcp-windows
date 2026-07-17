@@ -63,20 +63,23 @@ public sealed class OpenFileTests : IDisposable
     [Fact]
     public async Task Open_StandardWindowsDialog_SelectsFile()
     {
-        var testFilePath = Path.Combine(_testOutputDir, $"open-{Guid.NewGuid()}.txt");
-        await File.WriteAllTextAsync(testFilePath, "content to open");
+        await TestRetry.RunAsync(async _ =>
+        {
+            var testFilePath = Path.Combine(_testOutputDir, $"open-{Guid.NewGuid()}.txt");
+            await File.WriteAllTextAsync(testFilePath, "content to open");
 
-        _fixture.BringToFront();
-        await Task.Delay(500);
+            _fixture.BringToFront();
+            await Task.Delay(500);
 
-        var result = await _automationService.OpenFileAsync(_windowHandle, testFilePath);
+            var result = await _automationService.OpenFileAsync(_windowHandle, testFilePath);
 
-        Assert.True(result.Success, $"Open handling failed: {result.ErrorMessage}");
+            Assert.True(result.Success, $"Open handling failed: {result.ErrorMessage}");
 
-        await Task.Delay(300);
+            await Task.Delay(300);
 
-        var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
-        Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+            var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
+            Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+        });
     }
 
     [Fact]

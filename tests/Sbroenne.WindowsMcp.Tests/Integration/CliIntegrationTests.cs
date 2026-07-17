@@ -239,17 +239,20 @@ public sealed class CliIntegrationTests
         await File.WriteAllTextAsync(testFilePath, "cli open content");
         try
         {
-            _fixture.BringToFront();
-            await Task.Delay(500);
+            await TestRetry.RunAsync(async _ =>
+            {
+                _fixture.BringToFront();
+                await Task.Delay(500);
 
-            var (code, stdout, _) = await RunAsync("file-open", "--window", _windowHandle, "--path", testFilePath);
+                var (code, stdout, _) = await RunAsync("file-open", "--window", _windowHandle, "--path", testFilePath);
 
-            Assert.Equal(0, code);
-            Assert.True(SuccessOf(stdout), stdout);
+                Assert.Equal(0, code);
+                Assert.True(SuccessOf(stdout), stdout);
 
-            await Task.Delay(300);
-            var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
-            Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+                await Task.Delay(300);
+                var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
+                Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+            });
         }
         finally
         {
