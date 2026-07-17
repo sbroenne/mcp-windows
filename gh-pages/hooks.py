@@ -35,11 +35,21 @@ SITE_PAGE_MAP = {
     "vscode-extension/CHANGELOG.md": "/changelog/",
     "CONTRIBUTING.md": "/contributing/",
     "plugin/skills/windows-automation/SKILL.md": "/skills/",
+    "plugin/skills/windows-cli/SKILL.md": "/skills/",
 }
 
 _FRONT_MATTER = re.compile(r"^---\n.*?\n---\n", re.DOTALL)
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)\)")
+
+_HEADING = re.compile(r"^(#{1,5}) ", re.MULTILINE)
+
+
+def _demote_headings(text: str, levels: int = 1) -> str:
+    """Add ``levels`` extra ``#`` to every ATX heading so pulled-in content nests
+    under the wrapper page's own headings (e.g. a skill's ``## `` becomes ``### ``).
+    """
+    return _HEADING.sub(lambda m: "#" * levels + m.group(0), text)
 
 
 def _rewrite_links(text: str, source_rel: str) -> str:
@@ -144,10 +154,24 @@ def on_pre_build(config, **kwargs):  # noqa: D401 - MkDocs hook signature
         _read("CONTRIBUTING.md").strip() + "\n",
     )
 
-    # plugin/skills/windows-automation/SKILL.md -> skills (drop YAML front matter;
-    # the body already starts at an H2 and the wrapper page supplies the H1).
+    # plugin/skills/windows-automation/SKILL.md -> skills (drop YAML front matter,
+    # demote the skill's H2s by one level so they nest under the wrapper page's
+    # per-skill H2 section heading).
     _write(
         "skills.md",
         "plugin/skills/windows-automation/SKILL.md",
-        _FRONT_MATTER.sub("", _read("plugin/skills/windows-automation/SKILL.md")).strip() + "\n",
+        _demote_headings(
+            _FRONT_MATTER.sub("", _read("plugin/skills/windows-automation/SKILL.md")).strip()
+        )
+        + "\n",
+    )
+
+    # plugin/skills/windows-cli/SKILL.md -> the CLI skill section on the same page.
+    _write(
+        "skills-cli.md",
+        "plugin/skills/windows-cli/SKILL.md",
+        _demote_headings(
+            _FRONT_MATTER.sub("", _read("plugin/skills/windows-cli/SKILL.md")).strip()
+        )
+        + "\n",
     )
