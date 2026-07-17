@@ -26,6 +26,9 @@ public static class WindowsAutomationGuidance
         "ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') - wait for an element to appear\n" +
         "ui_wait(windowHandle='<handle>', mode='disappear', nameContains='...') - wait for a spinner/dialog to close\n" +
         "ui_wait(mode='state', elementId='...', desiredState='enabled') - wait until an element reaches a state\n\n" +
+        "### 2c. BATCH & FUSION (Fewer round-trips)\n" +
+        "ui_batch(windowHandle='<handle>', steps='[...]', stopOnError=true) - run many steps (find/click/type/select/wait/read/snapshot/key) in ONE call. Use for multi-field forms instead of many separate calls.\n" +
+        "ui_click(windowHandle='<handle>', name='...', withSnapshot=true) - add withSnapshot=true to ui_click/ui_type/ui_select to get the post-action element tree back and skip a follow-up ui_snapshot.\n\n" +
         "### 3. KEYBOARD\n" +
         "keyboard_control(windowHandle='<handle>', action='press', key='s', modifiers='ctrl') - hotkeys\n" +
         "keyboard_control(windowHandle='<handle>', action='type', text='...') - raw text input\n\n" +

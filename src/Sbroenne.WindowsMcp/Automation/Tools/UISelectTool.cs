@@ -33,6 +33,7 @@ public static partial class UISelectTool
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
     /// <param name="foundIndex">Return Nth matching control (1-based, default: 1).</param>
+    /// <param name="withSnapshot">When true, attach the window's post-action element tree (perceive/act fusion) so you can verify the new state without a separate ui_snapshot call. Default: false.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the select operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
@@ -47,6 +48,7 @@ public static partial class UISelectTool
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
         [DefaultValue(1)] int foundIndex,
+        [DefaultValue(false)] bool withSnapshot,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -84,6 +86,7 @@ public static partial class UISelectTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndSelectAsync(query, value, cancellationToken);
+            result = await WindowsToolsBase.WithPostActionSnapshotAsync(result, windowHandle, withSnapshot, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)

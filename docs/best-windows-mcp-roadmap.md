@@ -89,8 +89,8 @@ the MCP tool and the CLI verb. Ship `skills/windows-cli` and `skills/windows-mcp
 
 | Phase | Theme | Contents | Nature |
 |-------|-------|----------|--------|
-| **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services |
-| **1** | Ergonomics parity | `ui_batch` + perceive/act fusion + auto-wait/self-heal | Core differentiator |
+| **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
+| **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
 | **2** | Windows moat | Structured grid/table extraction, clipboard, generalized dialogs, UIA event waits | The unbeatable part |
 | **3** | Dual entry point | Core/Service refactor + CLI + Skills + generators (Excel pattern) | Strategic, larger |
 | **4** | Deterministic macros | Workflow record & replay, Win32 fallback | Long tail |

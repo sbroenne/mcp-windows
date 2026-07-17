@@ -295,6 +295,46 @@ public static class WindowsToolsBase
         };
     }
 
+    /// <summary>
+    /// Perceive/act fusion: when <paramref name="withSnapshot"/> is set and the action succeeded,
+    /// captures the target window's post-action element tree and attaches it to the result as
+    /// <see cref="UIAutomationResult.PostActionTree"/>. Best-effort - a snapshot failure never
+    /// turns a successful action into a failure.
+    /// </summary>
+    /// <param name="result">The action result to augment.</param>
+    /// <param name="windowHandle">Target window handle whose post-action state to capture.</param>
+    /// <param name="withSnapshot">Whether the caller requested the fused snapshot.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The original result, augmented with a post-action tree when applicable.</returns>
+    public static async Task<UIAutomationResult> WithPostActionSnapshotAsync(
+        UIAutomationResult result,
+        string? windowHandle,
+        bool withSnapshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (!withSnapshot || !result.Success || string.IsNullOrWhiteSpace(windowHandle))
+        {
+            return result;
+        }
+
+        try
+        {
+            var snapshot = await UIAutomationService.GetTreeAsync(windowHandle, null, 5, null, cancellationToken);
+            if (snapshot.Success && snapshot.Tree is { Length: > 0 })
+            {
+                return result with { PostActionTree = snapshot.Tree };
+            }
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Fusion is a convenience; never fail the underlying action because the snapshot failed.
+        }
+
+        return result;
+    }
+
     private static int GetTimeoutFromEnvironment()
     {
         var envValue = Environment.GetEnvironmentVariable("MCP_WINDOWS_TIMEOUT_MS");

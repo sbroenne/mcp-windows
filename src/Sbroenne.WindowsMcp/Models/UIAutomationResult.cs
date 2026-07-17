@@ -42,6 +42,16 @@ public sealed record UIAutomationResult
     public UIElementCompactTree[]? Tree { get; init; }
 
     /// <summary>
+    /// Post-action window snapshot ("perceive/act fusion"). When an interactive tool is called
+    /// with withSnapshot=true, this carries the window's element tree captured immediately after
+    /// the action succeeded, so agents can verify the new state without a separate ui_snapshot call.
+    /// Same shape as <see cref="Tree"/>: id, name, type, click:[x,y,monitor], enabled, children.
+    /// </summary>
+    [JsonPropertyName("postActionTree")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIElementCompactTree[]? PostActionTree { get; init; }
+
+    /// <summary>
     /// Number of elements found.
     /// </summary>
     [JsonPropertyName("elementCount")]

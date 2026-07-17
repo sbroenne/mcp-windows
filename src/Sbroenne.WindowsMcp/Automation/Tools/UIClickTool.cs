@@ -30,6 +30,7 @@ public static partial class UIClickTool
     /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium).</param>
     /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, clicks that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="withSnapshot">When true, attach the window's post-action element tree (perceive/act fusion) so you can verify the new state without a separate ui_snapshot call. Default: false.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the click operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
@@ -44,6 +45,7 @@ public static partial class UIClickTool
         [DefaultValue(null)] string? className,
         [DefaultValue(null)] string? elementId,
         [DefaultValue(1)] int foundIndex,
+        [DefaultValue(false)] bool withSnapshot,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -66,6 +68,7 @@ public static partial class UIClickTool
             if (!string.IsNullOrWhiteSpace(elementId))
             {
                 var byIdResult = await WindowsToolsBase.UIAutomationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
+                byIdResult = await WindowsToolsBase.WithPostActionSnapshotAsync(byIdResult, windowHandle, withSnapshot, cancellationToken);
                 return WindowsToolsBase.ToCallToolResult(byIdResult, includeDiagnostics);
             }
 
@@ -82,6 +85,7 @@ public static partial class UIClickTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndClickAsync(query, cancellationToken);
+            result = await WindowsToolsBase.WithPostActionSnapshotAsync(result, windowHandle, withSnapshot, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)

@@ -99,6 +99,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `ui_select` | Select a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (UIA + OCR) |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key) in one call |
 | `file_save` | Save files via Save As dialog (English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
@@ -308,6 +309,45 @@ Wait until a UI condition is met before continuing - no blind sleeps or screensh
 - Wait for dialogs/controls to appear before acting
 - Wait for spinners/progress dialogs to disappear
 - Wait for a specific element to become enabled/visible/toggled
+
+---
+
+## 🧩 UI Batch (`ui_batch`)
+
+Run a sequence of UI automation steps against a window in a single call. Built for coding agents: a multi-field form fill + submit that would otherwise take many `ui_type`/`ui_click` round-trips becomes one request.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle. Used for every step unless a step overrides it. | Yes |
+| `steps` | JSON array of step objects (see below). | Yes |
+| `stopOnError` | Stop at the first failing step (default: `true`). | No |
+| `withSnapshot` | Attach the window element tree after the batch completes. | No |
+
+### Step actions
+
+Each step is a JSON object with an `action` plus the fields that action needs:
+
+- `find` - selectors; resolves an element and exposes its id to the next step as `$prev`
+- `click` - selectors or `elementId`
+- `type` - selectors or `elementId`, plus `text` (optional `clearFirst`)
+- `select` - selectors, plus `value` (visible option text)
+- `wait` - `mode` (`appear`/`disappear`/`state`), selectors or `elementId`+`desiredState`, optional `timeoutMs`
+- `read` - selectors or `elementId` (or neither, to read the whole window), optional `includeChildren`
+- `snapshot` - capture the window element tree (optional `maxDepth`)
+- `key` - `key` (e.g. `enter`, `tab`, `f5`) with optional `modifiers` (`ctrl,shift,alt,win`) and `repeat`
+
+### Capabilities
+
+- One round-trip for multi-step workflows (fill username + password + submit)
+- Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
+- Chain steps by referencing the prior step's element with `elementId: "$prev"`
+- `stopOnError=false` runs every step and reports each outcome
+
+### Perceive/act fusion (`withSnapshot`)
+
+`ui_click`, `ui_type`, and `ui_select` accept `withSnapshot=true`. On success they attach the window's post-action element tree as `postActionTree`, so an agent can verify the new state without a separate `ui_snapshot` call.
 
 ---
 

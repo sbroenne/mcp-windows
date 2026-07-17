@@ -79,6 +79,7 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `ui_select` | Pick a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (with OCR fallback) |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/key) in one call |
 | `file_save` | Save files via Save As dialog |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |
