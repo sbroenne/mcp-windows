@@ -876,15 +876,6 @@ public sealed partial class UIAutomationService
             if (!string.IsNullOrWhiteSpace(filePath))
             {
                 filePath = Path.GetFullPath(filePath);
-                var directory = Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    return UIAutomationResult.CreateFailure(
-                        "save",
-                        UIAutomationErrorType.PathError,
-                        $"Save failed: directory '{directory}' does not exist.",
-                        CreateDiagnostics(stopwatch));
-                }
             }
 
             // Step 1: Focus the target window (FlaUI/White pattern)
@@ -903,6 +894,19 @@ public sealed partial class UIAutomationService
                 TimeSpan.FromMilliseconds(500),
                 TimeSpan.FromMilliseconds(25),
                 cancellationToken: cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(filePath))
+            {
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save",
+                        UIAutomationErrorType.PathError,
+                        $"Save failed: directory '{directory}' does not exist.",
+                        CreateDiagnostics(stopwatch));
+                }
+            }
 
             // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
             await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, cancellationToken: cancellationToken);
