@@ -112,6 +112,14 @@ public sealed partial class UIAutomationService
                     rows[r] = row;
                 }
 
+                // Some providers (notably the Win32/WinForms ListView) expose the Grid pattern and
+                // report the correct row/column counts, but GetItem() returns empty text for the
+                // sub-item columns. Fall back to reading each row element's child cells directly.
+                if (IsMissingSubItemText(rows, columnsToRead))
+                {
+                    FillRowsFromRowElements(gridElement, rows, rowsToRead, columnsToRead);
+                }
+
                 var truncated = totalRows > rowsToRead || totalColumns > columnsToRead;
                 var table = new UITableData
                 {
@@ -242,6 +250,123 @@ public sealed partial class UIAutomationService
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Detects the degenerate case where a grid reports multiple columns but every sub-item column
+    /// (index &gt;= 1) came back empty — typical of Win32 ListView Grid providers.
+    /// </summary>
+    private static bool IsMissingSubItemText(string[][] rows, int columnsToRead)
+    {
+        if (columnsToRead <= 1 || rows.Length == 0)
+        {
+            return false;
+        }
+
+        foreach (var row in rows)
+        {
+            for (var c = 1; c < row.Length; c++)
+            {
+                if (!string.IsNullOrEmpty(row[c]))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Rebuilds row text by enumerating each row element's child cells. Used as a fallback for
+    /// controls whose Grid pattern does not surface sub-item text via GetItem.
+    /// </summary>
+    private void FillRowsFromRowElements(UIA.IUIAutomationElement gridElement, string[][] rows, int rowsToRead, int columnsToRead)
+    {
+        UIA.IUIAutomationElementArray? rowElements;
+        try
+        {
+            rowElements = gridElement.FindAll(UIA.TreeScope.TreeScope_Children, Uia.TrueCondition);
+        }
+        catch (COMException)
+        {
+            return;
+        }
+
+        if (rowElements == null)
+        {
+            return;
+        }
+
+        var rowIndex = 0;
+        var elementCount = rowElements.Length;
+        for (var i = 0; i < elementCount && rowIndex < rowsToRead; i++)
+        {
+            UIA.IUIAutomationElement rowElement;
+            try
+            {
+                rowElement = rowElements.GetElement(i);
+                if (!IsRowControlType(rowElement.GetControlTypeId()))
+                {
+                    continue;
+                }
+            }
+            catch (COMException)
+            {
+                continue;
+            }
+
+            var cells = ReadRowCells(rowElement, columnsToRead);
+            if (cells != null)
+            {
+                rows[rowIndex] = cells;
+            }
+
+            rowIndex++;
+        }
+    }
+
+    private static bool IsRowControlType(int controlTypeId)
+        => controlTypeId is UIA3ControlTypeIds.DataItem or UIA3ControlTypeIds.ListItem or UIA3ControlTypeIds.TreeItem;
+
+    /// <summary>
+    /// Reads a row's cell text from its child elements, padding/truncating to <paramref name="columnsToRead"/>.
+    /// Falls back to the row element's own text when it exposes no child cells.
+    /// </summary>
+    private string[] ReadRowCells(UIA.IUIAutomationElement rowElement, int columnsToRead)
+    {
+        var cells = new string[columnsToRead];
+        UIA.IUIAutomationElementArray? children;
+        try
+        {
+            children = rowElement.FindAll(UIA.TreeScope.TreeScope_Children, Uia.TrueCondition);
+        }
+        catch (COMException)
+        {
+            children = null;
+        }
+
+        if (children == null || children.Length == 0)
+        {
+            // No child cells: use the row element's own text for the first column.
+            cells[0] = GetCellText(rowElement);
+            return cells;
+        }
+
+        var count = Math.Min(children.Length, columnsToRead);
+        for (var i = 0; i < count; i++)
+        {
+            try
+            {
+                cells[i] = GetCellText(children.GetElement(i));
+            }
+            catch (COMException)
+            {
+                cells[i] = string.Empty;
+            }
+        }
+
+        return cells;
     }
 
     /// <summary>
