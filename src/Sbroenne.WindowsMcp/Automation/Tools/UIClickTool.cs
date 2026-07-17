@@ -28,6 +28,7 @@ public static partial class UIClickTool
     /// <param name="controlType">Control type (Button, MenuItem, Hyperlink, ListItem, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium).</param>
+    /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, clicks that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -41,6 +42,7 @@ public static partial class UIClickTool
         [DefaultValue(null)] string? controlType,
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
+        [DefaultValue(null)] string? elementId,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -61,6 +63,12 @@ public static partial class UIClickTool
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(elementId))
+            {
+                var byIdResult = await WindowsToolsBase.UIAutomationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
+                return WindowsToolsBase.ToCallToolResult(byIdResult, includeDiagnostics);
+            }
+
             var query = new ElementQuery
             {
                 WindowHandle = windowHandle,

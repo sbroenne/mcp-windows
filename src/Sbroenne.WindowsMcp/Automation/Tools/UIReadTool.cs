@@ -27,6 +27,7 @@ public static partial class UIReadTool
     /// <param name="controlType">Control type (Text, Edit, Document, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
+    /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, reads that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="includeChildren">Include child element text (default: false).</param>
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
@@ -42,6 +43,7 @@ public static partial class UIReadTool
         [DefaultValue(null)] string? controlType,
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
+        [DefaultValue(null)] string? elementId,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool includeChildren,
         [DefaultValue(null)] string? language,
@@ -81,7 +83,12 @@ public static partial class UIReadTool
             // Try normal text extraction first
             // If no specific element criteria, just read from the window
             string? elementIdToRead = null;
-            if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) || !string.IsNullOrEmpty(namePattern) ||
+            if (!string.IsNullOrWhiteSpace(elementId))
+            {
+                // Caller supplied a stable element id from a prior find/snapshot - use it directly.
+                elementIdToRead = elementId;
+            }
+            else if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) || !string.IsNullOrEmpty(namePattern) ||
                 !string.IsNullOrEmpty(controlType) || !string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(className))
             {
                 // Find the element first

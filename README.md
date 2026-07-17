@@ -72,10 +72,13 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 
 | Tool | Purpose |
 |------|---------|
+| `ui_snapshot` | Capture a compact element tree of a window (orient first) |
+| `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
-| `ui_find` | Discover elements in a window (with timeout/retry) |
+| `ui_select` | Pick a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (with OCR fallback) |
+| `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `file_save` | Save files via Save As dialog |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |

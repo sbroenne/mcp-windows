@@ -215,6 +215,43 @@ public sealed partial class UIAutomationService
         }
     }
 
+    /// <summary>
+    /// Types text into a previously-discovered element addressed by its stable element id
+    /// (from ui_find/ui_snapshot), skipping the find step. Useful for reusing a known element
+    /// across multiple actions without re-querying.
+    /// </summary>
+    public async Task<UIAutomationResult> TypeIntoElementAsync(string elementId, string text, bool clearFirst, string? windowHandle, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(elementId);
+        var stopwatch = Stopwatch.StartNew();
+
+        // Normalize Windows file paths for consistency with FindAndTypeAsync.
+        text = PathNormalizer.NormalizeWindowsPath(text);
+
+        try
+        {
+            return await PerformTypeAsync(elementId, text, clearFirst, windowHandle, stopwatch, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindAndTypeError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Type"),
+                CreateDiagnostics(stopwatch));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogFindAndTypeError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.InternalError,
+                $"Type failed: {ex.Message}",
+                CreateDiagnostics(stopwatch));
+        }
+    }
+
     private static List<ElementQuery> BuildTypeSearchQueries(ElementQuery baseQuery)
     {
         var queries = new List<ElementQuery>();

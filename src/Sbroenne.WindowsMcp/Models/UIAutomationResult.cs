@@ -350,10 +350,10 @@ public sealed record UIAutomationResult
     private static string GetDefaultRecoverySuggestion(string errorType) => errorType switch
     {
         UIAutomationErrorType.ElementNotFound =>
-            "Element not found. Try get_tree (default depth=2) to explore, or use parentElementId to drill into a specific subtree.",
+            "Element not found. Try ui_snapshot to see the window's element tree, or pass parentElementId to ui_snapshot to drill into a specific subtree, then act with the returned selectors.",
 
         UIAutomationErrorType.MultipleMatches =>
-            "Multiple elements matched. Add automationId, use parentElementId to scope search, or specify foundIndex to select which match.",
+            "Multiple elements matched. Add automationId, scope with ui_snapshot parentElementId, or specify foundIndex to select which match.",
 
         UIAutomationErrorType.PatternNotSupported =>
             "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",

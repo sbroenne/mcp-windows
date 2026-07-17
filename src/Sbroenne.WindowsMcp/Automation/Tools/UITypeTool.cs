@@ -31,6 +31,7 @@ public static partial class UITypeTool
     /// <param name="controlType">Control type (Edit, Document, TextBox, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
+    /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, types into that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="clearFirst">Clear existing text before typing (default: false).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
@@ -46,6 +47,7 @@ public static partial class UITypeTool
         [DefaultValue(null)] string? controlType,
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
+        [DefaultValue(null)] string? elementId,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool clearFirst,
         [DefaultValue(false)] bool includeDiagnostics,
@@ -72,6 +74,12 @@ public static partial class UITypeTool
 
         try
         {
+            if (!string.IsNullOrWhiteSpace(elementId))
+            {
+                var byIdResult = await WindowsToolsBase.UIAutomationService.TypeIntoElementAsync(elementId, text, clearFirst, windowHandle, cancellationToken);
+                return WindowsToolsBase.ToCallToolResult(byIdResult, includeDiagnostics);
+            }
+
             var query = new ElementQuery
             {
                 WindowHandle = windowHandle,

@@ -92,10 +92,13 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Tool | Description |
 |------|-------------|
 | `app` | Launch applications |
+| `ui_snapshot` | Capture a compact element tree of a window (orient primitive) |
 | `ui_find` | Find UI elements by name, type, or ID (with timeout/retry via `timeoutMs`) |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
+| `ui_select` | Select a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (UIA + OCR) |
+| `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `file_save` | Save files via Save As dialog (English Windows only) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
@@ -234,6 +237,77 @@ Read text from elements using UI Automation or OCR.
 - Automatic OCR fallback for custom-rendered text
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
+
+---
+
+## 🌳 UI Snapshot (`ui_snapshot`)
+
+Capture a compact, interactive-elements-only tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. Token-optimized (hierarchical, depth-bounded, content-view filtered for Chromium/Electron).
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle (foreground window if omitted) | No |
+| `parentElementId` | Scope the snapshot to a subtree (id from a prior snapshot/find) | No |
+| `maxDepth` | Max tree depth (default framework-aware; capped at 20) | No (default: 5) |
+| `controlTypeFilter` | Comma-separated control types to keep (e.g. 'Button,Edit') | No |
+| `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
+
+### Capabilities
+
+- One call to see what's on screen with ids, names, types, and click coordinates
+- Drill into large windows via `parentElementId`
+- Prune noise with `controlTypeFilter`
+- Feed returned ids straight into `ui_click`, `ui_type`, `ui_read`, `ui_wait`
+
+---
+
+## 🎚️ UI Select (`ui_select`)
+
+Select a value in a combo box, drop-down, list box, or tab control using the proper UI Automation selection patterns (SelectionItem/ExpandCollapse) for cross-framework reliability.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `value` | Visible text of the option to select | Yes |
+| `name` / `nameContains` | Name/partial match of the selection control | No |
+| `automationId` | Automation ID of the control | No |
+| `controlType` | Control type (ComboBox, List, Tab) | No |
+| `foundIndex` | Nth matching control (1-based) | No (default: 1) |
+
+### Capabilities
+
+- Reliable selection without click-then-click guesswork
+- Auto-expands drop-downs when needed
+- Works across Win32, WinForms, WPF, WinUI, and browser controls
+
+---
+
+## ⏳ UI Wait (`ui_wait`)
+
+Wait until a UI condition is met before continuing - no blind sleeps or screenshot polling. Uses efficient exponential-backoff polling internally.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `mode` | `appear` (default), `disappear`, or `state` | No |
+| `windowHandle` | Target window handle for appear/disappear | No |
+| `name` / `nameContains` | Selector for appear/disappear | No |
+| `automationId` | Automation ID selector | No |
+| `controlType` | Control type selector | No |
+| `elementId` | Element id for `mode='state'` | No |
+| `desiredState` | Target state for `mode='state'` (enabled, disabled, on, off, indeterminate, visible, offscreen) | No |
+| `timeoutMs` | Max wait in milliseconds | No (default: 5000) |
+
+### Capabilities
+
+- Wait for dialogs/controls to appear before acting
+- Wait for spinners/progress dialogs to disappear
+- Wait for a specific element to become enabled/visible/toggled
 
 ---
 
