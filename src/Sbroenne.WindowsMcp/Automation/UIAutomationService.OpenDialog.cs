@@ -282,17 +282,19 @@ public sealed partial class UIAutomationService
         await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
 
         var normalizedPath = filePath.Replace('/', '\\');
+        var expectedFileName = Path.GetFileName(normalizedPath);
 
-        // Enter the path with SendInput keyboard typing - the same mechanism the proven-reliable Save
-        // flow uses (see FillSaveDialogAsync). The Windows file dialog only updates its internal path
-        // state from real keyboard input: neither the UIA Value pattern nor a clipboard paste feeds the
-        // dialog's CheckFileExists resolver, so a pasted path can appear in the box yet leave the dialog
-        // refusing to close. Typing drives the internal state correctly.
-        //
-        // The only reliable success signal is the dialog closing: the Open dialog stays open while the
-        // field is empty or the path does not resolve. So type, click Open, and check for close; if it
-        // stays open, re-focus, retype and retry. We click the Open button rather than pressing Enter,
-        // which can commit an autocomplete suggestion instead (FlaUI pattern).
+        // Enter the path robustly, verify it actually landed in the File name field, and only then
+        // confirm. Two mechanisms are combined because a loaded, shared CI desktop can drop focus or
+        // keystrokes:
+        //   1. SendInput typing (TypeTextAsync) - the same mechanism the proven-reliable Save flow uses
+        //      (FillSaveDialogAsync). Real keyboard input is what feeds the shell dialog's CheckFileExists
+        //      resolver, so it is required for the dialog to actually close.
+        //   2. ValuePattern SetValue as a fallback populate when typing did not register (e.g. focus was
+        //      lost) - it deterministically writes the inner Edit's text without needing focus.
+        // We read the field back (ValuePattern or TextPattern) and retype/repopulate until it holds the
+        // expected file name before clicking Open, so we never confirm an empty or garbled path. The
+        // Open button is clicked rather than Enter, which can commit an autocomplete suggestion instead.
         string? lastObservedValue = null;
 
         for (var attempt = 0; attempt < 3; attempt++)
@@ -328,8 +330,20 @@ public sealed partial class UIAutomationService
             await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
             _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
 
+            // Verify the path landed; if typing was dropped, force it via ValuePattern and re-read.
             lastObservedValue = await _staThread.ExecuteAsync(
-                () => editField.TryGetValue(), cancellationToken);
+                () =>
+                {
+                    var current = editField.GetText();
+                    if (!PathMatches(current, normalizedPath, expectedFileName))
+                    {
+                        editField.TrySetValue(normalizedPath);
+                        current = editField.GetText();
+                    }
+
+                    return current;
+                },
+                cancellationToken);
 
             var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
             if (!openClicked)
@@ -351,6 +365,24 @@ public sealed partial class UIAutomationService
             "The path may be invalid or the app rejected the file; open the dialog manually with " +
             "ui_click, type the path with ui_type, then confirm.",
             CreateDiagnostics(stopwatch));
+    }
+
+    /// <summary>
+    /// Whether the File name field's observed text corresponds to the requested path. The shell may
+    /// show just the file name, the full path, or a value with surrounding quotes, so accept any of
+    /// those rather than requiring an exact match.
+    /// </summary>
+    private static bool PathMatches(string? observed, string normalizedPath, string expectedFileName)
+    {
+        if (string.IsNullOrEmpty(observed))
+        {
+            return false;
+        }
+
+        var trimmed = observed.Trim().Trim('"');
+        return trimmed.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase)
+            || trimmed.EndsWith(expectedFileName, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
