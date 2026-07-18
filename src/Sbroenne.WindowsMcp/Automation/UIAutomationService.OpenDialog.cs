@@ -15,6 +15,13 @@ namespace Sbroenne.WindowsMcp.Automation;
 public sealed partial class UIAutomationService
 {
     /// <summary>
+    /// The File name combo (FileNameControlHost) can realize noticeably later than the address bar
+    /// on a contended desktop, so allow more time than <c>SaveDialogTimeout</c> to find it rather
+    /// than giving up and mis-targeting another edit.
+    /// </summary>
+    private static readonly TimeSpan OpenDialogEditFieldTimeout = TimeSpan.FromSeconds(8);
+
+    /// <summary>
     /// Opens a file through an application's standard Open dialog (Ctrl+O). Focuses the window,
     /// invokes the Open command, fills the File name field with <paramref name="filePath"/>, and
     /// confirms. The file must already exist so the operation is deterministic and never hangs on
@@ -219,6 +226,46 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
+    /// Diagnostic aid: lists the Edit and ComboBox descendants (AutomationId + Name) of the Open
+    /// dialog so a "File name field not found" failure on CI reveals the real control identifiers.
+    /// Runs a single enumeration on the failure path only, never per poll.
+    /// </summary>
+    private async Task<string> DumpDialogEditControlsAsync(
+        UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    {
+        return await _staThread.ExecuteAsync(
+            () =>
+            {
+                try
+                {
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var controlType in new[] { UIA3ControlTypeIds.Edit, UIA3ControlTypeIds.ComboBox })
+                    {
+                        var matches = dialog.FindAll(
+                            UIA.TreeScope.TreeScope_Descendants,
+                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, controlType));
+                        var label = controlType == UIA3ControlTypeIds.Edit ? "Edit" : "ComboBox";
+                        for (var i = 0; i < matches.Length && i < 40; i++)
+                        {
+                            var element = matches.GetElement(i);
+                            var id = element.GetAutomationId() ?? string.Empty;
+                            var name = element.GetName() ?? string.Empty;
+                            sb.Append(label).Append("(id='").Append(id).Append("',name='").Append(name).Append("') ");
+                        }
+                    }
+
+                    var text = sb.ToString();
+                    return text.Length == 0 ? "<none>" : text;
+                }
+                catch (COMException exception)
+                {
+                    return "dump-failed: " + exception.Message;
+                }
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
     /// Types the path into the Open dialog's File name field and clicks Open. Reuses
     /// <see cref="FindSaveDialogEditField"/> (the File name control is identical across the
     /// Save and Open shell dialogs) and <see cref="WaitForDialogCloseAsync"/>.
@@ -246,7 +293,7 @@ public sealed partial class UIAutomationService
                 editField = await _staThread.ExecuteAsync(() => FindSaveDialogEditField(dialog), cancellationToken);
                 return editField != null;
             },
-            SaveDialogTimeout,
+            OpenDialogEditFieldTimeout,
             SaveDialogPollInterval,
             transientException: exception =>
                 exception is COMException comException &&
@@ -255,10 +302,12 @@ public sealed partial class UIAutomationService
 
         if (!editFieldFound || editField == null)
         {
+            var controlDump = await DumpDialogEditControlsAsync(dialog, cancellationToken);
             return UIAutomationResult.CreateFailure(
                 "open",
                 UIAutomationErrorType.ElementNotFound,
-                "Could not find the File name field in the Open dialog.",
+                "Could not find the File name field in the Open dialog. Edit/ComboBox descendants: " +
+                controlDump,
                 CreateDiagnostics(stopwatch));
         }
 
