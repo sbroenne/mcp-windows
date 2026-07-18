@@ -395,12 +395,17 @@ public sealed partial class UIAutomationService
                 await _staThread.ExecuteAsync(() => { editField.TrySetValue(normalizedPath); return true; }, cancellationToken);
             }
 
-            var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
-            if (!openClicked)
+            // Confirm. The edit has keyboard focus and holds the verified path, so press Enter first -
+            // the canonical confirm for the classic Win32 dialog, which does not always commit when its
+            // Open button is invoked through UIA. Fall back to clicking the Open button for dialogs that
+            // swallow Enter (e.g. when an autocomplete popup is showing). Either commit closes the dialog.
+            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+            if (await WaitForDialogCloseAsync(dialog, cancellationToken))
             {
-                await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+                return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
             }
 
+            await ClickOpenButtonAsync(dialog, cancellationToken);
             if (await WaitForDialogCloseAsync(dialog, cancellationToken))
             {
                 return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
