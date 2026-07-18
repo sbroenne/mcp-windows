@@ -1298,25 +1298,24 @@ public sealed partial class UIAutomationService
             }
         }
 
-        var field1001 = dialog.FindFirst(
-            UIA.TreeScope.TreeScope_Descendants,
-            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1001"));
-        if (field1001 != null)
-        {
-            return field1001;
-        }
-
-        // Last resort: pick an Edit descendant, but never the address/breadcrumb bar or the search
-        // box. Those realize before the File name combo on a freshly opened dialog, so a blind
-        // "first Edit" match can grab the wrong control (its Name looks like "Address: C:\...") and
-        // every typed path then lands in the wrong field, leaving the dialog stuck open. Returning
-        // null here lets the caller keep polling until the real File name edit appears.
+        // Do NOT blindly match AutomationId "1001": on the modern IFileDialog that id belongs to the
+        // address/breadcrumb bar edit, which realizes before the FileNameControlHost combo. Because the
+        // caller polls and accepts the first non-null match, returning it here would lock onto the
+        // address bar so every typed path lands in the wrong control and the dialog never closes.
+        //
+        // Last resort: pick an Edit descendant, but never the address/breadcrumb bar or the search box.
+        // Returning null lets the caller keep polling until the real File name edit appears.
         var editControls = dialog.FindAll(
             UIA.TreeScope.TreeScope_Descendants,
             Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit));
         for (var i = 0; i < editControls.Length; i++)
         {
             var candidate = editControls.GetElement(i);
+            if (string.Equals(candidate.GetAutomationId(), "1001", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             var name = candidate.GetName() ?? string.Empty;
             if (name.StartsWith("Address", StringComparison.OrdinalIgnoreCase)
                 || name.Contains("Search", StringComparison.OrdinalIgnoreCase))
