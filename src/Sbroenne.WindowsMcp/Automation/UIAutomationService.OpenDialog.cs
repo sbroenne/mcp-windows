@@ -334,16 +334,14 @@ public sealed partial class UIAutomationService
         var expectedFileName = Path.GetFileName(normalizedPath);
 
         // Enter the path robustly, verify it actually landed in the File name field, and only then
-        // confirm. Two mechanisms are combined because a loaded, shared CI desktop can drop focus or
-        // keystrokes:
-        //   1. SendInput typing (TypeTextAsync) - the same mechanism the proven-reliable Save flow uses
-        //      (FillSaveDialogAsync). Real keyboard input is what feeds the shell dialog's CheckFileExists
-        //      resolver, so it is required for the dialog to actually close.
-        //   2. ValuePattern SetValue as a fallback populate when typing did not register (e.g. focus was
-        //      lost) - it deterministically writes the inner Edit's text without needing focus.
-        // We read the field back (ValuePattern or TextPattern) and retype/repopulate until it holds the
-        // expected file name before clicking Open, so we never confirm an empty or garbled path. The
-        // Open button is clicked rather than Enter, which can commit an autocomplete suggestion instead.
+        // confirm. A loaded, shared CI desktop can drop the first keystrokes right after the field
+        // gains focus (observed: the leading "C:" of the path went missing, leaving a driveless path
+        // the CheckFileExists resolver rejects, so the dialog never closes). The classic Win32 edit
+        // also ignores ValuePattern SetValue, so keyboard input is the only thing that updates it.
+        //
+        // So type, read the field back (GetText reads ValuePattern/TextPattern reliably even though
+        // writes are ignored), and retype until the field holds the full path before clicking Open. We
+        // click the Open button rather than pressing Enter, which can commit an autocomplete suggestion.
         string? lastObservedValue = null;
 
         for (var attempt = 0; attempt < 3; attempt++)
@@ -373,26 +371,29 @@ public sealed partial class UIAutomationService
                 TimeSpan.FromMilliseconds(25),
                 cancellationToken: cancellationToken);
 
-            await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-            await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
-            await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
-            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+            // Clear then type, verifying the field reads back the full path. Retype on mismatch so a
+            // dropped leading character (a contended-desktop hazard) is corrected before we confirm.
+            var matched = false;
+            for (var typeAttempt = 0; typeAttempt < 4 && !matched; typeAttempt++)
+            {
+                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+                await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
 
-            // Verify the path landed; if typing was dropped, force it via ValuePattern and re-read.
-            lastObservedValue = await _staThread.ExecuteAsync(
-                () =>
-                {
-                    var current = editField.GetText();
-                    if (!PathMatches(current, normalizedPath, expectedFileName))
-                    {
-                        editField.TrySetValue(normalizedPath);
-                        current = editField.GetText();
-                    }
+                lastObservedValue = await _staThread.ExecuteAsync(
+                    () => editField.GetText(), cancellationToken);
+                matched = PathMatches(lastObservedValue, normalizedPath, expectedFileName);
+            }
 
-                    return current;
-                },
-                cancellationToken);
+            if (!matched)
+            {
+                // Best-effort populate for dialogs that honor ValuePattern (the classic Win32 edit does
+                // not, but the Vista-style one does); harmless when ignored.
+                await _staThread.ExecuteAsync(() => { editField.TrySetValue(normalizedPath); return true; }, cancellationToken);
+            }
 
             var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
             if (!openClicked)
