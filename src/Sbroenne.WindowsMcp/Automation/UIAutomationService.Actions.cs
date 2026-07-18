@@ -1277,15 +1277,17 @@ public sealed partial class UIAutomationService
 
     private static UIA.IUIAutomationElement? FindSaveDialogEditField(UIA.IUIAutomationElement dialog)
     {
-        // FileNameControlHost is a ComboBox — use its inner Edit so the shell updates
-        // its internal path state rather than only changing the displayed text.
+        var editCondition = Uia.CreatePropertyCondition(
+            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+
+        // Vista-style common dialog: the File name combo has AutomationId "FileNameControlHost".
+        // Use its inner Edit so the shell updates its internal path state rather than only changing
+        // the displayed text.
         var fileNameHost = dialog.FindFirst(
             UIA.TreeScope.TreeScope_Descendants,
             Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost"));
         if (fileNameHost != null)
         {
-            var editCondition = Uia.CreatePropertyCondition(
-                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
             var innerEdit = fileNameHost.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
             if (innerEdit != null)
             {
@@ -1298,15 +1300,36 @@ public sealed partial class UIAutomationService
             }
         }
 
-        // Return null (not a blind Edit match) when the File name combo has not realized yet. The
-        // caller polls this finder, so returning any early Edit is dangerous:
-        //   - AutomationId "1001" on the modern IFileDialog is the address/breadcrumb bar, and a
-        //     blind first-Edit match grabs it too. Typing then lands in the wrong control and the
-        //     dialog never closes (observed value "Address: C:\...").
-        //   - A heavy FindAll(Descendants)+per-element property scan on every poll starves the shared
-        //     UIA STA thread, which stalls GetTree in other tests running in parallel.
-        // Both standard Save and Open dialogs expose FileNameControlHost, so waiting for it is
-        // reliable; keep polling until it appears.
+        // Classic Win32 file dialog (what the Open dialog renders as): the File name edit has the
+        // well-known control id 1148. Require the Edit control type so we get the inner edit rather
+        // than the wrapping ComboBox that shares the same id.
+        var classicFileNameEdit = dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            Uia.CreateAndCondition(
+                editCondition,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1148")));
+        if (classicFileNameEdit != null)
+        {
+            return classicFileNameEdit;
+        }
+
+        // Name-based fallback for localized/variant dialogs whose File name edit lacks id 1148.
+        var namedFileNameEdit = dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            Uia.CreateAndCondition(
+                editCondition,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "File name:")));
+        if (namedFileNameEdit != null)
+        {
+            return namedFileNameEdit;
+        }
+
+        // Return null (never a blind Edit match) when the File name field has not realized yet. The
+        // caller polls this finder, so returning any early Edit is dangerous: AutomationId "1001" is
+        // the address/breadcrumb bar and "SearchEditBox" is the search box, and typing a path into
+        // either leaves the dialog open. Keep polling until a positively-identified File name edit
+        // appears. All lookups above are cheap FindFirst calls so polling cannot starve the shared
+        // UIA STA thread.
         return null;
     }
 
