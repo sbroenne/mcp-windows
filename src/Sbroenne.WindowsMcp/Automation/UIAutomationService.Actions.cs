@@ -1306,9 +1306,28 @@ public sealed partial class UIAutomationService
             return field1001;
         }
 
-        return dialog.FindFirst(
+        // Last resort: pick an Edit descendant, but never the address/breadcrumb bar or the search
+        // box. Those realize before the File name combo on a freshly opened dialog, so a blind
+        // "first Edit" match can grab the wrong control (its Name looks like "Address: C:\...") and
+        // every typed path then lands in the wrong field, leaving the dialog stuck open. Returning
+        // null here lets the caller keep polling until the real File name edit appears.
+        var editControls = dialog.FindAll(
             UIA.TreeScope.TreeScope_Descendants,
             Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit));
+        for (var i = 0; i < editControls.Length; i++)
+        {
+            var candidate = editControls.GetElement(i);
+            var name = candidate.GetName() ?? string.Empty;
+            if (name.StartsWith("Address", StringComparison.OrdinalIgnoreCase)
+                || name.Contains("Search", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return null;
     }
 
     /// <summary>
