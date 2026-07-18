@@ -1298,34 +1298,15 @@ public sealed partial class UIAutomationService
             }
         }
 
-        // Do NOT blindly match AutomationId "1001": on the modern IFileDialog that id belongs to the
-        // address/breadcrumb bar edit, which realizes before the FileNameControlHost combo. Because the
-        // caller polls and accepts the first non-null match, returning it here would lock onto the
-        // address bar so every typed path lands in the wrong control and the dialog never closes.
-        //
-        // Last resort: pick an Edit descendant, but never the address/breadcrumb bar or the search box.
-        // Returning null lets the caller keep polling until the real File name edit appears.
-        var editControls = dialog.FindAll(
-            UIA.TreeScope.TreeScope_Descendants,
-            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit));
-        for (var i = 0; i < editControls.Length; i++)
-        {
-            var candidate = editControls.GetElement(i);
-            if (string.Equals(candidate.GetAutomationId(), "1001", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            var name = candidate.GetName() ?? string.Empty;
-            if (name.StartsWith("Address", StringComparison.OrdinalIgnoreCase)
-                || name.Contains("Search", StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
-
-            return candidate;
-        }
-
+        // Return null (not a blind Edit match) when the File name combo has not realized yet. The
+        // caller polls this finder, so returning any early Edit is dangerous:
+        //   - AutomationId "1001" on the modern IFileDialog is the address/breadcrumb bar, and a
+        //     blind first-Edit match grabs it too. Typing then lands in the wrong control and the
+        //     dialog never closes (observed value "Address: C:\...").
+        //   - A heavy FindAll(Descendants)+per-element property scan on every poll starves the shared
+        //     UIA STA thread, which stalls GetTree in other tests running in parallel.
+        // Both standard Save and Open dialogs expose FileNameControlHost, so waiting for it is
+        // reliable; keep polling until it appears.
         return null;
     }
 
