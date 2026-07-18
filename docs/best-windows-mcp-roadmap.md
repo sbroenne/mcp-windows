@@ -97,9 +97,19 @@ MCP/CLI parity from a single source of truth with zero business-logic duplicatio
 test asserts the CLI and MCP JSON outputs are byte-for-byte equal). Ships with a `windows-cli`
 plugin skill and `wincli guidance`/`tools`/`--help` discovery.
 
-**Deferred:** the `Core`/`Service` extraction and source generators (define each op once, emit both
-the MCP tool and the CLI verb) remain a future refactor — valuable for scaling, but not required now
-that parity is structurally guaranteed by reusing the tool methods directly.
+**Shared tool catalog (issue #159, increment 1):** the tool surface now also has a single,
+programmatic source of truth. `Sbroenne.WindowsMcp.Catalog.ToolCatalog` reads the exact SDK tool
+registrations (`WithToolsFromAssembly`) and both surfaces derive from it: the MCP server advertises
+them via `tools/list`, and the CLI exposes the identical manifest through `wincli tools --json`
+(names, descriptions, JSON input schemas) for machine discovery by coding agents. A contract test
+(`CliToolCoverageTests`) fails the build if any MCP tool lacks a matching `wincli` command, so the
+two entry points cannot drift.
+
+**Deferred (issue #159, remaining):** generating the CLI argument-binding verbs themselves from the
+op definitions (the full `Core`/`Service` + source-generator refactor — define each op once, emit
+both the MCP tool and the CLI verb). Valuable for scaling the op count, but lower priority now that
+(a) parity is structurally guaranteed by reusing the tool methods and (b) tool discovery is driven
+from the shared catalog with a build-breaking drift guard.
 
 ### 6. Trust: safety, observability, testing
 - Consistent, real recovery hints (no references to non-existent tools).
@@ -114,7 +124,7 @@ that parity is structurally guaranteed by reusing the tool methods directly.
 | **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
 | **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
 | **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard ✅ (`clipboard`), generalized dialogs ✅ (`file_open`); UIA event waits deferred (polling proven, see pillar 3) | The unbeatable part |
-| **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill | Strategic ✅ CLI + Skill done (shared-tool adapter; generator refactor deferred) |
+| **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill + shared `ToolCatalog` (`wincli tools --json`, drift-guard test, issue #159) | Strategic ✅ CLI + Skill + tool catalog done (full verb generator deferred, #159) |
 | **4** | Deterministic macros | Workflow record & replay ✅ (`ui_macro`); Win32/MSAA fallback deferred (UIA bridges MSAA; physical-input fallback covers the gap — see pillar 4) | Long tail |
 
 Phase 0 is almost entirely wiring code already written and tested in the service layer —

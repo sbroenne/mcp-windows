@@ -20,6 +20,11 @@ The CLI and the MCP server are **twins**. Every `wincli` command calls the exact
 This is verified by an integration test (`Cli_UiFind_MatchesMcpServerOutputExactly`) that asserts
 the CLI and MCP outputs are equal for the same call.
 
+The tool surface itself also has a single source of truth: `wincli tools --json` reports the exact
+same tool names, descriptions, and JSON input schemas the MCP server advertises via `tools/list`
+(both read from the shared `ToolCatalog`). A contract test (`CliToolCoverageTests`) fails the build
+if any MCP tool lacks a matching `wincli` command, so the two entry points can never drift.
+
 ## Usage
 
 ```
@@ -32,6 +37,7 @@ wincli <group> [<action>] [--option value] [--flag]
 | --- | --- |
 | `wincli --help` | Command map + common workflow |
 | `wincli tools` | Every command with its options |
+| `wincli tools --json` | Machine-readable tool manifest (names, descriptions, JSON input schemas) — ideal for agents |
 | `wincli guidance` | The full automation guide (same text the MCP host receives) |
 | `wincli --version` | Version |
 

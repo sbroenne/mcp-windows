@@ -18,6 +18,8 @@ so there is no server session to keep alive).
 
 - `wincli --help` - the command map and a common workflow.
 - `wincli tools` - every command with its options.
+- `wincli tools --json` - machine-readable tool manifest (names, descriptions, JSON input schemas);
+  the same surface the MCP server exposes via `tools/list`. Parse this to construct calls precisely.
 - `wincli guidance` - the full semantic-automation guide (same text the MCP host receives).
 
 ## Preferred workflow

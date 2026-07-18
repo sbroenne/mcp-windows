@@ -1,3 +1,4 @@
+using Sbroenne.WindowsMcp.Catalog;
 using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Prompts;
 
@@ -36,7 +37,16 @@ switch (first)
 
     case "tools":
     case "commands":
-        Console.Out.WriteLine(HelpText.Tools);
+        // `--json` emits the machine-readable tool manifest (name, description, JSON input schema)
+        // straight from the shared tool catalog - ideal for coding agents discovering the surface.
+        if (args.Any(a => a.Equals("--json", StringComparison.OrdinalIgnoreCase)))
+        {
+            Console.Out.WriteLine(ToolCatalog.ToJson());
+        }
+        else
+        {
+            Console.Out.WriteLine(HelpText.Tools);
+        }
         return ExitCodes.Success;
 
     case "guidance":

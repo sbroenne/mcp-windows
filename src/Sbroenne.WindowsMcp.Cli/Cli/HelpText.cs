@@ -26,6 +26,7 @@ internal static class HelpText
         DISCOVERY
           wincli --help                 Show this help.
           wincli tools                  List every command with its key options.
+          wincli tools --json           Machine-readable tool manifest (names + JSON input schemas).
           wincli guidance               Print the full automation guide (recommended read first).
           wincli --version              Print the version.
 
@@ -114,5 +115,6 @@ internal static class HelpText
             Replay uses the identical batch engine, so a macro run == the equivalent ui batch call.
 
         Global: add --include-diagnostics to any command for timing/diagnostic details.
+        Machine-readable: run 'wincli tools --json' for the full tool manifest (names + JSON schemas).
         """;
 }
