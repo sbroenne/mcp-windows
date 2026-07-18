@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Clipboard;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Utilities;
 using UIA = Interop.UIAutomationClient;
@@ -284,68 +283,74 @@ public sealed partial class UIAutomationService
 
         var normalizedPath = filePath.Replace('/', '\\');
 
-        // Enter the path atomically via clipboard paste rather than per-character typing. Unlike Save,
-        // the Open dialog auto-completes against files that already exist in the target directory and
-        // validates existence (CheckFileExists). Character-by-character typing can have an intermediate
-        // autocomplete suggestion committed - truncating the directory so the file no longer resolves -
-        // and a single dropped keystroke on a busy desktop has the same effect. Pasting the whole string
-        // in one gesture bypasses per-keystroke autocomplete and dropped-keystroke garbling.
+        // Enter the path with SendInput keyboard typing - the same mechanism the proven-reliable Save
+        // flow uses (see FillSaveDialogAsync). The Windows file dialog only updates its internal path
+        // state from real keyboard input: neither the UIA Value pattern nor a clipboard paste feeds the
+        // dialog's CheckFileExists resolver, so a pasted path can appear in the box yet leave the dialog
+        // refusing to close. Typing drives the internal state correctly.
         //
-        // The only reliable success signal is the dialog closing: the Open dialog stays open when the
-        // field is empty or the path does not resolve. So paste, confirm, and check for close; if it
-        // stays open, re-focus, re-paste and retry. This is robust even when the filename control's
-        // UIA Value pattern does not echo the pasted text back.
-        var clipboard = new ClipboardService(_staThread);
-        var savedClipboard = (await clipboard.GetTextAsync(cancellationToken)).Text;
+        // The only reliable success signal is the dialog closing: the Open dialog stays open while the
+        // field is empty or the path does not resolve. So type, click Open, and check for close; if it
+        // stays open, re-focus, retype and retry. We click the Open button rather than pressing Enter,
+        // which can commit an autocomplete suggestion instead (FlaUI pattern).
         string? lastObservedValue = null;
 
-        try
+        for (var attempt = 0; attempt < 3; attempt++)
         {
-            _ = await clipboard.SetTextAsync(normalizedPath, cancellationToken);
-
-            for (var attempt = 0; attempt < 3; attempt++)
+            await _staThread.ExecuteAsync(() => { editField.TrySetFocus(); return true; }, cancellationToken);
+            if (editFieldCenter is { Length: 2 })
             {
-                await _staThread.ExecuteAsync(() => { editField.TrySetFocus(); return true; }, cancellationToken);
-                if (editFieldCenter is { Length: 2 })
-                {
-                    await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
-                }
-
-                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
-                await _keyboardService.PressKeyAsync("v", ModifierKey.Ctrl, cancellationToken: cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-
-                lastObservedValue = await _staThread.ExecuteAsync(
-                    () => editField.TryGetValue(), cancellationToken);
-
-                var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
-                if (!openClicked)
-                {
-                    await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
-                }
-
-                if (await WaitForDialogCloseAsync(dialog, cancellationToken))
-                {
-                    return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
-                }
+                await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
             }
 
-            return UIAutomationResult.CreateFailure(
-                "open",
-                UIAutomationErrorType.Timeout,
-                "Open could not be verified because the Open dialog remained open after entering " +
-                $"'{normalizedPath}'. Last File name value observed: '{lastObservedValue ?? "<null>"}'. " +
-                "The path may be invalid or the app rejected the file; open the dialog manually with " +
-                "ui_click, type the path with ui_type, then confirm.",
-                CreateDiagnostics(stopwatch));
+            // Wait for the edit field to actually own keyboard focus so the typed path lands in it.
+            _ = await DeterministicWait.UntilAsync(
+                async () => await _staThread.ExecuteAsync(
+                    () =>
+                    {
+                        try
+                        {
+                            return editField.CurrentHasKeyboardFocus != 0;
+                        }
+                        catch (COMException)
+                        {
+                            return false;
+                        }
+                    },
+                    cancellationToken),
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromMilliseconds(25),
+                cancellationToken: cancellationToken);
+
+            await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+            await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
+            await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+            lastObservedValue = await _staThread.ExecuteAsync(
+                () => editField.TryGetValue(), cancellationToken);
+
+            var openClicked = await ClickOpenButtonAsync(dialog, cancellationToken);
+            if (!openClicked)
+            {
+                await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+            }
+
+            if (await WaitForDialogCloseAsync(dialog, cancellationToken))
+            {
+                return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
+            }
         }
-        finally
-        {
-            // Restore whatever the user had on the clipboard before the operation.
-            _ = await clipboard.SetTextAsync(savedClipboard ?? string.Empty, cancellationToken);
-        }
+
+        return UIAutomationResult.CreateFailure(
+            "open",
+            UIAutomationErrorType.Timeout,
+            "Open could not be verified because the Open dialog remained open after entering " +
+            $"'{normalizedPath}'. Last File name value observed: '{lastObservedValue ?? "<null>"}'. " +
+            "The path may be invalid or the app rejected the file; open the dialog manually with " +
+            "ui_click, type the path with ui_type, then confirm.",
+            CreateDiagnostics(stopwatch));
     }
 
     /// <summary>
