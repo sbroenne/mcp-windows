@@ -253,6 +253,7 @@ Read text from elements using UI Automation or OCR.
 | `controlType` | Control type filter | No |
 | `includeChildren` | Include child element text | No (default: false) |
 | `language` | OCR language code (e.g., 'en-US') | No |
+| `format` | `raw` (default) or `article` for clean web-page text | No |
 
 ### Capabilities
 
@@ -260,6 +261,11 @@ Read text from elements using UI Automation or OCR.
 - Automatic OCR fallback for custom-rendered text
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
+- **Article mode (`format: "article"`)** for web pages in Edge/Chrome: returns the main
+  content only — navigation chrome, breadcrumbs, and "in this article" rails are dropped,
+  inline link URLs are stripped (visible link text is kept), and headings/lists are emitted
+  as lightweight markdown. Because it reads the live signed-in browser window via UI
+  Automation, it also works for authenticated/internal pages that an HTTP fetch cannot reach.
 
 ---
 

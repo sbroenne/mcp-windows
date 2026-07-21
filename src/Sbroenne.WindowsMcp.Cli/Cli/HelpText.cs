@@ -73,7 +73,7 @@ internal static class HelpText
         ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>] [--with-snapshot]
         ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first] [--with-snapshot]
         ui select   --window <h> --value <s> [selectors] [--with-snapshot]
-        ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>]
+        ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>] [--format raw|article]
         ui read-table --window <h> [selectors|--element-id <id>] [--max-rows <n>] [--max-columns <n>]
         ui wait     [--window <h>] [--mode appear|disappear|...] [--element-id <id>]
                      [--desired-state <s>] [selectors] [--timeout-ms <n>]

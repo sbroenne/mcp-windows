@@ -10,7 +10,18 @@ namespace Sbroenne.WindowsMcp.Automation;
 public sealed partial class UIAutomationService
 {
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken = default)
+    public Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, CancellationToken cancellationToken = default)
+        => GetTextAsync(elementId, windowHandle, includeChildren, TextExtractionMode.Raw, cancellationToken);
+
+    /// <summary>
+    /// Extracts text from an element or window, either as raw aggregated text or as clean article text.
+    /// </summary>
+    /// <param name="elementId">Optional stable element id to read directly.</param>
+    /// <param name="windowHandle">Window handle used when no element id is supplied.</param>
+    /// <param name="includeChildren">Whether to aggregate descendant text (raw mode only).</param>
+    /// <param name="mode">Raw aggregation or clean article extraction.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public async Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, TextExtractionMode mode, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -45,7 +56,9 @@ public sealed partial class UIAutomationService
                     }
                 }
 
-                var text = ExtractText(targetElement, includeChildren);
+                var text = mode == TextExtractionMode.Article
+                    ? ExtractArticleText(targetElement)
+                    : ExtractText(targetElement, includeChildren);
 
                 return UIAutomationResult.CreateSuccessWithText("get_text", text, CreateDiagnostics(stopwatch));
             }, cancellationToken);
