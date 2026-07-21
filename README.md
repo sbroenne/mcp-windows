@@ -72,11 +72,19 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 
 | Tool | Purpose |
 |------|---------|
+| `ui_snapshot` | Capture a compact element tree of a window (orient first) |
+| `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
-| `ui_find` | Discover elements in a window (with timeout/retry) |
+| `ui_select` | Pick a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (with OCR fallback) |
+| `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
+| `ui_wait` | Wait for an element to appear, disappear, or reach a state |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/key) in one call |
+| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog |
+| `file_open` | Open an existing file via the Open dialog |
+| `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |
 | `mouse_control` | Coordinate-based clicks (fallback for games) |
@@ -84,6 +92,30 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `app` | Launch applications |
 
 Full reference: [FEATURES.md](FEATURES.md)
+
+## Command-line interface (`wincli`)
+
+The server ships with a **twin command-line entry point**, `wincli`, in
+[`src/Sbroenne.WindowsMcp.Cli`](src/Sbroenne.WindowsMcp.Cli/README.md). It exposes the exact same
+capabilities as the MCP server — every command calls the same underlying tool, so the JSON output is
+byte-for-byte identical to the MCP tools (verified by a parity test).
+
+`wincli` is the **token-efficient path for coding agents**: instead of loading every MCP tool schema
+into context, an agent with shell access discovers the whole surface through `--help` / `tools` /
+`guidance` and issues one command per action. Because window handles are OS-global, each call is
+stateless — there is no server session to keep alive.
+
+```powershell
+wincli window find --title Notepad           # -> window handle
+wincli ui snapshot --window 12345            # accessible element tree
+wincli ui click --window 12345 --name Submit --with-snapshot
+wincli clipboard set --text "hello"          # write the clipboard
+wincli macro run --name login --window 12345 # replay a saved workflow
+wincli guidance                              # full automation guide
+```
+
+Exit codes: `0` success, `1` tool error, `2` usage error. See the
+[CLI README](src/Sbroenne.WindowsMcp.Cli/README.md) for the full command reference.
 
 ## ⚠️ Caution
 

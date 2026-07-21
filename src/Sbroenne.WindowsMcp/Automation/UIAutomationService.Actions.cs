@@ -215,6 +215,43 @@ public sealed partial class UIAutomationService
         }
     }
 
+    /// <summary>
+    /// Types text into a previously-discovered element addressed by its stable element id
+    /// (from ui_find/ui_snapshot), skipping the find step. Useful for reusing a known element
+    /// across multiple actions without re-querying.
+    /// </summary>
+    public async Task<UIAutomationResult> TypeIntoElementAsync(string elementId, string text, bool clearFirst, string? windowHandle, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(elementId);
+        var stopwatch = Stopwatch.StartNew();
+
+        // Normalize Windows file paths for consistency with FindAndTypeAsync.
+        text = PathNormalizer.NormalizeWindowsPath(text);
+
+        try
+        {
+            return await PerformTypeAsync(elementId, text, clearFirst, windowHandle, stopwatch, cancellationToken);
+        }
+        catch (COMException ex)
+        {
+            LogFindAndTypeError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorMessage(ex, "Type"),
+                CreateDiagnostics(stopwatch));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            LogFindAndTypeError(_logger, elementId, ex);
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.InternalError,
+                $"Type failed: {ex.Message}",
+                CreateDiagnostics(stopwatch));
+        }
+    }
+
     private static List<ElementQuery> BuildTypeSearchQueries(ElementQuery baseQuery)
     {
         var queries = new List<ElementQuery>();
@@ -1240,15 +1277,17 @@ public sealed partial class UIAutomationService
 
     private static UIA.IUIAutomationElement? FindSaveDialogEditField(UIA.IUIAutomationElement dialog)
     {
-        // FileNameControlHost is a ComboBox — use its inner Edit so the shell updates
-        // its internal path state rather than only changing the displayed text.
+        var editCondition = Uia.CreatePropertyCondition(
+            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
+
+        // Vista-style common dialog: the File name combo has AutomationId "FileNameControlHost".
+        // Use its inner Edit so the shell updates its internal path state rather than only changing
+        // the displayed text.
         var fileNameHost = dialog.FindFirst(
             UIA.TreeScope.TreeScope_Descendants,
             Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "FileNameControlHost"));
         if (fileNameHost != null)
         {
-            var editCondition = Uia.CreatePropertyCondition(
-                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit);
             var innerEdit = fileNameHost.FindFirst(UIA.TreeScope.TreeScope_Descendants, editCondition);
             if (innerEdit != null)
             {
@@ -1261,17 +1300,37 @@ public sealed partial class UIAutomationService
             }
         }
 
-        var field1001 = dialog.FindFirst(
+        // Classic Win32 file dialog (what the Open dialog renders as): the File name edit has the
+        // well-known control id 1148. Require the Edit control type so we get the inner edit rather
+        // than the wrapping ComboBox that shares the same id.
+        var classicFileNameEdit = dialog.FindFirst(
             UIA.TreeScope.TreeScope_Descendants,
-            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1001"));
-        if (field1001 != null)
+            Uia.CreateAndCondition(
+                editCondition,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1148")));
+        if (classicFileNameEdit != null)
         {
-            return field1001;
+            return classicFileNameEdit;
         }
 
-        return dialog.FindFirst(
+        // Name-based fallback for localized/variant dialogs whose File name edit lacks id 1148.
+        var namedFileNameEdit = dialog.FindFirst(
             UIA.TreeScope.TreeScope_Descendants,
-            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Edit));
+            Uia.CreateAndCondition(
+                editCondition,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "File name:")));
+        if (namedFileNameEdit != null)
+        {
+            return namedFileNameEdit;
+        }
+
+        // Return null (never a blind Edit match) when the File name field has not realized yet. The
+        // caller polls this finder, so returning any early Edit is dangerous: AutomationId "1001" is
+        // the address/breadcrumb bar and "SearchEditBox" is the search box, and typing a path into
+        // either leaves the dialog open. Keep polling until a positively-identified File name edit
+        // appears. All lookups above are cheap FindFirst calls so polling cannot starve the shared
+        // UIA STA thread.
+        return null;
     }
 
     /// <summary>

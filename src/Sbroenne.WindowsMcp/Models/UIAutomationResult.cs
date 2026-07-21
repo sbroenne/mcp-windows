@@ -42,6 +42,16 @@ public sealed record UIAutomationResult
     public UIElementCompactTree[]? Tree { get; init; }
 
     /// <summary>
+    /// Post-action window snapshot ("perceive/act fusion"). When an interactive tool is called
+    /// with withSnapshot=true, this carries the window's element tree captured immediately after
+    /// the action succeeded, so agents can verify the new state without a separate ui_snapshot call.
+    /// Same shape as <see cref="Tree"/>: id, name, type, click:[x,y,monitor], enabled, children.
+    /// </summary>
+    [JsonPropertyName("postActionTree")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIElementCompactTree[]? PostActionTree { get; init; }
+
+    /// <summary>
     /// Number of elements found.
     /// </summary>
     [JsonPropertyName("elementCount")]
@@ -62,6 +72,14 @@ public sealed record UIAutomationResult
     [JsonPropertyName("text")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Text { get; init; }
+
+    /// <summary>
+    /// Structured tabular data (for read_table action). Rows/columns extracted from a
+    /// grid/table/list control via the UIA Grid and Table patterns.
+    /// </summary>
+    [JsonPropertyName("table")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UITableData? Table { get; init; }
 
     /// <summary>
     /// Error type if failed.
@@ -320,6 +338,31 @@ public sealed record UIAutomationResult
     }
 
     /// <summary>
+    /// Creates a success result with structured table data.
+    /// </summary>
+    /// <param name="action">The action performed.</param>
+    /// <param name="table">The extracted tabular data.</param>
+    /// <param name="diagnostics">Optional diagnostics.</param>
+    /// <returns>A success result carrying the table payload.</returns>
+    public static UIAutomationResult CreateSuccessWithTable(string action, UITableData table, UIAutomationDiagnostics? diagnostics = null)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+
+        var hint = table.Truncated == true
+            ? $"Extracted {table.Rows.Length} of {table.RowCount} rows x {table.ColumnCount} columns (truncated). Increase maxRows/maxColumns to read the rest."
+            : $"Extracted {table.Rows.Length} rows x {table.ColumnCount} columns.";
+
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            Table = table,
+            UsageHint = hint,
+            Diagnostics = diagnostics
+        };
+    }
+
+    /// <summary>
     /// Creates a failure result.
     /// </summary>
     /// <param name="action">The action attempted.</param>
@@ -350,10 +393,10 @@ public sealed record UIAutomationResult
     private static string GetDefaultRecoverySuggestion(string errorType) => errorType switch
     {
         UIAutomationErrorType.ElementNotFound =>
-            "Element not found. Try get_tree (default depth=2) to explore, or use parentElementId to drill into a specific subtree.",
+            "Element not found. Try ui_snapshot to see the window's element tree, or pass parentElementId to ui_snapshot to drill into a specific subtree, then act with the returned selectors.",
 
         UIAutomationErrorType.MultipleMatches =>
-            "Multiple elements matched. Add automationId, use parentElementId to scope search, or specify foundIndex to select which match.",
+            "Multiple elements matched. Add automationId, scope with ui_snapshot parentElementId, or specify foundIndex to select which match.",
 
         UIAutomationErrorType.PatternNotSupported =>
             "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",

@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
+using Sbroenne.WindowsMcp.Clipboard;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Macros;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tools;
@@ -41,6 +43,8 @@ public static class WindowsToolsBase
     private static readonly AnnotatedScreenshotService _annotatedScreenshotService = new(
         _uiAutomationService, _screenshotService, _imageProcessor);
     private static readonly LegacyOcrService _legacyOcrService = new(NullLogger<LegacyOcrService>.Instance);
+    private static readonly ClipboardService _clipboardService = new(_uiAutomationThread);
+    private static readonly MacroService _macroService = new();
 
     /// <summary>Gets the monitor service.</summary>
     public static MonitorService MonitorService => _monitorService;
@@ -83,6 +87,12 @@ public static class WindowsToolsBase
 
     /// <summary>Gets the legacy OCR service.</summary>
     public static LegacyOcrService LegacyOcrService => _legacyOcrService;
+
+    /// <summary>Gets the clipboard service.</summary>
+    public static ClipboardService ClipboardService => _clipboardService;
+
+    /// <summary>Gets the macro (record &amp; replay) service.</summary>
+    public static MacroService MacroService => _macroService;
 
     /// <summary>
     /// JSON serializer options for tool response serialization, optimized for LLM token efficiency.
@@ -293,6 +303,46 @@ public static class WindowsToolsBase
             Content = [new TextContentBlock { Text = SerializeToolError(actionName, ex) }],
             IsError = true
         };
+    }
+
+    /// <summary>
+    /// Perceive/act fusion: when <paramref name="withSnapshot"/> is set and the action succeeded,
+    /// captures the target window's post-action element tree and attaches it to the result as
+    /// <see cref="UIAutomationResult.PostActionTree"/>. Best-effort - a snapshot failure never
+    /// turns a successful action into a failure.
+    /// </summary>
+    /// <param name="result">The action result to augment.</param>
+    /// <param name="windowHandle">Target window handle whose post-action state to capture.</param>
+    /// <param name="withSnapshot">Whether the caller requested the fused snapshot.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The original result, augmented with a post-action tree when applicable.</returns>
+    public static async Task<UIAutomationResult> WithPostActionSnapshotAsync(
+        UIAutomationResult result,
+        string? windowHandle,
+        bool withSnapshot,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (!withSnapshot || !result.Success || string.IsNullOrWhiteSpace(windowHandle))
+        {
+            return result;
+        }
+
+        try
+        {
+            var snapshot = await UIAutomationService.GetTreeAsync(windowHandle, null, 5, null, cancellationToken);
+            if (snapshot.Success && snapshot.Tree is { Length: > 0 })
+            {
+                return result with { PostActionTree = snapshot.Tree };
+            }
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Fusion is a convenience; never fail the underlying action because the snapshot failed.
+        }
+
+        return result;
     }
 
     private static int GetTimeoutFromEnvironment()

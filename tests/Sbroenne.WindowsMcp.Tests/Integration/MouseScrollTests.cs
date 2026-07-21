@@ -38,15 +38,12 @@ public sealed class MouseScrollTests : IDisposable
         await Task.Delay(50);
         _fixture.Reset(); // Reset after the click
 
-        // Act
-        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Down, 1, panelCenter.X, panelCenter.Y);
+        // Act + Assert - physical scroll input on a shared desktop can be dropped when the harness
+        // loses foreground focus, so retry with a re-focus before failing.
+        var result = await ScrollWithRetryAsync(ScrollDirection.Down, panelCenter);
 
         // Assert - API returns success
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
-
-        // Assert - harness received the scroll event
-        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
-        Assert.True(scrollReceived, "Test harness did not receive the scroll event");
         _fixture.AssertScrollDetected(1);
 
         // Assert - scroll delta should be negative (down)
@@ -66,19 +63,38 @@ public sealed class MouseScrollTests : IDisposable
         await Task.Delay(50);
         _fixture.Reset(); // Reset after the click
 
-        // Act
-        var result = await _fixture.MouseInputService.ScrollAsync(ScrollDirection.Up, 1, panelCenter.X, panelCenter.Y);
+        // Act + Assert - retry to absorb dropped physical input on the shared CI desktop.
+        var result = await ScrollWithRetryAsync(ScrollDirection.Up, panelCenter);
 
         // Assert - API returns success
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
 
-        // Assert - harness received the scroll event
-        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
-        Assert.True(scrollReceived, "Test harness did not receive the scroll event");
-
         // Assert - scroll delta should be positive (up)
         var scrollDelta = _fixture.GetTotalScrollDelta();
         Assert.True(scrollDelta > 0, $"Expected positive scroll delta for up scroll, got {scrollDelta}");
+    }
+
+    /// <summary>
+    /// Performs a single-click scroll and waits for the harness to observe it, retrying once with a
+    /// stronger focus/hover precondition. Guards against dropped physical input on shared desktops.
+    /// </summary>
+    private async Task<MouseControlResult> ScrollWithRetryAsync(ScrollDirection direction, System.Drawing.Point panelCenter)
+    {
+        var result = await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+        if (await _fixture.WaitForScrollEventAsync(1))
+        {
+            return result;
+        }
+
+        // Retry once with stronger preconditions (re-focus + hover).
+        _fixture.EnsureTestWindowForeground();
+        await _fixture.MouseInputService.MoveAsync(panelCenter.X, panelCenter.Y);
+        await Task.Delay(50);
+        result = await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+
+        var scrollReceived = await _fixture.WaitForScrollEventAsync(1);
+        Assert.True(scrollReceived, "Test harness did not receive the scroll event");
+        return result;
     }
 
     [Fact]

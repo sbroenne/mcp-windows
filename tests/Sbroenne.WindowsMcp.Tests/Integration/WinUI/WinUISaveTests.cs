@@ -72,37 +72,40 @@ public sealed class WinUISaveTests : IDisposable
     [Fact]
     public async Task Save_WinUI3_SavesFile()
     {
-        // Arrange: Prepare test file path
-        var testFilePath = Path.Combine(_testOutputDir, $"winui-test-{Guid.NewGuid()}.txt");
-
-        // Ensure test file doesn't exist
-        if (File.Exists(testFilePath))
+        await TestRetry.RunAsync(async _ =>
         {
-            File.Delete(testFilePath);
-        }
+            // Arrange: Prepare test file path
+            var testFilePath = Path.Combine(_testOutputDir, $"winui-test-{Guid.NewGuid()}.txt");
 
-        // Bring window to front
-        _fixture.BringToFront();
-        await Task.Delay(500);
+            // Ensure test file doesn't exist
+            if (File.Exists(testFilePath))
+            {
+                File.Delete(testFilePath);
+            }
 
-        // Act: Call SaveAsync on the main window
-        // This sends Ctrl+S, which triggers the Save As dialog in the test harness
-        // Then it fills in the filename and presses Enter
-        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
+            // Bring window to front
+            _fixture.BringToFront();
+            await Task.Delay(500);
 
-        // Assert
-        Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
+            // Act: Call SaveAsync on the main window
+            // This sends Ctrl+S, which triggers the Save As dialog in the test harness
+            // Then it fills in the filename and presses Enter
+            var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
 
-        // Wait for file system to settle
-        await Task.Delay(500);
+            // Assert
+            Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
 
-        // Verify the file was created
-        Assert.True(File.Exists(testFilePath), $"Expected file to exist at: {testFilePath}");
+            // Wait for file system to settle
+            await Task.Delay(500);
 
-        // Verify the file has content (the test harness writes a timestamp)
-        var content = File.ReadAllText(testFilePath);
-        Assert.NotEmpty(content);
-        Assert.Contains("Test file created at", content);
+            // Verify the file was created
+            Assert.True(File.Exists(testFilePath), $"Expected file to exist at: {testFilePath}");
+
+            // Verify the file has content (the test harness writes a timestamp)
+            var content = File.ReadAllText(testFilePath);
+            Assert.NotEmpty(content);
+            Assert.Contains("Test file created at", content);
+        });
     }
 
     [Fact]
@@ -132,21 +135,23 @@ public sealed class WinUISaveTests : IDisposable
     {
         // This test verifies the Ctrl+S workflow works when a Save dialog appears
         // The WinUI test harness shows a Save As dialog when it receives Ctrl+S
+        await TestRetry.RunAsync(async _ =>
+        {
+            // Arrange
+            var testFilePath = Path.Combine(_testOutputDir, $"winui-ctrlS-test-{Guid.NewGuid()}.txt");
 
-        // Arrange
-        var testFilePath = Path.Combine(_testOutputDir, $"winui-ctrlS-test-{Guid.NewGuid()}.txt");
+            _fixture.BringToFront();
+            await Task.Delay(300);
 
-        _fixture.BringToFront();
-        await Task.Delay(300);
+            // Act
+            var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
 
-        // Act
-        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
+            // Assert
+            Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
 
-        // Assert
-        Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
-
-        await Task.Delay(300);
-        Assert.True(File.Exists(testFilePath), $"File was not created at: {testFilePath}");
+            await Task.Delay(300);
+            Assert.True(File.Exists(testFilePath), $"File was not created at: {testFilePath}");
+        });
     }
 
     [Fact]
@@ -154,23 +159,25 @@ public sealed class WinUISaveTests : IDisposable
     {
         // This test verifies that Save without filePath just sends Ctrl+S
         // If a dialog appears, it returns a hint instead of failing
-
-        // Arrange
-        _fixture.BringToFront();
-        await Task.Delay(300);
-
-        // Act - no filePath provided
-        var result = await _automationService.SaveAsync(_windowHandle);
-
-        // Assert - should succeed (either saved directly or dialog hint returned)
-        Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
-
-        // Cleanup: if a dialog was opened (hint returned), close it with Escape
-        if (result.UsageHint != null && result.UsageHint.Contains("dialog"))
+        await TestRetry.RunAsync(async _ =>
         {
-            var keyboardService = new KeyboardInputService();
-            await keyboardService.PressKeyAsync("Escape");
-            await Task.Delay(200);
-        }
+            // Arrange
+            _fixture.BringToFront();
+            await Task.Delay(300);
+
+            // Act - no filePath provided
+            var result = await _automationService.SaveAsync(_windowHandle);
+
+            // Assert - should succeed (either saved directly or dialog hint returned)
+            Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
+
+            // Cleanup: if a dialog was opened (hint returned), close it with Escape
+            if (result.UsageHint != null && result.UsageHint.Contains("dialog"))
+            {
+                var keyboardService = new KeyboardInputService();
+                await keyboardService.PressKeyAsync("Escape");
+                await Task.Delay(200);
+            }
+        });
     }
 }

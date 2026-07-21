@@ -67,8 +67,12 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Click a button by name | `ui_click` | Semantic, works at any DPI/theme |
 | Type text into a field | `ui_type` | Direct text input with clear option |
 | Read text from elements | `ui_read` | Get text via UIA or OCR |
+| Extract a table/grid to structured rows | `ui_read_table` | Rows + headers as JSON, no OCR/screenshot parsing |
 | Wait for windows | `window_management` | Use `wait_for` action for new windows |
 | Save files | `file_save` | Handle Save As dialogs automatically |
+| Open an existing file | `file_open` | Handle Open dialogs automatically |
+| Move bulk text in/out of an app | `clipboard` | Fastest text IO; pair with copy/paste hotkeys |
+| Record & replay a workflow | `ui_macro` | Save a `ui_batch` sequence by name, replay it later |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
@@ -92,15 +96,37 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Tool | Description |
 |------|-------------|
 | `app` | Launch applications |
+| `ui_snapshot` | Capture a compact element tree of a window (orient primitive) |
 | `ui_find` | Find UI elements by name, type, or ID (with timeout/retry via `timeoutMs`) |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
+| `ui_select` | Select a value in a combo box, list, or tab |
 | `ui_read` | Read text from elements (UIA + OCR) |
+| `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
+| `ui_wait` | Wait for an element to appear, disappear, or reach a state |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key) in one call |
+| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog (English Windows only) |
+| `file_open` | Open an existing file via the Open dialog (English Windows only) |
+| `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
 | `window_management` | Window control and management |
+
+### Two ways to call these tools
+
+Every tool listed above is available through **two equal entry points that share one implementation**:
+
+- **MCP server** — the tool schemas documented in this file (for MCP hosts).
+- **`wincli` CLI** — the same tools as shell commands (for coding agents with terminal access).
+  The CLI calls the exact same tool methods, so its JSON output is byte-for-byte identical to the
+  MCP tools. It is the token-efficient path: discover everything via `wincli --help` / `wincli tools`
+  / `wincli guidance` instead of loading every MCP schema. Command mapping mirrors the tool names,
+  e.g. `ui_click` → `wincli ui click`, `window_management` → `wincli window <action>`,
+  `screenshot_control` → `wincli screenshot`. See
+  [`src/Sbroenne.WindowsMcp.Cli/README.md`](src/Sbroenne.WindowsMcp.Cli/README.md) for the full
+  command reference.
 
 ---
 
@@ -237,6 +263,166 @@ Read text from elements using UI Automation or OCR.
 
 ---
 
+## 🧮 UI Read Table (`ui_read_table`)
+
+Extract a grid, table, or details-view list into structured rows — no OCR, screenshot parsing, or
+cell-by-cell `ui_read` loops. Uses the native UIA Grid/Table patterns, so WinForms `DataGridView`,
+WPF `DataGrid`, and Win32 `ListView` (Details view) all return clean row/column data.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | No |
+| `name` / `nameContains` / `namePattern` | Locate the grid by name | No |
+| `automationId` | Locate the grid by automation id | No |
+| `controlType` / `className` | Additional selectors | No |
+| `elementId` | Grid element id from a prior snapshot/find | No |
+| `foundIndex` | Nth match when selectors are ambiguous (1-based) | No (default: 1) |
+| `maxRows` | Cap rows returned (protects token budget) | No (default: 200) |
+| `maxColumns` | Cap columns returned | No (default: 50) |
+| `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
+
+If no selector matches an element that exposes the Grid pattern, the first grid-capable descendant
+of the target (or window root) is used automatically.
+
+### Response shape
+
+```json
+{
+  "success": true,
+  "table": {
+    "rowCount": 5,
+    "columnCount": 5,
+    "headers": ["ID", "Product Name", "Price", "Stock", "Available"],
+    "rows": [["P001", "Laptop Pro 15", "1299.99", "12", "True"]],
+    "truncated": true
+  }
+}
+```
+
+`headers` is omitted when the grid exposes no Table pattern; `truncated` is present only when
+`rowCount` exceeds the returned rows (raise `maxRows` to fetch the rest).
+
+### Capabilities
+
+- One call instead of N×M `ui_read` calls to scrape a grid
+- Column headers via the UIA Table pattern when available
+- Row/column caps keep large grids within an agent's token budget
+- Fails cleanly with a recovery hint when the target isn't a grid
+
+---
+
+## 🌳 UI Snapshot (`ui_snapshot`)
+
+Capture a compact, interactive-elements-only tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. Token-optimized (hierarchical, depth-bounded, content-view filtered for Chromium/Electron).
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle (foreground window if omitted) | No |
+| `parentElementId` | Scope the snapshot to a subtree (id from a prior snapshot/find) | No |
+| `maxDepth` | Max tree depth (default framework-aware; capped at 20) | No (default: 5) |
+| `controlTypeFilter` | Comma-separated control types to keep (e.g. 'Button,Edit') | No |
+| `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
+
+### Capabilities
+
+- One call to see what's on screen with ids, names, types, and click coordinates
+- Drill into large windows via `parentElementId`
+- Prune noise with `controlTypeFilter`
+- Feed returned ids straight into `ui_click`, `ui_type`, `ui_read`, `ui_wait`
+
+---
+
+## 🎚️ UI Select (`ui_select`)
+
+Select a value in a combo box, drop-down, list box, or tab control using the proper UI Automation selection patterns (SelectionItem/ExpandCollapse) for cross-framework reliability.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle | Yes |
+| `value` | Visible text of the option to select | Yes |
+| `name` / `nameContains` | Name/partial match of the selection control | No |
+| `automationId` | Automation ID of the control | No |
+| `controlType` | Control type (ComboBox, List, Tab) | No |
+| `foundIndex` | Nth matching control (1-based) | No (default: 1) |
+
+### Capabilities
+
+- Reliable selection without click-then-click guesswork
+- Auto-expands drop-downs when needed
+- Works across Win32, WinForms, WPF, WinUI, and browser controls
+
+---
+
+## ⏳ UI Wait (`ui_wait`)
+
+Wait until a UI condition is met before continuing - no blind sleeps or screenshot polling. Uses efficient exponential-backoff polling internally.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `mode` | `appear` (default), `disappear`, or `state` | No |
+| `windowHandle` | Target window handle for appear/disappear | No |
+| `name` / `nameContains` | Selector for appear/disappear | No |
+| `automationId` | Automation ID selector | No |
+| `controlType` | Control type selector | No |
+| `elementId` | Element id for `mode='state'` | No |
+| `desiredState` | Target state for `mode='state'` (enabled, disabled, on, off, indeterminate, visible, offscreen) | No |
+| `timeoutMs` | Max wait in milliseconds | No (default: 5000) |
+
+### Capabilities
+
+- Wait for dialogs/controls to appear before acting
+- Wait for spinners/progress dialogs to disappear
+- Wait for a specific element to become enabled/visible/toggled
+
+---
+
+## 🧩 UI Batch (`ui_batch`)
+
+Run a sequence of UI automation steps against a window in a single call. Built for coding agents: a multi-field form fill + submit that would otherwise take many `ui_type`/`ui_click` round-trips becomes one request.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle. Used for every step unless a step overrides it. | Yes |
+| `steps` | JSON array of step objects (see below). | Yes |
+| `stopOnError` | Stop at the first failing step (default: `true`). | No |
+| `withSnapshot` | Attach the window element tree after the batch completes. | No |
+
+### Step actions
+
+Each step is a JSON object with an `action` plus the fields that action needs:
+
+- `find` - selectors; resolves an element and exposes its id to the next step as `$prev`
+- `click` - selectors or `elementId`
+- `type` - selectors or `elementId`, plus `text` (optional `clearFirst`)
+- `select` - selectors, plus `value` (visible option text)
+- `wait` - `mode` (`appear`/`disappear`/`state`), selectors or `elementId`+`desiredState`, optional `timeoutMs`
+- `read` - selectors or `elementId` (or neither, to read the whole window), optional `includeChildren`
+- `snapshot` - capture the window element tree (optional `maxDepth`)
+- `key` - `key` (e.g. `enter`, `tab`, `f5`) with optional `modifiers` (`ctrl,shift,alt,win`) and `repeat`
+
+### Capabilities
+
+- One round-trip for multi-step workflows (fill username + password + submit)
+- Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
+- Chain steps by referencing the prior step's element with `elementId: "$prev"`
+- `stopOnError=false` runs every step and reports each outcome
+
+### Perceive/act fusion (`withSnapshot`)
+
+`ui_click`, `ui_type`, and `ui_select` accept `withSnapshot=true`. On success they attach the window's post-action element tree as `postActionTree`, so an agent can verify the new state without a separate `ui_snapshot` call.
+
+---
+
 ## 💾 File Save (`file_save`)
 
 Save files via Save As dialog. Handles the entire save workflow: triggers save, waits for dialog, fills path, confirms. **English Windows only** (detects English dialog titles and button text).
@@ -255,6 +441,72 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 - Fill in filename automatically
 - Handle overwrite confirmation dialogs
 - Works with Office apps, Notepad, and more
+
+---
+
+## 📂 File Open (`file_open`)
+
+Open an existing file via the standard Windows Open dialog — the counterpart to `file_save`. Sends Ctrl+O, waits for the Open dialog, types the path into the File name field, and clicks Open. **English Windows only**; the file must already exist so the operation is deterministic and never hangs on a "file not found" prompt.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
+| `filePath` | Absolute path of an existing file to open (forward/back slashes both work) | Yes |
+| `includeDiagnostics` | Include timing/diagnostic details in the response (default: false) | No |
+
+### Capabilities
+
+- Trigger Ctrl+O to open
+- Auto-detect Open dialog appearance (shares the Save-As dialog engine)
+- Fill in the file path and click Open
+- Validates the file exists up front for deterministic behavior
+
+---
+
+## 📋 Clipboard (`clipboard`)
+
+Read and write the Windows text clipboard — often the fastest way to move bulk text in and out of desktop apps, far cheaper than typing character-by-character or OCR.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | `get` (read text), `set` (write text), or `clear` | Yes |
+| `text` | Text to place on the clipboard. Required for `set`; an empty string clears | For `set` |
+
+### Capabilities
+
+- Pull text OUT of an app: focus it, `keyboard_control(key='c', modifiers='ctrl')`, then `clipboard(action='get')`
+- Push text INTO an app: `clipboard(action='set', text='...')` then `keyboard_control(key='v', modifiers='ctrl')`
+- `get` returns `text`, `length`, and `hasText`
+- Uses the raw Win32 clipboard API on a dedicated STA thread (no message-pump dependency)
+
+---
+
+## 🔁 UI Macro (`ui_macro`)
+
+Record and replay reusable UI workflows. A macro is a saved `ui_batch` steps array; running one replays it through the identical batch engine, so a macro run behaves exactly like the equivalent inline `ui_batch` call. Macros persist on disk across sessions.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | `save`, `run`, `get`, `list`, or `delete` | Yes |
+| `name` | Macro name (letters, digits, `-`, `_`, `.`) | For save/run/get/delete |
+| `steps` | A `ui_batch` steps JSON array | For save |
+| `windowHandle` | Target window handle for replay | For run |
+| `stopOnError` | For run: stop at the first failing step (default: true) | No |
+| `withSnapshot` | For run: attach the window's element tree after replay (default: false) | No |
+| `includeDiagnostics` | Reserved for parity (default: false) | No |
+
+### Capabilities
+
+- `save`: build and verify a sequence with `ui_batch`, then persist it under a name
+- `run`: replay a saved macro against any window (same `$prev` chaining and `stopOnError` semantics as `ui_batch`)
+- `list` / `get` / `delete`: manage saved macros
+- Turns a repeated multi-step task (open a form, fill fields, submit) into a single named call
 
 ---
 

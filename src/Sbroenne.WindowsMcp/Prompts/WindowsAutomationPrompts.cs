@@ -41,8 +41,12 @@ public sealed class WindowsAutomationPrompts
                 "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
                 "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
                 "• Read: ui_read(windowHandle='<handle>', nameContains='...') — get text content\n" +
+                "• Read table: ui_read_table(windowHandle='<handle>', automationId='...') — extract a grid/table/details-list into structured rows + headers in one call\n" +
 
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
+                "• Open: file_open(windowHandle='<handle>', filePath='...') — opens an existing file, handles Open dialogs automatically\n" +
+                "• Clipboard: clipboard(action='get') / clipboard(action='set', text='...') — fastest bulk text IO; pair with copy/paste hotkeys\n" +
+                "• Macro: ui_macro(action='save', name='...', steps='[...]') then ui_macro(action='run', name='...', windowHandle='<handle>') — record & replay a ui_batch sequence\n" +
                 "\n" +
                 "If you don't know element names:\n" +
                 "• screenshot_control(target='window', windowHandle='<handle>') — see numbered elements; image stays omitted by default to save tokens\n" +

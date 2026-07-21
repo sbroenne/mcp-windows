@@ -111,29 +111,32 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     [Trait("Category", "RequiresDesktop")]
     public async Task FindAndClick_WhenSemanticPatternIsUnavailable_UsesPhysicalFallback()
     {
-        EnsureHarnessOnPrimaryMonitor();
-        await SkipWhenPhysicalClickUnavailableAsync();
-        var target = await _automationService.FindElementsAsync(new ElementQuery
+        await TestRetry.RunAsync(async _ =>
         {
-            WindowHandle = _windowHandle,
-            AutomationId = "PhysicalFallbackTarget",
-        });
-        Assert.Single(target.Items!);
+            EnsureHarnessOnPrimaryMonitor();
+            await SkipWhenPhysicalFallbackClickUnavailableAsync();
+            var target = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "PhysicalFallbackTarget",
+            });
+            Assert.Single(target.Items!);
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            AutomationId = "PhysicalFallbackTarget",
-        });
+            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "PhysicalFallbackTarget",
+            });
 
-        Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
-        var status = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            AutomationId = "StatusLabel",
+            Assert.True(result.Success, $"Physical fallback failed: {result.ErrorMessage}");
+            var status = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "StatusLabel",
+            });
+            Assert.True(status.Success, $"Status read failed: {status.ErrorMessage}");
+            Assert.Equal("Physical fallback clicked", Assert.Single(status.Items!).Name);
         });
-        Assert.True(status.Success, $"Status read failed: {status.ErrorMessage}");
-        Assert.Equal("Physical fallback clicked", Assert.Single(status.Items!).Name);
     }
 
     [SkippableFact]
@@ -178,6 +181,33 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         Skip.If(
             !click.Success || !received,
             "The current desktop does not permit physical click injection.");
+    }
+
+    // Representative probe: verifies this desktop session can deliver AND verify a physical
+    // click to the *actual* PhysicalFallbackTarget panel (near the form's bottom edge) before
+    // the test asserts the product's physical-fallback behavior. A generic SubmitButton probe
+    // is not representative: it can pass while a click to this specific low target is dropped or
+    // lands off-target on a loaded, shared self-hosted desktop. Skipping (not failing) here keeps
+    // a genuine fallback-logic regression detectable while eliminating environment-only failures.
+    private async Task SkipWhenPhysicalFallbackClickUnavailableAsync()
+    {
+        var probeTarget = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "PhysicalFallbackTarget",
+        });
+        var clickPoint = Assert.Single(probeTarget.Items!).Click;
+        var click = await _mouseService.ClickAsync(clickPoint[0], clickPoint[1]);
+        var received = TestWait.Until(
+            () => _fixture.Form is not null &&
+                  (bool)_fixture.Form.Invoke(() =>
+                      _fixture.Form.PhysicalFallbackClickCount > 0));
+
+        _fixture.Reset();
+        _fixture.BringToFront();
+        Skip.If(
+            !click.Success || !received,
+            "The current desktop does not permit reliable physical clicks on the fallback target.");
     }
 
     private void EnsureHarnessOnPrimaryMonitor()

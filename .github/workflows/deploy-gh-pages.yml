@@ -10,6 +10,7 @@ on:
       - 'CONTRIBUTING.md'
       - 'vscode-extension/CHANGELOG.md'
       - 'plugin/skills/windows-automation/SKILL.md'
+      - 'plugin/skills/windows-cli/SKILL.md'
       - '.github/workflows/deploy-gh-pages.yml'
       - 'scripts/Update-StarHistory.ps1'
   schedule:
