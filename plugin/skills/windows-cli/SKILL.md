@@ -28,6 +28,7 @@ so there is no server session to keep alive).
 2. `wincli ui snapshot --window <handle>` to see the accessible element tree.
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
 4. `wincli ui read-table --window <handle> --automation-id <grid>` to pull a grid/table/details-list into structured rows + headers in one call.
+   For a web page, add `--format article` to `wincli ui read` to get clean main-content text (nav/breadcrumb chrome and inline link URLs stripped, headings/lists as markdown).
 5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
    Use `wincli file-open --window <handle> --path <file>` for Open flows.
 6. `wincli clipboard get|set|clear` for fast bulk text IO; `wincli macro save|run|list|get|delete`

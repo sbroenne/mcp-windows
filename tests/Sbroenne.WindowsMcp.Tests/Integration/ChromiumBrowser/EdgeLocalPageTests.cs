@@ -1,3 +1,4 @@
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
@@ -153,6 +154,46 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
 
         Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
         Assert.Equal(SignedOutStatus, readResult.Text);
+    }
+
+    [Theory]
+    [InlineData(ChromiumBrowserKind.Edge)]
+    [InlineData(ChromiumBrowserKind.Chrome)]
+    public async Task Read_LocalChromiumPage_ArticleMode_ReturnsCleanMainContent(ChromiumBrowserKind browser)
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(browser);
+
+        var session = _readOnlySessions.GetSession(browser);
+        using var harness = new ChromiumAutomationHarness();
+
+        var readResult = await harness.AutomationService.GetTextAsync(
+            elementId: null,
+            windowHandle: session.WindowHandleString,
+            includeChildren: false,
+            mode: TextExtractionMode.Article);
+
+        Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
+        Assert.False(string.IsNullOrWhiteSpace(readResult.Text), "Article text should not be empty.");
+
+        var article = readResult.Text!;
+
+        // Main content is present.
+        Assert.Contains("Chromium browser smoke page", article, StringComparison.Ordinal);
+        Assert.Contains("Getting started", article, StringComparison.Ordinal);
+        Assert.Contains("official guide", article, StringComparison.Ordinal); // visible link text is kept
+
+        // Lightweight markdown structure survives.
+        Assert.Contains("# ", article, StringComparison.Ordinal); // at least one heading marker
+        Assert.Contains("- Install the runtime", article, StringComparison.Ordinal); // list bullet
+
+        // Inline link URLs are stripped.
+        Assert.DoesNotContain("https://example.com", article, StringComparison.Ordinal);
+
+        // Navigation chrome (outside <main>) is excluded.
+        Assert.DoesNotContain("Pricing", article, StringComparison.Ordinal);
+
+        // Complementary rail (aria complementary landmark inside <main>) is excluded.
+        Assert.DoesNotContain("Complementary rail link", article, StringComparison.Ordinal);
     }
 
     private static ElementQuery CreateLocalPageQuery(string windowHandle, string name, string controlType)

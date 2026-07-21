@@ -282,6 +282,42 @@ internal static class UIA3PropertyIds
 
     // Window pattern properties
     internal const int WindowIsModal = 30077;
+
+    // Landmark / structure properties (used for article-mode reading of web pages)
+    internal const int LandmarkType = 30157;
+    internal const int LocalizedLandmarkType = 30158;
+    internal const int HeadingLevel = 30173;
+}
+
+/// <summary>
+/// UI Automation landmark type IDs and heading-level values used to identify main content
+/// and navigation chrome when reading web pages in article mode.
+/// </summary>
+internal static class UIA3LandmarkTypeIds
+{
+    internal const int Custom = 80000;
+    internal const int Form = 80001;
+    internal const int Main = 80002;
+    internal const int Navigation = 80003;
+    internal const int Search = 80004;
+
+    // HeadingLevel property returns HeadingLevel_None (80050) or HeadingLevel1..9 (80051..80059).
+    internal const int HeadingLevelNone = 80050;
+    internal const int HeadingLevel1 = 80051;
+    internal const int HeadingLevel9 = 80059;
+
+    /// <summary>
+    /// Converts a raw UIA HeadingLevel property value to a 1-9 level, or 0 when the element is not a heading.
+    /// </summary>
+    internal static int ToHeadingLevel(int rawHeadingLevelValue)
+    {
+        if (rawHeadingLevelValue is >= HeadingLevel1 and <= HeadingLevel9)
+        {
+            return rawHeadingLevelValue - HeadingLevelNone;
+        }
+
+        return 0;
+    }
 }
 
 /// <summary>

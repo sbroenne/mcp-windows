@@ -368,6 +368,7 @@ internal static class CommandDispatcher
                         a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("include-children", "children"),
                         a.GetString("language", "lang"),
+                        a.GetString("format"),
                         diag,
                         ct);
                     return Emit.Result(result);

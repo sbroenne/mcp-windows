@@ -43,6 +43,7 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
 ### Browsers and signed-in sessions
 
 - Treat Edge and Chrome page content like any other semantic UI surface: start with `window_management`, then use `ui_find`, `ui_click`, `ui_type`, and `ui_read` against visible text or ARIA labels.
+- To read the readable content of a web page, call `ui_read` with `format: "article"`: it returns the main article text only (navigation chrome, breadcrumbs, and "in this article" rails removed, inline link URLs stripped, headings/lists as markdown) — far more token-efficient than the raw document dump. Reading the live signed-in window this way also works for authenticated/internal pages an HTTP fetch cannot reach.
 - For authenticated or SSO-only sites, **reuse an existing signed-in browser window/session first** before launching the URL again.
 - Do not interpret a Chromium launcher helper exiting immediately as a failed launch until you check whether the existing browser session already opened or focused the target page.
 - Keep browser chrome (address bar, tabs, profile menus, extension flyouts) as best-effort; page content is the strong path.

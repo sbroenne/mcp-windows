@@ -19,6 +19,10 @@ public static partial class UIReadTool
     /// </summary>
     /// <remarks>
     /// Extract text from UI elements or screen regions. Auto-falls back to OCR if normal text extraction fails.
+    /// For web pages in Edge/Chrome, pass format='article' to get clean, token-efficient article text
+    /// (main content only, navigation chrome and inline link URLs stripped, headings/lists as markdown).
+    /// Reading the live signed-in browser window this way also works for authenticated/internal pages that
+    /// an HTTP fetch cannot reach.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive).</param>
@@ -29,8 +33,9 @@ public static partial class UIReadTool
     /// <param name="className">Element class name.</param>
     /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, reads that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
-    /// <param name="includeChildren">Include child element text (default: false).</param>
+    /// <param name="includeChildren">Include child element text (default: false). Ignored when format='article'.</param>
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
+    /// <param name="format">Text extraction mode: 'raw' (default, complete but includes nav chrome and link URLs) or 'article' (clean main-content text for web pages, chrome and inline URLs stripped, headings/lists as markdown).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload of the extracted text content from the element or screen region. <c>IsError</c> reflects operation success.</returns>
@@ -47,6 +52,7 @@ public static partial class UIReadTool
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool includeChildren,
         [DefaultValue(null)] string? language,
+        [DefaultValue(null)] string? format,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -62,6 +68,12 @@ public static partial class UIReadTool
         if (foundIndexError is not null)
         {
             return foundIndexError;
+        }
+
+        if (!TryParseTextExtractionMode(format, out var mode))
+        {
+            return WindowsToolsBase.FailResult(
+                $"Invalid format '{format}'. Use 'raw' (default) or 'article'.");
         }
 
         try
@@ -99,8 +111,15 @@ public static partial class UIReadTool
                 }
             }
 
-            var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, cancellationToken);
+            var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, mode, cancellationToken);
             if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
+            {
+                return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
+            }
+
+            // Article mode is a UIA-only, structure-aware extraction; OCR (which returns raw pixels
+            // as flat text) cannot honor it, so skip the OCR fallback and return the UIA result.
+            if (mode == TextExtractionMode.Article)
             {
                 return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
             }
@@ -146,6 +165,30 @@ public static partial class UIReadTool
         catch (Exception ex)
         {
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
+        }
+    }
+
+    private static bool TryParseTextExtractionMode(string? format, out TextExtractionMode mode)
+    {
+        mode = TextExtractionMode.Raw;
+
+        if (string.IsNullOrWhiteSpace(format))
+        {
+            return true;
+        }
+
+        switch (format.Trim().ToLowerInvariant())
+        {
+            case "raw":
+                mode = TextExtractionMode.Raw;
+                return true;
+            case "article":
+            case "markdown":
+            case "clean":
+                mode = TextExtractionMode.Article;
+                return true;
+            default:
+                return false;
         }
     }
 }
