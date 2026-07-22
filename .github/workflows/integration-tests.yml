@@ -53,7 +53,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Checkout runner scripts
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Start VM
         run: >-
@@ -92,7 +92,7 @@ jobs:
       MCP_TEST_CHROME: '1'
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
