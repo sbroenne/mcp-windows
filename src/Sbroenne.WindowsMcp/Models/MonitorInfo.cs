@@ -28,6 +28,26 @@ public sealed partial record MonitorInfo(
     [property: JsonPropertyName("y")] int Y,
     [property: JsonPropertyName("isPrimary")] bool IsPrimary)
 {
+    /// <summary>Effective DPI of the monitor (96 = 100% scaling). Defaults to 96 when unavailable.</summary>
+    [JsonPropertyName("effectiveDpi")]
+    public int EffectiveDpi { get; init; } = 96;
+
+    /// <summary>Display scale factor (EffectiveDpi / 96, e.g. 1.5 = 150%). Defaults to 1.0.</summary>
+    [JsonPropertyName("scale")]
+    public double Scale { get; init; } = 1.0;
+
+    /// <summary>Orientation derived from the logical dimensions: "landscape" or "portrait".</summary>
+    [JsonPropertyName("orientation")]
+    public string Orientation { get; init; } = "landscape";
+
+    /// <summary>
+    /// The usable work area (the monitor rectangle minus the taskbar and docked app bars).
+    /// Useful for placing windows where the taskbar will not cover them. Omitted when unknown.
+    /// </summary>
+    [JsonPropertyName("workArea")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public WorkAreaInfo? WorkArea { get; init; }
+
     /// <summary>
     /// Extracts the display number from a Windows device name.
     /// </summary>
@@ -53,3 +73,14 @@ public sealed partial record MonitorInfo(
     [GeneratedRegex(@"DISPLAY(\d+)", RegexOptions.IgnoreCase, "en-US")]
     private static partial Regex MyRegex();
 }
+
+/// <summary>The usable desktop rectangle of a monitor, excluding the taskbar and docked app bars.</summary>
+/// <param name="X">Left edge X coordinate (virtual screen).</param>
+/// <param name="Y">Top edge Y coordinate (virtual screen).</param>
+/// <param name="Width">Work-area width in pixels.</param>
+/// <param name="Height">Work-area height in pixels.</param>
+public sealed record WorkAreaInfo(
+    [property: JsonPropertyName("x")] int X,
+    [property: JsonPropertyName("y")] int Y,
+    [property: JsonPropertyName("width")] int Width,
+    [property: JsonPropertyName("height")] int Height);

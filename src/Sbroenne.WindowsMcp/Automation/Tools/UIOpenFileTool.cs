@@ -17,6 +17,8 @@ public static partial class UIOpenFileTool
     /// 📂 OPEN A FILE via the app's Open dialog - the counterpart to file_save. Sends Ctrl+O,
     /// waits for the Open dialog, types the path into the File name field, and clicks Open.
     /// NOTE: English Windows only; the file must already exist.
+    /// Keywords: open, open file, load, load file, open document, browse, import, ctrl+o,
+    /// open dialog, file picker, choose file.
     /// </summary>
     /// <remarks>
     /// WHEN TO USE: To load an existing document into an app that uses the standard Windows Open

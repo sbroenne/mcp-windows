@@ -9,6 +9,8 @@ namespace Sbroenne.WindowsMcp.Capture;
 public sealed class MonitorService
 {
     private const int ENUM_CURRENT_SETTINGS = -1;
+    private const int MDT_EFFECTIVE_DPI = 0;
+    private const int S_OK = 0;
 
     /// <inheritdoc />
     public int MonitorCount => Screen.AllScreens.Length;
@@ -51,6 +53,23 @@ public sealed class MonitorService
                 // Extract display number from device name (e.g., \\.\DISPLAY1 -> 1)
                 int displayNumber = MonitorInfo.ExtractDisplayNumber(deviceName);
 
+                // Effective DPI drives the scale factor (96 DPI = 100%). Fall back to 96/1.0 when
+                // the per-monitor DPI API is unavailable (e.g. pre-8.1 or a query failure).
+                int effectiveDpi = 96;
+                if (NativeMethods.GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == S_OK && dpiX > 0)
+                {
+                    effectiveDpi = (int)dpiX;
+                }
+
+                double scale = Math.Round(effectiveDpi / 96.0, 2, MidpointRounding.AwayFromZero);
+                string orientation = logicalHeight > logicalWidth ? "portrait" : "landscape";
+
+                var workArea = new WorkAreaInfo(
+                    X: monitorInfo.RcWork.Left,
+                    Y: monitorInfo.RcWork.Top,
+                    Width: monitorInfo.RcWork.Right - monitorInfo.RcWork.Left,
+                    Height: monitorInfo.RcWork.Bottom - monitorInfo.RcWork.Top);
+
                 monitors.Add(new MonitorInfo(
                     Index: index,
                     DisplayNumber: displayNumber,
@@ -61,7 +80,13 @@ public sealed class MonitorService
                     Height: logicalHeight,
                     X: logicalX,
                     Y: logicalY,
-                    IsPrimary: monitorInfo.IsPrimary));
+                    IsPrimary: monitorInfo.IsPrimary)
+                {
+                    EffectiveDpi = effectiveDpi,
+                    Scale = scale,
+                    Orientation = orientation,
+                    WorkArea = workArea,
+                });
             }
             index++;
             return true;

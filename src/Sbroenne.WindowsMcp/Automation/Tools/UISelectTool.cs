@@ -17,6 +17,8 @@ public static partial class UISelectTool
     /// Select a value in a combo box, drop-down, list box, or tab control. Prefer this over
     /// click-then-click sequences for selection controls - it uses the proper UI Automation
     /// selection patterns (SelectionItem/ExpandCollapse) so it is reliable across frameworks.
+    /// Keywords: select, choose, pick, dropdown, combo box, list box, tab, option, set value,
+    /// choose option, selection control, expand and select.
     /// </summary>
     /// <remarks>
     /// Locate the selection control with the selectors (name/automationId/controlType such as ComboBox,

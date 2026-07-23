@@ -54,6 +54,40 @@ public sealed class MonitorInfoTests
     }
 
     [Fact]
+    public void MonitorInfo_SerializesEnrichedDisplayFields()
+    {
+        var monitor = new MonitorInfo(0, 1, @"\\.\DISPLAY1", 3840, 2160, 3840, 2160, 0, 0, true)
+        {
+            EffectiveDpi = 144,
+            Scale = 1.5,
+            Orientation = "landscape",
+            WorkArea = new WorkAreaInfo(0, 0, 3840, 2112),
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(monitor);
+
+        Assert.Contains("\"effectiveDpi\":144", json);
+        Assert.Contains("\"scale\":1.5", json);
+        Assert.Contains("\"orientation\":\"landscape\"", json);
+        Assert.Contains("\"workArea\":{", json);
+        Assert.Contains("\"height\":2112", json);
+    }
+
+    [Fact]
+    public void MonitorInfo_DefaultsAreSaneAndWorkAreaOmittedWhenNull()
+    {
+        var monitor = new MonitorInfo(0, 1, @"\\.\DISPLAY1", 1920, 1080, 1920, 1080, 0, 0, true);
+
+        Assert.Equal(96, monitor.EffectiveDpi);
+        Assert.Equal(1.0, monitor.Scale);
+        Assert.Equal("landscape", monitor.Orientation);
+        Assert.Null(monitor.WorkArea);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(monitor);
+        Assert.DoesNotContain("workArea", json);
+    }
+
+    [Fact]
     public void MonitorInfo_SerializesToJson_WithSnakeCaseProperties()
     {
         // Arrange

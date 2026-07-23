@@ -25,6 +25,8 @@ public static partial class AppTool
     /// terminal, or command-line process launchers whenever the user asks to open, start, or launch an app.
     /// Use this to start programs like notepad.exe, calc.exe, msedge.exe, chrome.exe, winword.exe, excel.exe, etc.
     /// Returns structured launch status plus a window handle for use with window_management, keyboard_control, and other tools.
+    /// Keywords: launch, open, start, run, app, application, program, executable, exe, open app,
+    /// start program, launch application, run program, notepad, calculator, browser, edge, chrome.
     /// </summary>
     /// <remarks>
     /// This tool is safer and more reliable than shell commands for app launch because it focuses the window,

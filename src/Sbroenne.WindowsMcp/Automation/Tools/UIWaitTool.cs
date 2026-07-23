@@ -17,6 +17,8 @@ public static partial class UIWaitTool
     /// Wait until a UI condition is met before continuing: an element appears, disappears, or
     /// reaches a state. Use this instead of blind sleeps or screenshot polling after an action
     /// that triggers async UI changes (dialog opening/closing, spinner finishing, button enabling).
+    /// Keywords: wait, wait for, until, appear, disappear, poll, delay, synchronize, condition,
+    /// element appears, dialog closes, spinner, loading, ready.
     /// </summary>
     /// <remarks>
     /// Modes:

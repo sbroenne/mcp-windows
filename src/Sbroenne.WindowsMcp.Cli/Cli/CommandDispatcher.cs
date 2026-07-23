@@ -2,6 +2,7 @@ using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Clipboard.Tools;
 using Sbroenne.WindowsMcp.Macros.Tools;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Processes.Tools;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Cli;
@@ -44,6 +45,9 @@ internal static class CommandDispatcher
             case "fileopen":
             case "open":
                 return await FileOpenAsync(args, ct);
+            case "process":
+            case "proc":
+                return await ProcessAsync(args, ct);
             default:
                 return Emit.Usage($"unknown command '{args.Group}'.");
         }
@@ -193,6 +197,33 @@ internal static class CommandDispatcher
             Window(a) ?? string.Empty,
             a.GetString("path", "file-path", "file") ?? string.Empty,
             a.GetFlag("include-diagnostics", "diagnostics"),
+            ct);
+        return Emit.Result(result);
+    }
+
+    private static async Task<int> ProcessAsync(ParsedArgs a, CancellationToken ct)
+    {
+        if (!EnumHelper.TryParse<ProcessAction>(a.Action, out var action))
+        {
+            return Emit.Usage(
+                $"process requires a valid action. One of: {string.Join(", ", EnumHelper.Tokens<ProcessAction>())}.");
+        }
+
+        var sortBy = ProcessSortBy.Memory;
+        var sortRaw = a.GetString("sort-by", "sort");
+        if (sortRaw is not null && !EnumHelper.TryParse<ProcessSortBy>(sortRaw, out sortBy))
+        {
+            return Emit.Usage(
+                $"process --sort-by must be one of: {string.Join(", ", EnumHelper.Tokens<ProcessSortBy>())}.");
+        }
+
+        var result = await ProcessTool.ExecuteAsync(
+            action,
+            a.GetString("name"),
+            a.GetInt("pid"),
+            sortBy,
+            a.GetInt("limit"),
+            a.GetFlag("force"),
             ct);
         return Emit.Result(result);
     }

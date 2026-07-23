@@ -16,6 +16,8 @@ public static partial class UIReadTableTool
 {
     /// <summary>
     /// Reads a grid/table/list control as structured rows and columns.
+    /// Keywords: table, grid, rows, columns, cells, data grid, list view, spreadsheet, extract table,
+    /// read table, tabular data, headers, structured data.
     /// </summary>
     /// <remarks>
     /// Extracts tabular data (DataGrid, Table, WPF DataGrid, WinForms DataGridView, details/report

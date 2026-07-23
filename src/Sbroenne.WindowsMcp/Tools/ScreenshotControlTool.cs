@@ -17,6 +17,8 @@ public static partial class ScreenshotControlTool
     private const OutputMode DefaultOutputMode = OutputMode.Inline;
     /// <summary>
     /// Captures screenshots of screens, monitors, windows, or regions on Windows.
+    /// Keywords: screenshot, screen capture, capture screen, snapshot, screen grab, image of screen,
+    /// annotate, monitors, displays, list monitors, region capture, window capture.
     /// </summary>
     /// <remarks>
     /// **COORDINATE SYSTEM**: Screenshot pixel coordinates = mouse coordinates. No conversion needed!
@@ -42,7 +44,9 @@ public static partial class ScreenshotControlTool
     /// - 'monitor' with monitorIndex: For 3+ monitors, use list_monitors first to find the index.
     /// - 'all_monitors': Captures all monitors as a single composite image.
     ///
-    /// The list_monitors action returns display_number (matches Windows Settings) and is_primary flag.
+    /// The list_monitors action returns each monitor's displayNumber (matches Windows Settings),
+    /// isPrimary flag, effectiveDpi/scale (e.g. 1.5 = 150%), orientation, and workArea (the desktop
+    /// minus the taskbar) - useful for DPI-aware capture and for placing windows clear of the taskbar.
     /// Respects secure desktop (UAC/lock screen) restrictions.
     /// </remarks>
     /// <param name="action">The action to perform. Valid values: 'capture' (take screenshot), 'list_monitors' (enumerate displays). Default: 'capture'.</param>
