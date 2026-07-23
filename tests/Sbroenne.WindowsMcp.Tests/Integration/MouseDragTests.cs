@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify drag events are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class MouseDragTests : IDisposable
+public sealed class MouseDragTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -26,7 +26,7 @@ public sealed class MouseDragTests : IDisposable
         _fixture.MouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_LeftButton_VerifiedByHarness()
     {
         // Arrange - drag inside the drag panel (designed for drag testing)
@@ -46,7 +46,7 @@ public sealed class MouseDragTests : IDisposable
         _fixture.AssertDragDetected();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_RightButton_Succeeds()
     {
         // Arrange - drag inside the drag panel
@@ -65,7 +65,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, endY - 2, endY + 2);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_MiddleButton_Succeeds()
     {
         // Arrange - drag inside the drag panel
@@ -80,7 +80,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_OutOfBoundsStart_ReturnsError()
     {
         // Arrange - start coordinates outside screen bounds, end in test window
@@ -96,7 +96,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.Equal(MouseControlErrorCode.CoordinatesOutOfBounds, result.ErrorCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_OutOfBoundsEnd_ReturnsError()
     {
         // Arrange - start in test window, end coordinates outside screen bounds
@@ -112,7 +112,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.Equal(MouseControlErrorCode.CoordinatesOutOfBounds, result.ErrorCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_CursorEndsAtEndPosition()
     {
         // Arrange - drag inside the drag panel
@@ -130,7 +130,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, endY - 2, endY + 2);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_SameStartAndEnd_Succeeds()
     {
         // Arrange - same start and end point (essentially click and release)
@@ -144,7 +144,7 @@ public sealed class MouseDragTests : IDisposable
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_RecordsDragPositions()
     {
         // Arrange - drag inside the drag panel
@@ -173,7 +173,7 @@ public sealed class MouseDragTests : IDisposable
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_LongDistance_VerifiedByHarness()
     {
         // Arrange - drag a longer distance to ensure it's detected

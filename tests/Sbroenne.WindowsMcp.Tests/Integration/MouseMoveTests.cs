@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated Notepad window to avoid interfering with user's work.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public class MouseMoveTests : IDisposable
+public class MouseMoveTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -27,7 +27,7 @@ public class MouseMoveTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_ValidCoordinates_ReturnsSuccessWithFinalPosition()
     {
         // Arrange - use test window coordinates
@@ -44,7 +44,7 @@ public class MouseMoveTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, targetY - 1, targetY + 1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_NegativeCoordinates_WorksCorrectlyForSecondaryMonitor()
     {
         // Arrange
@@ -69,7 +69,7 @@ public class MouseMoveTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, targetY - 1, targetY + 1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_OutOfBoundsCoordinates_ReturnsCoordinatesOutOfBoundsError()
     {
         // Arrange
@@ -91,7 +91,7 @@ public class MouseMoveTests : IDisposable
         Assert.Equal(bounds, result.ScreenBounds);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_PositionAccuracy_MatchesRequestedCoordinatesWithin1Pixel()
     {
         // Arrange - use test window for DPI consistency
@@ -121,7 +121,7 @@ public class MouseMoveTests : IDisposable
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_BoundaryCoordinates_WorksAtWindowEdges()
     {
         // Arrange - use test window edges
@@ -136,7 +136,7 @@ public class MouseMoveTests : IDisposable
         Assert.True(result2.Success);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_RapidMoves_AllSucceed()
     {
         // Arrange - test 10 rapid move operations within test window

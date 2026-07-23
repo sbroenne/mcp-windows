@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify scroll events are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class MouseScrollTests : IDisposable
+public sealed class MouseScrollTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -26,7 +26,7 @@ public sealed class MouseScrollTests : IDisposable
         _fixture.MouseInputService.MoveAsync(_originalPosition.X, _originalPosition.Y).GetAwaiter().GetResult();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_DownOnScrollPanel_VerifiedByHarness()
     {
         // Arrange - scroll on the scroll panel
@@ -51,7 +51,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.True(scrollDelta < 0, $"Expected negative scroll delta for down scroll, got {scrollDelta}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_UpOnScrollPanel_VerifiedByHarness()
     {
         // Arrange - scroll on the scroll panel
@@ -97,7 +97,7 @@ public sealed class MouseScrollTests : IDisposable
         return result;
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_LeftInTestWindow_Succeeds()
     {
         // Arrange - scroll inside the dedicated test window
@@ -112,7 +112,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_RightInTestWindow_Succeeds()
     {
         // Arrange - scroll inside the dedicated test window
@@ -127,7 +127,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_WithCoordinates_MovesCursorFirst()
     {
         // Arrange - scroll on the scroll panel with specific coordinates
@@ -144,7 +144,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.InRange(result.FinalPosition.Y, panelCenter.Y - 2, panelCenter.Y + 2);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_OutOfBoundsCoordinates_ReturnsError()
     {
         // Arrange
@@ -159,7 +159,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.Equal(MouseControlErrorCode.CoordinatesOutOfBounds, result.ErrorCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_MultipleClicks_VerifiedByHarness()
     {
         // Arrange - scroll 5 clicks on the scroll panel
@@ -186,7 +186,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.True(scrollDelta != 0, "Scroll delta should not be zero after 5 scroll clicks");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_ZeroAmount_Succeeds()
     {
         // Arrange - scroll 0 clicks (effectively no scroll)
@@ -206,7 +206,7 @@ public sealed class MouseScrollTests : IDisposable
         Assert.Equal(0, scrollCount);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ScrollAsync_AccumulatesScrollDelta()
     {
         // Arrange - scroll multiple times and verify delta accumulates

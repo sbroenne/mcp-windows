@@ -9,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// and help catch issues where focus is lost to other windows.
 /// </summary>
 [Collection("KeyboardIntegrationTests")]
-public sealed class KeyboardControlToolIntegrationTests : IDisposable
+public sealed class KeyboardControlToolIntegrationTests : DesktopInputTestBase, IDisposable
 {
     private readonly KeyboardTestFixture _fixture;
 
@@ -45,7 +45,7 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
     /// The test ensures the harness is focused before typing and validates
     /// the text appears in the correct control.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeText_TextEndsUpInCorrectWindow()
     {
         // Arrange - ensure harness is focused with multiple retries
@@ -70,7 +70,7 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
     /// Verifies that after typing, the input appears in the harness.
     /// This validates that keyboard input goes to the focused window.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeMultipleCharacters_AllAppearInHarness()
     {
         // Arrange - ensure harness is focused with multiple retries
@@ -94,7 +94,7 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
     /// <summary>
     /// Verifies that special characters are typed correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeSpecialCharacters_AppearCorrectly()
     {
         // Arrange - ensure harness is focused with multiple retries
@@ -118,7 +118,7 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
     /// <summary>
     /// Verifies that pressing a simple key adds it to the harness.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKey_AppearsInHarness()
     {
         // Arrange - ensure harness is focused with multiple retries
@@ -140,7 +140,7 @@ public sealed class KeyboardControlToolIntegrationTests : IDisposable
     /// <summary>
     /// Verifies that consecutive typing operations go to the harness.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ConsecutiveTyping_AllTextAppearsInOrder()
     {
         // Arrange - ensure harness is focused with multiple retries

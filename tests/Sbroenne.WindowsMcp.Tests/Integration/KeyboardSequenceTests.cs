@@ -13,7 +13,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests use a short delay pattern to avoid overwhelming the input queue.
 /// </remarks>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardSequenceTests
+public class KeyboardSequenceTests : DesktopInputTestBase
 {
     // Constants for test delays - give Windows time to process input
     private const int ShortDelay = 50;
@@ -23,7 +23,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that a simple sequence of keys executes correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_SimpleSequence_ReturnsSuccessWithCount()
     {
         // Arrange - Simple sequence: a, b, c
@@ -44,7 +44,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that an empty sequence returns success with zero count.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_EmptySequence_ReturnsSuccessWithZeroCount()
     {
         // Arrange - Empty sequence
@@ -60,7 +60,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that a single-key sequence works correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_SingleKey_ReturnsSuccessWithOneCount()
     {
         // Arrange - Single key sequence
@@ -79,7 +79,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with navigation keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_NavigationKeys_ExecutesCorrectly()
     {
         // Arrange - Tab through form fields
@@ -105,7 +105,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with Ctrl modifier on specific keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_WithCtrlModifiers_ExecutesCorrectly()
     {
         // Arrange - Copy and paste sequence
@@ -128,7 +128,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with mixed modifiers.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_MixedModifiers_ExecutesCorrectly()
     {
         // Arrange - Sequence with various modifiers
@@ -150,7 +150,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with keys that have no modifiers mixed with modified keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_MixedModifiersAndPlain_ExecutesCorrectly()
     {
         // Arrange - Mix of plain and modified keys
@@ -172,7 +172,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with Shift modifier for text selection.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_ShiftModifierForSelection_ExecutesCorrectly()
     {
         // Arrange - Select text with Shift+Arrow
@@ -193,7 +193,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with Win modifier.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_WinModifier_ExecutesCorrectly()
     {
         // Arrange - Windows key sequences
@@ -218,7 +218,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with custom inter-key delay.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_WithCustomInterKeyDelay_RespectedDelay()
     {
         // Arrange
@@ -241,7 +241,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with per-item delay overrides.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_PerItemDelayOverride_UsesItemDelay()
     {
         // Arrange - Each item has its own delay
@@ -264,7 +264,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with zero delay (no delay between keys).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_ZeroDelay_ExecutesWithoutPause()
     {
         // Arrange
@@ -285,7 +285,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with mixed delays (some default, some custom).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_MixedDelays_HandlesCorrectly()
     {
         // Arrange - Some items use default, some use custom
@@ -312,7 +312,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that sequence stops on first invalid key.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_InvalidKeyInSequence_StopsAtFirstError()
     {
         // Arrange - Sequence with invalid key in the middle
@@ -333,7 +333,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that partial sequence completion is reported on error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_ErrorMidSequence_ReportsPartialCompletion()
     {
         // Arrange - Error occurs after some keys succeed
@@ -356,7 +356,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that sequence handles cancellation gracefully.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_Cancelled_StopsAndReportsProgress()
     {
         // Arrange - Long sequence that gets cancelled
@@ -374,7 +374,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests that sequence with null items is handled.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_NullSequence_ReturnsSuccessWithZero()
     {
         // Arrange - Null sequence should be treated as empty
@@ -390,7 +390,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with empty key name in item.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_EmptyKeyInItem_ReturnsInvalidKeyError()
     {
         // Arrange
@@ -415,7 +415,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests typical copy-paste workflow as a sequence.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_CopyPasteWorkflow_ExecutesCorrectly()
     {
         // Arrange - Real-world copy-paste workflow
@@ -437,7 +437,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence simulating keyboard macro.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_KeyboardMacro_ExecutesCorrectly()
     {
         // Arrange - Macro: Insert timestamp
@@ -461,7 +461,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence with function keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_FunctionKeys_ExecutesCorrectly()
     {
         // Arrange - Sequence using F-keys
@@ -482,7 +482,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests long sequence execution.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_LongSequence_ExecutesAllKeys()
     {
         // Arrange - 50 key sequence
@@ -500,7 +500,7 @@ public class KeyboardSequenceTests
     /// <summary>
     /// Tests sequence JSON format (as received from MCP tool).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ExecuteSequenceAsync_JsonFormat_DeserializesAndExecutes()
     {
         // Arrange - This is how the sequence would come from the MCP tool

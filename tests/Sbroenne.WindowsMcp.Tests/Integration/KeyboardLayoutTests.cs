@@ -10,13 +10,13 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// correctly from the system.
 /// </summary>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardLayoutTests
+public class KeyboardLayoutTests : DesktopInputTestBase
 {
     /// <summary>
     /// T073: Test that get_keyboard_layout returns layout information.
     /// Verifies layout query functionality returns non-empty data.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_ReturnsLayoutInfo()
     {
         // Arrange
@@ -37,7 +37,7 @@ public class KeyboardLayoutTests
     /// T074: Test KeyboardLayoutInfo structure validation.
     /// Verifies all fields are properly populated with valid data.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_LayoutInfoHasValidStructure()
     {
         // Arrange
@@ -71,7 +71,7 @@ public class KeyboardLayoutTests
     /// <summary>
     /// T074: Test that language tag is valid BCP-47 format or hex fallback.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_LanguageTagIsValidFormat()
     {
         // Arrange
@@ -97,7 +97,7 @@ public class KeyboardLayoutTests
     /// <summary>
     /// T074: Test layout query with cancellation token.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_SupportsCancellation()
     {
         // Arrange
@@ -115,7 +115,7 @@ public class KeyboardLayoutTests
     /// <summary>
     /// T074: Test that multiple layout queries return consistent results.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_ReturnsConsistentResults()
     {
         // Arrange
@@ -136,7 +136,7 @@ public class KeyboardLayoutTests
     /// T074: Test common keyboard layout IDs are recognized.
     /// This test documents expected layout IDs for common layouts.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetKeyboardLayoutAsync_RecognizedLayoutId()
     {
         // Arrange

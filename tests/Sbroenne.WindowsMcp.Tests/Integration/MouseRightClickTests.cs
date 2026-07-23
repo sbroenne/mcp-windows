@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify right-clicks are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public class MouseRightClickTests : IDisposable
+public class MouseRightClickTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -32,7 +32,7 @@ public class MouseRightClickTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_OnPanel_VerifiedByHarness()
     {
         // Arrange - right-click on the right-click panel
@@ -51,7 +51,7 @@ public class MouseRightClickTests : IDisposable
         _fixture.AssertRightClickDetected(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_WithCoordinates_MovesCursorFirst()
     {
         // Arrange - right-click on the panel
@@ -71,7 +71,7 @@ public class MouseRightClickTests : IDisposable
         Assert.True(rightClickReceived, "Test harness did not receive the right-click");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_OutOfBoundsCoordinates_ReturnsError()
     {
         // Arrange
@@ -87,7 +87,7 @@ public class MouseRightClickTests : IDisposable
         Assert.Equal(MouseControlErrorCode.CoordinatesOutOfBounds, result.ErrorCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_MultipleRightClicks_AllVerifiedByHarness()
     {
         // Arrange - right-click the panel 3 times
@@ -111,7 +111,7 @@ public class MouseRightClickTests : IDisposable
         Assert.True(allRightClicksReceived, $"Expected 3 right-clicks but harness received {_fixture.GetRightClickCount()}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_RecordsLastMouseButton()
     {
         // Arrange - right-click on the panel

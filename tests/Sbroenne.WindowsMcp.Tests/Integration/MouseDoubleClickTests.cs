@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify double-clicks are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public class MouseDoubleClickTests : IDisposable
+public class MouseDoubleClickTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -30,7 +30,7 @@ public class MouseDoubleClickTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_OnButton_VerifiedByHarness()
     {
         // Arrange - double-click on the test button
@@ -49,7 +49,7 @@ public class MouseDoubleClickTests : IDisposable
         _fixture.AssertButtonDoubleClicked(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_WithCoordinates_MovesCursorFirst()
     {
         // Arrange - double-click on the test button
@@ -69,7 +69,7 @@ public class MouseDoubleClickTests : IDisposable
         Assert.True(doubleClickReceived, "Test harness did not receive the double-click");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_BothClicksAtSamePosition_CursorDoesNotMove()
     {
         // Arrange - double-click on the test button
@@ -93,7 +93,7 @@ public class MouseDoubleClickTests : IDisposable
         Assert.True(doubleClickReceived, "Test harness did not receive the double-click");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_SendsValidDoubleClickSequence()
     {
         // This test verifies that the double-click sends all 4 events (2x down+up)
@@ -114,7 +114,7 @@ public class MouseDoubleClickTests : IDisposable
         Assert.True(doubleClickReceived, "Test harness did not recognize the double-click sequence");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_OutOfBoundsCoordinates_ReturnsError()
     {
         // Arrange
@@ -132,7 +132,7 @@ public class MouseDoubleClickTests : IDisposable
         Assert.Contains("out of bounds", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_MultipleDoubleClicks_AllVerifiedByHarness()
     {
         // Arrange - double-click the button 3 times
