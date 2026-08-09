@@ -146,4 +146,5 @@ If the AI can't use a tool correctly, we fix the tool — not the prompt.
 
 ![GitHub stars over time for mcp-windows](assets/images/star-history.svg){ loading=lazy }
 
-Updated daily from GitHub's stargazer data.
+Updated daily from GitHub's exact public star count. The historical seed and
+persisted snapshots contain aggregate dates and counts only.

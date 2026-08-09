@@ -29,5 +29,13 @@ mkdocs build --strict --clean   # production build into _site/
 ```
 
 The GitHub star-history chart (`docs/assets/images/star-history.svg`) is
-generated in CI by `scripts/Update-StarHistory.ps1`; it is git-ignored and does
+generated in CI by `scripts/update_star_history.py`; it is git-ignored and does
 not need to exist for a local `mkdocs serve`.
+
+The committed `scripts/star-history-bootstrap.json` contains exact cumulative
+date/count aggregates produced once from maintainer-authenticated GraphQL
+`stargazers.edges.starredAt` data. Raw identities and node IDs are never stored.
+The daily workflow reads the public repository `stargazers_count`, appends that
+exact aggregate snapshot, and persists the JSON on the dedicated
+`star-history-data` branch. This avoids pushing generated data to protected
+`main`, using a PAT, or estimating missing history from events or interpolation.

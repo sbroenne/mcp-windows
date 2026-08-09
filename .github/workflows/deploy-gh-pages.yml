@@ -12,16 +12,14 @@ on:
       - 'plugin/skills/windows-automation/SKILL.md'
       - 'plugin/skills/windows-cli/SKILL.md'
       - '.github/workflows/deploy-gh-pages.yml'
-      - 'scripts/Update-StarHistory.ps1'
+      - 'scripts/star-history-bootstrap.json'
+      - 'scripts/tests/test_update_star_history.py'
+      - 'scripts/update_star_history.py'
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+permissions: {}
 
 # Allow only one concurrent deployment
 concurrency:
@@ -29,24 +27,97 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  star-history:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Generate star history chart
-        shell: pwsh
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Test star history generator
+        run: python -m unittest scripts.tests.test_update_star_history
+
+      - name: Restore aggregate star history
+        id: star-history
+        shell: bash
+        run: |
+          history_path="$RUNNER_TEMP/star-history.json"
+          echo "path=$history_path" >> "$GITHUB_OUTPUT"
+
+          if git ls-remote --exit-code --heads origin star-history-data >/dev/null; then
+            git fetch --no-tags origin \
+              refs/heads/star-history-data:refs/remotes/origin/star-history-data
+            git show origin/star-history-data:star-history.json > "$history_path"
+            echo "persisted=true" >> "$GITHUB_OUTPUT"
+          else
+            cp scripts/star-history-bootstrap.json "$history_path"
+            echo "persisted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record exact star count and generate chart
         env:
-          STAR_HISTORY_TOKEN: ${{ github.token }}
-        run: >
-          ./scripts/Update-StarHistory.ps1
-          -Repository '${{ github.repository }}'
-          -Token $env:STAR_HISTORY_TOKEN
-          -OutputPath './gh-pages/docs/assets/images/star-history.svg'
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/update_star_history.py \
+            --repository '${{ github.repository }}' \
+            --history '${{ steps.star-history.outputs.path }}' \
+            --output gh-pages/docs/assets/images/star-history.svg
+
+      - name: Persist aggregate star history
+        shell: bash
+        env:
+          HISTORY_PATH: ${{ steps.star-history.outputs.path }}
+          HISTORY_PERSISTED: ${{ steps.star-history.outputs.persisted }}
+        run: |
+          history_worktree="$RUNNER_TEMP/star-history-data"
+
+          if [[ "$HISTORY_PERSISTED" == "true" ]]; then
+            git worktree add --detach "$history_worktree" origin/star-history-data
+          else
+            git worktree add --detach "$history_worktree" HEAD
+            git -C "$history_worktree" switch --orphan star-history-data
+            git -C "$history_worktree" rm -rf --ignore-unmatch .
+          fi
+
+          cp "$HISTORY_PATH" "$history_worktree/star-history.json"
+          git -C "$history_worktree" add star-history.json
+
+          if git -C "$history_worktree" diff --cached --quiet; then
+            echo "Today's exact aggregate snapshot is already persisted."
+            exit 0
+          fi
+
+          git -C "$history_worktree" config user.name "github-actions[bot]"
+          git -C "$history_worktree" config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C "$history_worktree" commit \
+            -m "chore: record star count for $(date -u +%F)"
+          git -C "$history_worktree" push origin HEAD:refs/heads/star-history-data
+
+      - name: Upload star history chart
+        uses: actions/upload-artifact@v7
+        with:
+          name: star-history-chart
+          path: gh-pages/docs/assets/images/star-history.svg
+          if-no-files-found: error
+
+  build:
+    needs: star-history
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      indexnow_urls: ${{ steps.indexnow-urls.outputs.urls }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -55,12 +126,29 @@ jobs:
           cache: pip
           cache-dependency-path: gh-pages/requirements.txt
 
+      - name: Download star history chart
+        uses: actions/download-artifact@v8
+        with:
+          name: star-history-chart
+          path: gh-pages/docs/assets/images
+
       - name: Install dependencies
         run: pip install -r gh-pages/requirements.txt
 
       - name: Build with MkDocs
         working-directory: gh-pages
         run: mkdocs build --strict --clean
+
+      - name: Collect IndexNow URLs
+        id: indexnow-urls
+        working-directory: gh-pages/_site
+        run: |
+          urls=$(find . -name "*.html" -type f ! -name "404.html" \
+            | sed 's|^\./||' \
+            | sed 's|index\.html$||' \
+            | sed 's|^|https://windowsmcpserver.dev/|' \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "urls=$urls" >> "$GITHUB_OUTPUT"
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
@@ -70,17 +158,24 @@ jobs:
         with:
           path: 'gh-pages/_site'
 
+  deploy:
+    needs: build
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
 
       - name: Notify IndexNow (Bing/Yandex)
+        env:
+          URLS: ${{ needs.build.outputs.indexnow_urls }}
         run: |
-          # Get list of all HTML pages from the built site (excluding 404.html which should not be indexed)
-          cd gh-pages/_site
-          URLS=$(find . -name "*.html" -type f ! -name "404.html" | sed 's|^\./||' | sed 's|index\.html$||' | sed 's|^|https://windowsmcpserver.dev/|' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-
-          # Submit to IndexNow API
           curl -X POST "https://api.indexnow.org/IndexNow" \
             -H "Content-Type: application/json; charset=utf-8" \
             -d "{
