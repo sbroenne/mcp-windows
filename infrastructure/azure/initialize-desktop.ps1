@@ -72,6 +72,19 @@ try {
     }
     Write-Output "::add-mask::$runnerPassword"
 
+    $enableRdpScript = @'
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server" -Name fDenyTSConnections -Value 0
+Enable-NetFirewallRule -Name "RemoteDesktop-UserMode-In-TCP"
+Enable-NetFirewallRule -Name "RemoteDesktop-UserMode-In-UDP"
+Set-Service -Name TermService -StartupType Automatic
+Start-Service -Name TermService
+'@
+    $null = Invoke-AzureCli vm run-command invoke `
+        --resource-group $ResourceGroup `
+        --name $VmName `
+        --command-id RunPowerShellScript `
+        --scripts $enableRdpScript
+
     & sudo apt-get update --quiet
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to update the hosted runner package index."
