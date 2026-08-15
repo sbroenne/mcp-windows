@@ -59,7 +59,26 @@ function Install-Msi {
     }
 }
 
+function Install-VisualCppRuntime {
+    # Native Node addons (for example Electron's bundled unzip binding) link against
+    # the Visual C++ 2015-2022 runtime, which a clean Windows image does not ship.
+    if (Test-Path (Join-Path $env:SystemRoot "System32\vcruntime140.dll")) {
+        return
+    }
+
+    Write-SetupLog "Installing the Visual C++ 2015-2022 redistributable."
+    $installer = Join-Path $env:TEMP "vc_redist.x64.exe"
+    Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $installer -UseBasicParsing
+    $process = Start-Process $installer -ArgumentList "/install", "/quiet", "/norestart" -Wait -PassThru
+    Remove-Item $installer -Force
+    if ($process.ExitCode -notin @(0, 3010)) {
+        throw "Visual C++ redistributable installation failed with exit code $($process.ExitCode)."
+    }
+}
+
 function Install-Prerequisites {
+    Install-VisualCppRuntime
+
     $dotnet = Join-Path $env:ProgramFiles "dotnet\dotnet.exe"
     $installedSdks = if (Test-Path $dotnet) { & $dotnet --list-sdks } else { @() }
     if (-not ($installedSdks -match "^10\.")) {

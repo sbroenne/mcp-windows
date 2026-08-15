@@ -91,7 +91,8 @@ this from an elevated PowerShell window:
   -WindowsPassword "<vm-admin-password>"
 ```
 
-The script installs .NET 10, Git, PowerShell 7, Node.js LTS, Chrome, and the latest
+The script installs the Visual C++ 2015-2022 redistributable, .NET 10, Git,
+PowerShell 7, Node.js LTS, Chrome, and the latest
 GitHub Actions runner. It registers the `windows-ui` label, configures en-US locale,
 stores the Windows password as an LSA secret with Sysinternals Autologon, and starts
 the runner from a non-elevated interactive scheduled task. The secrets are not written

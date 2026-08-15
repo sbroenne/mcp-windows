@@ -132,6 +132,26 @@ jobs:
           --runtime win-x64
           --no-restore
 
+      - name: Ensure Visual C++ runtime
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:SystemRoot\System32\vcruntime140.dll") {
+            Write-Host "Visual C++ 2015-2022 runtime already present."
+            exit 0
+          }
+
+          Write-Host "Installing the Visual C++ 2015-2022 redistributable."
+          $installer = Join-Path $env:TEMP "vc_redist.x64.exe"
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile $installer -UseBasicParsing
+          $process = Start-Process $installer -ArgumentList "/install", "/quiet", "/norestart" -Wait -PassThru
+          Remove-Item $installer -Force
+          if ($process.ExitCode -notin @(0, 3010)) {
+            throw "Visual C++ redistributable installation failed with exit code $($process.ExitCode)."
+          }
+          if (-not (Test-Path "$env:SystemRoot\System32\vcruntime140.dll")) {
+            throw "Visual C++ redistributable installation did not produce vcruntime140.dll."
+          }
+
       - name: Install Electron harness
         shell: pwsh
         working-directory: tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness
