@@ -17,7 +17,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$rdpProcess = $null
+$rdpJob = $null
 $runnerPassword = $null
 
 function Invoke-AzureCli {
@@ -80,7 +80,20 @@ try {
         "/sec:nla",
         "/size:1920x1080"
     )
-    $rdpProcess = Start-Process xvfb-run -ArgumentList $rdpArguments -PassThru
+    $rdpJob = Start-Job -ArgumentList (,$rdpArguments) -ScriptBlock {
+        param([string[]]$Arguments)
+
+        $deadline = (Get-Date).AddMinutes(4)
+        do {
+            $process = Start-Process xvfb-run -ArgumentList $Arguments -PassThru -Wait
+            if ($process.ExitCode -eq 0) {
+                return
+            }
+            Start-Sleep -Seconds 5
+        } while ((Get-Date) -lt $deadline)
+
+        throw "FreeRDP could not establish the temporary desktop session."
+    }
 
     $escapedUsername = [Regex]::Escape($RunnerUsername)
     $desktopScript = @"
@@ -119,7 +132,8 @@ throw "Timed out waiting for the temporary RDP session."
 }
 finally {
     $runnerPassword = $null
-    if ($rdpProcess -and -not $rdpProcess.HasExited) {
-        Stop-Process -Id $rdpProcess.Id -Force
+    if ($rdpJob) {
+        Stop-Job $rdpJob -ErrorAction SilentlyContinue
+        Remove-Job $rdpJob -Force -ErrorAction SilentlyContinue
     }
 }

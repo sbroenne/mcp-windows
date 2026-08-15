@@ -211,6 +211,33 @@ jobs:
             Where-Object SessionId -eq (Get-Process -Id $PID).SessionId |
             ForEach-Object { Stop-Process -Id $_.Id -Force }
 
+  integration-gate:
+    name: PR integration tests
+    if: always()
+    needs: [start-runner, integration-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enforce integration result
+        shell: pwsh
+        env:
+          START_RESULT: ${{ needs.start-runner.result }}
+          TEST_RESULT: ${{ needs.integration-tests.result }}
+        run: |
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
+              "${{ github.event.pull_request.draft }}" -eq "true") {
+            Write-Host "Integration tests are deferred until the pull request is ready for review."
+            exit 0
+          }
+
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
+              "${{ github.event.pull_request.head.repo.full_name }}" -ne $env:GITHUB_REPOSITORY) {
+            throw "Fork pull requests cannot execute untrusted code on the self-hosted runner. Move the reviewed commit to a repository branch before merging."
+          }
+
+          if ($env:START_RESULT -ne "success" -or $env:TEST_RESULT -ne "success") {
+            throw "Windows UI integration tests did not pass (runner: $env:START_RESULT, tests: $env:TEST_RESULT)."
+          }
+
   deallocate-runner:
     name: Deallocate Windows UI runner
     if: >-
