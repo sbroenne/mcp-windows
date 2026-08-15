@@ -30,6 +30,27 @@ function Invoke-AzureCli {
     return $output
 }
 
+function Wait-RdpPort {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$HostName,
+
+        [int]$TimeoutMinutes = 5
+    )
+
+    $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
+    do {
+        if (Test-Connection -TargetName $HostName -TcpPort 3389 -Quiet) {
+            return
+        }
+
+        Write-Host "Waiting for RDP port 3389 on $HostName..."
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
+
+    throw "RDP port 3389 on $HostName did not become reachable within $TimeoutMinutes minutes."
+}
+
 try {
     $vaultName = Invoke-AzureCli deployment group show `
         --resource-group $ResourceGroup `
@@ -69,6 +90,8 @@ try {
     else {
         (Get-Command xfreerdp -ErrorAction Stop).Source
     }
+
+    Wait-RdpPort -HostName $publicIp
 
     $rdpArguments = @(
         "-a",
@@ -126,7 +149,8 @@ throw "Timed out waiting for the temporary RDP session."
         --query "value[?contains(code, 'StdOut')].message | [0]" `
         --output tsv
     if ($commandResult -notmatch "Interactive desktop initialized") {
-        throw "Failed to transfer the RDP desktop to the console. $commandResult"
+        $rdpDiagnostics = (Receive-Job $rdpJob -Keep 2>&1 | Out-String).Trim()
+        throw "Failed to transfer the RDP desktop to the console. $commandResult`n$rdpDiagnostics"
     }
     Write-Host $commandResult
 }
