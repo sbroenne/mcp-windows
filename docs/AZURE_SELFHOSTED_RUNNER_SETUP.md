@@ -15,7 +15,7 @@ repository-scoped runner registration. There is no scheduled or nightly workflow
 | Disk | 128 GB Standard SSD |
 | Runner label | `windows-ui` |
 | Browsers | Microsoft Edge and Google Chrome |
-| Desktop | Secure automatic logon; workflow initializes an RDP display and transfers it to the console |
+| Desktop | Secure automatic console logon with an interactive runner task |
 | Cost control | VM starts for ready same-repository PRs or manual runs, then deallocates |
 | Backstop | Workflow sets auto-shutdown four hours ahead |
 
@@ -36,7 +36,6 @@ and uses a supported Generation 2 Windows 11 image.
 $resourceGroup = "rg-windows-mcp-runner"
 $location = "eastus2"
 $deployerObjectId = az ad signed-in-user show --query id -o tsv
-$workflowPrincipalObjectId = "<GitHub OIDC service-principal-object-id>"
 
 az group create --name $resourceGroup --location $location
 
@@ -46,15 +45,13 @@ az deployment group create `
   --template-file infrastructure\azure\azure-runner.bicep `
   --parameters infrastructure\azure\azure-runner.parameters.json `
   adminPassword="<strong-password>" `
-  deployerObjectId="$deployerObjectId" `
-  workflowPrincipalObjectId="$workflowPrincipalObjectId"
+  deployerObjectId="$deployerObjectId"
 ```
 
-The template creates the VM, network, static public IP, unrestricted inbound RDP rule,
-auto-shutdown schedule, and a Key Vault containing the generated administrator
-password. NLA and the strong VM credential protect RDP access. The workflow principal
-receives read-only access to that one vault so it can initialize the Azure display. It
-does not register the runner.
+The template creates the VM, network, static public IP for outbound connectivity,
+auto-shutdown schedule, and a Key Vault containing the administrator password. It does
+not permit inbound RDP. Use Azure Bastion or just-in-time access for interactive
+maintenance instead of exposing port 3389 to the internet.
 
 Retrieve the password without placing it in source control:
 
@@ -83,7 +80,8 @@ $runnerToken = gh api `
   --jq ".token"
 ```
 
-RDP to the VM, apply Windows Update, then run this from an elevated PowerShell window:
+Connect through Azure Bastion or just-in-time access, apply Windows Update, then run
+this from an elevated PowerShell window:
 
 ```powershell
 .\infrastructure\azure\setup-runner.ps1 `
@@ -106,14 +104,8 @@ gh api repos/sbroenne/mcp-windows/actions/runners `
   --jq ".runners[] | {name,status,busy,labels:[.labels[].name]}"
 ```
 
-Do not simply close an RDP session after maintenance: that can leave the interactive
-desktop disconnected and break screenshots or input. Reboot to restore the automatic
-console logon, or transfer the session back to the console before disconnecting:
-
-```powershell
-query session
-tscon <azureuser-session-id> /dest:console
-```
+Reboot after maintenance so automatic console logon restores the interactive runner
+session.
 
 ## Configure GitHub OIDC
 
@@ -141,9 +133,7 @@ Grant the service principal `Contributor` only on:
 /subscriptions/<subscription-id>/resourceGroups/rg-windows-mcp-runner
 ```
 
-Pass that service principal's object ID as `workflowPrincipalObjectId` when deploying
-the Bicep template. This grants only `get` permission for the Key Vault secret used to
-open the temporary RDP session.
+The workflow identity does not need access to the VM administrator password.
 
 ## Workflow behavior
 
@@ -157,13 +147,10 @@ Pull requests run the full desktop integration namespace. Manual runs can select
 keyboard, mouse, window, UI Automation, WinUI, Electron, or Chromium tests. Fork pull
 requests never start the VM or execute code on the self-hosted runner.
 
-Azure autologon creates a user session but does not initialize a display that accepts
-native `SendInput`. Before assigning the self-hosted job, the hosted start job:
-
-1. opens an RDP session using the password retrieved from Key Vault; and
-2. transfers that session to the VM console with `tscon`.
-
-The password is masked and never written to workflow output.
+Starting a deallocated VM performs a normal Windows boot. Sysinternals Autologon signs
+the runner account into the console, and the logon-triggered task starts the Actions
+runner in that interactive session. The workflow verifies that it is interactive and
+that Explorer is running before executing tests.
 
 ```powershell
 gh workflow run integration-tests.yml `
@@ -171,9 +158,8 @@ gh workflow run integration-tests.yml `
   -f scope=keyboard
 ```
 
-The existing hosted `CI` workflow remains the fast build, non-desktop test, and coverage
-gate. Consider requiring `Windows UI integration suite` only after the runner has
-proven stable.
+The hosted `CI` workflow remains the fast build, non-desktop test, and coverage gate.
+The `PR integration tests` status check requires the desktop suite to pass before merge.
 
 ## Operations
 

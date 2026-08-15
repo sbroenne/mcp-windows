@@ -14,9 +14,6 @@ param adminPassword string
 @description('Object ID allowed to retrieve the generated VM password from Key Vault.')
 param deployerObjectId string
 
-@description('Optional GitHub Actions service principal object ID allowed to retrieve the VM password for desktop initialization.')
-param workflowPrincipalObjectId string = ''
-
 @description('OS disk size in GB.')
 param osDiskSizeGB int = 128
 
@@ -38,19 +35,6 @@ resource nsg 'Microsoft.Network/networkSecurityGroups@2023-05-01' = {
   location: location
   properties: {
     securityRules: [
-      {
-        name: 'AllowRdp'
-        properties: {
-          priority: 1000
-          protocol: 'Tcp'
-          access: 'Allow'
-          direction: 'Inbound'
-          sourceAddressPrefix: '*'
-          sourcePortRange: '*'
-          destinationAddressPrefix: '*'
-          destinationPortRange: '3389'
-        }
-      }
       {
         name: 'AllowHttpsOutbound'
         properties: {
@@ -198,35 +182,21 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
     enableRbacAuthorization: false
     enableSoftDelete: true
     softDeleteRetentionInDays: 7
-    accessPolicies: concat(
-      [
-        {
-          tenantId: subscription().tenantId
-          objectId: deployerObjectId
-          permissions: {
-            secrets: [
-              'get'
-              'list'
-              'set'
-              'delete'
-              'recover'
-            ]
-          }
+    accessPolicies: [
+      {
+        tenantId: subscription().tenantId
+        objectId: deployerObjectId
+        permissions: {
+          secrets: [
+            'get'
+            'list'
+            'set'
+            'delete'
+            'recover'
+          ]
         }
-      ],
-      empty(workflowPrincipalObjectId)
-        ? []
-        : [
-            {
-              tenantId: subscription().tenantId
-              objectId: workflowPrincipalObjectId
-              permissions: {
-                secrets: [
-                  'get'
-                ]
-              }
-            }
-          ])
+      }
+    ]
   }
 }
 
@@ -241,5 +211,4 @@ resource adminPasswordSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 output vmName string = vm.name
 output publicIpAddress string = publicIp.properties.ipAddress
 output networkSecurityGroupName string = nsg.name
-output rdpHint string = 'RDP to ${publicIp.properties.ipAddress} as ${adminUsername}.'
 output keyVaultName string = keyVault.name
