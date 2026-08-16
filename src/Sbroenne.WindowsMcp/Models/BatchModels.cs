@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Models;
 /// </summary>
 public sealed class BatchStep
 {
-    /// <summary>Operation to run: find, click, type, select, wait, read, snapshot, or key.</summary>
+    /// <summary>Operation to run: find, click, type, select, wait, read, snapshot, key, mouse, or polyline.</summary>
     [JsonPropertyName("action")]
     public string Action { get; set; } = "";
 
@@ -91,6 +91,66 @@ public sealed class BatchStep
     /// <summary>Include child text for action=read (default: false).</summary>
     [JsonPropertyName("includeChildren")]
     public bool IncludeChildren { get; set; }
+
+    /// <summary>Double-click instead of single-click (action=click).</summary>
+    [JsonPropertyName("doubleClick")]
+    public bool DoubleClick { get; set; }
+
+    /// <summary>Mouse operation for action=mouse: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position.</summary>
+    [JsonPropertyName("mouseAction")]
+    public string? MouseAction { get; set; }
+
+    /// <summary>X coordinate for action=mouse (window-relative by default; monitor-relative when target/monitorIndex is set).</summary>
+    [JsonPropertyName("x")]
+    public int? X { get; set; }
+
+    /// <summary>Y coordinate for action=mouse.</summary>
+    [JsonPropertyName("y")]
+    public int? Y { get; set; }
+
+    /// <summary>Drag end X coordinate (action=mouse, mouseAction=drag).</summary>
+    [JsonPropertyName("endX")]
+    public int? EndX { get; set; }
+
+    /// <summary>Drag end Y coordinate (action=mouse, mouseAction=drag).</summary>
+    [JsonPropertyName("endY")]
+    public int? EndY { get; set; }
+
+    /// <summary>Vertices for action=polyline as [[x1,y1],[x2,y2],...] - drawn as one continuous stroke.</summary>
+    [JsonPropertyName("points")]
+    public int[][]? Points { get; set; }
+
+    /// <summary>Mouse button for drag/polyline: left, right, or middle (default: left).</summary>
+    [JsonPropertyName("button")]
+    public string? Button { get; set; }
+
+    /// <summary>Scroll direction (action=mouse, mouseAction=scroll): up, down, left, or right.</summary>
+    [JsonPropertyName("direction")]
+    public string? Direction { get; set; }
+
+    /// <summary>Number of scroll clicks (action=mouse, mouseAction=scroll, default: 1).</summary>
+    [JsonPropertyName("amount")]
+    public int Amount { get; set; } = 1;
+
+    /// <summary>Monitor target for screen-relative coordinates: primary_screen or secondary_screen. Overrides the batch window handle.</summary>
+    [JsonPropertyName("target")]
+    public string? Target { get; set; }
+
+    /// <summary>Monitor index (0-based) for screen-relative coordinates. Overrides the batch window handle.</summary>
+    [JsonPropertyName("monitorIndex")]
+    public int? MonitorIndex { get; set; }
+
+    /// <summary>Fail the step unless the foreground window's process matches (action=mouse). Suppresses auto-activation.</summary>
+    [JsonPropertyName("expectedProcessName")]
+    public string? ExpectedProcessName { get; set; }
+
+    /// <summary>Fail the step unless the foreground window's title contains this text (action=mouse). Suppresses auto-activation.</summary>
+    [JsonPropertyName("expectedWindowTitle")]
+    public string? ExpectedWindowTitle { get; set; }
+
+    /// <summary>Explicitly force or skip activating the target window before a mouse step. Defaults to activating unless a foreground guard is set.</summary>
+    [JsonPropertyName("activate")]
+    public bool? Activate { get; set; }
 }
 
 /// <summary>Outcome of a single <see cref="BatchStep"/>.</summary>

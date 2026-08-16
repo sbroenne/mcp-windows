@@ -32,6 +32,7 @@ public static partial class UIClickTool
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="withSnapshot">When true, attach the window's post-action element tree (perceive/act fusion) so you can verify the new state without a separate ui_snapshot call. Default: false.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
+    /// <param name="doubleClick">Double-click the element instead of single-clicking. Use for list/grid items that open on double-click - no coordinates needed. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the click operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_click", Title = "Click UI Element", Destructive = true, OpenWorld = false)]
@@ -47,6 +48,7 @@ public static partial class UIClickTool
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool withSnapshot,
         [DefaultValue(false)] bool includeDiagnostics,
+        [DefaultValue(false)] bool doubleClick,
         CancellationToken cancellationToken)
     {
         const string actionName = "click";
@@ -67,7 +69,9 @@ public static partial class UIClickTool
         {
             if (!string.IsNullOrWhiteSpace(elementId))
             {
-                var byIdResult = await WindowsToolsBase.UIAutomationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
+                var byIdResult = doubleClick
+                    ? await WindowsToolsBase.UIAutomationService.DoubleClickElementAsync(elementId, windowHandle, cancellationToken)
+                    : await WindowsToolsBase.UIAutomationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
                 byIdResult = await WindowsToolsBase.WithPostActionSnapshotAsync(byIdResult, windowHandle, withSnapshot, cancellationToken);
                 return WindowsToolsBase.ToCallToolResult(byIdResult, includeDiagnostics);
             }
@@ -84,7 +88,9 @@ public static partial class UIClickTool
                 FoundIndex = Math.Max(1, foundIndex)
             };
 
-            var result = await WindowsToolsBase.UIAutomationService.FindAndClickAsync(query, cancellationToken);
+            var result = doubleClick
+                ? await WindowsToolsBase.UIAutomationService.FindAndDoubleClickAsync(query, cancellationToken)
+                : await WindowsToolsBase.UIAutomationService.FindAndClickAsync(query, cancellationToken);
             result = await WindowsToolsBase.WithPostActionSnapshotAsync(result, windowHandle, withSnapshot, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }

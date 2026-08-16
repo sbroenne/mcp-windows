@@ -238,6 +238,18 @@ public sealed class SystemResources
             window_management(action="activate", handle="123456")
             mouse_control(action="click", windowHandle="123456", x=450, y=300)
             ```
+
+            ## Canvas Drawing
+
+            Do NOT send one mouse_control call per stroke. Batch the whole figure:
+
+            ```
+            ui_batch(windowHandle="123456", steps="[{\"action\":\"polyline\",\"points\":[[300,200],[500,200],[500,400],[300,200]]}]")
+            ```
+
+            `polyline` presses once, traces every vertex, and releases once - one continuous stroke with no pen
+            lift at the corners. A standalone `mouse_control(action="polyline", points="[[...]]")` does the same
+            for a single stroke.
             """;
     }
 

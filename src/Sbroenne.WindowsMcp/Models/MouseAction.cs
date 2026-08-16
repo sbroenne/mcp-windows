@@ -32,6 +32,10 @@ public enum MouseAction
     [JsonStringEnumMemberName("drag")]
     Drag,
 
+    /// <summary>Continuous multi-point stroke - hold button at the first point, trace every point, release at the last.</summary>
+    [JsonStringEnumMemberName("polyline")]
+    Polyline,
+
     /// <summary>Mouse wheel scroll.</summary>
     [JsonStringEnumMemberName("scroll")]
     Scroll,

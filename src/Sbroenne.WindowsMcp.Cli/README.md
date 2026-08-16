@@ -49,7 +49,7 @@ wincli <group> [<action>] [--option value] [--flag]
 | `window` | Manage windows (find, list, activate, move, close, …) |
 | `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `read-table`, `wait`, `batch`) |
 | `keyboard` | Send keystrokes (`type`, `press`, `sequence`, …) |
-| `mouse` | Mouse input (`move`, `click`, `drag`, `scroll`, …) |
+| `mouse` | Mouse input (`move`, `click`, `drag`, `polyline`, `scroll`, …) |
 | `screenshot` | Capture screens/windows/regions (annotated element discovery by default) |
 | `clipboard` | Read/write the Windows clipboard (`get`, `set`, `clear`) |
 | `macro` | Record & replay UI workflows (`save`, `run`, `list`, `get`, `delete`) |
@@ -71,6 +71,9 @@ wincli ui click --window 12345 --name Submit --with-snapshot
 
 # Run an ordered sequence in one invocation
 wincli ui batch --window 12345 --steps '[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]'
+
+# Draw a whole figure in one invocation (polyline = one continuous stroke, no pen lift)
+wincli ui batch --window 12345 --steps '[{"action":"polyline","points":[[300,200],[500,200],[500,400],[300,200]]}]'
 
 # Save that sequence as a macro, then replay it later against any window
 wincli macro save --name login --steps '[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]'

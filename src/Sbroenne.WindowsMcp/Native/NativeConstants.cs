@@ -53,6 +53,9 @@ internal static class NativeConstants
     /// <summary>Wheel rotation (horizontal scrolling).</summary>
     public const uint MOUSEEVENTF_HWHEEL = 0x1000;
 
+    /// <summary>The move message is not coalesced with pending moves; every point is delivered to the target.</summary>
+    public const uint MOUSEEVENTF_MOVE_NOCOALESCE = 0x2000;
+
     /// <summary>Coordinates are mapped to entire virtual desktop.</summary>
     public const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
 

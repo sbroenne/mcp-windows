@@ -58,6 +58,19 @@ public sealed class UITestHarnessForm : Form
     public int SubmitMouseInputCount { get; private set; }
 
     /// <summary>
+    /// Gets the center of the submit button in window-relative coordinates - the frame coordinate-addressed
+    /// mouse operations use when a windowHandle is supplied. Must be called on the UI thread.
+    /// </summary>
+    public Point SubmitButtonWindowRelativeCenter
+    {
+        get
+        {
+            var screen = _submitButton.PointToScreen(new Point(_submitButton.Width / 2, _submitButton.Height / 2));
+            return new Point(screen.X - Bounds.X, screen.Y - Bounds.Y);
+        }
+    }
+
+    /// <summary>
     /// Gets the number of physical mouse-up events received by semantic state controls.
     /// </summary>
     public int SemanticControlMouseInputCount { get; private set; }

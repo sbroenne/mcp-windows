@@ -76,6 +76,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
+| Draw on a canvas | `ui_batch` | Batch `mouse`/`polyline` steps; one call per figure, not one per stroke |
 | Find/move windows | `window_management` | Window lifecycle control |
 
 ### Browser Automation
@@ -104,7 +105,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `ui_read` | Read text from elements (UIA + OCR) |
 | `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
-| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key) in one call |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
 | `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog (English Windows only) |
 | `file_open` | Open an existing file via the Open dialog (English Windows only) |
@@ -202,6 +203,7 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 | `automationId` | Automation ID | No* |
 | `controlType` | Control type filter | No |
 | `foundIndex` | Click the Nth match (1-based) | No |
+| `doubleClick` | Double-click instead of single-click | No |
 
 *Selectors are optional; without one, the first actionable match in the target window is used.
 
@@ -211,6 +213,7 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 - Toggle checkboxes and toggle buttons
 - Handles various control patterns automatically
 - Falls back to coordinate-based click if pattern fails
+- `doubleClick=true` double-clicks an element by name/id - no coordinates needed for list/grid items that open on double-click. UI Automation has no double-click pattern, so this is always a physical double-click at the element's clickable point.
 
 ---
 
@@ -408,20 +411,37 @@ Run a sequence of UI automation steps against a window in a single call. Built f
 Each step is a JSON object with an `action` plus the fields that action needs:
 
 - `find` - selectors; resolves an element and exposes its id to the next step as `$prev`
-- `click` - selectors or `elementId`
+- `click` - selectors or `elementId`, optional `doubleClick`
 - `type` - selectors or `elementId`, plus `text` (optional `clearFirst`)
 - `select` - selectors, plus `value` (visible option text)
 - `wait` - `mode` (`appear`/`disappear`/`state`), selectors or `elementId`+`desiredState`, optional `timeoutMs`
 - `read` - selectors or `elementId` (or neither, to read the whole window), optional `includeChildren`
 - `snapshot` - capture the window element tree (optional `maxDepth`)
 - `key` - `key` (e.g. `enter`, `tab`, `f5`) with optional `modifiers` (`ctrl,shift,alt,win`) and `repeat`
+- `mouse` - `mouseAction` (`move`/`click`/`double_click`/`right_click`/`middle_click`/`drag`/`polyline`/`scroll`/`get_position`) plus `x`,`y` (and `endX`,`endY` for drag), optional `button`, `modifiers`, `direction`, `amount`
+- `polyline` - `points` as `[[x1,y1],[x2,y2],...]`, drawn as ONE continuous stroke; optional `button`
+
+### Mouse steps
+
+Mouse coordinates are **window-relative** by default (they inherit the batch `windowHandle`). Set `target` (`primary_screen`/`secondary_screen`) or `monitorIndex` on a step for screen-relative coordinates instead.
+
+The target window is activated before each mouse step, so a batch cannot fail with "Could not retrieve foreground window information". Setting `expectedProcessName` or `expectedWindowTitle` on a step suppresses that auto-activation and verifies the foreground window instead - the step fails cleanly if it doesn't match, and `stopOnError` halts the batch. Set `activate` explicitly to force either behavior.
+
+`polyline` presses once at the first point, traces every vertex, and releases at the last - a single continuous stroke. This is better than N segment-drags, which lift the pen at every vertex, and costs one round-trip instead of N.
+
+```json
+[{"action":"click","name":"Pencil"},
+ {"action":"polyline","points":[[300,200],[500,200],[500,400],[300,200]]},
+ {"action":"mouse","mouseAction":"drag","x":600,"y":200,"endX":700,"endY":400}]
+```
 
 ### Capabilities
 
-- One round-trip for multi-step workflows (fill username + password + submit)
+- One round-trip for multi-step workflows (fill username + password + submit) and for multi-stroke drawing
 - Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
 - Chain steps by referencing the prior step's element with `elementId: "$prev"`
 - `stopOnError=false` runs every step and reports each outcome
+- Mouse steps delegate to the same engine as `mouse_control`, so monitor resolution, foreground guards, secure-desktop and elevation checks behave identically
 
 ### Perceive/act fusion (`withSnapshot`)
 
@@ -530,14 +550,31 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 | `right_click` | Right-click at coordinates | optional: `x`, `y` |
 | `middle_click` | Middle-click at coordinates | optional: `x`, `y` |
 | `drag` | Drag from current position to coordinates | `x`, `y`, `endX`, `endY` |
+| `polyline` | One continuous stroke through every vertex | `points` |
 | `scroll` | Scroll at coordinates | `direction`, optional: `x`, `y`, `amount` |
 | `get_position` | Get current cursor position with monitor context | none |
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | The mouse action to perform | Yes |
+| `x` / `y` | Coordinates, relative to the monitor (or the window when `windowHandle` is set) | Per action |
+| `endX` / `endY` | Drag end position | For `drag` |
+| `points` | JSON array of `[x,y]` pairs, e.g. `[[650,430],[750,480],[750,620]]` (at least 2) | For `polyline` |
+| `button` | `left`, `right`, or `middle` for drag/polyline | No |
+| `modifiers` | `ctrl`, `shift`, `alt` (comma-separated) | No |
+| `direction` / `amount` | Scroll direction and click count | For `scroll` |
+| `target` / `monitorIndex` | Monitor targeting | With coordinates |
+| `windowHandle` | Window-relative coordinate mode | No |
+| `expectedWindowTitle` / `expectedProcessName` | Abort unless the foreground window matches | No |
 
 ### Capabilities
 
 - Click, double-click, right-click, middle-click
 - Move cursor to absolute coordinates
 - Drag operations with hold/release
+- Continuous multi-point strokes via `polyline` - press once, trace every vertex, release once. Unlike N separate drags there is no pen lift at the vertices, so freehand shapes render as one stroke.
 - Scroll up/down/left/right
 - Multi-monitor support with DPI awareness
 - Easy targeting with `target='primary_screen'` or `'secondary_screen'`

@@ -80,7 +80,7 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `ui_read` | Read text from elements (with OCR fallback) |
 | `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
-| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/key) in one call |
+| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
 | `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog |
 | `file_open` | Open an existing file via the Open dialog |

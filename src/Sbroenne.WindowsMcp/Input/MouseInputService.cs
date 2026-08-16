@@ -11,7 +11,18 @@ public sealed class MouseInputService
 {
     private readonly ModifierKeyManager _modifierKeyManager = new();
     /// <inheritdoc />
-    public Task<MouseControlResult> MoveAsync(int x, int y, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> MoveAsync(int x, int y, CancellationToken cancellationToken = default) =>
+        MoveCoreAsync(x, y, extraFlags: 0, cancellationToken);
+
+    /// <summary>
+    /// Moves the cursor as part of a held-button stroke. Sets <c>MOUSEEVENTF_MOVE_NOCOALESCE</c> so Windows
+    /// delivers this vertex to the target even when the target thread is busy; a plain move may be coalesced
+    /// with the next one, which would cut across the corner between them.
+    /// </summary>
+    private Task<MouseControlResult> MoveForStrokeAsync(int x, int y, CancellationToken cancellationToken) =>
+        MoveCoreAsync(x, y, NativeConstants.MOUSEEVENTF_MOVE_NOCOALESCE, cancellationToken);
+
+    private static Task<MouseControlResult> MoveCoreAsync(int x, int y, uint extraFlags, CancellationToken cancellationToken)
     {
         // Validate coordinates against virtual screen bounds
         var (isValid, screenBounds) = CoordinateNormalizer.ValidateCoordinates(x, y);
@@ -38,7 +49,7 @@ public sealed class MouseInputService
                     Dx = normalizedX,
                     Dy = normalizedY,
                     MouseData = 0,
-                    DwFlags = NativeConstants.MOUSEEVENTF_MOVE | NativeConstants.MOUSEEVENTF_ABSOLUTE | NativeConstants.MOUSEEVENTF_VIRTUALDESK,
+                    DwFlags = NativeConstants.MOUSEEVENTF_MOVE | NativeConstants.MOUSEEVENTF_ABSOLUTE | NativeConstants.MOUSEEVENTF_VIRTUALDESK | extraFlags,
                     Time = 0,
                     DwExtraInfo = 0,
                 },
@@ -596,39 +607,61 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public Task<MouseControlResult> DragAsync(int startX, int startY, int endX, int endY, MouseButton button = MouseButton.Left, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> DragAsync(int startX, int startY, int endX, int endY, MouseButton button = MouseButton.Left, CancellationToken cancellationToken = default) =>
+        StrokeAsync([new Coordinates(startX, startY), new Coordinates(endX, endY)], button, ModifierKey.None, cancellationToken);
+
+    /// <summary>
+    /// Presses a mouse button at the first point, moves through every remaining point, and releases at the last -
+    /// one continuous stroke with no intermediate pen lifts.
+    /// </summary>
+    /// <param name="points">Absolute screen coordinates to trace, in order. At least two are required.</param>
+    /// <param name="button">The mouse button to hold down for the duration of the stroke.</param>
+    /// <param name="modifiers">Modifier keys to hold while stroking.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A result whose final position is the last point, with target window info sampled at the first point.</returns>
+    /// <remarks>
+    /// <see cref="DragAsync"/> is the two-point case of this method, so drag and stroke can never diverge.
+    /// Every move after the press is sent with <c>MOUSEEVENTF_MOVE_NOCOALESCE</c> so no vertex is dropped when the
+    /// target thread is busy. The button is always released in a <c>finally</c> block, even when a move fails partway through.
+    /// </remarks>
+    public async Task<MouseControlResult> StrokeAsync(
+        IReadOnlyList<Coordinates> points,
+        MouseButton button = MouseButton.Left,
+        ModifierKey modifiers = ModifierKey.None,
+        CancellationToken cancellationToken = default)
     {
-        // Validate start coordinates
-        var (isStartValid, startBounds) = CoordinateNormalizer.ValidateCoordinates(startX, startY);
-        if (!isStartValid)
+        if (points is null || points.Count < 2)
         {
-            return Task.FromResult(MouseControlResult.CreateFailure(
-                MouseControlErrorCode.CoordinatesOutOfBounds,
-                $"Start coordinates ({startX}, {startY}) are out of bounds. Valid bounds: Left={startBounds.Left}, Top={startBounds.Top}, Right={startBounds.Right}, Bottom={startBounds.Bottom}",
-                startBounds));
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.MissingRequiredParameter,
+                $"A stroke requires at least 2 points; got {points?.Count ?? 0}.");
         }
 
-        // Validate end coordinates
-        var (isEndValid, endBounds) = CoordinateNormalizer.ValidateCoordinates(endX, endY);
-        if (!isEndValid)
+        // Validate every point up front so a bad vertex fails before any button is pressed
+        ScreenBounds screenBounds = default;
+        for (var i = 0; i < points.Count; i++)
         {
-            return Task.FromResult(MouseControlResult.CreateFailure(
-                MouseControlErrorCode.CoordinatesOutOfBounds,
-                $"End coordinates ({endX}, {endY}) are out of bounds. Valid bounds: Left={endBounds.Left}, Top={endBounds.Top}, Right={endBounds.Right}, Bottom={endBounds.Bottom}",
-                endBounds));
+            var (isValid, bounds) = CoordinateNormalizer.ValidateCoordinates(points[i].X, points[i].Y);
+            if (!isValid)
+            {
+                return MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.CoordinatesOutOfBounds,
+                    $"Point {i} ({points[i].X}, {points[i].Y}) is out of bounds. Valid bounds: Left={bounds.Left}, Top={bounds.Top}, Right={bounds.Right}, Bottom={bounds.Bottom}",
+                    bounds);
+            }
+
+            screenBounds = bounds;
         }
 
-        var screenBounds = startBounds; // Both are valid, use either
-
-        // Step 1: Move to start position
-        var moveToStartResult = MoveAsync(startX, startY, cancellationToken).GetAwaiter().GetResult();
+        // Step 1: Move to the first point
+        var moveToStartResult = await MoveAsync(points[0].X, points[0].Y, cancellationToken);
         if (!moveToStartResult.Success)
         {
-            return Task.FromResult(moveToStartResult);
+            return moveToStartResult;
         }
 
         // Get the target window info at the start position
-        var targetWindowInfo = GetTargetWindowInfoAtPoint(startX, startY);
+        var targetWindowInfo = GetTargetWindowInfoAtPoint(points[0].X, points[0].Y);
 
         // Determine which button down/up flags to use
         uint buttonDownFlag;
@@ -649,59 +682,12 @@ public sealed class MouseInputService
                 break;
         }
 
-        // Step 2: Press the mouse button down
-        var buttonDownInput = new INPUT[]
-        {
-            new INPUT
-            {
-                Type = NativeConstants.INPUT_MOUSE,
-                Data = new INPUTUNION
-                {
-                    Mouse = new MOUSEINPUT
-                    {
-                        Dx = 0,
-                        Dy = 0,
-                        MouseData = 0,
-                        DwFlags = buttonDownFlag,
-                        Time = 0,
-                        DwExtraInfo = 0,
-                    },
-                },
-            },
-        };
-
-        var buttonDownResult = NativeMethods.SendInput(1, buttonDownInput, INPUT.Size);
-        if (buttonDownResult != 1)
-        {
-            var error = Marshal.GetLastWin32Error();
-            var (errorCode, errorMessage) = MapSendInputError(error);
-            return Task.FromResult(MouseControlResult.CreateFailure(
-                errorCode,
-                $"SendInput failed for button down: {errorMessage}",
-                screenBounds));
-        }
+        var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
 
         try
         {
-            // Step 3: Move to end position
-            var moveToEndResult = MoveAsync(endX, endY, cancellationToken).GetAwaiter().GetResult();
-            if (!moveToEndResult.Success)
-            {
-                // Even if move fails, we need to release the button in finally
-                return Task.FromResult(moveToEndResult);
-            }
-
-            // Get the final cursor position
-            NativeMethods.GetCursorPos(out var finalPos);
-            var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
-
-            var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
-            return Task.FromResult(successResult with { TargetWindow = targetWindowInfo });
-        }
-        finally
-        {
-            // Step 4: Always release the mouse button, even on failure
-            var buttonUpInput = new INPUT[]
+            // Step 2: Press the mouse button down
+            var buttonDownInput = new INPUT[]
             {
                 new INPUT
                 {
@@ -713,7 +699,7 @@ public sealed class MouseInputService
                             Dx = 0,
                             Dy = 0,
                             MouseData = 0,
-                            DwFlags = buttonUpFlag,
+                            DwFlags = buttonDownFlag,
                             Time = 0,
                             DwExtraInfo = 0,
                         },
@@ -721,8 +707,68 @@ public sealed class MouseInputService
                 },
             };
 
-            // Send button up - ignore result since we're in finally block
-            _ = NativeMethods.SendInput(1, buttonUpInput, INPUT.Size);
+            var buttonDownResult = NativeMethods.SendInput(1, buttonDownInput, INPUT.Size);
+            if (buttonDownResult != 1)
+            {
+                var error = Marshal.GetLastWin32Error();
+                var (errorCode, errorMessage) = MapSendInputError(error);
+                return MouseControlResult.CreateFailure(
+                    errorCode,
+                    $"SendInput failed for button down: {errorMessage}",
+                    screenBounds);
+            }
+
+            try
+            {
+                // Step 3: Trace through the remaining points with the button held
+                for (var i = 1; i < points.Count; i++)
+                {
+                    var moveResult = await MoveForStrokeAsync(points[i].X, points[i].Y, cancellationToken);
+                    if (!moveResult.Success)
+                    {
+                        // Even if a move fails, the button is released in finally
+                        return moveResult;
+                    }
+                }
+
+                // Get the final cursor position
+                NativeMethods.GetCursorPos(out var finalPos);
+                var finalPosition = new Coordinates(finalPos.X, finalPos.Y);
+
+                var successResult = MouseControlResult.CreateSuccess(finalPosition, screenBounds);
+                return successResult with { TargetWindow = targetWindowInfo };
+            }
+            finally
+            {
+                // Step 4: Always release the mouse button, even on failure
+                var buttonUpInput = new INPUT[]
+                {
+                    new INPUT
+                    {
+                        Type = NativeConstants.INPUT_MOUSE,
+                        Data = new INPUTUNION
+                        {
+                            Mouse = new MOUSEINPUT
+                            {
+                                Dx = 0,
+                                Dy = 0,
+                                MouseData = 0,
+                                DwFlags = buttonUpFlag,
+                                Time = 0,
+                                DwExtraInfo = 0,
+                            },
+                        },
+                    },
+                };
+
+                // Send button up - ignore result since we're in finally block
+                _ = NativeMethods.SendInput(1, buttonUpInput, INPUT.Size);
+            }
+        }
+        finally
+        {
+            // Always release modifiers that we pressed, even on failure
+            _modifierKeyManager.ReleaseModifiers(pressedModifiers);
         }
     }
 
