@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
