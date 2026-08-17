@@ -68,7 +68,7 @@ public sealed partial class UIAutomationService
             LogGetTextError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "get_text",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "GetText"),
                 CreateDiagnostics(stopwatch));
         }

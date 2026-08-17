@@ -105,12 +105,9 @@ public sealed partial class UIAutomationService
         catch (COMException ex)
         {
             LogScrollIntoViewError(_logger, elementId, ex);
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : UIAutomationErrorType.InternalError;
             return UIAutomationResult.CreateFailure(
                 "scroll_into_view",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "ScrollIntoView"),
                 CreateDiagnostics(stopwatch));
         }

@@ -138,7 +138,7 @@ public sealed partial class UIAutomationService
             LogReadTableError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "read_table",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "ReadTable"),
                 CreateDiagnostics(stopwatch));
         }
