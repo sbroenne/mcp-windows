@@ -1,5 +1,4 @@
 using System.Runtime.InteropServices;
-using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Automation;
 
