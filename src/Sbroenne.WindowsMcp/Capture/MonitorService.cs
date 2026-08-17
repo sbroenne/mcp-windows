@@ -12,6 +12,8 @@ public sealed class MonitorService
     private const int MDT_EFFECTIVE_DPI = 0;
     private const int S_OK = 0;
 
+    internal delegate int DpiQuery(nint monitor, int dpiType, out uint dpiX, out uint dpiY);
+
     /// <inheritdoc />
     public int MonitorCount => Screen.AllScreens.Length;
 
@@ -55,11 +57,7 @@ public sealed class MonitorService
 
                 // Effective DPI drives the scale factor (96 DPI = 100%). Fall back to 96/1.0 when
                 // the per-monitor DPI API is unavailable (e.g. pre-8.1 or a query failure).
-                int effectiveDpi = 96;
-                if (NativeMethods.GetDpiForMonitor(hMonitor, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == S_OK && dpiX > 0)
-                {
-                    effectiveDpi = (int)dpiX;
-                }
+                int effectiveDpi = GetEffectiveDpi(hMonitor, NativeMethods.GetDpiForMonitor);
 
                 double scale = Math.Round(effectiveDpi / 96.0, 2, MidpointRounding.AwayFromZero);
                 string orientation = logicalHeight > logicalWidth ? "portrait" : "landscape";
@@ -95,6 +93,26 @@ public sealed class MonitorService
         NativeMethods.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, EnumCallback, IntPtr.Zero);
 
         return monitors;
+    }
+
+    internal static int GetEffectiveDpi(nint monitor, DpiQuery query)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+
+        try
+        {
+            return query(monitor, MDT_EFFECTIVE_DPI, out uint dpiX, out _) == S_OK && dpiX > 0
+                ? (int)dpiX
+                : 96;
+        }
+        catch (DllNotFoundException)
+        {
+            return 96;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return 96;
+        }
     }
 
     /// <inheritdoc />

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using SysProcess = System.Diagnostics.Process;
 
 namespace Sbroenne.WindowsMcp.Processes;
@@ -104,14 +105,18 @@ public sealed class ProcessService
 
         using (process)
         {
-            var summary = TryDescribe(process);
-            var displayName = summary?.Name ?? "process";
+            var displayName = TryGetProcessName(process);
 
             if (IsProtected(pid, displayName))
             {
                 return ProcessResult.CreateFailure(
-                    "kill", $"Refusing to terminate protected process '{displayName}' (pid {pid}).");
+                    "kill",
+                    displayName is null
+                        ? $"Refusing to terminate pid {pid} because its process name could not be determined."
+                        : $"Refusing to terminate protected process '{displayName}' (pid {pid}).");
             }
+
+            var summary = new ProcessSummary(pid, displayName!, TryGetMemoryMb(process));
 
             try
             {
@@ -123,7 +128,7 @@ public sealed class ProcessService
                     "kill", $"Failed to terminate '{displayName}' (pid {pid}): {ex.Message}.");
             }
 
-            return ProcessResult.CreateKillSuccess([summary ?? new ProcessSummary(pid, displayName, 0)]);
+            return ProcessResult.CreateKillSuccess([summary]);
         }
     }
 
@@ -174,15 +179,35 @@ public sealed class ProcessService
         return ProcessResult.CreateKillSuccess(killed);
     }
 
-    private static bool IsProtected(int pid, string name)
+    internal static bool IsProtected(int pid, string? name)
     {
-        if (pid <= 4 || pid == Environment.ProcessId)
+        if (pid <= 4 || pid == Environment.ProcessId || string.IsNullOrWhiteSpace(name))
         {
             return true;
         }
 
         var trimmed = name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? name[..^4] : name;
         return ProtectedNames.Contains(trimmed);
+    }
+
+    private static string? TryGetProcessName(SysProcess process)
+    {
+        try
+        {
+            return process.ProcessName;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (Win32Exception)
+        {
+            return null;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
 
     private static ProcessSummary? TryDescribe(SysProcess process)
@@ -196,6 +221,26 @@ public sealed class ProcessService
         {
             // Some system/protected processes deny access to their metrics; skip them.
             return null;
+        }
+    }
+
+    private static double TryGetMemoryMb(SysProcess process)
+    {
+        try
+        {
+            return Math.Round(process.WorkingSet64 / (1024d * 1024d), 1, MidpointRounding.AwayFromZero);
+        }
+        catch (InvalidOperationException)
+        {
+            return 0;
+        }
+        catch (Win32Exception)
+        {
+            return 0;
+        }
+        catch (NotSupportedException)
+        {
+            return 0;
         }
     }
 

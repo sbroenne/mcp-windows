@@ -1,3 +1,4 @@
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
@@ -85,6 +86,33 @@ public sealed class MonitorInfoTests
 
         var json = System.Text.Json.JsonSerializer.Serialize(monitor);
         Assert.DoesNotContain("workArea", json);
+    }
+
+    [Theory]
+    [InlineData(typeof(DllNotFoundException))]
+    [InlineData(typeof(EntryPointNotFoundException))]
+    public void GetEffectiveDpi_WhenNativeApiIsUnavailable_FallsBackTo96(Type exceptionType)
+    {
+        static int ThrowingQuery(
+            Type exceptionType,
+            nint monitor,
+            int dpiType,
+            out uint dpiX,
+            out uint dpiY)
+        {
+            _ = monitor;
+            _ = dpiType;
+            dpiX = 0;
+            dpiY = 0;
+            throw (Exception)Activator.CreateInstance(exceptionType)!;
+        }
+
+        var result = MonitorService.GetEffectiveDpi(
+            nint.Zero,
+            (nint monitor, int dpiType, out uint dpiX, out uint dpiY) =>
+                ThrowingQuery(exceptionType, monitor, dpiType, out dpiX, out dpiY));
+
+        Assert.Equal(96, result);
     }
 
     [Fact]

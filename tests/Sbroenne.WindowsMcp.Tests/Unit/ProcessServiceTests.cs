@@ -103,4 +103,10 @@ public sealed class ProcessServiceTests
         // Still running afterwards.
         Assert.NotEmpty(SysProcess.GetProcessesByName("csrss"));
     }
+
+    [Fact]
+    public void IsProtected_UnknownProcessName_FailsClosed()
+    {
+        Assert.True(ProcessService.IsProtected(pid: 100, name: null));
+    }
 }
