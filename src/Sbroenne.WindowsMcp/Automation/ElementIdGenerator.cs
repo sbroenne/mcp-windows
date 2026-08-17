@@ -168,7 +168,7 @@ public static class ElementIdGenerator
 
             return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:{treePath}{BuildSelectorSegment(element, cached: false)}";
         }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return "window:0|runtime:0|path:stale";
         }
@@ -191,7 +191,7 @@ public static class ElementIdGenerator
                 {
                     windowHandle = rootElement.GetCachedNativeWindowHandle();
                 }
-                catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+                catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
                 {
                     // Fall back to current property if not in cache
                     windowHandle = rootElement.GetNativeWindowHandle();
@@ -204,7 +204,7 @@ public static class ElementIdGenerator
             {
                 runtimeId = (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId);
             }
-            catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
             {
                 // Fall back to current if not cached
                 runtimeId = element.GetRuntimeId();
@@ -217,7 +217,7 @@ public static class ElementIdGenerator
             // Simplified format - no tree path (expensive to calculate)
             return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached{BuildSelectorSegment(element, cached: true)}";
         }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return "window:0|runtime:0|path:error";
         }
@@ -248,7 +248,7 @@ public static class ElementIdGenerator
             // Simplified format - no tree path
             return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast{BuildSelectorSegment(element, cached: false)}";
         }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return "window:0|runtime:0|path:error";
         }
@@ -332,7 +332,7 @@ public static class ElementIdGenerator
 
             return $"|sel:{sanitizedType}~{sanitizedName}";
         }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return string.Empty;
         }

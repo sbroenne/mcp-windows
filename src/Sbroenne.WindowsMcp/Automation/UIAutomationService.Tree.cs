@@ -334,7 +334,7 @@ public sealed partial class UIAutomationService
                 usePostHocFiltering,
                 ref elementsScanned);
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return null;
         }
@@ -373,7 +373,7 @@ public sealed partial class UIAutomationService
             {
                 cachedChildren = element.GetCachedChildren();
             }
-            catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
             {
                 // Children not cached - this shouldn't happen with TreeScope_Subtree
                 // Fall through with null

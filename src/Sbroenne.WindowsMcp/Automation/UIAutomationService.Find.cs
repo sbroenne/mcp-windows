@@ -307,7 +307,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared during search
         }
@@ -371,7 +371,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element tree changed during search - return whatever was collected.
         }
@@ -430,7 +430,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -497,7 +497,7 @@ public sealed partial class UIAutomationService
                 child = child.GetNextSibling();
             }
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared - skip it
         }
@@ -556,7 +556,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -573,7 +573,7 @@ public sealed partial class UIAutomationService
             var result = element.FindFirst(UIA.TreeScope.TreeScope_Element, condition);
             return result != null;
         }
-        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }

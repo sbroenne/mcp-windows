@@ -135,6 +135,24 @@ public sealed class COMExceptionHelperTests
     }
 
     [Fact]
+    public void IsExpectedElementFailure_AllowsInteropArgumentExceptions()
+    {
+        Assert.True(COMExceptionHelper.IsExpectedElementFailure(new ArgumentException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new ArgumentNullException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new ArgumentOutOfRangeException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new InvalidOperationException()));
+    }
+
+    [Fact]
+    public void IsExpectedElementTraversalFailure_OnlyAllowsStaleOrInteropArgumentFailures()
+    {
+        Assert.True(COMExceptionHelper.IsExpectedElementTraversalFailure(new ArgumentException()));
+        Assert.True(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_ELEMENTNOTAVAILABLE)));
+        Assert.False(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_NOTSUPPORTED)));
+        Assert.False(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_TIMEOUT)));
+    }
+
+    [Fact]
     public void TryExecute_WhenActionSucceeds_ReturnsSuccess()
     {
         var (success, error) = COMExceptionHelper.TryExecute(() => { }, "Op");

@@ -140,6 +140,27 @@ internal static class COMExceptionHelper
     }
 
     /// <summary>
+    /// Determines if an exception is an expected per-element provider failure.
+    /// UI Automation surfaces E_INVALIDARG as <see cref="ArgumentException"/> for some
+    /// unsupported property and cache combinations.
+    /// </summary>
+    public static bool IsExpectedElementFailure(Exception ex)
+    {
+        return ex.GetType() == typeof(ArgumentException) ||
+            ex is COMException comException && IsExpectedElementFailure(comException);
+    }
+
+    /// <summary>
+    /// Determines if best-effort tree traversal can skip an element that disappeared or exposed
+    /// an unsupported property/cache combination.
+    /// </summary>
+    public static bool IsExpectedElementTraversalFailure(Exception ex)
+    {
+        return ex.GetType() == typeof(ArgumentException) ||
+            ex is COMException comException && IsElementStale(comException);
+    }
+
+    /// <summary>
     /// Determines if the provider failed while its accessibility tree was transitioning.
     /// These failures are safe to retry only inside an already bounded observation loop.
     /// </summary>
