@@ -20,6 +20,8 @@ public static partial class UIMacroTool
     /// 🔁 RECORD &amp; REPLAY a reusable UI workflow. Save a ui_batch steps array under a name, then
     /// replay it against any window later - so a multi-step task (open a form, fill fields, submit)
     /// becomes a single named call. Also list, inspect, and delete saved macros.
+    /// Keywords: macro, record, replay, automate, workflow, script, sequence, repeat steps,
+    /// save steps, playback, reusable, batch replay, automation recipe.
     /// </summary>
     /// <remarks>
     /// WORKFLOW: build and verify a sequence with ui_batch, then ui_macro(action='save', name='login',

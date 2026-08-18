@@ -1,3 +1,4 @@
+using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
@@ -51,6 +52,67 @@ public sealed class MonitorInfoTests
 
         // Assert
         Assert.Equal(0, result);
+    }
+
+    [Fact]
+    public void MonitorInfo_SerializesEnrichedDisplayFields()
+    {
+        var monitor = new MonitorInfo(0, 1, @"\\.\DISPLAY1", 3840, 2160, 3840, 2160, 0, 0, true)
+        {
+            EffectiveDpi = 144,
+            Scale = 1.5,
+            Orientation = "landscape",
+            WorkArea = new WorkAreaInfo(0, 0, 3840, 2112),
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(monitor);
+
+        Assert.Contains("\"effectiveDpi\":144", json);
+        Assert.Contains("\"scale\":1.5", json);
+        Assert.Contains("\"orientation\":\"landscape\"", json);
+        Assert.Contains("\"workArea\":{", json);
+        Assert.Contains("\"height\":2112", json);
+    }
+
+    [Fact]
+    public void MonitorInfo_DefaultsAreSaneAndWorkAreaOmittedWhenNull()
+    {
+        var monitor = new MonitorInfo(0, 1, @"\\.\DISPLAY1", 1920, 1080, 1920, 1080, 0, 0, true);
+
+        Assert.Equal(96, monitor.EffectiveDpi);
+        Assert.Equal(1.0, monitor.Scale);
+        Assert.Equal("landscape", monitor.Orientation);
+        Assert.Null(monitor.WorkArea);
+
+        var json = System.Text.Json.JsonSerializer.Serialize(monitor);
+        Assert.DoesNotContain("workArea", json);
+    }
+
+    [Theory]
+    [InlineData(typeof(DllNotFoundException))]
+    [InlineData(typeof(EntryPointNotFoundException))]
+    public void GetEffectiveDpi_WhenNativeApiIsUnavailable_FallsBackTo96(Type exceptionType)
+    {
+        static int ThrowingQuery(
+            Type exceptionType,
+            nint monitor,
+            int dpiType,
+            out uint dpiX,
+            out uint dpiY)
+        {
+            _ = monitor;
+            _ = dpiType;
+            dpiX = 0;
+            dpiY = 0;
+            throw (Exception)Activator.CreateInstance(exceptionType)!;
+        }
+
+        var result = MonitorService.GetEffectiveDpi(
+            nint.Zero,
+            (nint monitor, int dpiType, out uint dpiX, out uint dpiY) =>
+                ThrowingQuery(exceptionType, monitor, dpiType, out dpiX, out dpiY));
+
+        Assert.Equal(96, result);
     }
 
     [Fact]

@@ -7,11 +7,11 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Integration tests for modifier key support (Ctrl, Shift, Alt) during click operations.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class ModifierKeyTests
+public sealed class ModifierKeyTests : DesktopInputTestBase
 {
     private readonly MouseInputService _service = new();
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithControlModifier_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -27,7 +27,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithShiftModifier_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -43,7 +43,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithAltModifier_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -59,7 +59,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithMultipleModifiers_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -76,7 +76,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithAllModifiers_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -93,7 +93,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClickAsync_WithControlModifier_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -109,7 +109,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RightClickAsync_WithShiftModifier_Succeeds()
     {
         // Arrange - use secondary monitor for DPI consistency
@@ -125,7 +125,7 @@ public sealed class ModifierKeyTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_AtCurrentPosition_WithModifier_Succeeds()
     {
         // Arrange - no coordinates, click at current position with modifier

@@ -17,6 +17,8 @@ public static partial class UIFileTool
     /// 💾 SAVE FILE TO DISK - The ONLY tool for saving documents. Automatically handles: Ctrl+S, Save As dialogs, filename entry, and overwrite prompts.
     /// ⚠️ DO NOT use keyboard_control(key='s', modifiers='ctrl') for saving - it CANNOT handle Save As dialogs and will get stuck!
     /// NOTE: English Windows only (detects 'Save As' dialog titles).
+    /// Keywords: save, save file, save as, save document, write file, store, persist, export,
+    /// ctrl+s, save dialog, overwrite, filename.
     /// </summary>
     /// <remarks>
     /// WHEN TO USE: Any time you need to save a file in ANY application (Notepad, Word, VS Code, etc.).

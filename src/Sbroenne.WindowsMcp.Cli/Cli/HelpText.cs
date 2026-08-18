@@ -46,6 +46,7 @@ internal static class HelpText
           macro        Record & replay UI workflows (save, run, list, get, delete).
           file-save    Save the active document (handles the Save As dialog).
           file-open    Open an existing file (handles the Open dialog).
+          process      List or kill running processes (task-manager style).
 
         Run 'wincli tools' for the full option reference.
         """;
@@ -107,6 +108,12 @@ internal static class HelpText
             actions: get (read clipboard text), set (write --text), clear
             Fast bulk text IO. Pair with keyboard copy/paste: focus app, keyboard c --modifiers ctrl,
             then clipboard get; or clipboard set --text '...' then keyboard v --modifiers ctrl.
+
+        process <action> [options]
+            actions: list ([--name <filter>] [--sort-by memory|name|pid] [--limit <n>]),
+                     kill (--pid <n> | --name <exe> [--force])
+            Task-manager style listing and termination. --force also kills the child process tree.
+            Critical Windows processes and the automation server itself are protected.
 
         macro <action> [options]
             actions: save (--name --steps '<json>'|--steps-file <path>), run (--name --window <h>

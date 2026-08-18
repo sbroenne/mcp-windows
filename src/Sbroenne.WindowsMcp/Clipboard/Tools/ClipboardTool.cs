@@ -17,6 +17,8 @@ public static partial class ClipboardTool
     /// <summary>
     /// 📋 READ/WRITE THE CLIPBOARD - the fastest way to move bulk text in and out of desktop apps.
     /// Prefer this over typing character-by-character or OCR when an app supports copy/paste.
+    /// Keywords: clipboard, copy, paste, cut, copy text, paste text, cut and paste, bulk text,
+    /// transfer text, get clipboard, set clipboard, clear clipboard, ctrl+c, ctrl+v.
     /// </summary>
     /// <remarks>
     /// WORKFLOW: To pull text OUT of an app, focus it, send keyboard_control(key='c', modifiers='ctrl')

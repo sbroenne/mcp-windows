@@ -22,6 +22,8 @@ public static partial class MouseControlTool
     /// USE FOR: drag operations, canvas drawing, custom controls without UIA.
     /// DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY).
     /// Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.
+    /// Keywords: mouse, cursor, click, double click, right click, drag, drop, scroll, move pointer,
+    /// coordinates, pixel, canvas, draw, hover, cursor position.
     /// </summary>
     /// <remarks>
     /// <para><strong>MONITOR TARGETING:</strong></para>

@@ -18,6 +18,8 @@ public static partial class UISnapshotTool
     /// selectors first. Returns a hierarchy of elements (id, name, type, click coordinates, enabled)
     /// so you can see what's on screen, then act with ui_click/ui_type/ui_select using an element's
     /// name/automationId (or its returned id).
+    /// Keywords: snapshot, element tree, structure, overview, inspect window, list elements,
+    /// what's on screen, accessibility tree, orient, discover UI, dump window.
     /// </summary>
     /// <remarks>
     /// This is usually the FIRST call when automating an unfamiliar window - prefer it over blind

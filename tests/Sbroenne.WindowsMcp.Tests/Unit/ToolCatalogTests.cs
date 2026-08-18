@@ -67,6 +67,20 @@ public sealed class ToolCatalogTests
         }
     }
 
+    [Fact]
+    public void GetTools_EveryDescriptionContainsKeywordsLine()
+    {
+        var tools = ToolCatalog.GetTools();
+
+        // Every tool description must carry a "Keywords:" line. These synonym-rich keyword lists
+        // improve tool discovery: an LLM matching a task ("close the frozen app", "copy this text")
+        // to a tool relies on the description, so each tool enumerates the phrasings a user might use.
+        Assert.All(tools, tool =>
+            Assert.True(
+                tool.Description?.Contains("Keywords:", StringComparison.Ordinal) == true,
+                $"{tool.Name} description must contain a 'Keywords:' line"));
+    }
+
     private static IEnumerable<string> ParameterNames(ToolCatalogEntry entry) =>
         entry.InputSchema.GetProperty("properties").EnumerateObject().Select(property => property.Name);
 }

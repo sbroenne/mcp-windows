@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests use a short delay pattern to avoid overwhelming the input queue.
 /// </remarks>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardHoldReleaseTests
+public class KeyboardHoldReleaseTests : DesktopInputTestBase
 {
     // Constants for test delays - give Windows time to process input
     private const int ShortDelay = 50;
@@ -21,7 +21,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down action sends a key press without key up.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownAsync_ValidKey_ReturnsSuccessWithHeldKeys()
     {
         // Arrange
@@ -37,7 +37,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down can hold multiple keys simultaneously.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownAsync_MultipleKeys_AllTrackedInHeldKeys()
     {
         // Arrange - Hold multiple keys in sequence
@@ -56,7 +56,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down for modifier keys works correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("ctrl")]
     [InlineData("shift")]
     [InlineData("alt")]
@@ -76,7 +76,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down for regular keys works correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("a")]
     [InlineData("space")]
     [InlineData("enter")]
@@ -96,7 +96,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down for an already held key returns appropriate error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownAsync_AlreadyHeldKey_ReturnsKeyAlreadyHeldError()
     {
         // Arrange - Try to hold a key that's already held
@@ -112,7 +112,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down with invalid key name returns error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownAsync_InvalidKey_ReturnsInvalidKeyError()
     {
         // Arrange
@@ -128,7 +128,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down with empty key name returns error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownAsync_EmptyKey_ReturnsMissingParameterError()
     {
         // Arrange
@@ -148,7 +148,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up releases a held key.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_HeldKey_ReturnsSuccessAndRemovesFromHeldKeys()
     {
         // Arrange - First hold a key, then release it
@@ -164,7 +164,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up for multiple held keys works correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_MultipleHeldKeys_ReleasesInCorrectOrder()
     {
         // Arrange - Hold multiple keys then release them
@@ -183,7 +183,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up for a key that's not held returns error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_NotHeldKey_ReturnsKeyNotHeldError()
     {
         // Arrange - Try to release a key that was never held
@@ -199,7 +199,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up is case-insensitive.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_CaseInsensitive_ReleasesCorrectKey()
     {
         // Arrange - Hold with lowercase, release with uppercase
@@ -217,7 +217,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up with invalid key name returns error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_InvalidKey_ReturnsInvalidKeyError()
     {
         // Arrange
@@ -233,7 +233,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up with empty key name returns error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyUpAsync_EmptyKey_ReturnsMissingParameterError()
     {
         // Arrange
@@ -253,7 +253,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that release_all releases all held keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ReleaseAllAsync_WithHeldKeys_ReleasesAllAndClearsTracker()
     {
         // Arrange - Hold multiple keys
@@ -272,7 +272,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that release_all with no held keys returns success.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ReleaseAllAsync_NoHeldKeys_ReturnsSuccess()
     {
         // Arrange - No keys are held
@@ -287,7 +287,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that release_all sends key up events in correct order.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ReleaseAllAsync_MultipleHeldKeys_ReleasesInReverseOrder()
     {
         // Arrange - Hold keys in specific order
@@ -307,7 +307,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that release_all clears held key tracking even if SendInput fails.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ReleaseAllAsync_OnError_StillClearsTracker()
     {
         // Arrange - Even if SendInput fails, the tracker should be cleared
@@ -327,7 +327,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held keys are correctly reported.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetHeldKeys_AfterKeyDown_ReturnsHeldKeyNames()
     {
         // Arrange
@@ -346,7 +346,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held keys are updated after key_up.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetHeldKeys_AfterKeyUp_ReflectsRemovedKey()
     {
         // Arrange - Hold multiple keys, then release one
@@ -365,7 +365,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held keys are empty after release_all.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetHeldKeys_AfterReleaseAll_ReturnsEmpty()
     {
         // Arrange - Hold some keys
@@ -384,7 +384,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held key names are normalized (lowercase).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task GetHeldKeys_KeyNameNormalization_ReturnsLowercase()
     {
         // Arrange - Hold with mixed case
@@ -404,7 +404,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_up for specific non-held key returns detailed error.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("a")]
     [InlineData("enter")]
     [InlineData("f1")]
@@ -424,7 +424,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held key state is preserved across multiple operations.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task HeldKeyState_AcrossOperations_MaintainsConsistency()
     {
         // Arrange - Perform various operations
@@ -454,7 +454,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that extended keys (arrows, etc.) work with key_down/key_up.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("up")]
     [InlineData("down")]
     [InlineData("left")]
@@ -478,7 +478,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that held keys are properly disposed when service is disposed.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task Dispose_WithHeldKeys_ReleasesAllKeys()
     {
         // Arrange - Hold some keys, then dispose the service
@@ -493,7 +493,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests the typical workflow: key_down, do something, key_up.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypicalWorkflow_HoldShiftSelectReleaseShift_WorksCorrectly()
     {
         // Arrange - Typical text selection workflow
@@ -518,7 +518,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that key_down/key_up work with Copilot key.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownUp_CopilotKey_WorksCorrectly()
     {
         // Arrange - Windows 11 Copilot key
@@ -534,7 +534,7 @@ public class KeyboardHoldReleaseTests
     /// <summary>
     /// Tests that holding and releasing the same key multiple times works.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task KeyDownUp_SameKeyMultipleTimes_WorksCorrectly()
     {
         // Arrange - Press and release the same key multiple times

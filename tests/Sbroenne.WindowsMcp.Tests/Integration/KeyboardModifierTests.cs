@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests use a short delay pattern to avoid overwhelming the input queue.
 /// </remarks>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardModifierTests
+public class KeyboardModifierTests : DesktopInputTestBase
 {
     // Constants for test delays - give Windows time to process input
     private const int ShortDelay = 50;
@@ -21,7 +21,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+C (Copy) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlC_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -39,7 +39,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+V (Paste) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlV_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -57,7 +57,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+Z (Undo) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlZ_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -75,7 +75,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+A (Select All) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlA_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -93,7 +93,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+S (Save) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlS_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -111,7 +111,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that "control" is a valid alias for "ctrl".
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ControlAlias_ReturnsSuccessWithModifiers()
     {
         // Arrange - "control" should work as alias for "ctrl"
@@ -133,7 +133,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Shift+Tab (Reverse Tab) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ShiftTab_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -151,7 +151,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Shift+Enter keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ShiftEnter_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -169,7 +169,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Shift+Delete (Cut) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ShiftDelete_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -187,7 +187,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Shift+Insert (Paste) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ShiftInsert_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -205,7 +205,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Shift+Arrow keys for text selection.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("up")]
     [InlineData("down")]
     [InlineData("left")]
@@ -232,7 +232,7 @@ public class KeyboardModifierTests
     /// Tests Alt+Tab (Task Switcher) keyboard shortcut.
     /// Note: This test is placeholder - actual Alt+Tab would switch windows.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_AltTab_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -251,7 +251,7 @@ public class KeyboardModifierTests
     /// Tests Alt+F4 (Close Window) keyboard shortcut.
     /// Note: This test is placeholder - actual Alt+F4 would close the window.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_AltF4_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -269,7 +269,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Alt+Enter (Toggle Fullscreen) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_AltEnter_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -292,7 +292,7 @@ public class KeyboardModifierTests
     /// Tests Ctrl+Shift+Escape (Task Manager) keyboard shortcut.
     /// Note: This test is placeholder - actual combo would open Task Manager.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlShiftEscape_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -310,7 +310,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+Shift+N (New Window) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlShiftN_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -328,7 +328,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+Shift+Tab (Previous Tab) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlShiftTab_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -346,7 +346,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Ctrl+Shift+Arrow keys for word selection.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("left")]
     [InlineData("right")]
     public async Task PressKeyAsync_CtrlShiftArrowKeys_ReturnsSuccessWithModifiers(string key)
@@ -371,7 +371,7 @@ public class KeyboardModifierTests
     /// Tests Win+E (Open Explorer) keyboard shortcut.
     /// Note: This test is placeholder - actual combo would open Explorer.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_WinE_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -390,7 +390,7 @@ public class KeyboardModifierTests
     /// Tests Win+D (Show Desktop) keyboard shortcut.
     /// Note: This test is placeholder - actual combo would show desktop.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_WinD_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -409,7 +409,7 @@ public class KeyboardModifierTests
     /// Tests Win+L (Lock Screen) keyboard shortcut.
     /// Note: This test is placeholder - actual combo would lock screen.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_WinL_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -427,7 +427,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Win+Tab (Task View) keyboard shortcut.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_WinTab_ReturnsSuccessWithModifiers()
     {
         // Arrange
@@ -445,7 +445,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests Win+Arrow keys for window snapping.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("up")]
     [InlineData("down")]
     [InlineData("left")]
@@ -467,7 +467,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that "windows" and "meta" are valid aliases for "win".
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("windows")]
     [InlineData("meta")]
     public async Task PressKeyAsync_WinAliases_ReturnsSuccessWithModifiers(string modifier)
@@ -492,7 +492,7 @@ public class KeyboardModifierTests
     /// Tests that modifier keys are properly released after press operation.
     /// This prevents "stuck" keys.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_AfterCombo_ModifiersReleased()
     {
         // Arrange - After a combo, no modifier keys should be stuck
@@ -511,7 +511,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that multiple sequential combos don't leave stuck modifiers.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_SequentialCombos_NoStuckModifiers()
     {
         // Arrange - Simulate multiple combos in sequence
@@ -536,7 +536,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests combo with all modifiers simultaneously.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_AllModifiers_ReturnsSuccessAndReleasesAll()
     {
         // Arrange - Extreme case: all modifiers at once
@@ -554,7 +554,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that an error during key press still releases modifiers.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ErrorDuringPress_ModifiersStillReleased()
     {
         // Arrange - Even if the key press fails, modifiers should be released
@@ -576,7 +576,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests the combo action (alias for press with modifiers).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ComboAction_CtrlC_ReturnsSuccess()
     {
         // Arrange - Combo is an alias for press with modifiers
@@ -596,7 +596,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests combo action with multiple modifiers.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ComboAction_CtrlShiftN_ReturnsSuccess()
     {
         // Arrange
@@ -616,7 +616,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that combo action without modifiers still works (just a key press).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ComboAction_NoModifiers_ReturnsSuccess()
     {
         // Arrange - Combo without modifiers is just a key press
@@ -640,7 +640,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that modifiers can be specified with various spacing.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("ctrl,shift")]
     [InlineData("ctrl, shift")]
     [InlineData("ctrl , shift")]
@@ -661,7 +661,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that modifier case is ignored.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("CTRL")]
     [InlineData("Ctrl")]
     [InlineData("ctrl")]
@@ -681,7 +681,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that empty modifiers result in no modifiers being applied.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("")]
     [InlineData("   ")]
     public async Task ParseModifiers_Empty_ReturnsNone(string modifiers)
@@ -699,7 +699,7 @@ public class KeyboardModifierTests
     /// <summary>
     /// Tests that invalid modifier names are ignored.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task ParseModifiers_InvalidModifier_IgnoredSilently()
     {
         // Arrange - Invalid modifiers should be ignored, not cause an error

@@ -28,6 +28,7 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
 
     private const string DialogWindowTitle = "MCP Dialog Test Window";
     private const string CloseButtonName = "Save and Close";
+    private const string CloseButtonAutomationId = "CloseButton";
 
     public UIAutomationClickClosesWindowTests()
     {
@@ -76,7 +77,6 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
             throw new TimeoutException("Dialog test window did not appear within timeout");
         }
 
-        await Task.Delay(300); // Let window settle
     }
 
     private void RunMessageLoop()
@@ -86,7 +86,11 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 
         _dialogWindow = new DialogWithCloseButtonForm(DialogWindowTitle, CloseButtonName);
-        _dialogWindow.Load += (s, e) => _formReady.Set();
+        _dialogWindow.Shown += (_, _) =>
+        {
+            _dialogWindow.Activate();
+            _formReady.Set();
+        };
         _dialogWindow.FormClosed += (s, e) => _formClosed.Set();
 
         Application.Run(_dialogWindow);
@@ -139,15 +143,31 @@ public sealed class UIAutomationClickClosesWindowTests : IAsyncLifetime, IDispos
         Assert.NotNull(_dialogWindow);
         var windowHandle = _dialogWindow.Handle.ToString(CultureInfo.InvariantCulture);
 
-        // First, find the close button
-        var findResult = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = windowHandle,
-            Name = CloseButtonName,
-            ControlType = "Button",
-        });
+        // The WinForms window can be shown before its UI Automation provider is discoverable under
+        // load. Retry the observable semantic lookup rather than sleeping for an assumed duration.
+        UIAutomationResult? findResult = null;
+        var found = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                _dialogWindow.Invoke(() =>
+                {
+                    _dialogWindow.Activate();
+                    _dialogWindow.BringToFront();
+                });
+                findResult = await _automationService.FindElementsAsync(new ElementQuery
+                {
+                    WindowHandle = windowHandle,
+                    AutomationId = CloseButtonAutomationId,
+                    ControlType = "Button",
+                    ExactDepth = 1,
+                });
+            },
+            condition: () => findResult is { Success: true, Items.Length: 1 },
+            timeout: TimeSpan.FromSeconds(10),
+            pollInterval: TimeSpan.FromMilliseconds(100));
 
-        Assert.True(findResult.Success, $"Find failed: {findResult.ErrorMessage}");
+        Assert.True(found, $"Find failed: {findResult?.ErrorMessage ?? "button did not become observable"}");
+        Assert.NotNull(findResult);
         Assert.NotNull(findResult.Items);
         Assert.Single(findResult.Items);
 

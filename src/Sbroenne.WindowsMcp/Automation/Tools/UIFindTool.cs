@@ -15,6 +15,8 @@ public static partial class UIFindTool
 {
     /// <summary>
     /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element names, types, and coordinates for use with ui_click/ui_type/mouse_control.
+    /// Keywords: find, locate, search element, discover, inspect, look for, get element, query UI,
+    /// element by name, control, accessibility tree, where is.
     /// </summary>
     /// <remarks>
     /// Finds UI elements by name, type, ID, or other criteria. Returns each element's name, automationId, controlType, and click coordinates.

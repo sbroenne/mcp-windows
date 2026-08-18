@@ -19,6 +19,8 @@ public static partial class WindowManagementTool
     /// find windows, check which window is foreground, activate or bring a window to front, move/resize/minimize/restore,
     /// or close application windows.
     /// Supports: list, find, activate, minimize, maximize, restore, close, move, resize, and more.
+    /// Keywords: window, windows, activate, focus, foreground, bring to front, minimize, maximize,
+    /// restore, close window, move window, resize, arrange, find window, switch window, monitor.
     /// </summary>
     /// <remarks>
     /// To launch apps, use the app tool. This tool manages windows AFTER they exist.

@@ -61,6 +61,13 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     /// <inheritdoc />
     public async Task InitializeAsync()
     {
+        // Desktop-input tests are opt-in (they inject real mouse input). When not enabled every
+        // test in the collection skips, so avoid launching the harness or injecting any warmup input.
+        if (!DesktopInputTests.Enabled)
+        {
+            return;
+        }
+
         // Create UI thread for the test harness
         _uiThread = new Thread(RunMessageLoop)
         {

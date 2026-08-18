@@ -26,6 +26,8 @@ public static partial class UIBatchTool
     /// select, wait, read, snapshot, key). Use this for multi-field workflows - e.g. fill a login form
     /// and submit - instead of many separate ui_type/ui_click calls. Fewer round-trips = faster and
     /// cheaper for agents.
+    /// Keywords: batch, multiple steps, sequence, workflow, fill form, multi-step, combine actions,
+    /// chain, login form, automate several, one call, bulk UI actions.
     /// </summary>
     /// <remarks>
     /// Steps run top to bottom. By default the batch stops at the first failing step (stopOnError=true).

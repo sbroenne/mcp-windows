@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify input is actually received.
 /// </summary>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardTypeTests : IDisposable
+public class KeyboardTypeTests : DesktopInputTestBase, IDisposable
 {
     private readonly KeyboardTestFixture _fixture;
 
@@ -25,7 +25,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that basic ASCII text can be typed correctly and is received by the harness.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("Hello")]
     [InlineData("Test123")]
     [InlineData("abc")]
@@ -50,7 +50,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that empty text returns success with zero characters.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeAsync_EmptyText_ReturnsSuccessWithZeroCharacters()
     {
         // Arrange
@@ -70,7 +70,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that special characters commonly used in code are typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("!@#")]
     [InlineData("$%^")]
     [InlineData("&*()")]
@@ -96,7 +96,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that spaces are typed correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeAsync_WithSpaces_VerifiedByHarness()
     {
         // Arrange
@@ -117,7 +117,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that uppercase letters are typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("ABC")]
     [InlineData("XYZ")]
     [InlineData("HELLO")]
@@ -140,7 +140,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that mixed case text is typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("HelloWorld")]
     [InlineData("CamelCase")]
     [InlineData("mixedCASE")]
@@ -163,7 +163,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that numbers are typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("12345")]
     [InlineData("67890")]
     [InlineData("0")]
@@ -186,7 +186,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that typing multiple times appends to existing text.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeAsync_MultipleTimes_AppendsText()
     {
         // Arrange
@@ -207,7 +207,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that Unicode characters (accented) are typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("café")]
     [InlineData("naïve")]
     [InlineData("résumé")]
@@ -230,7 +230,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that punctuation is typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData(".")]
     [InlineData(",")]
     [InlineData(";")]
@@ -255,7 +255,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that brackets and quotes are typed correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("()")]
     [InlineData("[]")]
     [InlineData("{}")]
@@ -280,7 +280,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that a complete sentence is typed correctly.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task TypeAsync_CompleteSentence_VerifiedByHarness()
     {
         // Arrange
@@ -303,7 +303,7 @@ public class KeyboardTypeTests : IDisposable
     /// <summary>
     /// Tests that WaitForIdle returns success when called (basic functionality).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task WaitForIdle_ReturnsSuccessOrAppropriateError()
     {
         // Arrange
@@ -336,7 +336,7 @@ public class KeyboardTypeTests : IDisposable
     /// Note: Current implementation may not honor cancellation immediately since
     /// it uses WaitForInputIdle which is a blocking call.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task WaitForIdle_WithCancellationToken_CompletesNormally()
     {
         // Arrange
