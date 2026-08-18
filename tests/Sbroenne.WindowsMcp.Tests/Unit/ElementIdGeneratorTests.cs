@@ -10,6 +10,34 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 [SupportedOSPlatform("windows")]
 public class ElementIdGeneratorTests
 {
+    [Fact]
+    public void RegisterFullId_WhenCapacityExceeded_EvictsOldestId()
+    {
+        ElementIdGenerator.Clear();
+        var firstShortId = ElementIdGenerator.RegisterFullId("window:1|runtime:1|path:cached");
+
+        for (var i = 2; i <= ElementIdGenerator.MaxRetainedIds + 1; i++)
+        {
+            ElementIdGenerator.RegisterFullId($"window:1|runtime:{i}|path:cached");
+        }
+
+        Assert.Null(ElementIdGenerator.ResolveFullId(firstShortId));
+        Assert.Equal(ElementIdGenerator.MaxRetainedIds, ElementIdGenerator.RetainedIdCount);
+    }
+
+    [Fact]
+    public void RegisterFullId_WhenIdAlreadyExists_ReusesShortIdWithoutGrowingCache()
+    {
+        ElementIdGenerator.Clear();
+        const string FullId = "window:1|runtime:7|path:cached";
+
+        var first = ElementIdGenerator.RegisterFullId(FullId);
+        var second = ElementIdGenerator.RegisterFullId(FullId);
+
+        Assert.Equal(first, second);
+        Assert.Equal(1, ElementIdGenerator.RetainedIdCount);
+    }
+
     #region ResolveToAutomationElement Tests
 
     [Fact]
@@ -51,6 +79,14 @@ public class ElementIdGeneratorTests
     {
         // Window handle part is not a valid number
         var result = ElementIdGenerator.ResolveToAutomationElement("window:abc|runtime:0|path:0");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void ResolveToAutomationElement_MalformedFullId_NegativeTreeIndex_ReturnsNull()
+    {
+        var result = ElementIdGenerator.ResolveToAutomationElement("window:0|runtime:0|path:-1");
 
         Assert.Null(result);
     }

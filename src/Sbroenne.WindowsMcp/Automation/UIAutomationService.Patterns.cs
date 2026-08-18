@@ -74,16 +74,9 @@ public sealed partial class UIAutomationService
         {
             LogInvokePatternError(_logger, pattern ?? "Invoke", elementId, ex);
 
-            // Provide detailed error based on HRESULT
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : COMExceptionHelper.IsAccessDenied(ex)
-                    ? UIAutomationErrorType.ElevatedTarget
-                    : UIAutomationErrorType.InternalError;
-
             return UIAutomationResult.CreateFailure(
                 "invoke",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, pattern ?? "Invoke"),
                 CreateDiagnostics(stopwatch));
         }

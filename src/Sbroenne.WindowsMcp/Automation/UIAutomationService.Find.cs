@@ -240,14 +240,9 @@ public sealed partial class UIAutomationService
         catch (COMException ex)
         {
             LogFindElementsError(_logger, ex);
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : COMExceptionHelper.IsAccessDenied(ex)
-                    ? UIAutomationErrorType.ElevatedTarget
-                    : UIAutomationErrorType.InternalError;
             return UIAutomationResult.CreateFailure(
                 "find",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Find"),
                 CreateDiagnostics(stopwatch, query));
         }
@@ -312,7 +307,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared during search
         }
@@ -376,7 +371,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element tree changed during search - return whatever was collected.
         }
@@ -414,7 +409,11 @@ public sealed partial class UIAutomationService
                         return false;
                     }
                 }
-                catch
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
                 {
                     return false;
                 }
@@ -431,7 +430,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -498,7 +497,7 @@ public sealed partial class UIAutomationService
                 child = child.GetNextSibling();
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared - skip it
         }
@@ -536,7 +535,11 @@ public sealed partial class UIAutomationService
                         return false;
                     }
                 }
-                catch
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
                 {
                     return false;
                 }
@@ -553,7 +556,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -570,7 +573,7 @@ public sealed partial class UIAutomationService
             var result = element.FindFirst(UIA.TreeScope.TreeScope_Element, condition);
             return result != null;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }

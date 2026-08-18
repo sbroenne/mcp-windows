@@ -62,7 +62,7 @@ public sealed partial class UIAutomationService
             LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
             return UIAutomationResult.CreateFailure(
                 "click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Click"),
                 CreateDiagnostics(stopwatch));
         }
@@ -200,7 +200,7 @@ public sealed partial class UIAutomationService
             LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
             return UIAutomationResult.CreateFailure(
                 "type",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Type"),
                 CreateDiagnostics(stopwatch));
         }
@@ -237,7 +237,7 @@ public sealed partial class UIAutomationService
             LogFindAndTypeError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "type",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Type"),
                 CreateDiagnostics(stopwatch));
         }
@@ -454,7 +454,7 @@ public sealed partial class UIAutomationService
             LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
             return UIAutomationResult.CreateFailure(
                 "select",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Select"),
                 CreateDiagnostics(stopwatch));
         }
@@ -703,7 +703,7 @@ public sealed partial class UIAutomationService
             LogFindAndClickError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Click"),
                 CreateDiagnostics(stopwatch));
         }
@@ -765,7 +765,7 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "highlight",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Highlight"),
                 CreateDiagnostics(stopwatch));
         }
@@ -989,7 +989,7 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "save",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Save"),
                 CreateDiagnostics(stopwatch));
         }

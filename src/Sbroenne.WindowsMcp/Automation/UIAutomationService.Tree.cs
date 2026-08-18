@@ -102,14 +102,9 @@ public sealed partial class UIAutomationService
         catch (COMException ex)
         {
             LogGetTreeError(_logger, windowHandle, ex);
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : COMExceptionHelper.IsAccessDenied(ex)
-                    ? UIAutomationErrorType.ElevatedTarget
-                    : UIAutomationErrorType.InternalError;
             return UIAutomationResult.CreateFailure(
                 "get_tree",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "GetTree"),
                 CreateDiagnostics(stopwatch));
         }
@@ -339,7 +334,7 @@ public sealed partial class UIAutomationService
                 usePostHocFiltering,
                 ref elementsScanned);
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return null;
         }
@@ -378,7 +373,7 @@ public sealed partial class UIAutomationService
             {
                 cachedChildren = element.GetCachedChildren();
             }
-            catch
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
             {
                 // Children not cached - this shouldn't happen with TreeScope_Subtree
                 // Fall through with null

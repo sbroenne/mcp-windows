@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
@@ -20,6 +21,8 @@ public sealed class COMExceptionHelperTests
     private const int UIA_E_ELEMENTNOTENABLED = unchecked((int)0x80040200);
     private const int UIA_E_ELEMENTNOTAVAILABLE = unchecked((int)0x80040201);
     private const int UIA_E_NOCLICKABLEPOINT = unchecked((int)0x80040202);
+    private const int UIA_E_NOTSUPPORTED = unchecked((int)0x80040204);
+    private const int UIA_E_TIMEOUT = unchecked((int)0x80131505);
 
     private static COMException MakeException(int hresult) =>
 #pragma warning disable CA2201 // Constructing COMException directly is intentional: tests must simulate specific UIA HRESULTs.
@@ -98,6 +101,55 @@ public sealed class COMExceptionHelperTests
     public void IsTransientProviderFailure_ClassifiesRetryableHResults(int hresult, bool expected)
     {
         Assert.Equal(expected, COMExceptionHelper.IsTransientProviderFailure(MakeException(hresult)));
+    }
+
+    [Theory]
+    [InlineData(UIA_E_TIMEOUT, true)]
+    [InlineData(E_ACCESSDENIED, false)]
+    [InlineData(UIA_E_ELEMENTNOTAVAILABLE, false)]
+    public void IsProviderTimeout_ClassifiesTimeoutHResults(int hresult, bool expected)
+    {
+        Assert.Equal(expected, COMExceptionHelper.IsProviderTimeout(MakeException(hresult)));
+    }
+
+    [Theory]
+    [InlineData(UIA_E_TIMEOUT, UIAutomationErrorType.Timeout)]
+    [InlineData(E_ACCESSDENIED, UIAutomationErrorType.ElevatedTarget)]
+    [InlineData(UIA_E_ELEMENTNOTAVAILABLE, UIAutomationErrorType.ElementStale)]
+    [InlineData(UIA_E_NOCLICKABLEPOINT, UIAutomationErrorType.InternalError)]
+    public void GetErrorType_MapsKnownHResults(int hresult, string expected)
+    {
+        Assert.Equal(expected, COMExceptionHelper.GetErrorType(MakeException(hresult)));
+    }
+
+    [Theory]
+    [InlineData(UIA_E_ELEMENTNOTAVAILABLE, true)]
+    [InlineData(UIA_E_ELEMENTNOTENABLED, true)]
+    [InlineData(UIA_E_NOCLICKABLEPOINT, true)]
+    [InlineData(UIA_E_NOTSUPPORTED, true)]
+    [InlineData(UIA_E_TIMEOUT, false)]
+    [InlineData(E_ACCESSDENIED, false)]
+    public void IsExpectedElementFailure_ExcludesInfrastructureFailures(int hresult, bool expected)
+    {
+        Assert.Equal(expected, COMExceptionHelper.IsExpectedElementFailure(MakeException(hresult)));
+    }
+
+    [Fact]
+    public void IsExpectedElementFailure_AllowsInteropArgumentExceptions()
+    {
+        Assert.True(COMExceptionHelper.IsExpectedElementFailure(new ArgumentException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new ArgumentNullException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new ArgumentOutOfRangeException()));
+        Assert.False(COMExceptionHelper.IsExpectedElementFailure(new InvalidOperationException()));
+    }
+
+    [Fact]
+    public void IsExpectedElementTraversalFailure_OnlyAllowsStaleOrInteropArgumentFailures()
+    {
+        Assert.True(COMExceptionHelper.IsExpectedElementTraversalFailure(new ArgumentException()));
+        Assert.True(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_ELEMENTNOTAVAILABLE)));
+        Assert.False(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_NOTSUPPORTED)));
+        Assert.False(COMExceptionHelper.IsExpectedElementTraversalFailure(MakeException(UIA_E_TIMEOUT)));
     }
 
     [Fact]

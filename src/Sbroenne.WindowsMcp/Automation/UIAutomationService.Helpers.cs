@@ -306,7 +306,7 @@ public sealed partial class UIAutomationService
 
             return info;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -332,7 +332,7 @@ public sealed partial class UIAutomationService
                 count++;
                 child = walker.GetNextSiblingElement(child);
             }
-            catch
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
             {
                 break;
             }
@@ -457,7 +457,7 @@ public sealed partial class UIAutomationService
                         child = walker.GetNextSiblingElement(child);
                         childCount++;
                     }
-                    catch
+                    catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
                     {
                         break;
                     }
@@ -466,7 +466,7 @@ public sealed partial class UIAutomationService
 
             return frameworkId;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -511,7 +511,7 @@ public sealed partial class UIAutomationService
                     null);
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             // Best effort
         }

@@ -22,7 +22,7 @@ public static class UIA3Extensions
         {
             return element.CachedName;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -38,7 +38,7 @@ public static class UIA3Extensions
         {
             return element.CachedAutomationId;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -54,7 +54,7 @@ public static class UIA3Extensions
         {
             return element.CachedControlType;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return 0;
         }
@@ -80,7 +80,7 @@ public static class UIA3Extensions
             var rect = element.CachedBoundingRectangle;
             return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return (0, 0, 0, 0);
         }
@@ -96,7 +96,7 @@ public static class UIA3Extensions
         {
             return element.CachedIsEnabled != 0;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -112,7 +112,7 @@ public static class UIA3Extensions
         {
             return element.CachedIsOffscreen != 0;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return true;
         }
@@ -128,7 +128,7 @@ public static class UIA3Extensions
         {
             return element.CachedFrameworkId;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -144,7 +144,7 @@ public static class UIA3Extensions
         {
             return element.CachedClassName;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -160,7 +160,7 @@ public static class UIA3Extensions
         {
             return element.CachedNativeWindowHandle;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return 0;
         }
@@ -176,7 +176,7 @@ public static class UIA3Extensions
         {
             return element.GetCachedChildren();
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -196,7 +196,7 @@ public static class UIA3Extensions
         {
             return element.CurrentName;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -212,7 +212,7 @@ public static class UIA3Extensions
         {
             return element.CurrentAutomationId;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -228,7 +228,7 @@ public static class UIA3Extensions
         {
             return element.CurrentClassName;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -244,7 +244,7 @@ public static class UIA3Extensions
         {
             return element.CurrentControlType;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return 0;
         }
@@ -269,7 +269,7 @@ public static class UIA3Extensions
         {
             return element.CurrentNativeWindowHandle;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return 0;
         }
@@ -285,7 +285,7 @@ public static class UIA3Extensions
         {
             return element.CurrentIsEnabled != 0;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -301,7 +301,7 @@ public static class UIA3Extensions
         {
             return element.CurrentIsOffscreen != 0;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return true;
         }
@@ -318,7 +318,7 @@ public static class UIA3Extensions
             var rect = element.CurrentBoundingRectangle;
             return (rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return (0, 0, 0, 0);
         }
@@ -334,7 +334,7 @@ public static class UIA3Extensions
         {
             return element.GetRuntimeId();
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -350,7 +350,7 @@ public static class UIA3Extensions
         {
             return element.CurrentFrameworkId;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -367,7 +367,7 @@ public static class UIA3Extensions
             element.SetFocus();
             return true;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -384,7 +384,7 @@ public static class UIA3Extensions
             var pattern = element.GetCurrentPattern(patternId);
             return pattern as T;
         }
-        catch (COMException)
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -401,7 +401,7 @@ public static class UIA3Extensions
             var pattern = element.GetCurrentPattern(patternId);
             return pattern != null;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -486,7 +486,7 @@ public static class UIA3Extensions
         {
             return element.FindFirst(scope, condition);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -503,7 +503,7 @@ public static class UIA3Extensions
         {
             return element.FindAll(scope, condition);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -519,7 +519,7 @@ public static class UIA3Extensions
         {
             return UIA3Automation.Instance.ControlViewWalker.GetParentElement(element);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -535,7 +535,7 @@ public static class UIA3Extensions
         {
             return UIA3Automation.Instance.ControlViewWalker.GetFirstChildElement(element);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -551,7 +551,7 @@ public static class UIA3Extensions
         {
             return UIA3Automation.Instance.ControlViewWalker.GetNextSiblingElement(element);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -579,7 +579,7 @@ public static class UIA3Extensions
                 }
             }
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             // Ignore errors during enumeration
         }
@@ -598,7 +598,7 @@ public static class UIA3Extensions
             var pattern = element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
             return pattern?.CurrentValue;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -621,7 +621,7 @@ public static class UIA3Extensions
             pattern.SetValue(value);
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -644,7 +644,7 @@ public static class UIA3Extensions
             pattern.Invoke();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -667,7 +667,7 @@ public static class UIA3Extensions
             pattern.DoDefaultAction();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -690,7 +690,7 @@ public static class UIA3Extensions
             pattern.Toggle();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -718,7 +718,7 @@ public static class UIA3Extensions
                 _ => null
             };
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -741,7 +741,7 @@ public static class UIA3Extensions
             pattern.Expand();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -764,7 +764,7 @@ public static class UIA3Extensions
             pattern.Collapse();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -787,7 +787,7 @@ public static class UIA3Extensions
             pattern.Select();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -810,7 +810,7 @@ public static class UIA3Extensions
             pattern.ScrollIntoView();
             return true;
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -846,7 +846,7 @@ public static class UIA3Extensions
             // Fall back to Name
             return element.GetName();
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
@@ -875,7 +875,7 @@ public static class UIA3Extensions
 
             return id1.SequenceEqual(id2);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return false;
         }
@@ -919,7 +919,7 @@ public static class UIA3Extensions
                 return true;
             }
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             // Element may be stale or offscreen
         }
@@ -944,7 +944,7 @@ public static class UIA3Extensions
                 return ((int)(bounds.X + bounds.Width / 2), (int)(bounds.Y + bounds.Height / 2));
             }
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             // Element may be stale or offscreen
         }

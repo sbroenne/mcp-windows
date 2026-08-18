@@ -16,6 +16,8 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public sealed class UIA3Automation : IDisposable
 {
+    private static readonly TimeSpan DefaultConnectionTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan DefaultTransactionTimeout = TimeSpan.FromSeconds(10);
     private static readonly Lazy<UIA3Automation> LazyInstance = new(() => new UIA3Automation(), LazyThreadSafetyMode.ExecutionAndPublication);
     private readonly UIA.IUIAutomation _automation;
     private readonly UIA.IUIAutomationTreeWalker _controlViewWalker;
@@ -40,6 +42,7 @@ public sealed class UIA3Automation : IDisposable
             _automation = new UIA.CUIAutomation();
         }
 
+        ConfigureProvider(_automation);
         _controlViewWalker = _automation.ControlViewWalker;
         _trueCondition = _automation.CreateTrueCondition();
         _contentViewCondition = _automation.ContentViewCondition;
@@ -49,6 +52,21 @@ public sealed class UIA3Automation : IDisposable
     /// Gets the native IUIAutomation interface.
     /// </summary>
     public UIA.IUIAutomation Automation => _automation;
+
+    internal TimeSpan ConnectionTimeout =>
+        _automation is UIA.IUIAutomation2 automation
+            ? TimeSpan.FromMilliseconds(automation.ConnectionTimeout)
+            : Timeout.InfiniteTimeSpan;
+
+    internal TimeSpan TransactionTimeout =>
+        _automation is UIA.IUIAutomation2 automation
+            ? TimeSpan.FromMilliseconds(automation.TransactionTimeout)
+            : Timeout.InfiniteTimeSpan;
+
+    internal bool ConnectionRecoveryEnabled =>
+        _automation is UIA.IUIAutomation6 automation &&
+        automation.ConnectionRecoveryBehavior ==
+        UIA.ConnectionRecoveryBehaviorOptions.ConnectionRecoveryBehaviorOptions_Enabled;
 
     /// <summary>
     /// Gets the control view tree walker.
@@ -83,14 +101,9 @@ public sealed class UIA3Automation : IDisposable
         {
             return _automation.ElementFromHandle(hwnd);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
         {
-            // Window handle may be invalid, stale, or the window may be unresponsive
-            return null;
-        }
-        catch (TimeoutException)
-        {
-            // COM operation may timeout for unresponsive windows
+            // Window handle may be invalid or stale.
             return null;
         }
     }
@@ -105,7 +118,7 @@ public sealed class UIA3Automation : IDisposable
             var point = new UIA.tagPOINT { x = x, y = y };
             return _automation.ElementFromPoint(point);
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
         {
             return null;
         }
@@ -120,7 +133,7 @@ public sealed class UIA3Automation : IDisposable
         {
             return _automation.GetFocusedElement();
         }
-        catch (COMException)
+        catch (COMException ex) when (COMExceptionHelper.IsElementStale(ex))
         {
             return null;
         }
@@ -158,6 +171,21 @@ public sealed class UIA3Automation : IDisposable
     public UIA.IUIAutomationCacheRequest CreateCacheRequest()
     {
         return _automation.CreateCacheRequest();
+    }
+
+    private static void ConfigureProvider(UIA.IUIAutomation automation)
+    {
+        if (automation is UIA.IUIAutomation2 automation2)
+        {
+            automation2.ConnectionTimeout = checked((uint)DefaultConnectionTimeout.TotalMilliseconds);
+            automation2.TransactionTimeout = checked((uint)DefaultTransactionTimeout.TotalMilliseconds);
+        }
+
+        if (automation is UIA.IUIAutomation6 automation6)
+        {
+            automation6.ConnectionRecoveryBehavior =
+                UIA.ConnectionRecoveryBehaviorOptions.ConnectionRecoveryBehaviorOptions_Enabled;
+        }
     }
 
     /// <summary>
