@@ -252,8 +252,8 @@ public sealed class UITestHarnessForm : Form
 
         _physicalFallbackTarget = new Panel
         {
-            Location = new Point(10, 375),
-            Size = new Size(300, 40),
+            Location = new Point(430, 205),
+            Size = new Size(95, 35),
             Name = "PhysicalFallbackTarget",
             BorderStyle = BorderStyle.FixedSingle,
             AccessibleName = "Physical fallback",
@@ -269,8 +269,8 @@ public sealed class UITestHarnessForm : Form
 
         var inertTarget = new Panel
         {
-            Location = new Point(320, 375),
-            Size = new Size(300, 40),
+            Location = new Point(535, 205),
+            Size = new Size(95, 35),
             Name = "InertTarget",
             BorderStyle = BorderStyle.FixedSingle,
             AccessibleName = "Inert target",
