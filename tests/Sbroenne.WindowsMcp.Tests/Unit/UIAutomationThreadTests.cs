@@ -6,6 +6,8 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 [SupportedOSPlatform("windows")]
 public sealed class UIAutomationThreadTests
 {
+    private static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
     [Fact]
     public async Task ExecuteAsync_WhenQueueIsFull_FailsWithoutBlockingCaller()
     {
@@ -16,9 +18,12 @@ public sealed class UIAutomationThreadTests
         var running = executor.ExecuteAsync(() =>
         {
             runningWorkStarted.SetResult();
-            releaseRunningWork.Wait();
+            if (!releaseRunningWork.Wait(TestTimeout))
+            {
+                throw new TimeoutException("Timed out waiting to release the running work item.");
+            }
         });
-        await runningWorkStarted.Task;
+        await runningWorkStarted.Task.WaitAsync(TestTimeout);
 
         var queued = executor.ExecuteAsync(() => { });
         var rejected = executor.ExecuteAsync(() => { });
@@ -40,9 +45,12 @@ public sealed class UIAutomationThreadTests
         var running = executor.ExecuteAsync(() =>
         {
             runningWorkStarted.SetResult();
-            releaseRunningWork.Wait();
+            if (!releaseRunningWork.Wait(TestTimeout))
+            {
+                throw new TimeoutException("Timed out waiting to release the running work item.");
+            }
         });
-        await runningWorkStarted.Task;
+        await runningWorkStarted.Task.WaitAsync(TestTimeout);
 
         var queued = executor.ExecuteAsync(() => { });
         var disposing = Task.Run(executor.Dispose);
