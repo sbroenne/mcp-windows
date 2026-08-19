@@ -156,6 +156,14 @@ public sealed partial class UIAutomationService
             conditions.Add(Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, query.AutomationId));
         }
 
+        if (!string.IsNullOrEmpty(query.ClassName))
+        {
+            conditions.Add(Uia.CreatePropertyConditionWithFlags(
+                UIA3PropertyIds.ClassName,
+                query.ClassName,
+                UIA.PropertyConditionFlags.PropertyConditionFlags_IgnoreCase));
+        }
+
         if (!string.IsNullOrEmpty(query.ControlType))
         {
             var controlTypeId = GetControlTypeId(query.ControlType);
