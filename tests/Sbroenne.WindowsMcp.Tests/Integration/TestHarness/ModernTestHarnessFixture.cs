@@ -62,7 +62,9 @@ public sealed class ModernTestHarnessFixture : IDisposable
         {
             throw new FileNotFoundException(
                 $"Modern test harness not found at: {HarnessPath}. " +
-                "Build the Sbroenne.WindowsMcp.ModernHarness project first.",
+                "The test project builds it automatically via ProjectReference; if you are running " +
+                "with --no-build, build it first with: " +
+                "dotnet build tests\\Sbroenne.WindowsMcp.ModernHarness -c Debug",
                 HarnessPath);
         }
 

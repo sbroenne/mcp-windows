@@ -23,7 +23,7 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
         _readOnlySessions = readOnlySessions;
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_DefaultOnChromium_UsesContentView(ChromiumBrowserKind browser)
@@ -46,7 +46,7 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
         Assert.True(result.Diagnostics!.UsedContentView, "Chromium find should default to the content view.");
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_ContentView_ScansNoMoreThanControlView(ChromiumBrowserKind browser)
@@ -87,7 +87,7 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
             $"Content view scanned {contentScanned} elements but control view scanned {controlScanned}.");
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_ContentViewOff_StillFindsElement(ChromiumBrowserKind browser)
