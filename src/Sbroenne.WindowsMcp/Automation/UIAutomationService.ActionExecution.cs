@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Utilities;
@@ -62,6 +63,17 @@ public sealed partial class UIAutomationService
         }
         catch (ArgumentException)
         {
+            // Process already exited.
+            return;
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch (Win32Exception)
+        {
+            // Cannot open the process (for example a more privileged target). The gate is
+            // advisory, so an unqueryable process must not prevent the action.
             return;
         }
 
@@ -78,6 +90,10 @@ public sealed partial class UIAutomationService
             catch (InvalidOperationException)
             {
                 // Process exited or has no message queue to interrogate.
+            }
+            catch (Win32Exception)
+            {
+                // Access denied while probing responsiveness. Proceed with the action.
             }
         }
     }

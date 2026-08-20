@@ -533,6 +533,11 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
             ClassName = "NoSuchClassName_ZZZ",
         });
 
+        // A zero-result find is reported as ElementNotFound rather than an empty success,
+        // so assert the specific error type: that distinguishes "the filter worked" from
+        // "the query failed for some other reason".
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
         Assert.True(result.Items == null || result.Items.Length == 0,
             $"Expected no elements for a bogus className, got {result.Items?.Length ?? 0}.");
     }
@@ -552,6 +557,8 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
             NameContains = "ThisNameDoesNotExist_ZZZ",
         });
 
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
         Assert.True(result.Items == null || result.Items.Length == 0,
             $"Expected no elements when nameContains cannot match, got {result.Items?.Length ?? 0}.");
     }
