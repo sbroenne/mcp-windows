@@ -9,6 +9,11 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
 public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessionFixture>
 {
     private const int QueryTimeoutMs = 5000;
+
+    // Content that only appears in response to an interaction needs a larger budget than content
+    // that is already on screen: the click has to round-trip through the page and then propagate
+    // into the accessibility tree. EdgePublicPageTests already uses this same 20s budget.
+    private const int PostInteractionTimeoutMs = 20000;
     private const string SearchInputName = "Docs Search";
     private const string SignInButtonName = "Sign in";
     private const string SignedOutStatus = "Signed out";
@@ -132,7 +137,12 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
 
         Assert.True(clickResult.Success, $"Click failed: {clickResult.ErrorMessage}");
 
-        var focusMessage = await FindSingleElementAsync(harness, session.WindowHandleString, FocusedButtonMessage, "Text");
+        var focusMessage = await FindSingleElementAsync(
+            harness,
+            session.WindowHandleString,
+            FocusedButtonMessage,
+            "Text",
+            PostInteractionTimeoutMs);
         var readResult = await harness.AutomationService.GetTextAsync(focusMessage.Id, session.WindowHandleString, includeChildren: false);
 
         Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
@@ -196,14 +206,18 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.DoesNotContain("Complementary rail link", article, StringComparison.Ordinal);
     }
 
-    private static ElementQuery CreateLocalPageQuery(string windowHandle, string name, string controlType)
+    private static ElementQuery CreateLocalPageQuery(
+        string windowHandle,
+        string name,
+        string controlType,
+        int? timeoutMs = null)
     {
         return new ElementQuery
         {
             WindowHandle = windowHandle,
             Name = name,
             ControlType = controlType,
-            TimeoutMs = QueryTimeoutMs,
+            TimeoutMs = timeoutMs ?? QueryTimeoutMs,
         };
     }
 
@@ -211,9 +225,11 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         ChromiumAutomationHarness harness,
         string windowHandle,
         string name,
-        string controlType)
+        string controlType,
+        int? timeoutMs = null)
     {
-        var result = await harness.AutomationService.FindElementsAsync(CreateLocalPageQuery(windowHandle, name, controlType));
+        var result = await harness.AutomationService.FindElementsAsync(
+            CreateLocalPageQuery(windowHandle, name, controlType, timeoutMs));
 
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
         Assert.NotNull(result.Items);
