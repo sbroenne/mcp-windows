@@ -76,14 +76,17 @@ public sealed class OpenFileTests : IDisposable
             Assert.True(result.Success, $"Open handling failed: {result.ErrorMessage}");
 
             // Wait for the harness to record the opened path instead of assuming it has done so.
+            string? lastOpened = null;
             await TestWait.UntilAsync(
-                () => string.Equals(
-                    testFilePath,
-                    _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath)),
-                    StringComparison.OrdinalIgnoreCase),
+                () =>
+                {
+                    lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
+                    return string.Equals(testFilePath, lastOpened, StringComparison.OrdinalIgnoreCase);
+                },
                 TimeSpan.FromSeconds(10));
 
-            var lastOpened = _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form!.LastOpenPath));
+            // Assert on the observed value rather than on the wait result: if the wait times out this
+            // reports the expected and actual paths, which is more actionable than "the wait expired".
             Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
         });
     }
