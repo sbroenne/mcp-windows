@@ -69,6 +69,60 @@ jobs:
             throw "Failed to set the VM auto-shutdown watchdog."
           }
 
+      # `az vm start` only proves the VM powered on. The runner itself is launched by the
+      # WindowsMcp-GitHub-Runner scheduled task, which has an *interactive logon* trigger so the
+      # tests get a real desktop. If nobody logs on (for example when autologon is disabled), the
+      # task never fires, no runner registers, and the integration job sits queued until GitHub
+      # discards it 24 hours later. Fail fast here instead, with an actionable message.
+      - name: Wait for the self-hosted runner to come online
+        shell: pwsh
+        env:
+          RUNNER_ONLINE_TIMEOUT_MINUTES: '10'
+        run: |
+          $probePath = Join-Path $env:RUNNER_TEMP 'probe-windows-ui-runner.ps1'
+          @'
+          $listener = Get-Process Runner.Listener -ErrorAction SilentlyContinue
+          $hasSession = @(quser 2>$null | Select-String -Pattern '\sActive\s').Count -gt 0
+          if ($listener -and $hasSession) { Write-Output 'RUNNER_ONLINE' }
+          elseif ($hasSession) { Write-Output 'SESSION_BUT_NO_LISTENER' }
+          else { Write-Output 'NO_INTERACTIVE_SESSION' }
+          '@ | Set-Content -Path $probePath -Encoding utf8
+
+          $deadline = (Get-Date).AddMinutes([int]$env:RUNNER_ONLINE_TIMEOUT_MINUTES)
+          $lastState = 'no probe completed'
+
+          while ((Get-Date) -lt $deadline) {
+            $probeOutput = az vm run-command invoke `
+              --resource-group $env:AZURE_RESOURCE_GROUP `
+              --name $env:AZURE_VM_NAME `
+              --command-id RunPowerShellScript `
+              --scripts "@$probePath" `
+              --query "value[].message" -o tsv
+
+            if ($LASTEXITCODE -eq 0 -and $probeOutput) {
+              $lastState = ($probeOutput | Out-String).Trim()
+              if ($lastState -match 'RUNNER_ONLINE') {
+                Write-Host 'Runner is online and attached to an interactive desktop session.'
+                exit 0
+              }
+            }
+
+            Write-Host "Runner not ready yet (state: $lastState). Retrying in 30s."
+            Start-Sleep -Seconds 30
+          }
+
+          throw @"
+          The Windows UI runner did not come online within $env:RUNNER_ONLINE_TIMEOUT_MINUTES minutes.
+          Last probe state: $lastState
+
+          NO_INTERACTIVE_SESSION means the VM booted to a login screen and nobody logged on, so the
+          WindowsMcp-GitHub-Runner logon-triggered scheduled task never fired. Verify that autologon
+          is enabled for the runner account on $env:AZURE_VM_NAME.
+
+          SESSION_BUT_NO_LISTENER means someone is logged on but Runner.Listener is not running.
+          Check C:\actions-runner\_diag on the VM and the state of the scheduled task.
+          "@
+
   integration-tests:
     name: Windows UI integration suite
     needs: start-runner
