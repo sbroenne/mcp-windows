@@ -119,6 +119,72 @@ public sealed partial class UIAutomationService
         }
     }
 
+    /// <summary>
+    /// Controls whether waits are assisted by UIA structure-changed events. Polling remains the
+    /// correctness guarantee either way; this only decides whether a sleep can be cut short.
+    /// Exposed so the spike benchmark can measure both paths in a single process.
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <see langword="false"/>: the issue #189 spike measured only a ~5% median
+    /// latency gain, inside run-to-run noise. Even when an event woke the waiter immediately,
+    /// latency stayed near 460ms, so the cost of the UIA query itself dominates — not the sleep
+    /// this mechanism shortens. Kept, disabled, so the benchmark stays reproducible.
+    /// </remarks>
+    internal static bool EventAssistedWaitEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Counts structure-changed events observed by the most recent event-assisted wait. Diagnostic
+    /// only, for the spike benchmark.
+    /// </summary>
+    internal static int LastWaitEventCount { get; private set; }
+
+    /// <summary>
+    /// Subscribes to structure changes for the query's window, when event assistance is enabled and
+    /// the provider allows it. Returns <see langword="null"/> to mean "poll unassisted".
+    /// </summary>
+    private async Task<StructureChangeSignal?> TrySubscribeToStructureChangesAsync(
+        ElementQuery query,
+        CancellationToken cancellationToken)
+    {
+        if (!EventAssistedWaitEnabled)
+        {
+            return null;
+        }
+
+        try
+        {
+            var root = await _staThread.ExecuteAsync(
+                () => GetRootElement(query.WindowHandle),
+                cancellationToken).ConfigureAwait(false);
+
+            return root is null
+                ? null
+                : await StructureChangeSignal.CreateAsync(_staThread, root, cancellationToken).ConfigureAwait(false);
+        }
+        catch (COMException)
+        {
+            // Subscription is an optimisation; never fail a wait because it could not be set up.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Sleeps for <paramref name="delay"/>, returning early if the tree changed underneath us.
+    /// </summary>
+    private static async Task DelayOrUntilStructureChangedAsync(
+        StructureChangeSignal? signal,
+        int delay,
+        CancellationToken cancellationToken)
+    {
+        if (signal is null)
+        {
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        _ = await signal.WaitForChangeAsync(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
+    }
+
     /// <inheritdoc/>
     public async Task<UIAutomationResult> WaitForElementAsync(ElementQuery query, int timeoutMs, CancellationToken cancellationToken = default)
     {
@@ -128,32 +194,47 @@ public sealed partial class UIAutomationService
         var delay = 50;
         const int MaxDelay = 500;
 
-        while (stopwatch.ElapsedMilliseconds < timeoutMs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        // Subscribe before the first probe, so a change that lands between probing and sleeping
+        // still wakes us instead of being lost.
+        var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
-            var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-            if (result.Success)
+        try
+        {
+            while (stopwatch.ElapsedMilliseconds < timeoutMs)
             {
-                return result with { Action = "wait_for" };
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
+                if (result.Success)
+                {
+                    return result with { Action = "wait_for" };
+                }
+
+                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
+                delay = Math.Min(delay * 2, MaxDelay);
             }
 
-            await Task.Delay(delay, cancellationToken);
-            delay = Math.Min(delay * 2, MaxDelay);
+            stopwatch.Stop();
+
+            return UIAutomationResult.CreateFailure(
+                "wait_for",
+                UIAutomationErrorType.Timeout,
+                $"Element not found within {timeoutMs}ms timeout.",
+                new UIAutomationDiagnostics
+                {
+                    DurationMs = stopwatch.ElapsedMilliseconds,
+                    Query = query,
+                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
+                });
         }
-
-        stopwatch.Stop();
-
-        return UIAutomationResult.CreateFailure(
-            "wait_for",
-            UIAutomationErrorType.Timeout,
-            $"Element not found within {timeoutMs}ms timeout.",
-            new UIAutomationDiagnostics
+        finally
+        {
+            if (signal is not null)
             {
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                Query = query,
-                ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-            });
+                LastWaitEventCount = signal.EventCount;
+                await signal.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -165,40 +246,53 @@ public sealed partial class UIAutomationService
         var delay = 50;
         const int MaxDelay = 500;
 
-        while (stopwatch.ElapsedMilliseconds < timeoutMs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
+        var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
-            var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-            if (!result.Success || (result.Items?.Length ?? 0) == 0)
+        try
+        {
+            while (stopwatch.ElapsedMilliseconds < timeoutMs)
             {
-                // Element no longer found - success!
-                stopwatch.Stop();
-                return UIAutomationResult.CreateSuccess(
-                    "wait_for_disappear",
-                    new UIAutomationDiagnostics
-                    {
-                        DurationMs = stopwatch.ElapsedMilliseconds,
-                        Query = query
-                    });
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
+                if (!result.Success || (result.Items?.Length ?? 0) == 0)
+                {
+                    // Element no longer found - success!
+                    stopwatch.Stop();
+                    return UIAutomationResult.CreateSuccess(
+                        "wait_for_disappear",
+                        new UIAutomationDiagnostics
+                        {
+                            DurationMs = stopwatch.ElapsedMilliseconds,
+                            Query = query
+                        });
+                }
+
+                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
+                delay = Math.Min(delay * 2, MaxDelay);
             }
 
-            await Task.Delay(delay, cancellationToken);
-            delay = Math.Min(delay * 2, MaxDelay);
+            stopwatch.Stop();
+
+            return UIAutomationResult.CreateFailure(
+                "wait_for_disappear",
+                UIAutomationErrorType.Timeout,
+                $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
+                new UIAutomationDiagnostics
+                {
+                    DurationMs = stopwatch.ElapsedMilliseconds,
+                    Query = query,
+                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
+                });
         }
-
-        stopwatch.Stop();
-
-        return UIAutomationResult.CreateFailure(
-            "wait_for_disappear",
-            UIAutomationErrorType.Timeout,
-            $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
-            new UIAutomationDiagnostics
+        finally
+        {
+            if (signal is not null)
             {
-                DurationMs = stopwatch.ElapsedMilliseconds,
-                Query = query,
-                ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-            });
+                LastWaitEventCount = signal.EventCount;
+                await signal.DisposeAsync().ConfigureAwait(false);
+            }
+        }
     }
 
     /// <inheritdoc/>
