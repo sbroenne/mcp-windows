@@ -81,11 +81,12 @@ public sealed partial class UIAutomationService
                     referencePoint = BoundingRect.FromCoordinates(refRect.left, refRect.top, refRect.right - refRect.left, refRect.bottom - refRect.top);
                 }
 
-                // Determine if we can use fast FindAll
+                // Determine if we can use fast FindAll.
+                // ClassName is deliberately absent: it is a native UIA property, so BuildCondition
+                // pushes it into the FindAll condition instead of forcing a bulk fetch + in-process scan.
                 var hasAdvancedCriteria = !string.IsNullOrEmpty(query.NameContains) ||
                                          !string.IsNullOrEmpty(query.NamePattern) ||
                                          query.ExactDepth.HasValue ||
-                                         !string.IsNullOrEmpty(query.ClassName) ||
                                          regionFilter != null;
 
                 var elementInfos = new List<UIElementInfo>();

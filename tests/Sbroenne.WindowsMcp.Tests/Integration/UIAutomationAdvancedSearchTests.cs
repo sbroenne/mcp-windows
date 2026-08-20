@@ -3,6 +3,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -477,6 +478,109 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         Assert.NotNull(result.Items);
         Assert.True(result.Items!.Length >= 1, "Should find at least one checkbox");
         Assert.NotEqual(allCheckboxes.Items![0].Id, result.Items![0].Id);
+    }
+
+    #endregion
+
+    #region ClassName Tests
+
+    [Fact]
+    public async Task Find_WithClassName_ReturnsMatchingElements()
+    {
+        // WinForms class names carry a volatile suffix (WindowsForms10.BUTTON.app.0.3cb9f91),
+        // so discover a real one from the harness at runtime rather than hardcoding it.
+        var className = GetFirstChildClassName(_fixture.TestWindowHandle);
+        Assert.False(string.IsNullOrEmpty(className), "Could not discover a child window class name from the harness.");
+
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ClassName = className,
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+    }
+
+    [Fact]
+    public async Task Find_WithClassNameDifferentCasing_StillMatches()
+    {
+        // ClassName is pushed into the native UIA condition; it must stay case-insensitive
+        // to match the previous in-process OrdinalIgnoreCase comparison.
+        var className = GetFirstChildClassName(_fixture.TestWindowHandle);
+        Assert.False(string.IsNullOrEmpty(className), "Could not discover a child window class name from the harness.");
+
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ClassName = className!.ToUpperInvariant(),
+        });
+
+        Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
+        Assert.NotNull(result.Items);
+        Assert.NotEmpty(result.Items!);
+    }
+
+    [Fact]
+    public async Task Find_WithNonMatchingClassName_ReturnsNoElements()
+    {
+        // Guards against ClassName silently ceasing to be applied as a filter.
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            ClassName = "NoSuchClassName_ZZZ",
+        });
+
+        // A zero-result find is reported as ElementNotFound rather than an empty success,
+        // so assert the specific error type: that distinguishes "the filter worked" from
+        // "the query failed for some other reason".
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
+        Assert.True(result.Items == null || result.Items.Length == 0,
+            $"Expected no elements for a bogus className, got {result.Items?.Length ?? 0}.");
+    }
+
+    [Fact]
+    public async Task Find_WithClassNameAndNameContains_AppliesBoth()
+    {
+        var className = GetFirstChildClassName(_fixture.TestWindowHandle);
+        Assert.False(string.IsNullOrEmpty(className), "Could not discover a child window class name from the harness.");
+
+        // Combining ClassName with an advanced criterion keeps the cached-filter path,
+        // with ClassName now pre-filtered natively.
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ClassName = className,
+            NameContains = "ThisNameDoesNotExist_ZZZ",
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
+        Assert.True(result.Items == null || result.Items.Length == 0,
+            $"Expected no elements when nameContains cannot match, got {result.Items?.Length ?? 0}.");
+    }
+
+    private static string? GetFirstChildClassName(nint parent)
+    {
+        string? found = null;
+
+        NativeMethods.EnumChildWindows(parent, (hWnd, _) =>
+        {
+            var buffer = new char[256];
+            var length = NativeMethods.GetClassName(hWnd, buffer, buffer.Length);
+            if (length > 0)
+            {
+                found = new string(buffer, 0, length);
+                return false;
+            }
+
+            return true;
+        }, nint.Zero);
+
+        return found;
     }
 
     #endregion

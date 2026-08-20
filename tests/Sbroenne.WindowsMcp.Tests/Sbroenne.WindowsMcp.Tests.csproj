@@ -40,6 +40,16 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp\Sbroenne.WindowsMcp.csproj" />
     <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp.Cli\Sbroenne.WindowsMcp.Cli.csproj" />
+    <!--
+      The WinUI 3 harness is launched as a separate process by ModernTestHarnessFixture, which locates
+      it by probing the harness project's own bin directory. We only need it *built*, not referenced:
+      ReferenceOutputAssembly=false keeps its assembly and Windows App SDK dependencies out of the test
+      output, while still guaranteeing it exists on a fresh clone.
+    -->
+    <ProjectReference Include="..\Sbroenne.WindowsMcp.ModernHarness\Sbroenne.WindowsMcp.ModernHarness.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
   </ItemGroup>
 
   <ItemGroup>

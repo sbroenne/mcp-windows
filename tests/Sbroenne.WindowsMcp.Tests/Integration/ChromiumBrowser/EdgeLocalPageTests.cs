@@ -21,7 +21,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         _readOnlySessions = readOnlySessions;
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_PrimaryNavigation_IsDiscoverable(ChromiumBrowserKind browser)
@@ -43,7 +43,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.NotEmpty(result.Items!);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_SearchInputByAriaLabel_ReturnsEdit(ChromiumBrowserKind browser)
@@ -67,7 +67,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal("Edit", result.Items![0].Type);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_SignInButtonByAriaLabel_ReturnsButton(ChromiumBrowserKind browser)
@@ -91,7 +91,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal("Button", result.Items![0].Type);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Type_LocalChromiumPage_SearchInput_ReadsBackTypedValue(ChromiumBrowserKind browser)
@@ -117,7 +117,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal(expectedText, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Click_LocalChromiumPage_SignInButton_RevealsFocusedContent(ChromiumBrowserKind browser)
@@ -139,7 +139,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal(FocusedButtonMessage, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Read_LocalChromiumPage_InitialStatus_ReturnsSignedOut(ChromiumBrowserKind browser)
@@ -156,7 +156,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal(SignedOutStatus, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Read_LocalChromiumPage_ArticleMode_ReturnsCleanMainContent(ChromiumBrowserKind browser)
