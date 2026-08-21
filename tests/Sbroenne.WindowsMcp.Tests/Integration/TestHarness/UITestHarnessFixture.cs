@@ -79,12 +79,76 @@ public sealed class UITestHarnessFixture : IDisposable
     /// <summary>
     /// Resets the form state.
     /// </summary>
+    /// <remarks>
+    /// Closes any modal dialog left open by a previous test before resetting control state.
+    /// The harness shows Save/Open common dialogs via a blocking <c>ShowDialog</c>, so a test that
+    /// fails mid-interaction leaves the dialog on screen owning the foreground, with the harness
+    /// form disabled. Resetting control values alone does not recover from that, and every
+    /// subsequent test in the collection inherits the wedged UI (issue #195).
+    /// </remarks>
     public void Reset()
     {
-        if (_form != null && !_form.IsDisposed)
+        if (_form == null || _form.IsDisposed)
         {
-            _form.Invoke(() => _form.Reset());
+            return;
         }
+
+        CloseOwnedDialogs();
+
+        // Marshalled with Invoke: safe now that any modal loop has been exited.
+        _form.Invoke(() => _form.Reset());
+    }
+
+    /// <summary>
+    /// Closes any modal dialog owned by the harness form, and waits for it to go away.
+    /// </summary>
+    /// <remarks>
+    /// Uses <c>GW_ENABLEDPOPUP</c> to find the owned popup, matching the pattern already used by
+    /// <c>WindowService</c> to detect save dialogs, and closes it with <c>WM_CLOSE</c> (equivalent
+    /// to Cancel for a common dialog). <c>WM_CLOSE</c> is posted rather than sent because the UI
+    /// thread is blocked inside the dialog's modal message loop.
+    /// </remarks>
+    public void CloseOwnedDialogs()
+    {
+        var owner = TestWindowHandle;
+        if (owner == IntPtr.Zero)
+        {
+            return;
+        }
+
+        // Bounded so a dialog that refuses to close cannot hang the whole suite. Each iteration
+        // handles one dialog, which covers a dialog stacked on top of another.
+        for (var i = 0; i < 5; i++)
+        {
+            var dialog = GetOwnedDialog(owner);
+            if (dialog == IntPtr.Zero)
+            {
+                return;
+            }
+
+            NativeMethods.PostMessage(dialog, NativeConstants.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+
+            if (!TestWait.Until(() => GetOwnedDialog(owner) != dialog))
+            {
+                throw new InvalidOperationException(
+                    $"UI test harness has a modal dialog (handle {dialog}) that did not close in " +
+                    "response to WM_CLOSE. The harness is wedged and later tests would be unreliable.");
+            }
+        }
+
+        throw new InvalidOperationException(
+            "UI test harness still had a modal dialog open after closing 5 of them.");
+    }
+
+    /// <summary>
+    /// Gets the modal dialog owned by <paramref name="owner"/>, or zero when there is none.
+    /// </summary>
+    private static nint GetOwnedDialog(nint owner)
+    {
+        var dialog = NativeMethods.GetWindow(owner, NativeConstants.GW_ENABLEDPOPUP);
+
+        // GetWindow returns the owner itself when no owned popup is enabled.
+        return dialog == owner || !NativeMethods.IsWindowVisible(dialog) ? IntPtr.Zero : dialog;
     }
 
     /// <summary>
@@ -116,13 +180,19 @@ public sealed class UITestHarnessFixture : IDisposable
         {
             try
             {
+                // A form with an open modal dialog will not close, so clear dialogs first.
+                CloseOwnedDialogs();
                 _form.Invoke(() => _form.Close());
             }
             catch
             {
-                // Form may already be disposed
+                // Form may already be disposed, or be wedged with a dialog that will not close.
             }
         }
+
+        // Join the UI thread so its message loop and window handles are gone before the next
+        // fixture starts, rather than racing with it for foreground.
+        _uiThread?.Join(TimeSpan.FromSeconds(5));
 
         _formReady.Dispose();
     }

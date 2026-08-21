@@ -722,6 +722,14 @@ public sealed class UITestHarnessForm : Form
         UpdateStatus("UI Test Harness Reset");
     }
 
+    /// <summary>
+    /// Opens the Save dialog directly, without going through the keyboard or a click.
+    /// Exists so isolation tests can reproduce a test that failed while a modal dialog was open.
+    /// Blocks the UI thread until the dialog is dismissed, so callers must use
+    /// <see cref="Control.BeginInvoke(Delegate)"/> rather than <c>Invoke</c>.
+    /// </summary>
+    public void ShowSaveDialogForTesting() => ShowSaveDialog();
+
     private void UpdateStatus(string message)
     {
         _statusLabel.Text = message;
