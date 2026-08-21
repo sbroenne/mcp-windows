@@ -25,9 +25,6 @@ public sealed class ElectronHarnessFixture : IDisposable
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-    private static extern nint FindWindow(string? lpClassName, string lpWindowName);
-
     [DllImport("user32.dll")]
     private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
@@ -211,6 +208,10 @@ public sealed class ElectronHarnessFixture : IDisposable
             throw new InvalidOperationException($"Electron executable not found at: {electronExePath}");
         }
 
+        // Remove orphans from earlier runs before starting, so they cannot compete for the
+        // foreground or outlive this fixture.
+        KillStaleHarnessProcesses(electronExePath);
+
         // Use "." as argument and set working directory - same as `electron .` from command line
         _electronProcess = new Process
         {
@@ -232,15 +233,19 @@ public sealed class ElectronHarnessFixture : IDisposable
 
     private void WaitForWindow()
     {
+        var electronProcessId = _electronProcess?.Id
+            ?? throw new InvalidOperationException("Electron process was not started.");
+
         var appeared = TestWait.Until(
             condition: () =>
             {
-                _windowHandle = FindWindow(null, ELECTRON_HARNESS_TITLE);
                 if (_electronProcess?.HasExited == true)
                 {
                     throw new InvalidOperationException(
                         $"Electron process exited unexpectedly (exit code {_electronProcess.ExitCode})");
                 }
+
+                _windowHandle = FindHarnessWindow(electronProcessId);
 
                 return _windowHandle != nint.Zero;
             },
@@ -253,13 +258,104 @@ public sealed class ElectronHarnessFixture : IDisposable
                 $"Electron harness window did not appear within {MAX_WAIT_SECONDS} seconds");
         }
 
+        // Note: readiness is bimodal in practice - the tree is exposed within a second or two, or
+        // not at all - so a longer budget only slows failures down.
         var automationReady = TestWait.Until(
             condition: IsAutomationTreeReady,
             timeout: TimeSpan.FromSeconds(10),
             pollInterval: TimeSpan.FromMilliseconds(100));
         if (!automationReady)
         {
-            throw new TimeoutException("Electron harness UI Automation tree did not become ready.");
+            var windows = string.Join(
+                ", ",
+                GetProcessWindows(electronProcessId).Select(h => $"{h}:'{GetWindowTitle(h)}'"));
+
+            throw new TimeoutException(
+                "Electron harness UI Automation tree did not become ready. " +
+                $"Process {electronProcessId} owns window {_windowHandle}; visible windows: [{windows}].");
+        }
+    }
+
+    /// <summary>
+    /// Finds the harness window belonging to <paramref name="processId"/>.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not <c>FindWindow(null, title)</c>. That searches every top-level window on the
+    /// desktop, so an orphaned harness left behind by an earlier run wins over the process this
+    /// fixture just started. UI Automation then runs against a window the fixture does not own and
+    /// never becomes ready, the fixture constructor throws, and xUnit fails every test in the
+    /// collection instantly (issue #195).
+    /// </remarks>
+    private static nint FindHarnessWindow(int processId) =>
+        GetProcessWindows(processId, ELECTRON_HARNESS_TITLE).FirstOrDefault();
+
+    /// <summary>
+    /// Gets the visible top-level windows owned by <paramref name="processId"/>, optionally
+    /// filtered to an exact window title.
+    /// </summary>
+    private static List<nint> GetProcessWindows(int processId, string? title = null)
+    {
+        var windows = new List<nint>();
+
+        NativeMethods.EnumWindows(
+            (hWnd, _) =>
+            {
+                NativeMethods.GetWindowThreadProcessId(hWnd, out var owningProcessId);
+                if (owningProcessId != (uint)processId || !NativeMethods.IsWindowVisible(hWnd))
+                {
+                    return true;
+                }
+
+                if (title == null || GetWindowTitle(hWnd) == title)
+                {
+                    windows.Add(hWnd);
+                }
+
+                return true;
+            },
+            nint.Zero);
+
+        return windows;
+    }
+
+    private static string GetWindowTitle(nint hWnd)
+    {
+        var buffer = new char[512];
+        var length = NativeMethods.GetWindowText(hWnd, buffer, buffer.Length);
+
+        return length > 0 ? new string(buffer, 0, length) : string.Empty;
+    }
+
+    /// <summary>
+    /// Kills harness processes left behind by an earlier run before starting a new one.
+    /// </summary>
+    /// <remarks>
+    /// Scoped to processes started from this repository's own Electron executable, so a developer's
+    /// unrelated Electron applications are never touched. Orphans accumulate because a failed run
+    /// can close the window while its process tree survives, and they then compete for the
+    /// foreground and for the harness window title.
+    /// </remarks>
+    private static void KillStaleHarnessProcesses(string electronExePath)
+    {
+        foreach (var process in Process.GetProcessesByName("electron"))
+        {
+            try
+            {
+                if (string.Equals(process.MainModule?.FileName, electronExePath, StringComparison.OrdinalIgnoreCase))
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(TimeSpan.FromSeconds(5));
+                }
+            }
+            catch
+            {
+                // MainModule throws for processes we cannot open, and the process may exit while
+                // we look at it. Either way there is nothing useful to do.
+            }
+            finally
+            {
+                process.Dispose();
+            }
         }
     }
 
@@ -285,23 +381,30 @@ public sealed class ElectronHarnessFixture : IDisposable
     }
 
     /// <summary>
-    /// Dismisses any open modal dialogs (Save As, etc.) by sending WM_CLOSE
-    /// to known dialog titles. Uses FindWindow + PostMessage which is targeted
-    /// and doesn't interfere with the main Electron window (unlike keybd_event Escape).
+    /// Dismisses any open modal dialogs (Save As, etc.) by sending WM_CLOSE.
     /// </summary>
-#pragma warning disable CA1822 // Mark members as static — called as instance method from tests for readability
+    /// <remarks>
+    /// Scoped to windows owned by the harness process. A global <c>FindWindow(null, "Save")</c>
+    /// would match any window on the desktop with that title, including one belonging to an
+    /// unrelated application.
+    /// </remarks>
     public void DismissDialogs()
-#pragma warning restore CA1822
     {
+        if (_electronProcess is not { HasExited: false })
+        {
+            return;
+        }
+
+        var processId = _electronProcess.Id;
         string[] dialogTitles = ["Save As", "Save as", "Save"];
+
         foreach (var title in dialogTitles)
         {
-            var dialogHwnd = FindWindow(null, title);
-            if (dialogHwnd != nint.Zero)
+            foreach (var dialogHwnd in GetProcessWindows(processId, title))
             {
                 PostMessage(dialogHwnd, WM_CLOSE, nint.Zero, nint.Zero);
                 TestWait.Until(
-                    () => FindWindow(null, title) == nint.Zero,
+                    () => !NativeMethods.IsWindow(dialogHwnd) || !NativeMethods.IsWindowVisible(dialogHwnd),
                     timeout: TimeSpan.FromSeconds(2));
             }
         }
