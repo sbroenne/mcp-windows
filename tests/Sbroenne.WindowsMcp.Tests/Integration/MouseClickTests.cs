@@ -9,7 +9,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify clicks are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public class MouseClickTests : IDisposable
+public class MouseClickTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -35,7 +35,7 @@ public class MouseClickTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_OnButton_VerifiedByHarness()
     {
         // Arrange - click on the test button
@@ -55,7 +55,7 @@ public class MouseClickTests : IDisposable
         _fixture.AssertButtonClicked(initialClickCount + 1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_WithCoordinates_MovesAndClicks()
     {
         // Arrange - click on the test button using coordinates
@@ -75,7 +75,7 @@ public class MouseClickTests : IDisposable
         Assert.True(clickReceived, "Test harness did not receive the button click");
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public void ElevationDetector_AllowsSameIntegrityTarget()
     {
@@ -89,7 +89,7 @@ public class MouseClickTests : IDisposable
         Assert.False(isHigherIntegrity);
     }
 
-    [Fact]
+    [SkippableFact]
     public void SecureDesktopDetector_CanDetectSecureDesktopState()
     {
         // Arrange & Act
@@ -102,7 +102,7 @@ public class MouseClickTests : IDisposable
         Assert.False(isSecureDesktopActive);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_ReturnsTestWindowTitle()
     {
         // Arrange - click at center of test window
@@ -119,7 +119,7 @@ public class MouseClickTests : IDisposable
         Assert.Contains(MouseTestFixture.TestWindowTitle, result.TargetWindow.Title);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_OutOfBoundsCoordinates_ReturnsError()
     {
         // Arrange
@@ -137,7 +137,7 @@ public class MouseClickTests : IDisposable
         Assert.Contains("out of bounds", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_MultipleClicks_AllVerifiedByHarness()
     {
         // Arrange - click the button 3 times
@@ -157,7 +157,7 @@ public class MouseClickTests : IDisposable
         Assert.True(allClicksReceived, $"Expected 3 clicks but harness received {_fixture.GetButtonClickCount()}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_OnTextBox_ReturnsSuccess()
     {
         // Arrange - click on the text box

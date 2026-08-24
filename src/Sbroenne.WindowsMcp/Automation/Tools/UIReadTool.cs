@@ -16,6 +16,8 @@ public static partial class UIReadTool
 {
     /// <summary>
     /// Reads text from a UI element. If UIA text extraction fails, automatically tries OCR.
+    /// Keywords: read, read text, get text, extract text, OCR, text content, contents, value,
+    /// scrape, article text, web page text, what does it say.
     /// </summary>
     /// <remarks>
     /// Extract text from UI elements or screen regions. Auto-falls back to OCR if normal text extraction fails.

@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Sbroenne.WindowsMcp.Catalog;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
@@ -75,6 +76,35 @@ builder.Services
     .WithPrompts<WindowsAutomationPrompts>()
     .WithResources<SystemResources>();
 
+// Optional least-privilege filtering: expose only an allowlist of tools (--tools / WINDOWS_MCP_TOOLS)
+// and/or hide a denylist (--exclude-tools / WINDOWS_MCP_EXCLUDE_TOOLS). CLI flags win over env vars.
+var includeTools = ParseToolList(
+    GetOption(args, "--tools") ?? Environment.GetEnvironmentVariable("WINDOWS_MCP_TOOLS"));
+var excludeTools = ParseToolList(
+    GetOption(args, "--exclude-tools") ?? Environment.GetEnvironmentVariable("WINDOWS_MCP_EXCLUDE_TOOLS"));
+
+if (includeTools.Count > 0 || excludeTools.Count > 0)
+{
+    var filter = ToolFilter.Apply(builder.Services, includeTools, excludeTools);
+    Console.Error.WriteLine(
+        $"[windows-mcp] tool filter active: {filter.Kept.Count} enabled, {filter.Removed.Count} disabled.");
+    if (filter.Removed.Count > 0)
+    {
+        Console.Error.WriteLine($"[windows-mcp] disabled tools: {string.Join(", ", filter.Removed)}");
+    }
+
+    if (filter.Unknown.Count > 0)
+    {
+        Console.Error.WriteLine(
+            $"[windows-mcp] WARNING: unknown tool name(s) ignored: {string.Join(", ", filter.Unknown)}");
+    }
+
+    if (filter.Kept.Count == 0)
+    {
+        Console.Error.WriteLine("[windows-mcp] WARNING: tool filter left no tools enabled.");
+    }
+}
+
 var host = builder.Build();
 
 // Services are lazy-initialized via WindowsToolsBase when first accessed by tools.
@@ -83,3 +113,36 @@ var host = builder.Build();
 await host.RunAsync();
 
 return 0;
+
+// Reads a "--name value" or "--name=value" option from the raw args, or null if absent.
+static string? GetOption(string[] arguments, string name)
+{
+    for (var i = 0; i < arguments.Length; i++)
+    {
+        var current = arguments[i];
+        if (current.StartsWith(name + "=", StringComparison.Ordinal))
+        {
+            return current[(name.Length + 1)..];
+        }
+
+        if (string.Equals(current, name, StringComparison.Ordinal) && i + 1 < arguments.Length)
+        {
+            return arguments[i + 1];
+        }
+    }
+
+    return null;
+}
+
+// Splits a comma/semicolon-separated tool list into trimmed, non-empty names.
+static List<string> ParseToolList(string? value)
+{
+    if (string.IsNullOrWhiteSpace(value))
+    {
+        return [];
+    }
+
+    return value
+        .Split([',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToList();
+}

@@ -23,6 +23,8 @@ public static partial class MouseControlTool
     /// DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY).
     /// POLYLINE: Use points='[[x1,y1],[x2,y2],...]' for ONE continuous stroke (no pen lift between vertices).
     /// Actions: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position.
+    /// Keywords: mouse, cursor, click, double click, right click, drag, drop, scroll, move pointer,
+    /// coordinates, pixel, canvas, draw, hover, cursor position, polyline, stroke.
     /// </summary>
     /// <remarks>
     /// <para><strong>MONITOR TARGETING:</strong></para>
@@ -35,7 +37,7 @@ public static partial class MouseControlTool
     /// <para><strong>MONITOR CONTEXT:</strong> Successful operations with explicit coordinates return monitor_index, monitor_width, and monitor_height in the response.</para>
     /// <para><strong>QUERY POSITION:</strong> Use action='get_position' to query current cursor position with monitor context.</para>
     /// </remarks>
-    /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position.</param>
+    /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, polyline, scroll, or get_position.</param>
     /// <param name="target">Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.</param>
     /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
     /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>

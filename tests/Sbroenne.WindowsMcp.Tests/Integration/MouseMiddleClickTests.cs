@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests use a dedicated test harness window to verify middle-clicks are actually received.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public class MouseMiddleClickTests : IDisposable
+public class MouseMiddleClickTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -30,7 +30,7 @@ public class MouseMiddleClickTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MiddleClickAsync_OnPanel_VerifiedByHarness()
     {
         // Arrange - middle-click on the right-click panel (which also tracks middle clicks)
@@ -49,7 +49,7 @@ public class MouseMiddleClickTests : IDisposable
         _fixture.AssertMiddleClickDetected(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MiddleClickAsync_WithCoordinates_MovesCursorFirst()
     {
         // Arrange - middle-click on the panel
@@ -69,7 +69,7 @@ public class MouseMiddleClickTests : IDisposable
         Assert.True(middleClickReceived, "Test harness did not receive the middle-click");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MiddleClickAsync_OutOfBoundsCoordinates_ReturnsError()
     {
         // Arrange
@@ -85,7 +85,7 @@ public class MouseMiddleClickTests : IDisposable
         Assert.Equal(MouseControlErrorCode.CoordinatesOutOfBounds, result.ErrorCode);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MiddleClickAsync_MultipleMiddleClicks_AllVerifiedByHarness()
     {
         // Arrange - middle-click the panel 3 times
@@ -105,7 +105,7 @@ public class MouseMiddleClickTests : IDisposable
         Assert.True(allMiddleClicksReceived, $"Expected 3 middle-clicks but harness received {_fixture.GetMiddleClickCount()}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MiddleClickAsync_OnButton_VerifiedByHarness()
     {
         // Arrange - middle-click on the test button (which tracks middle clicks via MouseDown)

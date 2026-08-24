@@ -265,8 +265,8 @@ public sealed class UITestHarnessForm : Form
 
         _physicalFallbackTarget = new Panel
         {
-            Location = new Point(10, 375),
-            Size = new Size(300, 40),
+            Location = new Point(430, 205),
+            Size = new Size(95, 35),
             Name = "PhysicalFallbackTarget",
             BorderStyle = BorderStyle.FixedSingle,
             AccessibleName = "Physical fallback",
@@ -282,8 +282,8 @@ public sealed class UITestHarnessForm : Form
 
         var inertTarget = new Panel
         {
-            Location = new Point(320, 375),
-            Size = new Size(300, 40),
+            Location = new Point(535, 205),
+            Size = new Size(95, 35),
             Name = "InertTarget",
             BorderStyle = BorderStyle.FixedSingle,
             AccessibleName = "Inert target",
@@ -734,6 +734,14 @@ public sealed class UITestHarnessForm : Form
         _lastOpenPathLabel.Text = "Last opened: (none)";
         UpdateStatus("UI Test Harness Reset");
     }
+
+    /// <summary>
+    /// Opens the Save dialog directly, without going through the keyboard or a click.
+    /// Exists so isolation tests can reproduce a test that failed while a modal dialog was open.
+    /// Blocks the UI thread until the dialog is dismissed, so callers must use
+    /// <see cref="Control.BeginInvoke(Delegate)"/> rather than <c>Invoke</c>.
+    /// </summary>
+    public void ShowSaveDialogForTesting() => ShowSaveDialog();
 
     private void UpdateStatus(string message)
     {

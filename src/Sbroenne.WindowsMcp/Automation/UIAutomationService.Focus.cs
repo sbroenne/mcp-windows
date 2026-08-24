@@ -53,14 +53,9 @@ public sealed partial class UIAutomationService
         catch (COMException ex)
         {
             LogFocusElementError(_logger, elementId, ex);
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : COMExceptionHelper.IsAccessDenied(ex)
-                    ? UIAutomationErrorType.ElevatedTarget
-                    : UIAutomationErrorType.InternalError;
             return UIAutomationResult.CreateFailure(
                 "focus",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Focus"),
                 CreateDiagnostics(stopwatch));
         }
@@ -114,7 +109,7 @@ public sealed partial class UIAutomationService
             LogGetFocusedElementError(_logger, ex);
             return UIAutomationResult.CreateFailure(
                 "get_focused_element",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "GetFocusedElement"),
                 CreateDiagnostics(stopwatch));
         }
@@ -170,7 +165,7 @@ public sealed partial class UIAutomationService
             LogGetElementAtCursorError(_logger, ex);
             return UIAutomationResult.CreateFailure(
                 "get_element_at_cursor",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "GetElementAtCursor"),
                 CreateDiagnostics(stopwatch));
         }
@@ -244,7 +239,7 @@ public sealed partial class UIAutomationService
             LogGetAncestorsError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "get_ancestors",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "GetAncestors"),
                 CreateDiagnostics(stopwatch));
         }

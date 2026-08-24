@@ -220,6 +220,17 @@ internal static partial class NativeMethods
     internal static partial bool EnumWindows(EnumWindowsProc lpEnumFunc, nint lParam);
 
     /// <summary>
+    /// Enumerates the child windows of the specified parent window.
+    /// </summary>
+    /// <param name="hWndParent">Handle to the parent window.</param>
+    /// <param name="lpEnumFunc">Callback function for each child window.</param>
+    /// <param name="lParam">Application-defined value to pass to callback.</param>
+    /// <returns>True if successful, false otherwise.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EnumChildWindows(nint hWndParent, EnumWindowsProc lpEnumFunc, nint lParam);
+
+    /// <summary>
     /// Retrieves the name of the class to which the specified window belongs.
     /// </summary>
     /// <param name="hWnd">Handle to the window.</param>

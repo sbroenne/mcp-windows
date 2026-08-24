@@ -73,6 +73,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Open an existing file | `file_open` | Handle Open dialogs automatically |
 | Move bulk text in/out of an app | `clipboard` | Fastest text IO; pair with copy/paste hotkeys |
 | Record & replay a workflow | `ui_macro` | Save a `ui_batch` sequence by name, replay it later |
+| List or kill running processes | `process` | Task-manager style: find hung apps, free resources |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
 | Custom controls / games | `mouse_control` | Coordinate-based fallback |
@@ -110,6 +111,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `file_save` | Save files via Save As dialog (English Windows only) |
 | `file_open` | Open an existing file via the Open dialog (English Windows only) |
 | `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
+| `process` | List or kill running processes, task-manager style (list/kill) |
 | `screenshot_control` | Annotated screenshots for discovery + fallback |
 | `keyboard_control` | Keyboard input and hotkeys |
 | `mouse_control` | Coordinate-based mouse input (fallback) |
@@ -536,6 +538,30 @@ Record and replay reusable UI workflows. A macro is a saved `ui_batch` steps arr
 
 ---
 
+## ⚙️ Process Management (`process`)
+
+List and terminate running processes, task-manager style — useful for finding a hung application before automating it, or freeing resources after a workflow.
+
+### Parameters
+
+| Parameter | Description | Required |
+|-----------|-------------|----------|
+| `action` | `list` (enumerate) or `kill` (terminate) | Yes |
+| `name` | For `list`: case-insensitive substring filter. For `kill`: terminate all processes with this name | For kill (or `pid`) |
+| `pid` | For `kill`: the process id to terminate (takes precedence over `name`) | For kill (or `name`) |
+| `sortBy` | For `list`: `memory` (default), `name`, or `pid` | No |
+| `limit` | For `list`: max rows to return (1–500, default 20) | No |
+| `force` | For `kill`: also terminate the entire child process tree | No |
+
+### Capabilities
+
+- `list` returns `pid`, `name`, and `memoryMb` per process, ordered for token economy
+- `kill` by `pid` (precise) or by `name` (all matches)
+- Critical Windows processes (System, csrss, wininit, winlogon, services, lsass, …) and the automation server's own process are **protected** — the tool refuses to terminate them
+- CPU usage is intentionally not reported (an accurate percentage requires sampling over time, which would add latency)
+
+---
+
 ## 🖱️ Mouse Control (`mouse_control`)
 
 Control mouse input on Windows with full multi-monitor and DPI awareness.
@@ -697,7 +723,9 @@ Capture screenshots on Windows with LLM-optimized defaults. **By default, screen
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
 | `capture` | Capture screenshot (with element annotations by default) | optional `target` |
-| `list_monitors` | List all connected monitors | none |
+| `list_monitors` | List all connected monitors (with DPI, scale, orientation, and work area) | none |
+
+Each `list_monitors` entry includes `displayNumber`, `width`/`height`, `x`/`y`, `isPrimary`, `effectiveDpi`, `scale` (e.g. `1.5` = 150%), `orientation` (`landscape`/`portrait`), and `workArea` (the desktop rectangle minus the taskbar — handy for placing windows where the taskbar won't cover them).
 
 ### Capture Targets
 

@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests interact with the actual Windows input system.
 /// </summary>
 [Collection("KeyboardIntegrationTests")]
-public class KeyboardPressTests : IDisposable
+public class KeyboardPressTests : DesktopInputTestBase, IDisposable
 {
     private readonly KeyboardTestFixture _fixture;
 
@@ -29,7 +29,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests letter key presses are received by the harness.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("a", "a")]
     [InlineData("z", "z")]
     [InlineData("m", "m")]
@@ -52,7 +52,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests uppercase letter keys via shift modifier.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("a", "A")]
     [InlineData("z", "Z")]
     public async Task PressKeyAsync_LetterWithShift_ProducesUppercase(string key, string expectedText)
@@ -78,7 +78,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests number key presses are received by the harness.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("0", "0")]
     [InlineData("1", "1")]
     [InlineData("5", "5")]
@@ -106,7 +106,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that space key press produces a space character.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Space_VerifiedByHarness()
     {
         // Arrange
@@ -130,7 +130,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that backspace deletes the previous character.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Backspace_DeletesPreviousCharacter()
     {
         // Arrange - first type some text
@@ -152,7 +152,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that backspace with repeat count deletes multiple characters.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_BackspaceWithRepeat_DeletesMultipleCharacters()
     {
         // Arrange - first type some text
@@ -179,7 +179,7 @@ public class KeyboardPressTests : IDisposable
     /// Tests that arrow keys return success.
     /// Note: Arrow keys don't produce visible text, but API should return success.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("up")]
     [InlineData("down")]
     [InlineData("left")]
@@ -199,7 +199,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests arrow key aliases work correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("arrowup")]
     [InlineData("arrowdown")]
     [InlineData("arrowleft")]
@@ -223,7 +223,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests navigation keys return success.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("home")]
     [InlineData("end")]
     [InlineData("pageup")]
@@ -245,7 +245,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that Home/End keys move cursor within text.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_HomeAndEnd_MovesCursor()
     {
         // Arrange - type some text
@@ -267,7 +267,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that Delete key removes character at cursor.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Delete_RemovesCharacterAtCursor()
     {
         // Arrange - type text and move cursor to beginning
@@ -295,7 +295,7 @@ public class KeyboardPressTests : IDisposable
     /// Tests that F1-F12 function keys return success.
     /// Note: Function keys trigger system actions, so we only verify API response.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("f1")]
     [InlineData("f2")]
     [InlineData("f3")]
@@ -323,7 +323,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests extended function keys F13-F24.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("f13")]
     [InlineData("f14")]
     [InlineData("f15")]
@@ -355,7 +355,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that Tab key produces a tab character in text input.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Tab_VerifiedByHarness()
     {
         // Arrange
@@ -375,7 +375,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests Tab with repeat count.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData(1)]
     [InlineData(3)]
     public async Task PressKeyAsync_TabWithRepeat_ReturnsSuccess(int repeatCount)
@@ -397,7 +397,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that Escape key returns success.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Escape_ReturnsSuccess()
     {
         // Arrange
@@ -413,7 +413,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests Esc alias.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_EscAlias_ReturnsSuccess()
     {
         // Arrange
@@ -433,7 +433,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that Enter key returns success.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_Enter_ReturnsSuccess()
     {
         // Arrange
@@ -449,7 +449,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests Return alias for Enter.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_ReturnAlias_ReturnsSuccess()
     {
         // Arrange
@@ -469,7 +469,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests numpad number keys produce correct digits.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("numpad0", "0")]
     [InlineData("numpad1", "1")]
     [InlineData("numpad5", "5")]
@@ -493,7 +493,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests numpad operator keys.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("numpadmultiply", "*")]
     [InlineData("numpadadd", "+")]
     [InlineData("numpadsubtract", "-")]
@@ -517,7 +517,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests numpad decimal key - locale-dependent (may be . or , depending on keyboard layout).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_NumpadDecimal_ReturnsSuccessAndProducesDecimalSeparator()
     {
         // Arrange
@@ -545,7 +545,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that repeat count works correctly.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData(1, "a")]
     [InlineData(3, "aaa")]
     [InlineData(5, "aaaaa")]
@@ -568,7 +568,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that repeat=0 or negative is handled (implementation clamps to 1).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_RepeatZeroOrNegative_ClampsToOne()
     {
         // Arrange
@@ -592,7 +592,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that invalid key names return InvalidKey error.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("invalidkey")]
     [InlineData("notakey")]
     [InlineData("xyz123")]
@@ -613,7 +613,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that empty key name returns InvalidKey error.
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_EmptyKeyName_ReturnsInvalidKeyError()
     {
         // Arrange
@@ -630,7 +630,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests that shortcut-style key names give helpful error message.
     /// </summary>
-    [Theory]
+    [SkippableTheory]
     [InlineData("Ctrl+S")]
     [InlineData("Alt+Tab")]
     [InlineData("Ctrl+Shift+N")]
@@ -655,7 +655,7 @@ public class KeyboardPressTests : IDisposable
     /// <summary>
     /// Tests Ctrl+A selects all (verifiable via the harness).
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public async Task PressKeyAsync_CtrlA_SelectsAll()
     {
         // Arrange - type some text first

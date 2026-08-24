@@ -10,17 +10,29 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public sealed class UIAutomationThread : IDisposable
 {
+    private const int DefaultQueueCapacity = 256;
     private readonly Thread _staThread;
     private readonly BlockingCollection<WorkItem> _workQueue;
     private readonly CancellationTokenSource _shutdownCts;
+    private readonly Lock _cleanupLock = new();
     private volatile bool _disposed;
+    private bool _resourcesDisposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="UIAutomationThread"/> class.
     /// </summary>
     public UIAutomationThread()
+        : this(DefaultQueueCapacity)
     {
-        _workQueue = new BlockingCollection<WorkItem>();
+    }
+
+    internal UIAutomationThread(int boundedCapacity)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(boundedCapacity, 1);
+
+        _workQueue = new BlockingCollection<WorkItem>(
+            new ConcurrentQueue<WorkItem>(),
+            boundedCapacity);
         _shutdownCts = new CancellationTokenSource();
 
         _staThread = new Thread(ProcessWorkItems)
@@ -44,25 +56,35 @@ public sealed class UIAutomationThread : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var workItem = new WorkItem(() =>
-        {
-            try
+        var workItem = new WorkItem(
+            () =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                var result = func();
-                tcs.TrySetResult(result);
-            }
-            catch (OperationCanceledException)
-            {
-                tcs.TrySetCanceled(cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                tcs.TrySetException(ex);
-            }
-        });
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var result = func();
+                    tcs.TrySetResult(result);
+                }
+                catch (OperationCanceledException)
+                {
+                    tcs.TrySetCanceled(cancellationToken);
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            },
+            () => tcs.TrySetException(new ObjectDisposedException(nameof(UIAutomationThread))));
 
-        if (!_workQueue.TryAdd(workItem))
+        try
+        {
+            if (!_workQueue.TryAdd(workItem))
+            {
+                tcs.TrySetException(new InvalidOperationException(
+                    "The UI Automation queue is full. Retry after the current operation completes."));
+            }
+        }
+        catch (InvalidOperationException)
         {
             tcs.TrySetException(new ObjectDisposedException(nameof(UIAutomationThread)));
         }
@@ -91,40 +113,75 @@ public sealed class UIAutomationThread : IDisposable
         {
             foreach (var workItem in _workQueue.GetConsumingEnumerable(_shutdownCts.Token))
             {
+                if (_disposed)
+                {
+                    workItem.Cancel();
+                    continue;
+                }
+
                 workItem.Execute();
             }
         }
         catch (OperationCanceledException)
         {
-            // Shutdown requested
+            // Shutdown requested.
+        }
+        finally
+        {
+            CancelPendingWork();
+            CleanupResources();
         }
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (_disposed)
+        lock (_cleanupLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            _workQueue.CompleteAdding();
+            _shutdownCts.Cancel();
+            CancelPendingWork();
         }
 
-        _disposed = true;
-
-        _workQueue.CompleteAdding();
-        _shutdownCts.Cancel();
-
-        // Give the thread a chance to finish current work
-        if (!_staThread.Join(TimeSpan.FromSeconds(5)))
-        {
-            // Thread didn't stop in time - it will be killed when the process exits
-        }
-
-        _shutdownCts.Dispose();
-        _workQueue.Dispose();
+        // Give the thread a chance to finish current work.
+        _ = _staThread.Join(TimeSpan.FromSeconds(5));
     }
 
-    private sealed class WorkItem(Action work)
+    private void CancelPendingWork()
     {
-        public void Execute() => work();
+        while (_workQueue.TryTake(out var pending))
+        {
+            pending.Cancel();
+        }
+    }
+
+    private void CleanupResources()
+    {
+        lock (_cleanupLock)
+        {
+            if (_resourcesDisposed)
+            {
+                return;
+            }
+
+            CancelPendingWork();
+            _shutdownCts.Dispose();
+            _workQueue.Dispose();
+            _resourcesDisposed = true;
+        }
+    }
+
+    private sealed class WorkItem(Action execute, Action cancel)
+    {
+        public void Execute() => execute();
+
+        public void Cancel() => cancel();
     }
 }

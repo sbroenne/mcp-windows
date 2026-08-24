@@ -17,6 +17,16 @@ public sealed partial class UIAutomationService
     private static readonly TimeSpan SaveDialogTimeout = TimeSpan.FromSeconds(2);
 
     /// <summary>
+    /// Timeout for waiting for a dialog to close after the save has been committed. This is a
+    /// different kind of wait from locating a dialog or a control that is already on screen: the
+    /// application still has to write the file and tear the dialog down, which on a contended
+    /// desktop (or for a larger file) routinely takes longer than <see cref="SaveDialogTimeout"/>.
+    /// Reusing the short discovery budget here reported a spurious "save could not be verified"
+    /// failure even though the save had actually succeeded.
+    /// </summary>
+    private static readonly TimeSpan SaveDialogCloseTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Polling interval for dialog detection retry loop.
     /// </summary>
     private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
@@ -62,7 +72,7 @@ public sealed partial class UIAutomationService
             LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
             return UIAutomationResult.CreateFailure(
                 "click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Click"),
                 CreateDiagnostics(stopwatch));
         }
@@ -200,7 +210,7 @@ public sealed partial class UIAutomationService
             LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
             return UIAutomationResult.CreateFailure(
                 "type",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Type"),
                 CreateDiagnostics(stopwatch));
         }
@@ -237,7 +247,7 @@ public sealed partial class UIAutomationService
             LogFindAndTypeError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "type",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Type"),
                 CreateDiagnostics(stopwatch));
         }
@@ -454,7 +464,7 @@ public sealed partial class UIAutomationService
             LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
             return UIAutomationResult.CreateFailure(
                 "select",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Select"),
                 CreateDiagnostics(stopwatch));
         }
@@ -866,7 +876,7 @@ public sealed partial class UIAutomationService
             LogFindAndClickError(_logger, elementId, ex);
             return UIAutomationResult.CreateFailure(
                 "click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Click"),
                 CreateDiagnostics(stopwatch));
         }
@@ -1170,7 +1180,7 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "highlight",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Highlight"),
                 CreateDiagnostics(stopwatch));
         }
@@ -1394,7 +1404,7 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "save",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Save"),
                 CreateDiagnostics(stopwatch));
         }
@@ -1795,9 +1805,19 @@ public sealed partial class UIAutomationService
     /// <summary>
     /// Waits for a dialog to close (White Framework pattern: WaitWhileBusy).
     /// </summary>
-    private async Task<bool> WaitForDialogCloseAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    /// <param name="dialog">The dialog element to watch.</param>
+    /// <param name="cancellationToken">Token used to cancel the wait.</param>
+    /// <param name="timeout">
+    /// How long to wait. Defaults to <see cref="SaveDialogCloseTimeout"/>; callers that are merely
+    /// tidying up after an already-failed operation pass the shorter <see cref="SaveDialogTimeout"/>
+    /// so a failure is not made slower than it needs to be.
+    /// </param>
+    private async Task<bool> WaitForDialogCloseAsync(
+        UIA.IUIAutomationElement dialog,
+        CancellationToken cancellationToken,
+        TimeSpan? timeout = null)
     {
-        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+        var deadline = DateTime.UtcNow + (timeout ?? SaveDialogCloseTimeout);
 
         while (DateTime.UtcNow < deadline)
         {
@@ -1932,7 +1952,9 @@ public sealed partial class UIAutomationService
                         cancellationToken);
                 }
 
-                _ = await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken);
+                // The operation has already failed; only the dialog teardown is being observed here,
+                // so keep the short budget rather than delaying the error returned to the caller.
+                _ = await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout);
 
                 // Press Escape to close the Save As dialog
                 await _keyboardService.PressKeyAsync("Escape", cancellationToken: cancellationToken);

@@ -68,6 +68,20 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 { "servers": { "windows": { "command": "path\\to\\Sbroenne.WindowsMcp.exe" } } }
 ```
 
+**Limiting the exposed tools (optional)** — for a least-privilege setup, pass an allowlist or denylist on the server command line (or via environment variables). CLI flags take precedence over the env vars.
+
+```json
+{ "servers": { "windows": {
+  "command": "path\\to\\Sbroenne.WindowsMcp.exe",
+  "args": ["--tools", "ui_snapshot,ui_find,ui_click,ui_type,ui_read"]
+} } }
+```
+
+- `--tools <a,b,c>` / `WINDOWS_MCP_TOOLS` — expose only these tools.
+- `--exclude-tools <x,y>` / `WINDOWS_MCP_EXCLUDE_TOOLS` — expose everything except these.
+
+Excluded tools never appear in `tools/list` and cannot be invoked.
+
 ## Tools
 
 | Tool | Purpose |
@@ -85,6 +99,7 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 | `file_save` | Save files via Save As dialog |
 | `file_open` | Open an existing file via the Open dialog |
 | `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
+| `process` | List or kill running processes, task-manager style (list/kill) |
 | `screenshot_control` | Get element metadata (image optional) |
 | `window_management` | Find, activate, move, resize windows |
 | `mouse_control` | Coordinate-based clicks (fallback for games) |

@@ -9,11 +9,11 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// with negative coordinates and across multiple monitors.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class MultiMonitorTests
+public sealed class MultiMonitorTests : DesktopInputTestBase
 {
     private readonly MouseInputService _service = new();
 
-    [Fact]
+    [SkippableFact]
     public async Task MoveAsync_NegativeCoordinates_WorksCorrectlyForSecondaryMonitor()
     {
         // Arrange - negative coordinates (secondary monitor to the left)
@@ -29,7 +29,7 @@ public sealed class MultiMonitorTests
         // ErrorCode is a value type, just verify result is not null
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ClickAsync_NegativeCoordinates_HandlesCorrectly()
     {
         // Arrange - negative coordinates
@@ -44,7 +44,7 @@ public sealed class MultiMonitorTests
         // ErrorCode is a value type, just verify result is not null
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DragAsync_AcrossVirtualDesktop_HandlesCorrectly()
     {
         // Arrange - start and end on secondary monitor if available for DPI consistency
@@ -61,7 +61,7 @@ public sealed class MultiMonitorTests
             $"Expected success or elevated process target, got {result.ErrorCode}: {result.ErrorMessage}");
     }
 
-    [Fact]
+    [SkippableFact]
     public void CoordinateNormalization_VirtualDesktopBounds_ReturnsValidBounds()
     {
         // Act
@@ -76,7 +76,7 @@ public sealed class MultiMonitorTests
         Assert.True(bounds.Bottom >= bounds.Top, "Bottom should be >= Top");
     }
 
-    [Fact]
+    [SkippableFact]
     public void ValidateCoordinates_WithinTestMonitor_ReturnsTrue()
     {
         // Arrange - test coordinates on secondary monitor if available
@@ -94,7 +94,7 @@ public sealed class MultiMonitorTests
         Assert.True(isValid3, $"Coordinates ({x3}, {y3}) should be valid on test monitor");
     }
 
-    [Fact]
+    [SkippableFact]
     public void ValidateCoordinates_FarOutOfBounds_ReturnsFalse()
     {
         // Arrange - coordinates far outside any reasonable screen

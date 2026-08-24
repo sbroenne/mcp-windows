@@ -33,6 +33,8 @@ internal static class COMExceptionHelper
     private const int UIA_E_ELEMENTNOTAVAILABLE = unchecked((int)0x80040201);
     private const int UIA_E_NOCLICKABLEPOINT = unchecked((int)0x80040202);
     private const int UIA_E_PROXYASSEMBLYNOTLOADED = unchecked((int)0x80040203);
+    private const int UIA_E_NOTSUPPORTED = unchecked((int)0x80040204);
+    private const int UIA_E_TIMEOUT = unchecked((int)0x80131505);
 
     /// <summary>
     /// Gets a user-friendly error message for a COMException.
@@ -64,8 +66,30 @@ internal static class COMExceptionHelper
             UIA_E_ELEMENTNOTAVAILABLE => "Element is no longer available. The UI may have changed.",
             UIA_E_NOCLICKABLEPOINT => "Element has no clickable point. It may be obscured or zero-sized.",
             UIA_E_PROXYASSEMBLYNOTLOADED => "UI Automation proxy assembly not loaded.",
+            UIA_E_NOTSUPPORTED => "The provider does not support the requested property or pattern.",
+            UIA_E_TIMEOUT => "The UI Automation provider did not respond before the configured timeout.",
             _ => null
         };
+    }
+
+    /// <summary>
+    /// Maps a UI Automation COM failure to the MCP error taxonomy.
+    /// </summary>
+    public static string GetErrorType(COMException ex)
+    {
+        if (IsElementStale(ex))
+        {
+            return UIAutomationErrorType.ElementStale;
+        }
+
+        if (IsAccessDenied(ex))
+        {
+            return UIAutomationErrorType.ElevatedTarget;
+        }
+
+        return IsProviderTimeout(ex)
+            ? UIAutomationErrorType.Timeout
+            : UIAutomationErrorType.InternalError;
     }
 
     /// <summary>
@@ -94,6 +118,46 @@ internal static class COMExceptionHelper
     public static bool IsInvalidState(COMException ex)
     {
         return ex.HResult is E_INVALIDOPERATION or UIA_E_ELEMENTNOTENABLED;
+    }
+
+    /// <summary>
+    /// Determines if the provider exceeded the UI Automation transaction timeout.
+    /// </summary>
+    public static bool IsProviderTimeout(COMException ex)
+    {
+        return ex.HResult == UIA_E_TIMEOUT;
+    }
+
+    /// <summary>
+    /// Determines if a best-effort element operation can safely return an unavailable result.
+    /// Infrastructure, access, and timeout failures are intentionally excluded.
+    /// </summary>
+    public static bool IsExpectedElementFailure(COMException ex)
+    {
+        return IsElementStale(ex) ||
+            IsInvalidState(ex) ||
+            ex.HResult is UIA_E_NOCLICKABLEPOINT or UIA_E_NOTSUPPORTED;
+    }
+
+    /// <summary>
+    /// Determines if an exception is an expected per-element provider failure.
+    /// UI Automation surfaces E_INVALIDARG as <see cref="ArgumentException"/> for some
+    /// unsupported property and cache combinations.
+    /// </summary>
+    public static bool IsExpectedElementFailure(Exception ex)
+    {
+        return ex.GetType() == typeof(ArgumentException) ||
+            ex is COMException comException && IsExpectedElementFailure(comException);
+    }
+
+    /// <summary>
+    /// Determines if best-effort tree traversal can skip an element that disappeared or exposed
+    /// an unsupported property/cache combination.
+    /// </summary>
+    public static bool IsExpectedElementTraversalFailure(Exception ex)
+    {
+        return ex.GetType() == typeof(ArgumentException) ||
+            ex is COMException comException && IsElementStale(comException);
     }
 
     /// <summary>

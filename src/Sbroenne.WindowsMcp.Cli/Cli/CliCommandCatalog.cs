@@ -30,5 +30,6 @@ internal static class CliCommandCatalog
             ["ui_read_table"] = "ui read-table",
             ["ui_wait"] = "ui wait",
             ["ui_batch"] = "ui batch",
+            ["process"] = "process",
         };
 }

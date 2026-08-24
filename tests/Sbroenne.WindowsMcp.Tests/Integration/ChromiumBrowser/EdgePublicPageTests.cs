@@ -11,7 +11,7 @@ public sealed class ChromiumPublicPageTests
 {
     private const int QueryTimeoutMs = 20000;
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_PlaywrightTodoMvc_NewTodoInputByPlaceholder_ReturnsEdit(ChromiumBrowserKind browser)

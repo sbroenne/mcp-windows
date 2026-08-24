@@ -104,6 +104,24 @@ Assert.Equal("3", readResult.Text);
 - Only tests explicitly marked `[Skip]` (e.g., requiring 3+ monitors) are acceptable to skip
 - If tests fail due to timing/window focus issues, that's a BUG to fix, not an acceptable state
 
+### Desktop-Input Tests Are Opt-In (`MCP_TEST_DESKTOP_INPUT`)
+
+Tests that inject **real** mouse/keyboard input (the `MouseIntegrationTests` and `KeyboardIntegrationTests`
+collections) drive `SendInput` against the live desktop. That input is **global to the active input
+desktop** — the test harness window limits *where clicks land*, but it cannot stop the run from
+commandeering the cursor and keyboard focus for the whole session. Running them on a shared or
+interactive machine hijacks your desktop.
+
+They therefore **skip by default** and only run when `MCP_TEST_DESKTOP_INPUT=1` is set (mirroring the
+existing `MCP_TEST_CHROME` opt-in). The dedicated Windows UI CI runner sets this variable, so full
+coverage still runs in CI on a disposable, interactive VM. Locally, only opt in on a machine you can
+let the tests take over:
+
+```powershell
+$env:MCP_TEST_DESKTOP_INPUT = '1'
+dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Integration.Mouse" -v q
+```
+
 ### Surgical Integration Testing (REQUIRED FIRST STEP)
 
 **Always start with surgical tests targeting your specific changes:**

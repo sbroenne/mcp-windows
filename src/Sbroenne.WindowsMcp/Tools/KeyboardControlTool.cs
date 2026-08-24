@@ -19,6 +19,8 @@ public static partial class KeyboardControlTool
     /// Sends keyboard input to a specific window. The window is activated before input is sent.
     /// Best for: typing text, hotkeys (key='s', modifiers='ctrl'), special keys.
     /// For typing into a specific UI element by name/automationId, use ui_type instead.
+    /// Keywords: keyboard, type, press key, hotkey, shortcut, key combination, ctrl, alt, shift,
+    /// enter, tab, escape, function keys, send keys, key sequence, keystroke.
     /// </summary>
     /// <remarks>
     /// Supports type (text), press (key), key_down, key_up, sequence, release_all, get_keyboard_layout, and wait_for_idle actions. WARNING: Do NOT put modifiers in the 'key' parameter (e.g., 'Ctrl+S' is WRONG). Use key='s', modifiers='ctrl'. ⚠️ FOR SAVE: Use file_save tool - it handles Save As dialogs!

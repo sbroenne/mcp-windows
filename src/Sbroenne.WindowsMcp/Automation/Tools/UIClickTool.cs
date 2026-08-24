@@ -15,6 +15,8 @@ public static partial class UIClickTool
 {
     /// <summary>
     /// Click a UI element. REQUIRED for all click operations - you must call this tool to click anything. Auto-activates window.
+    /// Keywords: click, press button, tap, select, push, activate button, click button, click link,
+    /// click menu, check box, toggle, invoke element, UI element, control.
     /// </summary>
     /// <remarks>
     /// Clicks a UI element. Automatically activates the target window before clicking.

@@ -8,9 +8,9 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests verify that elevated process detection works correctly.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class ElevationDetectionTests
+public sealed class ElevationDetectionTests : DesktopInputTestBase
 {
-    [Fact]
+    [SkippableFact]
     public void ElevationDetector_CanDetectTargetElevation()
     {
         // Arrange
@@ -28,7 +28,7 @@ public sealed class ElevationDetectionTests
         Assert.NotNull(isElevated);
     }
 
-    [Fact]
+    [SkippableFact]
     public void ElevationDetector_CanBeInstantiated()
     {
         // Arrange & Act
@@ -38,7 +38,7 @@ public sealed class ElevationDetectionTests
         Assert.NotNull(detector);
     }
 
-    [Fact]
+    [SkippableFact]
     public void SecureDesktopDetector_CanDetectSecureDesktopState()
     {
         // Arrange
@@ -52,7 +52,7 @@ public sealed class ElevationDetectionTests
         Assert.False(isSecure, "Secure desktop should not be active during normal test execution");
     }
 
-    [Fact]
+    [SkippableFact]
     public void ElevationDetector_AtDesktopPosition_HandlesCorrectly()
     {
         // Arrange
@@ -70,7 +70,7 @@ public sealed class ElevationDetectionTests
         Assert.NotNull(isElevated);
     }
 
-    [Fact]
+    [SkippableFact]
     public void ElevationDetector_ErrorMessageClarity_WhenElevatedTargetDetected()
     {
         // This test verifies that the error message is clear and actionable
@@ -85,7 +85,7 @@ public sealed class ElevationDetectionTests
         Assert.Contains("administrator", result.Error?.ToLowerInvariant() ?? "");
     }
 
-    [Fact]
+    [SkippableFact]
     public void SecureDesktopDetector_ErrorMessageClarity_WhenSecureDesktopActive()
     {
         // This test verifies that the error message is clear and actionable

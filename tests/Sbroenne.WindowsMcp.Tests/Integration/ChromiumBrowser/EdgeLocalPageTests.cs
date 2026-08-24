@@ -9,6 +9,11 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
 public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessionFixture>
 {
     private const int QueryTimeoutMs = 5000;
+
+    // Content that only appears in response to an interaction needs a larger budget than content
+    // that is already on screen: the click has to round-trip through the page and then propagate
+    // into the accessibility tree. EdgePublicPageTests already uses this same 20s budget.
+    private const int PostInteractionTimeoutMs = 20000;
     private const string SearchInputName = "Docs Search";
     private const string SignInButtonName = "Sign in";
     private const string SignedOutStatus = "Signed out";
@@ -21,7 +26,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         _readOnlySessions = readOnlySessions;
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_PrimaryNavigation_IsDiscoverable(ChromiumBrowserKind browser)
@@ -43,7 +48,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.NotEmpty(result.Items!);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_SearchInputByAriaLabel_ReturnsEdit(ChromiumBrowserKind browser)
@@ -67,7 +72,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal("Edit", result.Items![0].Type);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Find_LocalChromiumPage_SignInButtonByAriaLabel_ReturnsButton(ChromiumBrowserKind browser)
@@ -91,7 +96,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal("Button", result.Items![0].Type);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Type_LocalChromiumPage_SearchInput_ReadsBackTypedValue(ChromiumBrowserKind browser)
@@ -117,7 +122,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal(expectedText, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Click_LocalChromiumPage_SignInButton_RevealsFocusedContent(ChromiumBrowserKind browser)
@@ -132,14 +137,19 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
 
         Assert.True(clickResult.Success, $"Click failed: {clickResult.ErrorMessage}");
 
-        var focusMessage = await FindSingleElementAsync(harness, session.WindowHandleString, FocusedButtonMessage, "Text");
+        var focusMessage = await FindSingleElementAsync(
+            harness,
+            session.WindowHandleString,
+            FocusedButtonMessage,
+            "Text",
+            PostInteractionTimeoutMs);
         var readResult = await harness.AutomationService.GetTextAsync(focusMessage.Id, session.WindowHandleString, includeChildren: false);
 
         Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
         Assert.Equal(FocusedButtonMessage, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Read_LocalChromiumPage_InitialStatus_ReturnsSignedOut(ChromiumBrowserKind browser)
@@ -156,7 +166,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.Equal(SignedOutStatus, readResult.Text);
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Edge)]
     [InlineData(ChromiumBrowserKind.Chrome)]
     public async Task Read_LocalChromiumPage_ArticleMode_ReturnsCleanMainContent(ChromiumBrowserKind browser)
@@ -196,14 +206,18 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         Assert.DoesNotContain("Complementary rail link", article, StringComparison.Ordinal);
     }
 
-    private static ElementQuery CreateLocalPageQuery(string windowHandle, string name, string controlType)
+    private static ElementQuery CreateLocalPageQuery(
+        string windowHandle,
+        string name,
+        string controlType,
+        int? timeoutMs = null)
     {
         return new ElementQuery
         {
             WindowHandle = windowHandle,
             Name = name,
             ControlType = controlType,
-            TimeoutMs = QueryTimeoutMs,
+            TimeoutMs = timeoutMs ?? QueryTimeoutMs,
         };
     }
 
@@ -211,9 +225,11 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         ChromiumAutomationHarness harness,
         string windowHandle,
         string name,
-        string controlType)
+        string controlType,
+        int? timeoutMs = null)
     {
-        var result = await harness.AutomationService.FindElementsAsync(CreateLocalPageQuery(windowHandle, name, controlType));
+        var result = await harness.AutomationService.FindElementsAsync(
+            CreateLocalPageQuery(windowHandle, name, controlType, timeoutMs));
 
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
         Assert.NotNull(result.Items);

@@ -104,7 +104,7 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "open",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Open"),
                 CreateDiagnostics(stopwatch));
         }

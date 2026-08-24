@@ -81,11 +81,12 @@ public sealed partial class UIAutomationService
                     referencePoint = BoundingRect.FromCoordinates(refRect.left, refRect.top, refRect.right - refRect.left, refRect.bottom - refRect.top);
                 }
 
-                // Determine if we can use fast FindAll
+                // Determine if we can use fast FindAll.
+                // ClassName is deliberately absent: it is a native UIA property, so BuildCondition
+                // pushes it into the FindAll condition instead of forcing a bulk fetch + in-process scan.
                 var hasAdvancedCriteria = !string.IsNullOrEmpty(query.NameContains) ||
                                          !string.IsNullOrEmpty(query.NamePattern) ||
                                          query.ExactDepth.HasValue ||
-                                         !string.IsNullOrEmpty(query.ClassName) ||
                                          regionFilter != null;
 
                 var elementInfos = new List<UIElementInfo>();
@@ -240,14 +241,9 @@ public sealed partial class UIAutomationService
         catch (COMException ex)
         {
             LogFindElementsError(_logger, ex);
-            var errorType = COMExceptionHelper.IsElementStale(ex)
-                ? UIAutomationErrorType.ElementStale
-                : COMExceptionHelper.IsAccessDenied(ex)
-                    ? UIAutomationErrorType.ElevatedTarget
-                    : UIAutomationErrorType.InternalError;
             return UIAutomationResult.CreateFailure(
                 "find",
-                errorType,
+                COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Find"),
                 CreateDiagnostics(stopwatch, query));
         }
@@ -312,7 +308,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared during search
         }
@@ -376,7 +372,7 @@ public sealed partial class UIAutomationService
                 }
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element tree changed during search - return whatever was collected.
         }
@@ -414,7 +410,11 @@ public sealed partial class UIAutomationService
                         return false;
                     }
                 }
-                catch
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
                 {
                     return false;
                 }
@@ -431,7 +431,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -498,7 +498,7 @@ public sealed partial class UIAutomationService
                 child = child.GetNextSibling();
             }
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element disappeared - skip it
         }
@@ -536,7 +536,11 @@ public sealed partial class UIAutomationService
                         return false;
                     }
                 }
-                catch
+                catch (ArgumentException)
+                {
+                    return false;
+                }
+                catch (RegexMatchTimeoutException)
                 {
                     return false;
                 }
@@ -553,7 +557,7 @@ public sealed partial class UIAutomationService
 
             return true;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }
@@ -570,7 +574,7 @@ public sealed partial class UIAutomationService
             var result = element.FindFirst(UIA.TreeScope.TreeScope_Element, condition);
             return result != null;
         }
-        catch
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             return false;
         }

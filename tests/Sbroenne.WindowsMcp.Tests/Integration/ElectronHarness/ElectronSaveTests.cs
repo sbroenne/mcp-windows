@@ -93,15 +93,28 @@ public sealed class ElectronSaveTests : IDisposable
         // Assert
         Assert.True(result.Success, $"SaveAsync failed: {result.ErrorMessage}");
 
-        // Wait for file system to settle
-        await Task.Delay(500);
+        // Wait for the harness to finish writing the file. Waiting on the content rather than on
+        // File.Exists also rules out observing a file that exists but has not been flushed yet.
+        var content = string.Empty;
+        var saved = await TestWait.UntilAsync(
+            () =>
+            {
+                try
+                {
+                    content = File.ReadAllText(testFilePath);
+                }
+                catch (IOException)
+                {
+                    return false;
+                }
 
-        // Verify the file was created
-        Assert.True(File.Exists(testFilePath),
-            $"Expected file to exist at: {testFilePath}. Duration={result.Diagnostics?.DurationMs}ms");
+                return content.Contains("Test file created at", StringComparison.Ordinal);
+            },
+            TimeSpan.FromSeconds(10));
 
-        // Verify the file has content (the Electron harness writes a timestamp)
-        var content = File.ReadAllText(testFilePath);
+        Assert.True(
+            saved,
+            $"Expected file to exist with harness content at: {testFilePath}. Duration={result.Diagnostics?.DurationMs}ms");
         Assert.NotEmpty(content);
         Assert.Contains("Test file created at", content);
     }
@@ -146,8 +159,10 @@ public sealed class ElectronSaveTests : IDisposable
         // Assert
         Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
 
-        await Task.Delay(300);
-        Assert.True(File.Exists(testFilePath), $"File was not created at: {testFilePath}");
+        var created = await TestWait.UntilAsync(
+            () => File.Exists(testFilePath),
+            TimeSpan.FromSeconds(10));
+        Assert.True(created, $"File was not created at: {testFilePath}");
     }
 
     [Fact]

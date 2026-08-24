@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Utilities;
 using UIA = Interop.UIAutomationClient;
@@ -8,6 +10,7 @@ public sealed partial class UIAutomationService
 {
     private static readonly TimeSpan ActionVerificationTimeout = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan ActionVerificationPollInterval = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan ElementResponsivenessTimeout = TimeSpan.FromSeconds(2);
 
     private readonly record struct ElementActionOutcome(
         bool Success,
@@ -28,12 +31,84 @@ public sealed partial class UIAutomationService
         UIA.ToggleState? ToggleState,
         bool? IsSelected);
 
+    /// <summary>
+    /// Waits, up to <see cref="ElementResponsivenessTimeout"/>, for the process owning
+    /// <paramref name="element"/> to stop being busy. Purely advisory: every failure mode
+    /// (no process id, exited process, non-UI process) falls through so the caller still acts.
+    /// </summary>
+    private async Task WaitForElementResponsiveAsync(
+        UIA.IUIAutomationElement element,
+        CancellationToken cancellationToken)
+    {
+        int processId;
+        try
+        {
+            processId = await _staThread.ExecuteAsync(() => element.CurrentProcessId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (COMException)
+        {
+            return;
+        }
+
+        if (processId <= 0)
+        {
+            return;
+        }
+
+        Process process;
+        try
+        {
+            process = Process.GetProcessById(processId);
+        }
+        catch (ArgumentException)
+        {
+            // Process already exited.
+            return;
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        catch (Win32Exception)
+        {
+            // Cannot open the process (for example a more privileged target). The gate is
+            // advisory, so an unqueryable process must not prevent the action.
+            return;
+        }
+
+        using (process)
+        {
+            try
+            {
+                _ = await DeterministicWait.UntilAsync(
+                    () => process.Responding,
+                    ElementResponsivenessTimeout,
+                    ActionVerificationPollInterval,
+                    cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (InvalidOperationException)
+            {
+                // Process exited or has no message queue to interrogate.
+            }
+            catch (Win32Exception)
+            {
+                // Access denied while probing responsiveness. Proceed with the action.
+            }
+        }
+    }
+
     private async Task<ElementActionOutcome> ExecuteElementActionAsync(
         UIA.IUIAutomationElement element,
         UIA.IUIAutomationElement rootElement,
         Point? fallbackClickPoint,
         CancellationToken cancellationToken)
     {
+        // Gate on the owning process being responsive. Acting while the target app is still
+        // pumping a long operation is a common source of dropped clicks and lost keystrokes.
+        // Best-effort: a still-busy process does not fail the action, it just stops us racing ahead.
+        await WaitForElementResponsiveAsync(element, cancellationToken).ConfigureAwait(false);
+
         var initial = await _staThread.ExecuteAsync(
             () => new ElementActionState(
                 element.GetControlTypeId(),

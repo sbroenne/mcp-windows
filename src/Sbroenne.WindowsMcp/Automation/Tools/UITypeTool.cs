@@ -17,6 +17,8 @@ public static partial class UITypeTool
     /// Types text into a text field or other input element. Automatically activates the target window.
     /// ✅ WORKS ON ELEVATED WINDOWS - use this when keyboard_control fails with "elevated window" error.
     /// WARNING: Do NOT use for Save As dialogs - use file_save(windowHandle, filePath) instead. It handles path entry and Save button automatically.
+    /// Keywords: type, type text, enter text, input, fill, fill field, write text, set text,
+    /// text field, edit box, form field, elevated window, admin window.
     /// </summary>
     /// <remarks>
     /// Type text into Edit, Document, TextBox, or search fields. Auto-activates window, optionally clears existing text first.
