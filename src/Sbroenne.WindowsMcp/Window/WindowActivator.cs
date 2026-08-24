@@ -28,6 +28,11 @@ public sealed class WindowActivator
             return false;
         }
 
+        if (GetForegroundWindow() == handle)
+        {
+            return true;
+        }
+
         // Check if window is valid
         if (!NativeMethods.IsWindowVisible(handle))
         {
@@ -111,6 +116,11 @@ public sealed class WindowActivator
     /// </summary>
     private bool TrySetForegroundWindow(nint handle)
     {
+        if (GetForegroundWindow() == handle)
+        {
+            return true;
+        }
+
         return NativeMethods.SetForegroundWindow(handle) && IsForegroundWindow(handle);
     }
 

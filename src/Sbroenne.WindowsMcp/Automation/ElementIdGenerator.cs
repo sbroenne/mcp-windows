@@ -114,6 +114,32 @@ public static class ElementIdGenerator
         }
     }
 
+    private static nint GetTopLevelWindowHandle(UIA.IUIAutomationElement element)
+    {
+        var current = element;
+        nint topLevelHandle = IntPtr.Zero;
+
+        while (current != null)
+        {
+            try
+            {
+                var hwnd = current.GetNativeWindowHandle();
+                if (hwnd != 0)
+                {
+                    topLevelHandle = hwnd;
+                }
+
+                current = current.GetParent();
+            }
+            catch
+            {
+                break;
+            }
+        }
+
+        return topLevelHandle;
+    }
+
     /// <summary>
     /// Generates the full internal ID for an element (not for external use).
     /// </summary>
@@ -124,22 +150,10 @@ public static class ElementIdGenerator
 
         try
         {
-            // Get window handle
-            var windowHandle = element.GetNativeWindowHandle();
+            var windowHandle = GetTopLevelWindowHandle(element);
             if (windowHandle == 0)
             {
-                // Try to get from parent
-                var parent = element.GetParent();
-                while (parent != null)
-                {
-                    windowHandle = parent.GetNativeWindowHandle();
-                    if (windowHandle != 0)
-                    {
-                        break;
-                    }
-
-                    parent = parent.GetParent();
-                }
+                windowHandle = rootElement.GetNativeWindowHandle();
             }
 
             // Get runtime ID
@@ -166,10 +180,7 @@ public static class ElementIdGenerator
     {
         try
         {
-            // Get cached window handle (fast - no COM call)
-            var windowHandle = element.GetCachedNativeWindowHandle();
-
-            // If no handle on element, use root's handle
+            var windowHandle = GetTopLevelWindowHandle(element);
             if (windowHandle == 0)
             {
                 try
@@ -178,7 +189,6 @@ public static class ElementIdGenerator
                 }
                 catch
                 {
-                    // Fall back to current property if not in cache
                     windowHandle = rootElement.GetNativeWindowHandle();
                 }
             }
@@ -215,10 +225,7 @@ public static class ElementIdGenerator
     {
         try
         {
-            // Get window handle from current properties
-            var windowHandle = element.GetNativeWindowHandle();
-
-            // If no handle on element, use root's handle
+            var windowHandle = GetTopLevelWindowHandle(element);
             if (windowHandle == 0)
             {
                 windowHandle = rootElement.GetNativeWindowHandle();
@@ -567,5 +574,37 @@ public static class ElementIdGenerator
         ArgumentNullException.ThrowIfNull(shortId);
 
         return s_shortToFull.TryGetValue(shortId, out var fullId) ? fullId : null;
+    }
+
+    /// <summary>
+    /// Resolves a window handle from a short or full element ID without requiring callers to know the
+    /// internal ID format. This is used for activation safety checks before sending raw mouse input.
+    /// </summary>
+    public static bool TryResolveWindowHandle(string elementId, out nint windowHandle)
+    {
+        windowHandle = IntPtr.Zero;
+        if (string.IsNullOrWhiteSpace(elementId))
+        {
+            return false;
+        }
+
+        var fullId = ResolveFullId(elementId) ?? elementId;
+
+        const string prefix = "window:";
+        var startIndex = fullId.IndexOf(prefix, StringComparison.Ordinal);
+        if (startIndex < 0)
+        {
+            return false;
+        }
+
+        startIndex += prefix.Length;
+        var endIndex = fullId.IndexOf('|', startIndex);
+        if (endIndex < 0)
+        {
+            endIndex = fullId.Length;
+        }
+
+        var windowValue = fullId.Substring(startIndex, endIndex - startIndex).Trim();
+        return nint.TryParse(windowValue, out windowHandle) && windowHandle != IntPtr.Zero;
     }
 }

@@ -616,6 +616,141 @@ public sealed partial class UIAutomationService
     private void TryActivateWindowForElement(UIA.IUIAutomationElement element, nint? windowHandle) =>
         _ = ActivateWindowForElement(element, windowHandle);
 
+    private static bool IsRequestedWindowHandleCompatible(nint elementWindowHandle, nint? requestedWindowHandle)
+    {
+        if (!requestedWindowHandle.HasValue || requestedWindowHandle.Value == IntPtr.Zero)
+        {
+            return true;
+        }
+
+        if (elementWindowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        if (requestedWindowHandle.Value == elementWindowHandle)
+        {
+            return true;
+        }
+
+        var elementRoot = NativeMethods.GetAncestor(elementWindowHandle, NativeConstants.GA_ROOT);
+        var requestedRoot = NativeMethods.GetAncestor(requestedWindowHandle.Value, NativeConstants.GA_ROOT);
+        if (elementRoot != IntPtr.Zero && requestedRoot != IntPtr.Zero)
+        {
+            return elementRoot == requestedRoot;
+        }
+
+        return false;
+    }
+
+    private static nint ResolveElementWindowHandle(UIA.IUIAutomationElement element)
+    {
+        var current = element;
+        var walker = Uia.ControlViewWalker;
+        var visited = new HashSet<UIA.IUIAutomationElement>();
+
+        while (current != null)
+        {
+            try
+            {
+                if (!visited.Add(current))
+                {
+                    break;
+                }
+
+                var hwnd = TryGetNativeWindowHandle(current);
+                if (hwnd != IntPtr.Zero)
+                {
+                    return hwnd;
+                }
+
+                current = walker.GetParentElement(current);
+            }
+            catch
+            {
+                break;
+            }
+        }
+
+        try
+        {
+            var root = GetRootElementForScroll(element);
+            var rootHandle = TryGetNativeWindowHandle(root);
+            if (rootHandle != IntPtr.Zero)
+            {
+                return rootHandle;
+            }
+        }
+        catch
+        {
+            // Fall through to the screen-point fallback below.
+        }
+
+        try
+        {
+            var clickablePoint = GetPhysicalClickPoint(element);
+            if (!clickablePoint.HasValue)
+            {
+                return IntPtr.Zero;
+            }
+
+            var point = new global::Sbroenne.WindowsMcp.Native.POINT(
+                (int)Math.Round((double)clickablePoint.Value.X, MidpointRounding.AwayFromZero),
+                (int)Math.Round((double)clickablePoint.Value.Y, MidpointRounding.AwayFromZero));
+            var hwnd = NativeMethods.WindowFromPoint(point);
+            if (hwnd == IntPtr.Zero)
+            {
+                return IntPtr.Zero;
+            }
+
+            var rootHwnd = NativeMethods.GetAncestor(hwnd, NativeConstants.GA_ROOT);
+            return rootHwnd != IntPtr.Zero ? rootHwnd : hwnd;
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
+    }
+
+    private static bool TryParseElementWindowHandle(string elementId, out nint windowHandle) =>
+        ElementIdGenerator.TryResolveWindowHandle(elementId, out windowHandle);
+
+    private static nint TryGetNativeWindowHandle(UIA.IUIAutomationElement? element)
+    {
+        if (element == null)
+        {
+            return IntPtr.Zero;
+        }
+
+        try
+        {
+            var hwnd = element.CurrentNativeWindowHandle;
+            if (hwnd != 0)
+            {
+                return new IntPtr(hwnd);
+            }
+        }
+        catch
+        {
+            // Ignore and fall back below.
+        }
+
+        try
+        {
+            var hwnd = element.CachedNativeWindowHandle;
+            if (hwnd != 0)
+            {
+                return new IntPtr(hwnd);
+            }
+        }
+        catch
+        {
+            // Ignore and fall back below.
+        }
+
+        return IntPtr.Zero;
+    }
+
     /// <summary>
     /// Activates the window that hosts <paramref name="element"/> and reports whether it is confirmed to be the
     /// foreground window afterwards. Semantic actions can ignore the result; anything that injects physical input
@@ -630,42 +765,36 @@ public sealed partial class UIAutomationService
                 return false;
             }
 
-            var handle = windowHandle;
-            if (!handle.HasValue || handle.Value == IntPtr.Zero)
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (windowHandle.HasValue && windowHandle.Value != IntPtr.Zero)
             {
-                // Walk up to find a window
-                var current = element;
-                var walker = Uia.ControlViewWalker;
-                while (current != null)
+                if (elementWindowHandle != IntPtr.Zero && !IsRequestedWindowHandleCompatible(elementWindowHandle, windowHandle))
                 {
-                    try
-                    {
-                        var hwnd = current.CurrentNativeWindowHandle;
-                        if (hwnd != 0)
-                        {
-                            handle = new IntPtr(hwnd);
-                            break;
-                        }
-
-                        current = walker.GetParentElement(current);
-                    }
-                    catch
-                    {
-                        break;
-                    }
+                    return false;
                 }
+
+                _windowActivator.ActivateWindowAsync(windowHandle.Value, cancellationToken: CancellationToken.None)
+                    .GetAwaiter()
+                    .GetResult();
+                return DeterministicWait.Until(
+                    () => _windowActivator.IsForegroundWindow(windowHandle.Value),
+                    TimeSpan.FromMilliseconds(500),
+                    ActionVerificationPollInterval);
             }
 
-            if (!handle.HasValue || handle.Value == IntPtr.Zero)
+            var handle = elementWindowHandle == IntPtr.Zero
+                ? TryGetNativeWindowHandle(GetRootElementForScroll(element))
+                : elementWindowHandle;
+            if (handle == IntPtr.Zero)
             {
                 return false;
             }
 
-            _windowActivator.ActivateWindowAsync(handle.Value, cancellationToken: CancellationToken.None)
+            _windowActivator.ActivateWindowAsync(handle, cancellationToken: CancellationToken.None)
                 .GetAwaiter()
                 .GetResult();
             return DeterministicWait.Until(
-                () => _windowActivator.IsForegroundWindow(handle.Value),
+                () => _windowActivator.IsForegroundWindow(handle),
                 TimeSpan.FromMilliseconds(500),
                 ActionVerificationPollInterval);
         }
@@ -870,6 +999,10 @@ public sealed partial class UIAutomationService
             }
 
             activationHandle = parsedHandle;
+        }
+        else if (TryParseElementWindowHandle(elementId, out var parsedElementHandle))
+        {
+            activationHandle = parsedElementHandle;
         }
 
         var prepared = await _staThread.ExecuteAsync(() =>
