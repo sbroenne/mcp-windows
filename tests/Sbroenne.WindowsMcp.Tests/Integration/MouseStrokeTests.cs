@@ -7,7 +7,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// feature: one press, N moves, one release - no pen lift at the vertices, which N segment-drags cannot give.
 /// </summary>
 [Collection("MouseIntegrationTests")]
-public sealed class MouseStrokeTests : IDisposable
+public sealed class MouseStrokeTests : DesktopInputTestBase, IDisposable
 {
     private readonly Coordinates _originalPosition;
     private readonly MouseTestFixture _fixture;
@@ -40,7 +40,7 @@ public sealed class MouseStrokeTests : IDisposable
         ];
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task StrokeAsync_FourPoints_PressesOnceAndEndsAtLastPoint()
     {
@@ -64,7 +64,7 @@ public sealed class MouseStrokeTests : IDisposable
         Assert.Equal(0, _fixture.GetButtonClickCount());
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task StrokeAsync_FourPoints_PassesThroughEveryVertex()
     {
@@ -94,7 +94,7 @@ public sealed class MouseStrokeTests : IDisposable
         }
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task StrokeAsync_SinglePoint_FailsWithoutSendingInput()
     {
@@ -106,7 +106,7 @@ public sealed class MouseStrokeTests : IDisposable
         Assert.Equal(0, _fixture.GetDragPressCount());
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task StrokeAsync_OutOfBoundsVertex_FailsBeforePressing()
     {
@@ -122,7 +122,7 @@ public sealed class MouseStrokeTests : IDisposable
         Assert.Equal(0, _fixture.GetDragPressCount());
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task DragAsync_StillReportsSingleDrag_AfterStrokeRefactor()
     {
