@@ -16,7 +16,7 @@ public static class WindowsAutomationGuidance
         "### 2. UI INTERACTION (Preferred)\n" +
         "ui_snapshot(windowHandle='<handle>') - ORIENT FIRST: compact element tree (ids, names, types, coordinates). Pass parentElementId to drill into a subtree.\n" +
         "ui_find(windowHandle='<handle>', name='...') - discover elements (name, controlType, coordinates)\n" +
-        "ui_click(windowHandle='<handle>', name='...' | nameContains='...' | automationId='...' | elementId='...') - click by name or reuse an id from ui_snapshot/ui_find\n" +
+        "ui_click(windowHandle='<handle>', name='...' | nameContains='...' | automationId='...' | elementId='...') - click by name or reuse an id from ui_snapshot/ui_find. Add doubleClick=true to double-click an element without coordinates.\n" +
         "ui_type(windowHandle='<handle>', text='...', controlType='Edit') - type into a field (also accepts elementId='...')\n" +
         "ui_select(windowHandle='<handle>', value='...', name='...') - pick a value in a combo box / list / tab\n" +
         "ui_read(windowHandle='<handle>', name='...') - read element text (OCR fallback; also accepts elementId='...')\n" +
@@ -29,7 +29,7 @@ public static class WindowsAutomationGuidance
         "ui_wait(windowHandle='<handle>', mode='disappear', nameContains='...') - wait for a spinner/dialog to close\n" +
         "ui_wait(mode='state', elementId='...', desiredState='enabled') - wait until an element reaches a state\n\n" +
         "### 2c. BATCH, MACROS & FUSION (Fewer round-trips)\n" +
-        "ui_batch(windowHandle='<handle>', steps='[...]', stopOnError=true) - run many steps (find/click/type/select/wait/read/snapshot/key) in ONE call. Use for multi-field forms instead of many separate calls.\n" +
+        "ui_batch(windowHandle='<handle>', steps='[...]', stopOnError=true) - run many steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in ONE call. Use for multi-field forms AND for canvas drawing instead of many separate calls.\n" +
         "ui_macro(action='save', name='...', steps='[...]') then ui_macro(action='run', name='...', windowHandle='<handle>') - persist a ui_batch sequence and replay it later; also action='list'/'get'/'delete'.\n" +
         "ui_click(windowHandle='<handle>', name='...', withSnapshot=true) - add withSnapshot=true to ui_click/ui_type/ui_select to get the post-action element tree back and skip a follow-up ui_snapshot.\n\n" +
         "### 2d. CLIPBOARD (Fast bulk text IO)\n" +
@@ -47,10 +47,15 @@ public static class WindowsAutomationGuidance
         "- Canvas/drawing areas (no accessibility elements inside)\n" +
         "- Drag operations\n" +
         "- Custom controls ui_click can't click\n\n" +
+        "**Multi-stroke drawing - use ui_batch, not N separate calls:**\n" +
+        "ui_batch(windowHandle='<handle>', steps='[{\"action\":\"polyline\",\"points\":[[300,200],[500,200],[500,400],[300,200]]}, {\"action\":\"mouse\",\"mouseAction\":\"drag\",\"x\":600,\"y\":200,\"endX\":700,\"endY\":400}]')\n" +
+        "- polyline presses once, traces every vertex, releases once - ONE continuous stroke, no pen lift at corners.\n" +
+        "- mouse step coordinates are window-relative by default; add target='primary_screen' or monitorIndex for screen-relative.\n" +
+        "- The window is auto-activated before each mouse step, so batches don't fail on lost focus.\n\n" +
         "**Hybrid workflow for drawing apps:**\n" +
         "- Use ui_click to click toolbar buttons (tools, colors)\n" +
         "- Use ui_find to get the canvas bounding rectangle\n" +
-        "- Use mouse_control(drag) inside canvas bounds for drawing\n\n" +
+        "- Use ONE ui_batch with mouse/polyline steps inside canvas bounds for the drawing itself\n\n" +
         "### 5. VERIFICATION\n" +
         "screenshot_control(annotate=true) - see current state with element positions\n" +
         "ui_find(...) - confirm expected elements are present after an action";

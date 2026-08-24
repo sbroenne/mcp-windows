@@ -75,6 +75,18 @@ public sealed class TestHarnessForm : Form
     public bool DragDetected { get; private set; }
 
     /// <summary>
+    /// Gets every drag-panel position observed while a button was held, in order. Lets a test prove a
+    /// multi-point stroke actually passed through each vertex instead of jumping start-to-end.
+    /// </summary>
+    public List<Point> DragPathPoints { get; } = [];
+
+    /// <summary>
+    /// Gets the number of button-down events seen on the drag panel. A continuous stroke presses once;
+    /// N segment-drags press N times, so this distinguishes the two.
+    /// </summary>
+    public int DragPressCount { get; private set; }
+
+    /// <summary>
     /// Gets the current text in the input text box.
     /// </summary>
     public string InputText => _inputTextBox.Text;
@@ -384,6 +396,8 @@ public sealed class TestHarnessForm : Form
         DragStartPosition = null;
         DragEndPosition = null;
         DragDetected = false;
+        DragPathPoints.Clear();
+        DragPressCount = 0;
         LastKeyPressed = null;
         LastKeyModifiers = Keys.None;
         KeysPressed.Clear();
@@ -668,6 +682,9 @@ public sealed class TestHarnessForm : Form
         _dragButton = e.Button;
         _isDragging = true;
         DragDetected = false;
+        DragPressCount++;
+        DragPathPoints.Clear();
+        DragPathPoints.Add(panelPos);
 
         LogEvent($"Drag panel mouse-down: {e.Button} at ({panelPos.X}, {panelPos.Y})");
     }
@@ -678,6 +695,7 @@ public sealed class TestHarnessForm : Form
         {
             var control = sender as Control;
             var panelPos = control == _dragPanel ? e.Location : _dragPanel.PointToClient(control!.PointToScreen(e.Location));
+            DragPathPoints.Add(panelPos);
 
             var distance = Math.Sqrt(
                 Math.Pow(panelPos.X - _dragStart.X, 2) +

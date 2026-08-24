@@ -21,9 +21,10 @@ public static partial class MouseControlTool
     /// BEFORE USING: Get coordinates from ui_find bounding rects OR screenshot_control(annotate=true). Never guess positions.
     /// USE FOR: drag operations, canvas drawing, custom controls without UIA.
     /// DRAG: Use x,y for START and endX,endY for END position (NOT startX/startY).
-    /// Actions: move, click, double_click, right_click, middle_click, drag, scroll, get_position.
+    /// POLYLINE: Use points='[[x1,y1],[x2,y2],...]' for ONE continuous stroke (no pen lift between vertices).
+    /// Actions: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position.
     /// Keywords: mouse, cursor, click, double click, right click, drag, drop, scroll, move pointer,
-    /// coordinates, pixel, canvas, draw, hover, cursor position.
+    /// coordinates, pixel, canvas, draw, hover, cursor position, polyline, stroke.
     /// </summary>
     /// <remarks>
     /// <para><strong>MONITOR TARGETING:</strong></para>
@@ -36,7 +37,7 @@ public static partial class MouseControlTool
     /// <para><strong>MONITOR CONTEXT:</strong> Successful operations with explicit coordinates return monitor_index, monitor_width, and monitor_height in the response.</para>
     /// <para><strong>QUERY POSITION:</strong> Use action='get_position' to query current cursor position with monitor context.</para>
     /// </remarks>
-    /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, scroll, or get_position.</param>
+    /// <param name="action">The mouse action to perform: move, click, double_click, right_click, middle_click, drag, polyline, scroll, or get_position.</param>
     /// <param name="target">Monitor target: 'primary_screen' (main display with taskbar), 'secondary_screen' (other monitor in 2-monitor setups). For 3+ monitors, use monitorIndex instead.</param>
     /// <param name="x">X-coordinate relative to the monitor's left edge (required for move, optional for clicks).</param>
     /// <param name="y">Y-coordinate relative to the monitor's top edge (required for move, optional for clicks).</param>
@@ -50,6 +51,7 @@ public static partial class MouseControlTool
     /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
     /// <param name="windowHandle">Window handle for window-relative coordinates. When provided, x/y are relative to the window's top-left corner.</param>
+    /// <param name="points">JSON array of [x,y] pairs for action='polyline', e.g. '[[650,430],[750,480],[750,620]]'. At least 2 points. Drawn as ONE continuous stroke.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload including success status, cursor position, monitor context, and 'target_window' for click actions. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "mouse_control", Title = "Mouse Control", Destructive = true, OpenWorld = false)]
@@ -68,6 +70,7 @@ public static partial class MouseControlTool
         [DefaultValue(null)] string? expectedWindowTitle,
         [DefaultValue(null)] string? expectedProcessName,
         [DefaultValue(null)] string? windowHandle,
+        [DefaultValue(null)] string? points,
         CancellationToken cancellationToken)
     {
         try
@@ -87,8 +90,19 @@ public static partial class MouseControlTool
                 }
             }
 
+            // Parse the polyline point list up front so a malformed list fails before anything moves
+            List<Coordinates>? relativePoints = null;
+            if (!string.IsNullOrWhiteSpace(points))
+            {
+                if (!TryParsePoints(points, out relativePoints, out var pointsError))
+                {
+                    return ToCallToolResult(MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates, pointsError));
+                }
+            }
+
             // Check if coordinates are provided
-            var hasCoordinates = (x.HasValue && y.HasValue) || (endX.HasValue && endY.HasValue);
+            var hasCoordinates = (x.HasValue && y.HasValue) || (endX.HasValue && endY.HasValue) || relativePoints is { Count: > 0 };
 
             // Window-relative coordinate mode: if windowHandle is provided, coordinates are relative to window
             bool isWindowRelativeMode = !string.IsNullOrEmpty(windowHandle) && hasCoordinates;
@@ -216,6 +230,7 @@ public static partial class MouseControlTool
 
             // Translate coordinates to absolute screen coordinates
             int? absoluteX = x, absoluteY = y, absoluteEndX = endX, absoluteEndY = endY;
+            List<Coordinates>? absolutePoints = null;
             var monitor = WindowsToolsBase.MonitorService.GetMonitor(targetMonitorIndex);
             if (monitor == null)
             {
@@ -272,9 +287,39 @@ public static partial class MouseControlTool
                 }
             }
 
+            // Polyline points ride the same origin as x/y above
+            if (relativePoints is not null)
+            {
+                var originX = isWindowRelativeMode ? windowLeft : monitor.X;
+                var originY = isWindowRelativeMode ? windowTop : monitor.Y;
+                absolutePoints = relativePoints
+                    .Select(p => new Coordinates(originX + p.X, originY + p.Y))
+                    .ToList();
+            }
+
             // Validate coordinates are within monitor bounds
             if (hasCoordinates && resolvedMonitorIndex.HasValue)
             {
+                if (relativePoints is not null)
+                {
+                    for (var i = 0; i < relativePoints.Count; i++)
+                    {
+                        var point = relativePoints[i];
+                        if (point.X < 0 || point.X >= monitor.Width || point.Y < 0 || point.Y >= monitor.Height)
+                        {
+                            var result = MouseControlResult.CreateFailure(
+                                MouseControlErrorCode.CoordinatesOutOfBounds,
+                                $"Point {i} ({point.X}, {point.Y}) out of bounds for monitor {targetMonitorIndex}",
+                                errorDetails: new Dictionary<string, object>
+                                {
+                                    { "valid_bounds", new { left = 0, top = 0, right = monitor.Width, bottom = monitor.Height } },
+                                    { "provided_coordinates", new { x = point.X, y = point.Y } }
+                                });
+                            return ToCallToolResult(result);
+                        }
+                    }
+                }
+
                 if (x.HasValue && y.HasValue)
                 {
                     if (x.Value < 0 || x.Value >= monitor.Width || y.Value < 0 || y.Value >= monitor.Height)
@@ -284,7 +329,7 @@ public static partial class MouseControlTool
                             $"Coordinates ({x.Value}, {y.Value}) out of bounds for monitor {targetMonitorIndex}",
                             errorDetails: new Dictionary<string, object>
                             {
-                                { "valid_bounds", new { left = monitor.X, top = monitor.Y, right = monitor.X + monitor.Width, bottom = monitor.Y + monitor.Height } },
+                                { "valid_bounds", new { left = 0, top = 0, right = monitor.Width, bottom = monitor.Height } },
                                 { "provided_coordinates", new { x = x.Value, y = y.Value } }
                             });
                         return ToCallToolResult(result);
@@ -300,7 +345,7 @@ public static partial class MouseControlTool
                             $"End coordinates ({endX.Value}, {endY.Value}) out of bounds for monitor {targetMonitorIndex}",
                             errorDetails: new Dictionary<string, object>
                             {
-                                { "valid_bounds", new { left = monitor.X, top = monitor.Y, right = monitor.X + monitor.Width, bottom = monitor.Y + monitor.Height } },
+                                { "valid_bounds", new { left = 0, top = 0, right = monitor.Width, bottom = monitor.Height } },
                                 { "provided_coordinates", new { x = endX.Value, y = endY.Value } }
                             });
                         return ToCallToolResult(result);
@@ -334,6 +379,10 @@ public static partial class MouseControlTool
 
                 case MouseAction.Drag:
                     operationResult = await HandleDragAsync(absoluteX, absoluteY, absoluteEndX, absoluteEndY, button, linkedToken);
+                    break;
+
+                case MouseAction.Polyline:
+                    operationResult = await HandlePolylineAsync(absolutePoints, button, modifiers, linkedToken);
                     break;
 
                 case MouseAction.Scroll:
@@ -382,8 +431,10 @@ public static partial class MouseControlTool
 
             return ToCallToolResult(operationResult);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
+            // Only the internal timeout is reported as a result; caller cancellation propagates so callers
+            // (including ui_batch) see a cancelled request rather than a fabricated timeout.
             var errorResult = MouseControlResult.CreateFailure(
                 MouseControlErrorCode.OperationTimeout,
                 $"Operation timed out after {WindowsToolsBase.TimeoutMs}ms");
@@ -591,6 +642,76 @@ public static partial class MouseControlTool
 
         var mouseButton = ParseMouseButton(buttonString);
         return await WindowsToolsBase.MouseInputService.DragAsync(startX.Value, startY.Value, endX.Value, endY.Value, mouseButton, cancellationToken);
+    }
+
+    private static async Task<MouseControlResult> HandlePolylineAsync(List<Coordinates>? points, string? buttonString, string? modifiersString, CancellationToken cancellationToken)
+    {
+        if (points is null || points.Count < 2)
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.MissingRequiredParameter,
+                $"Polyline requires 'points' with at least 2 [x,y] pairs, e.g. points='[[650,430],[750,480],[750,620]]'. Got {points?.Count ?? 0}.");
+        }
+
+        if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.SecureDesktopActive,
+                "Cannot perform polyline operation: secure desktop (UAC, lock screen) is active");
+        }
+
+        if (WindowsToolsBase.ElevationDetector.IsTargetAtHigherIntegrity(points[0].X, points[0].Y))
+        {
+            return MouseControlResult.CreateFailure(
+                MouseControlErrorCode.ElevatedProcessTarget,
+                "Cannot draw into elevated (administrator) window. The target window requires elevated privileges that this tool does not have.");
+        }
+
+        var mouseButton = ParseMouseButton(buttonString);
+        var modifierKeys = ParseModifiers(modifiersString);
+        return await WindowsToolsBase.MouseInputService.StrokeAsync(points, mouseButton, modifierKeys, cancellationToken);
+    }
+
+    /// <summary>
+    /// Parses a JSON array of [x,y] pairs into coordinates. Returns false with a caller-ready message on any
+    /// malformed input so a bad point list never reaches SendInput.
+    /// </summary>
+    private static bool TryParsePoints(string? json, out List<Coordinates>? points, out string error)
+    {
+        points = null;
+        error = "";
+
+        int[][]? pairs;
+        try
+        {
+            pairs = JsonSerializer.Deserialize<int[][]>(json!);
+        }
+        catch (JsonException ex)
+        {
+            error = $"points is not valid JSON: {ex.Message}. Expected an array of [x,y] pairs, e.g. '[[650,430],[750,480]]'.";
+            return false;
+        }
+
+        if (pairs is null || pairs.Length == 0)
+        {
+            error = "points must be a non-empty JSON array of [x,y] pairs, e.g. '[[650,430],[750,480]]'.";
+            return false;
+        }
+
+        var parsed = new List<Coordinates>(pairs.Length);
+        for (var i = 0; i < pairs.Length; i++)
+        {
+            if (pairs[i] is not { Length: 2 })
+            {
+                error = $"points[{i}] must be exactly two numbers [x,y]; got {pairs[i]?.Length ?? 0} value(s).";
+                return false;
+            }
+
+            parsed.Add(new Coordinates(pairs[i][0], pairs[i][1]));
+        }
+
+        points = parsed;
+        return true;
     }
 
     private static async Task<MouseControlResult> HandleScrollAsync(int? x, int? y, string? directionString, int amount, CancellationToken cancellationToken)

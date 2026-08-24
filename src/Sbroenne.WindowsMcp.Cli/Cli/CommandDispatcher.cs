@@ -149,6 +149,7 @@ internal static class CommandDispatcher
             a.GetString("expected-window-title", "expected-title"),
             a.GetString("expected-process-name", "expected-process"),
             Window(a),
+            a.GetString("points"),
             ct);
         return Emit.Result(result);
     }
@@ -331,6 +332,7 @@ internal static class CommandDispatcher
                         a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("with-snapshot", "snapshot"),
                         diag,
+                        a.GetFlag("double-click", "dblclick"),
                         ct);
                     return Emit.Result(result);
                 }

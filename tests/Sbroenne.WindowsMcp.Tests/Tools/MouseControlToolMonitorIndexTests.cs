@@ -50,6 +50,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -84,6 +85,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -119,6 +121,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -153,6 +156,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -186,6 +190,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -220,6 +225,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -253,6 +259,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -292,6 +299,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -328,6 +336,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -364,6 +373,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);
@@ -398,6 +408,7 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
             expectedWindowTitle: null,
             expectedProcessName: null,
             windowHandle: null,
+            points: null,
             cancellationToken: CancellationToken.None);
 
         var result = DeserializeResult(resultJson);

@@ -23,26 +23,33 @@ public static partial class UIBatchTool
 
     /// <summary>
     /// Execute several UI automation steps in order against a window in ONE call (find, click, type,
-    /// select, wait, read, snapshot, key). Use this for multi-field workflows - e.g. fill a login form
-    /// and submit - instead of many separate ui_type/ui_click calls. Fewer round-trips = faster and
-    /// cheaper for agents.
+    /// select, wait, read, snapshot, key, mouse, polyline). Use this for multi-field workflows - e.g. fill a
+    /// login form and submit - instead of many separate ui_type/ui_click calls, and for canvas/drawing work
+    /// instead of many separate mouse_control calls. Fewer round-trips = faster and cheaper for agents.
     /// Keywords: batch, multiple steps, sequence, workflow, fill form, multi-step, combine actions,
-    /// chain, login form, automate several, one call, bulk UI actions.
+    /// chain, login form, automate several, one call, bulk UI actions, canvas, drawing, mouse, polyline.
     /// </summary>
     /// <remarks>
     /// Steps run top to bottom. By default the batch stops at the first failing step (stopOnError=true).
     /// Each step is a JSON object with an "action" plus the fields that action needs:
     /// - find:     selectors (name/controlType/automationId/...). Resolves an element; its id is exposed to the next step as "$prev".
-    /// - click:    selectors OR elementId.
+    /// - click:    selectors OR elementId, optional doubleClick.
     /// - type:     selectors OR elementId, plus text (and optional clearFirst).
     /// - select:   selectors, plus value (visible option text).
     /// - wait:     mode (appear/disappear/state), selectors or elementId+desiredState, optional timeoutMs.
     /// - read:     selectors or elementId (or neither, to read the whole window), optional includeChildren.
     /// - snapshot: capture the window element tree (optional maxDepth).
     /// - key:      key (e.g. enter, tab, f5) with optional modifiers (ctrl,shift,alt,win) and repeat.
+    /// - mouse:    mouseAction (move/click/double_click/right_click/middle_click/drag/polyline/scroll) plus x,y
+    ///             (and endX,endY for drag), optional button, modifiers, direction, amount.
+    /// - polyline: points [[x1,y1],[x2,y2],...] drawn as ONE continuous stroke, optional button.
     /// Reference the previous step's resolved element by setting a step's elementId to "$prev".
+    /// Mouse coordinates are window-relative by default; set target ('primary_screen'/'secondary_screen') or
+    /// monitorIndex on a step for screen-relative coordinates. The target window is activated before each mouse
+    /// step unless expectedProcessName/expectedWindowTitle is set (those verify the foreground window instead).
     /// Example steps: [{"action":"type","automationId":"UsernameInput","text":"admin"},
     /// {"action":"type","automationId":"PasswordInput","text":"secret"},{"action":"click","name":"Submit"}]
+    /// Drawing example: [{"action":"polyline","points":[[100,100],[300,100],[300,250],[100,100]]}]
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). Used for every step unless a step overrides it. REQUIRED.</param>
     /// <param name="steps">JSON array of step objects (see remarks). REQUIRED.</param>
@@ -194,10 +201,22 @@ public static partial class UIBatchTool
 
             case "click":
                 {
-                    var result = !string.IsNullOrWhiteSpace(elementId)
-                        ? await service.ClickElementAsync(elementId, windowHandle, cancellationToken)
-                        : await service.FindAndClickAsync(BuildQuery(step, windowHandle), cancellationToken);
-                    return Step(index, action, result.Success, result.Success ? "clicked" : null,
+                    UIAutomationResult result;
+                    if (!string.IsNullOrWhiteSpace(elementId))
+                    {
+                        result = step.DoubleClick
+                            ? await service.DoubleClickElementAsync(elementId, windowHandle, cancellationToken)
+                            : await service.ClickElementAsync(elementId, windowHandle, cancellationToken);
+                    }
+                    else
+                    {
+                        var query = BuildQuery(step, windowHandle);
+                        result = step.DoubleClick
+                            ? await service.FindAndDoubleClickAsync(query, cancellationToken)
+                            : await service.FindAndClickAsync(query, cancellationToken);
+                    }
+
+                    return Step(index, action, result.Success, result.Success ? (step.DoubleClick ? "double-clicked" : "clicked") : null,
                         result.ErrorMessage, elementId ?? FirstElementId(result));
                 }
 
@@ -313,10 +332,144 @@ public static partial class UIBatchTool
                         keyResult.Success ? $"pressed {step.Key}" : null, keyResult.Error);
                 }
 
+            case "mouse":
+            case "polyline":
+                return await ExecuteMouseStepAsync(index, action, step, windowHandle, cancellationToken);
+
             default:
                 return Step(index, action, false, null,
-                    $"unknown action '{step.Action}'. Valid: find, click, type, select, wait, read, snapshot, key.");
+                    $"unknown action '{step.Action}'. Valid: find, click, type, select, wait, read, snapshot, key, mouse, polyline.");
         }
+    }
+
+    /// <summary>
+    /// Runs a coordinate-addressed mouse step by delegating to <see cref="MouseControlTool"/>, so monitor
+    /// resolution, foreground guards, secure-desktop and elevation checks stay byte-identical to the
+    /// standalone <c>mouse_control</c> tool rather than being reimplemented here.
+    /// </summary>
+    private static async Task<BatchStepResult> ExecuteMouseStepAsync(
+        int index,
+        string action,
+        BatchStep step,
+        string windowHandle,
+        CancellationToken cancellationToken)
+    {
+        // "polyline" is a top-level shorthand for {"action":"mouse","mouseAction":"polyline"}
+        var requested = action == "polyline" ? "polyline" : step.MouseAction;
+        if (string.IsNullOrWhiteSpace(requested))
+        {
+            return Step(index, action, false, null,
+                "mouse step requires 'mouseAction'. Valid: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position.");
+        }
+
+        if (!TryParseMouseAction(requested, out var mouseAction))
+        {
+            return Step(index, action, false, null,
+                $"invalid mouseAction '{requested}'. Valid: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position.");
+        }
+
+        // A foreground guard means "verify, don't force" - activating first would make the guard unfalsifiable.
+        var hasGuard = !string.IsNullOrWhiteSpace(step.ExpectedProcessName) || !string.IsNullOrWhiteSpace(step.ExpectedWindowTitle);
+        if (step.Activate ?? !hasGuard)
+        {
+            if (!long.TryParse(windowHandle, out var handleValue) || handleValue == 0)
+            {
+                return Step(index, action, false, null, $"invalid windowHandle '{windowHandle}' for mouse step.");
+            }
+
+            var activation = await WindowsToolsBase.WindowService.ActivateWindowAsync(new IntPtr(handleValue), cancellationToken);
+            if (!activation.Success)
+            {
+                return Step(index, action, false, null, $"failed to activate window: {activation.Error}");
+            }
+        }
+
+        // mouse_control gives windowHandle precedence over target/monitorIndex, so a step asking for
+        // screen-relative coordinates must drop the inherited handle for the override to take effect.
+        var wantsScreenRelative = !string.IsNullOrWhiteSpace(step.Target) || step.MonitorIndex.HasValue;
+        var effectiveHandle = wantsScreenRelative ? null : windowHandle;
+
+        var pointsJson = step.Points is { Length: > 0 }
+            ? JsonSerializer.Serialize(step.Points)
+            : null;
+
+        var callResult = await MouseControlTool.ExecuteAsync(
+            mouseAction,
+            step.Target,
+            step.X,
+            step.Y,
+            step.EndX,
+            step.EndY,
+            step.Direction,
+            step.Amount,
+            step.Modifiers,
+            step.Button,
+            step.MonitorIndex,
+            step.ExpectedWindowTitle,
+            step.ExpectedProcessName,
+            effectiveHandle,
+            pointsJson,
+            cancellationToken);
+
+        // mouse_control reports its own timeout as a result; make sure a cancelled caller never reads as one.
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var payload = callResult.Content.OfType<TextContentBlock>().FirstOrDefault()?.Text;
+        var succeeded = callResult.IsError != true;
+
+        string? error = null;
+        string? summary = null;
+        if (payload is not null)
+        {
+            try
+            {
+                // Read the raw JSON rather than deserializing MouseControlResult: its Position is a computed
+                // property over a [JsonIgnore] field, so a round-trip would always report (0, 0).
+                using var document = JsonDocument.Parse(payload);
+                var root = document.RootElement;
+
+                if (succeeded)
+                {
+                    summary = root.TryGetProperty("position", out var position) && position.GetArrayLength() >= 2
+                        ? $"{requested} → ({position[0].GetInt32()}, {position[1].GetInt32()})"
+                        : requested;
+                }
+                else if (root.TryGetProperty("error", out var message))
+                {
+                    error = root.TryGetProperty("recoverySuggestion", out var hint)
+                        ? $"{message.GetString()} {hint.GetString()}"
+                        : message.GetString();
+                }
+            }
+            catch (JsonException)
+            {
+                // Fall through to the raw payload below rather than masking the real failure.
+            }
+        }
+
+        return Step(index, action, succeeded, summary ?? (succeeded ? requested : null), error ?? (succeeded ? null : payload));
+    }
+
+    private static bool TryParseMouseAction(string value, out MouseAction action)
+    {
+        var normalized = value.Trim().ToLowerInvariant().Replace("_", "", StringComparison.Ordinal);
+
+        MouseAction? parsed = normalized switch
+        {
+            "move" => Models.MouseAction.Move,
+            "click" => Models.MouseAction.Click,
+            "doubleclick" => Models.MouseAction.DoubleClick,
+            "rightclick" => Models.MouseAction.RightClick,
+            "middleclick" => Models.MouseAction.MiddleClick,
+            "drag" => Models.MouseAction.Drag,
+            "polyline" => Models.MouseAction.Polyline,
+            "scroll" => Models.MouseAction.Scroll,
+            "getposition" => Models.MouseAction.GetPosition,
+            _ => null
+        };
+
+        action = parsed ?? default;
+        return parsed.HasValue;
     }
 
     private static ElementQuery BuildQuery(BatchStep step, string windowHandle) => new()

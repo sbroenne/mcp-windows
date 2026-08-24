@@ -363,6 +363,16 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     public Point? GetDragEndPosition() => GetValue(f => f.DragEndPosition);
 
     /// <summary>
+    /// Gets every drag-panel position observed while a button was held, in order.
+    /// </summary>
+    public IReadOnlyList<Point> GetDragPathPoints() => GetValue(f => f.DragPathPoints.ToArray());
+
+    /// <summary>
+    /// Gets the number of button-down events seen on the drag panel.
+    /// </summary>
+    public int GetDragPressCount() => GetValue(f => f.DragPressCount);
+
+    /// <summary>
     /// Gets the current text in the input text box.
     /// </summary>
     public string GetInputText() => GetValue(f => f.InputText);
