@@ -33,6 +33,9 @@ public sealed class UIBatchAndFusionIntegrationTests
     private static BatchResult ParseBatch(CallToolResult result) =>
         JsonSerializer.Deserialize<BatchResult>(ExtractText(result), ParseOptions)!;
 
+    private static void RequireDesktopInput() =>
+        DesktopInputTests.SkipUnlessEnabled();
+
     [Fact]
     public async Task Batch_FillFormAndSubmit_AllStepsSucceed()
     {
@@ -137,10 +140,11 @@ public sealed class UIBatchAndFusionIntegrationTests
         return (point.X, point.Y);
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task Batch_MouseClickStep_ClicksAtWindowRelativeCoordinates()
     {
+        RequireDesktopInput();
         var (x, y) = SubmitCenter();
         var before = _fixture.Form!.SubmitMouseInputCount;
 
@@ -159,10 +163,11 @@ public sealed class UIBatchAndFusionIntegrationTests
         Assert.True(_fixture.Form!.SubmitMouseInputCount > before, "Submit button received no physical mouse input from the batch mouse step.");
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task Batch_PolylineStep_RunsAsSingleStep()
     {
+        RequireDesktopInput();
         var (x, y) = SubmitCenter();
 
         var steps = JsonSerializer.Serialize(new object[]
@@ -179,10 +184,11 @@ public sealed class UIBatchAndFusionIntegrationTests
         Assert.Equal("polyline", batch.Steps[0].Action);
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task Batch_MouseStepWithWrongProcessGuard_FailsAndHaltsBatch()
     {
+        RequireDesktopInput();
         var (x, y) = SubmitCenter();
 
         var steps = JsonSerializer.Serialize(new object[]
@@ -203,10 +209,11 @@ public sealed class UIBatchAndFusionIntegrationTests
         Assert.Contains("does not match expected process", batch.Steps[0].Error, StringComparison.Ordinal);
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task Batch_ClickStepWithDoubleClick_DeliversTwoMouseUps()
     {
+        RequireDesktopInput();
         var before = _fixture.Form!.SubmitMouseInputCount;
 
         var steps = JsonSerializer.Serialize(new object[]
@@ -228,10 +235,11 @@ public sealed class UIBatchAndFusionIntegrationTests
             $"Expected at least 2 physical mouse-ups, saw {_fixture.Form!.SubmitMouseInputCount - before}.");
     }
 
-    [Fact]
+    [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
     public async Task UiClick_DoubleClick_DeliversTwoMouseUps()
     {
+        RequireDesktopInput();
         var before = _fixture.Form!.SubmitMouseInputCount;
 
         var result = await UIClickTool.ExecuteAsync(

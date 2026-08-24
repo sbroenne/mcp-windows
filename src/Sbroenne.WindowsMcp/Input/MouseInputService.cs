@@ -289,7 +289,7 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = MoveAsync(x.Value, y.Value, cancellationToken).GetAwaiter().GetResult();
+            var moveResult = await MoveAsync(x.Value, y.Value, cancellationToken).ConfigureAwait(false);
             if (!moveResult.Success)
             {
                 return moveResult;
@@ -683,6 +683,7 @@ public sealed class MouseInputService
             MouseControlErrorCode.UnexpectedError,
             "Stroke could not complete.",
             screenBounds);
+        var buttonDownSucceeded = false;
 
         try
         {
@@ -719,6 +720,8 @@ public sealed class MouseInputService
                 goto Finish;
             }
 
+            buttonDownSucceeded = true;
+
             // Step 3: Trace through the remaining points with the button held
             for (var i = 1; i < points.Count; i++)
             {
@@ -741,37 +744,40 @@ public sealed class MouseInputService
         }
         finally
         {
-            // Step 4: Always release the mouse button, even on failure. If the release fails, report it rather
-            // than silently dropping the event and leaving the UI in a stuck pressed state.
-            var buttonUpInput = new INPUT[]
+            // Step 4: Release only after a successful press. If it fails, report the error rather than
+            // silently dropping the event and leaving the UI in a stuck pressed state.
+            if (buttonDownSucceeded)
             {
-                new INPUT
+                var buttonUpInput = new INPUT[]
                 {
-                    Type = NativeConstants.INPUT_MOUSE,
-                    Data = new INPUTUNION
+                    new INPUT
                     {
-                        Mouse = new MOUSEINPUT
+                        Type = NativeConstants.INPUT_MOUSE,
+                        Data = new INPUTUNION
                         {
-                            Dx = 0,
-                            Dy = 0,
-                            MouseData = 0,
-                            DwFlags = buttonUpFlag,
-                            Time = 0,
-                            DwExtraInfo = 0,
+                            Mouse = new MOUSEINPUT
+                            {
+                                Dx = 0,
+                                Dy = 0,
+                                MouseData = 0,
+                                DwFlags = buttonUpFlag,
+                                Time = 0,
+                                DwExtraInfo = 0,
+                            },
                         },
                     },
-                },
-            };
+                };
 
-            var buttonUpResult = NativeMethods.SendInput(1, buttonUpInput, INPUT.Size);
-            if (buttonUpResult != 1)
-            {
-                var error = Marshal.GetLastWin32Error();
-                var (errorCode, errorMessage) = MapSendInputError(error);
-                result = MouseControlResult.CreateFailure(
-                    errorCode,
-                    $"SendInput failed for button up: {errorMessage}",
-                    screenBounds);
+                var buttonUpResult = NativeMethods.SendInput(1, buttonUpInput, INPUT.Size);
+                if (buttonUpResult != 1)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    var (errorCode, errorMessage) = MapSendInputError(error);
+                    result = MouseControlResult.CreateFailure(
+                        errorCode,
+                        $"SendInput failed for button up: {errorMessage}",
+                        screenBounds);
+                }
             }
 
             _modifierKeyManager.ReleaseModifiers(pressedModifiers);
