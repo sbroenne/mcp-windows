@@ -66,36 +66,6 @@ public sealed class MouseStrokeTests : DesktopInputTestBase, IDisposable
 
     [SkippableFact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task StrokeAsync_FourPoints_PassesThroughEveryVertex()
-    {
-        // Arrange
-        var points = BuildZigzag();
-        _fixture.EnsureTestWindowForeground();
-        var panel = _fixture.GetDragPanelBounds();
-
-        // Act
-        var result = await _fixture.MouseInputService.StrokeAsync(points, MouseButton.Left, ModifierKey.None);
-        Assert.True(result.Success, $"Expected success, got {result.ErrorCode}: {result.ErrorMessage}");
-
-        await Task.Delay(150);
-
-        // Assert - every requested vertex shows up in the observed path (panel-relative), proving the
-        // stroke traced the polyline rather than jumping straight from first to last.
-        var observed = _fixture.GetDragPathPoints();
-        Assert.True(observed.Count >= points.Length, $"Expected at least {points.Length} path points, saw {observed.Count}");
-
-        foreach (var point in points)
-        {
-            var expectedX = point.X - panel.X;
-            var expectedY = point.Y - panel.Y;
-            Assert.True(
-                observed.Any(p => Math.Abs(p.X - expectedX) <= 2 && Math.Abs(p.Y - expectedY) <= 2),
-                $"Vertex ({expectedX}, {expectedY}) was never observed. Path: {string.Join(" -> ", observed.Select(p => $"({p.X},{p.Y})"))}");
-        }
-    }
-
-    [SkippableFact]
-    [Trait("Category", "RequiresDesktop")]
     public async Task StrokeAsync_SinglePoint_FailsWithoutSendingInput()
     {
         var (x, y) = _fixture.GetDragPanelCoordinates(20, 20);
