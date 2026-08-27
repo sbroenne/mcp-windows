@@ -37,6 +37,8 @@ internal sealed record SnapshotBenchmarkRun(
     double SnapshotMs,
     int Bytes,
     int Tokens,
+    int ComparableFullBytes,
+    int ComparableFullTokens,
     int FullResponses,
     int DiffResponses);
 
@@ -105,6 +107,8 @@ internal static class SnapshotBenchmarkRunner
                 var snapshotMs = 0.0;
                 var bytes = 0;
                 var tokens = 0;
+                var comparableFullBytes = 0;
+                var comparableFullTokens = 0;
                 var fullResponses = 0;
                 var diffResponses = 0;
 
@@ -128,11 +132,20 @@ internal static class SnapshotBenchmarkRunner
                         scenario.MaxDepth,
                         scenario.ControlTypeFilter);
                     var snapshotClock = Stopwatch.StartNew();
+                    UIAutomationResult? capturedFull = null;
                     var snapshot = await state.CaptureAsync(
                         key,
                         arm == SnapshotBenchmarkArm.Full ? SnapshotMode.Full : SnapshotMode.Auto,
-                        token => scenario.AutomationService.GetTreeAsync(
-                            currentHandle, null, scenario.MaxDepth, scenario.ControlTypeFilter, token),
+                        async token =>
+                        {
+                            capturedFull = await scenario.AutomationService.GetTreeAsync(
+                                currentHandle,
+                                null,
+                                scenario.MaxDepth,
+                                scenario.ControlTypeFilter,
+                                token).ConfigureAwait(false);
+                            return capturedFull;
+                        },
                         cancellationToken).ConfigureAwait(false);
                     snapshotClock.Stop();
 
@@ -148,6 +161,9 @@ internal static class SnapshotBenchmarkRunner
                     var json = JsonSerializer.Serialize(snapshot, WindowsToolsBase.JsonOptions);
                     bytes += System.Text.Encoding.UTF8.GetByteCount(json);
                     tokens += TokenEncoding.Encode(json).Count;
+                    var comparableJson = JsonSerializer.Serialize(capturedFull, WindowsToolsBase.JsonOptions);
+                    comparableFullBytes += System.Text.Encoding.UTF8.GetByteCount(comparableJson);
+                    comparableFullTokens += TokenEncoding.Encode(comparableJson).Count;
                     fullResponses += string.Equals(snapshot.Kind, "full", StringComparison.Ordinal) ? 1 : 0;
                     diffResponses += string.Equals(snapshot.Kind, "diff", StringComparison.Ordinal) ? 1 : 0;
                 }
@@ -159,6 +175,8 @@ internal static class SnapshotBenchmarkRunner
                     snapshotMs,
                     bytes,
                     tokens,
+                    comparableFullBytes,
+                    comparableFullTokens,
                     fullResponses,
                     diffResponses));
             }
@@ -197,27 +215,29 @@ internal static class SnapshotBenchmarkRunner
                 $"{runs.Sum(run => run.FullResponses)}/{runs.Sum(run => run.DiffResponses)} |");
         }
 
-        var fullBytes = Median(result.For(SnapshotBenchmarkArm.Full).Select(run => (double)run.Bytes));
-        var autoBytes = Median(result.For(SnapshotBenchmarkArm.Auto).Select(run => (double)run.Bytes));
-        var fullTokens = Median(result.For(SnapshotBenchmarkArm.Full).Select(run => (double)run.Tokens));
-        var autoTokens = Median(result.For(SnapshotBenchmarkArm.Auto).Select(run => (double)run.Tokens));
+        var autoRuns = result.For(SnapshotBenchmarkArm.Auto);
+        var byteSavings = Median(autoRuns.Select(run =>
+            Reduction(run.ComparableFullBytes, run.Bytes)));
+        var tokenSavings = Median(autoRuns.Select(run =>
+            Reduction(run.ComparableFullTokens, run.Tokens)));
 
         _ = builder.AppendLine();
         _ = builder.AppendLine(
             CultureInfo.InvariantCulture,
-            $"**Median auto savings versus repeated full snapshots:** {Reduction(fullBytes, autoBytes):F1}% bytes, " +
-            $"{Reduction(fullTokens, autoTokens):F1}% tokens.");
+            $"**Median paired auto savings versus the same captures returned in full:** " +
+            $"{byteSavings:F1}% bytes, {tokenSavings:F1}% tokens.");
         _ = builder.AppendLine();
         _ = builder.AppendLine("## Raw samples");
         _ = builder.AppendLine();
-        _ = builder.AppendLine("| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full | Diff |");
-        _ = builder.AppendLine("|---:|---|---:|---:|---:|---:|---:|---:|");
+        _ = builder.AppendLine("| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full | Diff |");
+        _ = builder.AppendLine("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var run in result.Runs)
         {
             _ = builder.AppendLine(
                 CultureInfo.InvariantCulture,
                 $"| {run.Sample} | {ArmName(run.Arm)} | {run.ActionMs:F1} | {run.SnapshotMs:F1} | " +
-                $"{run.Bytes} | {run.Tokens} | {run.FullResponses} | {run.DiffResponses} |");
+                $"{run.Bytes} | {run.Tokens} | {run.ComparableFullBytes} | {run.ComparableFullTokens} | " +
+                $"{run.FullResponses} | {run.DiffResponses} |");
         }
 
         return builder.ToString();
@@ -237,17 +257,23 @@ internal static class SnapshotBenchmarkRunner
             Assert.Equal(0, run.Bytes);
             Assert.Equal(0, run.Tokens);
             Assert.Equal(0, run.SnapshotMs);
+            Assert.Equal(0, run.ComparableFullBytes);
+            Assert.Equal(0, run.ComparableFullTokens);
         });
         Assert.All(full, run =>
         {
             Assert.True(run.Bytes > 0);
             Assert.True(run.Tokens > 0);
+            Assert.True(run.ComparableFullBytes >= run.Bytes);
+            Assert.True(run.ComparableFullTokens >= run.Tokens);
             Assert.True(run.FullResponses > 0);
         });
         Assert.All(auto, run =>
         {
             Assert.True(run.Bytes > 0);
             Assert.True(run.Tokens > 0);
+            Assert.True(run.ComparableFullBytes >= run.Bytes);
+            Assert.True(run.ComparableFullTokens >= run.Tokens);
             Assert.True(run.FullResponses + run.DiffResponses > 0);
         });
     }

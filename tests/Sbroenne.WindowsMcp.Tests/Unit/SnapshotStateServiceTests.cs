@@ -43,11 +43,65 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
+    public async Task Auto_FirstCaptureReturnsCompleteSemanticTree()
+    {
+        using var service = new SnapshotStateService();
+        var layout = TypedNode(
+            "layout",
+            null,
+            "Pane",
+            runtimeId: 2,
+            semanticLayoutOnly: true,
+            children: [TypedNode("save", "Save", "Button", runtimeId: 3)]);
+        var snapshot = Result(TypedNode(
+            "root",
+            "Changing title",
+            "Window",
+            runtimeId: 1,
+            children: [layout]));
+
+        var result = await service.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), CancellationToken.None);
+
+        Assert.Equal("full", result.Kind);
+        var root = Assert.Single(result.Tree!);
+        Assert.Equal("Changing title", root.Name);
+        Assert.Equal("Save", Assert.Single(root.Children!).Name);
+        Assert.Equal(2, result.ElementCount);
+        Assert.Contains("Simplified tree", result.UsageHint, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FullCaptureKeepsCompleteLayoutTree()
+    {
+        using var service = new SnapshotStateService();
+        var layout = TypedNode(
+            "layout",
+            null,
+            "Pane",
+            runtimeId: 2,
+            semanticLayoutOnly: true,
+            children: [TypedNode("save", "Save", "Button", runtimeId: 3)]);
+        var snapshot = Result(TypedNode(
+            "root",
+            "Window title",
+            "Window",
+            runtimeId: 1,
+            children: [layout]));
+
+        var result = await service.CaptureAsync(
+            Key, SnapshotMode.Full, _ => Task.FromResult(snapshot), CancellationToken.None);
+
+        Assert.Equal("Window title", Assert.Single(result.Tree!).Name);
+        Assert.Equal(layout.Id, Assert.Single(result.Tree![0].Children!).Id);
+    }
+
+    [Fact]
     public async Task Auto_ReturnsFullWhenDiffIsNotAtLeastTwentyPercentSmaller()
     {
         var service = new SnapshotStateService();
-        var before = Result(Node("1", "Window"));
-        var after = Result(Node("9", new string('x', 4000)));
+        var before = Result(Node("1", "Window", children: [Node("2", "Before")]));
+        var after = Result(Node("9", "Window", children: [Node("8", new string('x', 4000))]));
 
         _ = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
         var result = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
@@ -81,6 +135,7 @@ public sealed class SnapshotStateServiceTests
 
             Assert.Equal("diff", result.Kind);
             Assert.Empty(result.Changes!);
+            Assert.Equal(21, result.ElementCount);
             Assert.Equal(
                 "window:1|runtime:2|path:cached",
                 ElementIdGenerator.ResolveFullId(beforeId));
@@ -92,7 +147,7 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
-    public async Task Auto_ReturnsFullWhenRootSemanticIdentityChanges()
+    public async Task Auto_WindowTitleChangeDoesNotReplaceTheSemanticRoot()
     {
         var service = new SnapshotStateService();
         var before = LargeResult("Window");
@@ -101,9 +156,9 @@ public sealed class SnapshotStateServiceTests
         _ = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
         var result = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
 
-        Assert.Equal("full", result.Kind);
-        Assert.NotNull(result.Tree);
-        Assert.Null(result.Changes);
+        Assert.Equal("diff", result.Kind);
+        Assert.Empty(result.Changes!);
+        Assert.Null(result.Tree);
     }
 
     [Fact]
@@ -339,7 +394,21 @@ public sealed class SnapshotStateServiceTests
     {
         var service = new SnapshotStateService();
         var unidentifiedKey = Key with { ProcessStartTimeUtcTicks = 0 };
-        var snapshot = LargeResult("Window");
+        var snapshot = Result(TypedNode(
+            "root",
+            "Window",
+            "Window",
+            runtimeId: 1,
+            children:
+            [
+                TypedNode(
+                    "layout",
+                    null,
+                    "Pane",
+                    runtimeId: 2,
+                    children: [TypedNode("save", "Save", "Button", runtimeId: 3)],
+                    semanticLayoutOnly: true)
+            ]));
 
         var first = await service.CaptureAsync(
             unidentifiedKey, SnapshotMode.Auto, _ => Task.FromResult(snapshot), CancellationToken.None);
@@ -348,6 +417,7 @@ public sealed class SnapshotStateServiceTests
 
         Assert.Equal("full", first.Kind);
         Assert.Equal("full", second.Kind);
+        Assert.Equal("Save", Assert.Single(Assert.Single(first.Tree!).Children!).Name);
         Assert.Equal(0, service.Count);
     }
 
@@ -366,6 +436,58 @@ public sealed class SnapshotStateServiceTests
         Assert.Equal("full", afterRestart.Kind);
         Assert.NotNull(afterRestart.Tree);
         Assert.Null(afterRestart.Changes);
+    }
+
+    [Fact]
+    public async Task Auto_LayoutWrapperReplacement_ReturnsSemanticDiffAndPreservesActionIds()
+    {
+        ElementIdGenerator.Clear();
+        try
+        {
+            using var service = new SnapshotStateService();
+            var previousButtons = Enumerable.Range(1, 20)
+                .Select(index => TypedNode(
+                    $"before-{index}",
+                    $"Action {index}",
+                    "Button",
+                    runtimeId: index))
+                .ToArray();
+            var currentButtons = Enumerable.Range(1, 20)
+                .Select(index => TypedNode(
+                    $"after-{index}",
+                    $"Action {index}",
+                    "Button",
+                    runtimeId: index + 100))
+                .ToArray();
+            var previousActionId = previousButtons[0].Id;
+            var before = Result(TypedNode(
+                "before-root",
+                "Window",
+                "Window",
+                runtimeId: 1000,
+                children: [TypedNode("old-layout", null, "Pane", 1001, previousButtons, semanticLayoutOnly: true)]));
+            var after = Result(TypedNode(
+                "after-root",
+                "Window",
+                "Window",
+                runtimeId: 2000,
+                children: [TypedNode("new-layout", null, "Group", 2001, currentButtons, semanticLayoutOnly: true)]));
+
+            _ = await service.CaptureAsync(
+                Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
+            var result = await service.CaptureAsync(
+                Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
+
+            Assert.Equal("diff", result.Kind);
+            Assert.Empty(result.Changes!);
+            Assert.Equal(
+                "window:42|runtime:101|path:cached|sel:Button~Action 1",
+                ElementIdGenerator.ResolveFullId(previousActionId));
+        }
+        finally
+        {
+            ElementIdGenerator.Clear();
+        }
     }
 
     private static UIAutomationResult Result(params UIElementCompactTree[] tree) =>
@@ -400,6 +522,25 @@ public sealed class SnapshotStateServiceTests
             Type = "Window",
             Click = [1, 2, 0],
             Enabled = enabled,
+            Children = children
+        };
+
+    private static UIElementCompactTree TypedNode(
+        string id,
+        string? name,
+        string type,
+        int runtimeId,
+        UIElementCompactTree[]? children = null,
+        bool semanticLayoutOnly = false) =>
+        new()
+        {
+            Id = ElementIdGenerator.RegisterFullId(
+                $"window:42|runtime:{runtimeId}|path:cached|sel:{type}~{name}"),
+            Name = name,
+            Type = type,
+            Click = [1, 2, 0],
+            Enabled = true,
+            IsSemanticLayoutOnly = semanticLayoutOnly,
             Children = children
         };
 }

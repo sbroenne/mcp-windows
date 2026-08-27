@@ -14,7 +14,7 @@ public static class WindowsAutomationGuidance
         "window_management(action='find', title='...') → returns handle\n" +
         "Use this handle for ALL subsequent operations. Never launch twice - reuse handles.\n\n" +
         "### 2. UI INTERACTION (Preferred)\n" +
-        "ui_snapshot(windowHandle='<handle>') - ORIENT FIRST: compact element tree (ids, names, types, coordinates). For repeated checks, use mode='auto': the first call is complete and later calls return only useful changes when smaller. Use mode='reset' to start over. Pass parentElementId to drill into a subtree.\n" +
+        "ui_snapshot(windowHandle='<handle>') - ORIENT FIRST: compact element tree (ids, names, types, coordinates). For repeated checks, use mode='auto': the first call is a complete simplified view and later calls return only useful changes when smaller. Use mode='reset' to start over. Pass parentElementId to drill into a subtree.\n" +
         "ui_find(windowHandle='<handle>', name='...') - discover elements (name, controlType, coordinates)\n" +
         "ui_click(windowHandle='<handle>', name='...' | nameContains='...' | automationId='...' | elementId='...') - click by name or reuse an id from ui_snapshot/ui_find. Add doubleClick=true to double-click an element without coordinates.\n" +
         "ui_type(windowHandle='<handle>', text='...', controlType='Edit') - type into a field (also accepts elementId='...')\n" +

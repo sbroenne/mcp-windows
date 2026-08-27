@@ -24,11 +24,12 @@ public static partial class UISnapshotTool
     /// <remarks>
     /// This is usually the FIRST call when automating an unfamiliar window - prefer it over blind
     /// ui_find guesses or screenshots. It is token-optimized: elements are returned in a compact,
-    /// hierarchical form, depth-bounded, and (for Chromium/Electron) filtered to the leaner content view.
+    /// hierarchical and depth-bounded form.
     /// Existing calls return a complete tree. Set mode='auto' to let this running server remember the
-    /// previous view and return only useful changes when that is smaller. The first auto call returns a
-    /// complete tree. Set mode='reset' to forget and replace the remembered view. No saved-view id is
-    /// required. Separate wincli invocations start fresh and therefore safely return a complete tree.
+    /// previous semantic view and return only useful changes when that is smaller. Automatic complete
+    /// responses omit proven layout-only Chromium/Electron wrappers while retaining named and actionable
+    /// controls. Set mode='reset' to forget and replace the remembered view. No saved-view id is required.
+    /// Separate wincli invocations start fresh and therefore safely return a complete simplified view.
     /// To drill into a large window, pass parentElementId (from a prior snapshot/find) to scope the scan,
     /// or controlTypeFilter to retain matching controls and the ancestors needed to reach them.
     /// </remarks>
@@ -36,7 +37,7 @@ public static partial class UISnapshotTool
     /// <param name="parentElementId">Scope the snapshot to the subtree under this element id (from a prior snapshot or ui_find). Reduces size and tokens.</param>
     /// <param name="maxDepth">Maximum tree depth to traverse. Default (5) uses a framework-aware recommendation; explicit values are capped at 20.</param>
     /// <param name="controlTypeFilter">Comma-separated control types to keep (e.g. 'Button,Edit,MenuItem'). Others are pruned. Omit to keep all.</param>
-    /// <param name="mode">Snapshot mode: full (default complete tree), auto (changes after the first view), or reset (forget and return a new complete view).</param>
+    /// <param name="mode">Snapshot mode: full (default complete tree), auto (complete simplified view then smaller changes), or reset (forget and return a new complete simplified view).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, elements scanned, detected framework) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload of the element tree. <c>IsError</c> reflects operation success.</returns>

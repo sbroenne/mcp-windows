@@ -5,6 +5,8 @@ namespace Sbroenne.WindowsMcp.Models;
 /// </summary>
 public sealed record UIElementInfo
 {
+    internal bool IsSemanticLayoutOnly { get; init; }
+
     /// <summary>
     /// Composite identifier for subsequent operations.
     /// Format: "window:{hwnd}|runtime:{id}|path:{treePath}"

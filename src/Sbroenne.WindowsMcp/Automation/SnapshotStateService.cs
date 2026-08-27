@@ -166,7 +166,12 @@ internal sealed class SnapshotStateService : IDisposable
         // start time, there is no safe way to know that a remembered tree belongs to this process.
         if (key.ProcessStartTimeUtcTicks <= 0)
         {
-            return EnsureFull(await capture(cancellationToken).ConfigureAwait(false));
+            var unidentifiedCapture = await capture(cancellationToken).ConfigureAwait(false);
+            return unidentifiedCapture.Success && unidentifiedCapture.Tree is not null
+                ? EnsureSemanticFull(
+                    unidentifiedCapture,
+                    SnapshotDiffEngine.CreateSemanticTree(unidentifiedCapture.Tree))
+                : unidentifiedCapture;
         }
 
         var keyGate = _keyGates[(int)((uint)key.GetHashCode() % LockStripeCount)];
@@ -188,32 +193,35 @@ internal sealed class SnapshotStateService : IDisposable
             }
 
             var now = _utcNow();
-            var full = EnsureFull(captured);
+            var semanticTree = SnapshotDiffEngine.CreateSemanticTree(captured.Tree);
+            var comparableTree = SnapshotDiffEngine.CreateComparableTree(semanticTree);
+            var full = EnsureSemanticFull(captured, semanticTree);
 
             if (mode == SnapshotMode.Reset || previous is null)
             {
-                StoreTree(key, captured.Tree, now);
+                StoreTree(key, comparableTree, now);
                 return full;
             }
 
-            if (!RootSemanticsMatch(previous.Tree, captured.Tree))
+            if (!RootSemanticsMatch(previous.Tree, comparableTree))
             {
-                StoreTree(key, captured.Tree, now);
+                StoreTree(key, comparableTree, now);
                 return full;
             }
 
-            if (!SnapshotDiffEngine.HasCompatibleOrder(previous.Tree, captured.Tree))
+            if (!SnapshotDiffEngine.HasCompatibleOrder(previous.Tree, comparableTree))
             {
-                StoreTree(key, captured.Tree, now);
+                StoreTree(key, comparableTree, now);
                 return full;
             }
 
-            var changes = SnapshotDiffEngine.Compare(previous.Tree, captured.Tree).ToArray();
+            var changes = SnapshotDiffEngine.Compare(previous.Tree, comparableTree).ToArray();
             var diff = captured with
             {
                 Tree = null,
                 FullTree = null,
                 Kind = "diff",
+                ElementCount = CountElements(semanticTree),
                 Changes = changes,
                 UsageHint = changes.Length == 0
                     ? "No UI changes since the previous automatic snapshot."
@@ -222,16 +230,16 @@ internal sealed class SnapshotStateService : IDisposable
 
             if (!IsWorthReturning(diff, full))
             {
-                StoreTree(key, captured.Tree, now);
+                StoreTree(key, comparableTree, now);
                 return full;
             }
 
             if (!SnapshotDiffEngine.TryPreserveMatchedIds(
                     previous.Tree,
-                    captured.Tree,
+                    comparableTree,
                     out var rememberedTree))
             {
-                StoreTree(key, captured.Tree, now);
+                StoreTree(key, comparableTree, now);
                 return full;
             }
 
@@ -248,6 +256,27 @@ internal sealed class SnapshotStateService : IDisposable
         result.Success && result.Tree is not null
             ? result with { Kind = "full", Changes = null, Elements = null }
             : result;
+
+    private static UIAutomationResult EnsureSemanticFull(
+        UIAutomationResult result,
+        UIElementCompactTree[] semanticTree)
+    {
+        var elementCount = CountElements(semanticTree);
+        return result with
+        {
+            Tree = semanticTree,
+            Kind = "full",
+            Changes = null,
+            Elements = null,
+            ElementCount = elementCount,
+            UsageHint =
+                $"Simplified tree contains {elementCount} meaningful elements. " +
+                "Layout-only containers were omitted; actionable controls retain current element ids."
+        };
+    }
+
+    private static int CountElements(IEnumerable<UIElementCompactTree> tree) =>
+        tree.Sum(node => 1 + CountElements(node.Children ?? []));
 
     private static bool IsWorthReturning(UIAutomationResult diff, UIAutomationResult full)
     {

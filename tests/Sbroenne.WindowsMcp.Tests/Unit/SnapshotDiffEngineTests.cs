@@ -429,6 +429,114 @@ public sealed class SnapshotDiffEngineTests
         Assert.Empty(changes);
     }
 
+    [Fact]
+    public void CreateSemanticTree_FlattensUnnamedLayoutContainers()
+    {
+        var group = Node(
+            "group",
+            " ",
+            "Group",
+            Node("status", "Ready", "Text")) with
+        {
+            IsSemanticLayoutOnly = true
+        };
+        var pane = Node(
+            "pane",
+            null,
+            "Pane",
+            Node("save", "Save", "Button"),
+            group) with
+        {
+            IsSemanticLayoutOnly = true
+        };
+        var tree = new[]
+        {
+            Node("root", "Window", "Window", pane)
+        };
+
+        var semantic = SnapshotDiffEngine.CreateSemanticTree(tree);
+
+        var root = Assert.Single(semantic);
+        Assert.Equal("Window", root.Name);
+        Assert.Equal(["Save", "Ready"], root.Children!.Select(child => child.Name));
+        Assert.DoesNotContain(
+            Flatten(semantic),
+            node => node.Id is "pane" or "group");
+    }
+
+    [Fact]
+    public void CreateSemanticTree_PreservesNamedLayoutContainersAndActionFields()
+    {
+        var namedPane = Node(
+            "pane",
+            "Navigation",
+            "Pane",
+            Node("link", "Issues", "Hyperlink")) with
+        {
+            Value = "current",
+            Toggle = "On"
+        };
+
+        var semantic = SnapshotDiffEngine.CreateSemanticTree([namedPane]);
+
+        var result = Assert.Single(semantic);
+        Assert.Equal("pane", result.Id);
+        Assert.Equal("Navigation", result.Name);
+        Assert.Equal("current", result.Value);
+        Assert.Equal("On", result.Toggle);
+        Assert.Equal("Issues", Assert.Single(result.Children!).Name);
+    }
+
+    [Fact]
+    public void CreateSemanticTree_PreservesContainerNotMarkedAsLayoutOnly()
+    {
+        var pane = Node("pane", null, "Pane", Node("save", "Save", "Button"));
+
+        var result = Assert.Single(SnapshotDiffEngine.CreateSemanticTree([pane]));
+
+        Assert.Equal("pane", result.Id);
+        Assert.Equal("Save", Assert.Single(result.Children!).Name);
+    }
+
+    [Fact]
+    public void CreateSemanticTree_DoesNotMutateCompleteTree()
+    {
+        var pane = Node("pane", null, "Pane", Node("save", "Save", "Button")) with
+        {
+            IsSemanticLayoutOnly = true
+        };
+        var tree = new[] { Node("root", "Window", "Window", pane) };
+
+        _ = SnapshotDiffEngine.CreateSemanticTree(tree);
+
+        Assert.Same(pane, Assert.Single(tree[0].Children!));
+        Assert.Equal("Window", tree[0].Name);
+    }
+
+    [Fact]
+    public void CreateComparableTree_NormalizesOnlyTopLevelWindowName()
+    {
+        var semantic = new[]
+        {
+            Node(
+                "root",
+                "Browser title",
+                "Window",
+                Node("dialog", "Dialog title", "Window"))
+        };
+
+        var comparable = SnapshotDiffEngine.CreateComparableTree(semantic);
+
+        Assert.Null(Assert.Single(comparable).Name);
+        Assert.Equal("Dialog title", Assert.Single(comparable[0].Children!).Name);
+        Assert.Equal("Browser title", semantic[0].Name);
+    }
+
+    private static IEnumerable<UIElementCompactTree> Flatten(
+        IEnumerable<UIElementCompactTree> nodes) =>
+        nodes.SelectMany(node =>
+            new[] { node }.Concat(Flatten(node.Children ?? [])));
+
     private static UIElementCompactTree Node(
         string id,
         string? name,

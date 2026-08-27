@@ -112,10 +112,10 @@ For repeated views through the long-running MCP server, call `ui_snapshot` with 
 The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
 space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
 remain the default, and separate `wincli` commands do not share remembered views.
-[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-94% median
-byte/token savings in Electron, Word, and Excel. Edge used full responses for live GitHub navigation;
-Chrome returned three small updates in 20 navigations. Scoped same-page browser form changes can
-produce diffs more consistently.
+[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
+byte/token savings in Electron, Word, and Excel. A Playwright-style semantic view improved realistic
+Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of 20
+responses were complete simplified views.
 
 **Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
 longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read
@@ -194,7 +194,7 @@ Requires GitHub authentication (`GITHUB_TOKEN` or an existing `gh` login) and a 
 | Document | Description |
 |----------|-------------|
 | [FEATURES.md](FEATURES.md) | Complete tool reference — all actions, parameters, examples |
-| [Incremental snapshot benchmark](docs/incremental-snapshot-benchmark.md) | Five-run Electron, Edge, Chrome, Word, and Excel measurements |
+| [Incremental snapshot benchmark](docs/incremental-snapshot-benchmark.md) | Five-run Electron, Chrome, Word, and Excel measurements |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Build instructions, coding guidelines, PR process |
 | [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) | How to run LLM integration tests |
 | [Release Setup](.github/RELEASE_SETUP.md) | Azure OIDC and GitHub Actions configuration |

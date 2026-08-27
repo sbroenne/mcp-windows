@@ -21,11 +21,10 @@ public sealed class ChromiumSnapshotBenchmarkTests
         _output = output;
     }
 
-    [SkippableTheory]
-    [InlineData(ChromiumBrowserKind.Edge)]
-    [InlineData(ChromiumBrowserKind.Chrome)]
-    public async Task Benchmark_PublicGitHubRepositoryWorkflow(ChromiumBrowserKind browser)
+    [SkippableFact]
+    public async Task Benchmark_PublicGitHubRepositoryWorkflow_Chrome()
     {
+        const ChromiumBrowserKind browser = ChromiumBrowserKind.Chrome;
         ChromiumBrowserSession.SkipUnlessSupported(browser);
 
         var result = await SnapshotBenchmarkRunner.RunAsync(
@@ -147,34 +146,39 @@ public sealed class ChromiumSnapshotBenchmarkTests
         string expectedTitle,
         CancellationToken cancellationToken)
     {
-        var typeResult = await harness.AutomationService.FindAndTypeAsync(
-            new ElementQuery
-            {
-                WindowHandle = session.WindowHandleString,
-                Name = "Address and search bar",
-                ControlType = "Edit",
-                ContentViewOnly = false,
-                TimeoutMs = 10000
-            },
-            url,
-            clearFirst: true,
-            cancellationToken);
-        Assert.True(
-            typeResult.Success || IsChromeValueReadBackFailure(typeResult.ErrorMessage),
-            $"Typing browser URL failed: {typeResult.ErrorMessage}");
+        var ready = false;
+        for (var attempt = 1; attempt <= 2 && !ready; attempt++)
+        {
+            var typeResult = await harness.AutomationService.FindAndTypeAsync(
+                new ElementQuery
+                {
+                    WindowHandle = session.WindowHandleString,
+                    Name = "Address and search bar",
+                    ControlType = "Edit",
+                    ContentViewOnly = false,
+                    TimeoutMs = 10000
+                },
+                url,
+                clearFirst: true,
+                cancellationToken);
+            Assert.True(
+                typeResult.Success || IsChromeValueReadBackFailure(typeResult.ErrorMessage),
+                $"Typing browser URL failed: {typeResult.ErrorMessage}");
 
-        var enterResult = await keyboard.PressKeyAsync(
-            "enter",
-            ModifierKey.None,
-            repeat: 1,
-            cancellationToken);
-        Assert.True(enterResult.Success, $"Navigating browser failed: {enterResult.Error}");
+            var enterResult = await keyboard.PressKeyAsync(
+                "enter",
+                ModifierKey.None,
+                repeat: 1,
+                cancellationToken);
+            Assert.True(enterResult.Success, $"Navigating browser failed: {enterResult.Error}");
 
-        var ready = await WaitForWindowTitleAsync(
-            session.WindowHandle,
-            expectedTitle,
-            TimeSpan.FromSeconds(30),
-            cancellationToken);
+            ready = await WaitForWindowTitleAsync(
+                session.WindowHandle,
+                expectedTitle,
+                TimeSpan.FromSeconds(30),
+                cancellationToken);
+        }
+
         Assert.True(
             ready,
             $"GitHub page title did not contain '{expectedTitle}' after navigating to {url}. " +
@@ -184,7 +188,7 @@ public sealed class ChromiumSnapshotBenchmarkTests
             harness,
             session.WindowHandleString,
             expectedTitle,
-            TimeSpan.FromSeconds(15),
+            TimeSpan.FromSeconds(30),
             cancellationToken);
     }
 

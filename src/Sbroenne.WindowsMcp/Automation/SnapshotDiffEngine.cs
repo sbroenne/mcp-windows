@@ -7,6 +7,52 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 internal static class SnapshotDiffEngine
 {
+    public static UIElementCompactTree[] CreateSemanticTree(
+        IReadOnlyList<UIElementCompactTree> tree)
+    {
+        ArgumentNullException.ThrowIfNull(tree);
+        return CreateSemanticTree(tree, isRoot: true, normalizeWindowName: false);
+    }
+
+    public static UIElementCompactTree[] CreateComparableTree(
+        IReadOnlyList<UIElementCompactTree> semanticTree)
+    {
+        ArgumentNullException.ThrowIfNull(semanticTree);
+        return CreateSemanticTree(semanticTree, isRoot: true, normalizeWindowName: true);
+    }
+
+    private static UIElementCompactTree[] CreateSemanticTree(
+        IReadOnlyList<UIElementCompactTree> tree,
+        bool isRoot,
+        bool normalizeWindowName)
+    {
+        var result = new List<UIElementCompactTree>(tree.Count);
+        foreach (var node in tree)
+        {
+            var children = CreateSemanticTree(
+                node.Children ?? [],
+                isRoot: false,
+                normalizeWindowName);
+            if (node.IsSemanticLayoutOnly)
+            {
+                result.AddRange(children);
+                continue;
+            }
+
+            result.Add(node with
+            {
+                Name = normalizeWindowName &&
+                    isRoot &&
+                    string.Equals(node.Type, "Window", StringComparison.Ordinal)
+                    ? null
+                    : node.Name,
+                Children = children.Length == 0 ? null : children
+            });
+        }
+
+        return [.. result];
+    }
+
     public static IReadOnlyList<SnapshotChange> Compare(
         IReadOnlyList<UIElementCompactTree> before,
         IReadOnlyList<UIElementCompactTree> after)

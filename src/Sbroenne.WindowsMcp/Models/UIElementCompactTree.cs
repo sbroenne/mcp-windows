@@ -9,6 +9,9 @@ namespace Sbroenne.WindowsMcp.Models;
 /// </summary>
 public sealed record UIElementCompactTree
 {
+    [JsonIgnore]
+    internal bool IsSemanticLayoutOnly { get; init; }
+
     /// <summary>
     /// Element ID for subsequent operations (use with elementId parameter).
     /// </summary>
@@ -73,6 +76,7 @@ public sealed record UIElementCompactTree
         return new UIElementCompactTree
         {
             Id = full.ElementId,
+            IsSemanticLayoutOnly = full.IsSemanticLayoutOnly,
             Name = full.Name,
             Type = full.ControlType,
             Click = full.ClickablePoint != null

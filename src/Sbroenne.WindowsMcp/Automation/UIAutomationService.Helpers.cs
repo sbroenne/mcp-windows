@@ -250,13 +250,15 @@ public sealed partial class UIAutomationService
     /// <param name="coordinateConverter">Coordinate converter for monitor-relative positions.</param>
     /// <param name="children">Optional child elements.</param>
     /// <param name="fromCachedElement">If true, element was retrieved with a cache request (use cached properties). If false, use current properties.</param>
+    /// <param name="detectSemanticLayoutActions">Whether to retain Chromium layout containers that expose a direct action.</param>
     /// <returns>The element info, or null if conversion fails.</returns>
     internal static UIElementInfo? ConvertToElementInfo(
         UIA.IUIAutomationElement element,
         UIA.IUIAutomationElement rootElement,
         CoordinateConverter coordinateConverter,
         UIElementInfo[]? children = null,
-        bool fromCachedElement = false)
+        bool fromCachedElement = false,
+        bool detectSemanticLayoutActions = false)
     {
         try
         {
@@ -291,6 +293,12 @@ public sealed partial class UIAutomationService
             bool isOffscreen = fromCachedElement
                 ? element.GetCachedIsOffscreen()
                 : element.CurrentIsOffscreen != 0;
+            var isSemanticLayoutCandidate =
+                fromCachedElement &&
+                detectSemanticLayoutActions &&
+                controlType is "Pane" or "Group" &&
+                string.IsNullOrWhiteSpace(name) &&
+                string.IsNullOrWhiteSpace(automationId);
 
             var info = new UIElementInfo
             {
@@ -302,9 +310,9 @@ public sealed partial class UIAutomationService
                 MonitorRelativeRect = monitorRelativeRect,
                 MonitorIndex = monitorIndex,
                 ClickablePoint = ClickablePoint.FromCenter(monitorRelativeRect, monitorIndex),
-                // Skip expensive pattern detection when tree walking/finding - patterns only
-                // needed when performing actions, not for discovery/navigation
                 SupportedPatterns = fromCachedElement ? [] : element.GetSupportedPatternNames(),
+                IsSemanticLayoutOnly = isSemanticLayoutCandidate &&
+                    !HasCachedDirectAction(element),
                 Value = !fromCachedElement || string.Equals(controlType, "Edit", StringComparison.Ordinal)
                     ? element.TryGetValue()
                     : null,
@@ -320,10 +328,22 @@ public sealed partial class UIAutomationService
 
             return info;
         }
+
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
         }
+    }
+
+    private static bool HasCachedDirectAction(UIA.IUIAutomationElement element)
+    {
+        // Chromium exposes ScrollItem on nearly every page wrapper. It only brings an element
+        // into view; it does not make an otherwise anonymous layout container a user-facing action.
+        return element.GetCachedPropertyValue(UIA3PropertyIds.IsInvokePatternAvailable) is true ||
+               element.GetCachedPropertyValue(UIA3PropertyIds.IsExpandCollapsePatternAvailable) is true ||
+               element.GetCachedPropertyValue(UIA3PropertyIds.IsSelectionItemPatternAvailable) is true ||
+               element.GetCachedPropertyValue(UIA3PropertyIds.IsTogglePatternAvailable) is true ||
+               element.GetCachedPropertyValue(UIA3PropertyIds.IsValuePatternAvailable) is true;
     }
 
     private UIElementInfo[]? GetChildren(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxChildren = 100)

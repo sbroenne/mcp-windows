@@ -63,6 +63,7 @@ public sealed partial class UIAutomationService
                     effectiveMaxDepth,
                     controlTypeSet,
                     strategy.UsePostHocFiltering,
+                    string.Equals(strategy.FrameworkName, "Chromium/Electron", StringComparison.Ordinal),
                     ref elementsScanned);
 
                 var wasTruncated = elementsScanned > MaxElementsToScan;
@@ -408,6 +409,7 @@ public sealed partial class UIAutomationService
         int maxDepth,
         HashSet<string>? controlTypeFilter,
         bool usePostHocFiltering,
+        bool detectSemanticLayoutActions,
         ref int elementsScanned)
     {
         try
@@ -435,6 +437,7 @@ public sealed partial class UIAutomationService
                 0,
                 controlTypeFilter,
                 usePostHocFiltering,
+                detectSemanticLayoutActions,
                 ref elementsScanned);
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
@@ -454,6 +457,7 @@ public sealed partial class UIAutomationService
         int currentDepth,
         HashSet<string>? controlTypeFilter,
         bool usePostHocFiltering,
+        bool detectSemanticLayoutActions,
         ref int elementsScanned)
     {
         elementsScanned++;
@@ -494,7 +498,10 @@ public sealed partial class UIAutomationService
 
                     var childInfo = BuildTreeFromCachedElement(
                         child, rootElement, maxDepth, currentDepth + 1,
-                        controlTypeFilter, usePostHocFiltering, ref elementsScanned);
+                        controlTypeFilter,
+                        usePostHocFiltering,
+                        detectSemanticLayoutActions,
+                        ref elementsScanned);
 
                     childInfos.AddRange(childInfo);
                 }
@@ -509,7 +516,13 @@ public sealed partial class UIAutomationService
                 return [];
             }
 
-            var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
+            var elementInfo = ConvertToElementInfo(
+                element,
+                rootElement,
+                _coordinateConverter,
+                null,
+                fromCachedElement: true,
+                detectSemanticLayoutActions: detectSemanticLayoutActions);
             if (elementInfo == null)
             {
                 return [.. childInfos];
@@ -538,13 +551,25 @@ public sealed partial class UIAutomationService
 
             // Preserve the non-matching ancestor when it is the only way to keep several matching
             // descendant branches connected. Dropping all but childInfos[0] silently lost controls.
-            var ancestor = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
+            var ancestor = ConvertToElementInfo(
+                element,
+                rootElement,
+                _coordinateConverter,
+                null,
+                fromCachedElement: true,
+                detectSemanticLayoutActions: detectSemanticLayoutActions);
             return ancestor is null
                 ? [.. childInfos]
                 : [ancestor with { Children = [.. childInfos] }];
         }
 
-        var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
+        var info = ConvertToElementInfo(
+            element,
+            rootElement,
+            _coordinateConverter,
+            null,
+            fromCachedElement: true,
+            detectSemanticLayoutActions: detectSemanticLayoutActions);
         if (info == null)
         {
             return [.. childInfos];

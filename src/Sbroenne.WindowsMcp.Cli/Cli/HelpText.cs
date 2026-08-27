@@ -68,9 +68,9 @@ internal static class HelpText
 
         ui snapshot --window <h> [--parent <id>] [--max-depth <n>] [--control-type <t>]
                     [--mode full|auto|reset]
-            full returns the complete tree (default). auto returns changes after the first view when
-            smaller. reset forgets the remembered view. Separate wincli calls start fresh, so auto
-            safely returns a complete tree unless commands later share a running server process.
+            full returns the complete tree (default). auto starts with a complete simplified view,
+            then returns changes when smaller. reset forgets the remembered view. Separate wincli
+            calls start fresh, so auto safely returns a complete simplified view.
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
                      [--sort-by-prominence] [--in-region x,y,w,h] [--near-element <id>]
