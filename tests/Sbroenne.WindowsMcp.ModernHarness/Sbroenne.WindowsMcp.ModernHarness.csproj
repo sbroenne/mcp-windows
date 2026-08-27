@@ -36,6 +36,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.MSIX" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Web.WebView2" />
+    <PackageReference Include="Microsoft.Windows.AI.MachineLearning" />
+    <PackageReference Include="System.Numerics.Tensors" />
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 

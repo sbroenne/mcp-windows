@@ -55,6 +55,11 @@ public sealed class ElectronHarnessFixture : IDisposable
     /// </summary>
     public int? ProcessId => _electronProcess?.Id;
 
+    /// <summary>
+    /// Gets the Electron executable version used by the harness.
+    /// </summary>
+    public string ElectronVersion { get; }
+
     public ElectronHarnessFixture()
     {
         // Find the Electron harness directory relative to the test assembly
@@ -101,6 +106,8 @@ public sealed class ElectronHarnessFixture : IDisposable
 
         // Ensure npm packages are installed
         EnsureNodeModulesInstalled();
+        var electronExePath = Path.Combine(_electronHarnessPath, "node_modules", "electron", "dist", "electron.exe");
+        ElectronVersion = FileVersionInfo.GetVersionInfo(electronExePath).FileVersion ?? "unknown";
 
         try
         {
@@ -150,7 +157,7 @@ public sealed class ElectronHarnessFixture : IDisposable
             }
         }
 
-        // Electron 43 downloads its binary lazily when the package is first required. The fixture
+        // Electron downloads its binary lazily when the package is first required. The fixture
         // launches electron.exe directly, so resolve the package once before checking that path.
         var electronExePath = Path.Combine(nodeModulesPath, "electron", "dist", "electron.exe");
         if (!File.Exists(electronExePath))

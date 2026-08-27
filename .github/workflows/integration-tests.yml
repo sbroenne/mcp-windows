@@ -241,7 +241,7 @@ jobs:
           TEST_SCOPE: ${{ github.event_name == 'pull_request' && 'all' || inputs.scope }}
         run: |
           $filters = @{
-            all = "FullyQualifiedName~Integration"
+            all = "FullyQualifiedName~Integration&Category!=SnapshotBenchmark"
             keyboard = "FullyQualifiedName~Integration.Keyboard"
             mouse = "FullyQualifiedName~Integration.Mouse|FullyQualifiedName~Integration.DpiAwareness|FullyQualifiedName~Integration.ModifierKey|FullyQualifiedName~Integration.MultiMonitor"
             window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"

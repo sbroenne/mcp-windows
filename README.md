@@ -112,6 +112,13 @@ For repeated views through the long-running MCP server, call `ui_snapshot` with 
 The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
 space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
 remain the default, and separate `wincli` commands do not share remembered views.
+[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-91% median
+byte/token savings in Word and Excel, while Electron and live GitHub browser workflows correctly
+fell back to full responses and showed no meaningful savings.
+
+**Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
+longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read
+that undocumented duplicate should migrate to `tree` (or use `ui_find` for a flat result).
 
 ## Command-line interface (`wincli`)
 
@@ -186,6 +193,7 @@ Requires GitHub authentication (`GITHUB_TOKEN` or an existing `gh` login) and a 
 | Document | Description |
 |----------|-------------|
 | [FEATURES.md](FEATURES.md) | Complete tool reference — all actions, parameters, examples |
+| [Incremental snapshot benchmark](docs/incremental-snapshot-benchmark.md) | Five-run Electron, Edge, Chrome, Word, and Excel measurements |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Build instructions, coding guidelines, PR process |
 | [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) | How to run LLM integration tests |
 | [Release Setup](.github/RELEASE_SETUP.md) | Azure OIDC and GitHub Actions configuration |

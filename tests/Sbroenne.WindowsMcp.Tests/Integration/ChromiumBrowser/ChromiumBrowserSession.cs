@@ -94,6 +94,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 "TodoMVC",
                 TimeSpan.FromSeconds(20),
                 [new ReadyElement("What needs to be done?", "Edit")]),
+            ChromiumPublicSite.GitHubVisualStudioCode => new BrowserTarget(
+                "GitHub microsoft/vscode",
+                "https://github.com/microsoft/vscode",
+                "microsoft/vscode",
+                TimeSpan.FromSeconds(30),
+                [new ReadyElement("Code")],
+                AppMode: false),
             _ => throw new ArgumentOutOfRangeException(nameof(site), site, "Unsupported Chromium public site."),
         });
     }
@@ -488,10 +495,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     private static string BuildLaunchArguments(BrowserTarget target, string userDataDirectory)
     {
+        var targetArgument = target.AppMode
+            ? $"--app=\"{target.Url}\""
+            : $"\"{target.Url}\"";
         string[] arguments =
         [
             "--new-window",
-            $"--app=\"{target.Url}\"",
+            targetArgument,
             $"--user-data-dir=\"{userDataDirectory}\"",
             "--no-first-run",
             "--no-default-browser-check",
@@ -656,7 +666,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
         string Url,
         string TitleFragment,
         TimeSpan ReadyTimeout,
-        IReadOnlyList<ReadyElement> ReadyElements);
+        IReadOnlyList<ReadyElement> ReadyElements,
+        bool AppMode = true);
     private sealed record BrowserDescriptor(string DisplayName, string ProcessName, IReadOnlyList<string> CandidatePaths);
     private sealed record ReadyElement(string Name, string? ControlType = null);
     private sealed record PopupSignal(string SignalText, IReadOnlyList<string> DismissButtons);

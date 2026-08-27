@@ -80,6 +80,7 @@ theme:
 nav:
   - Home: index.md
   - Features: features.md
+  - Benchmark: benchmark.md
   - Installation: installation.md
   - More:
     - Architecture: architecture.md

@@ -348,6 +348,15 @@ Capture a compact tree ("snapshot") of a window. This is the **orient primitive*
 - Use `mode=auto` for repeated checks. The first response is complete; later responses contain only changes when that is clearly smaller.
 - Use `mode=reset` after deliberately starting a new workflow. Separate `wincli` commands start fresh and safely return a complete view.
 
+Savings depend on how stable an application's accessibility tree is. The
+[five-workload benchmark](docs/incremental-snapshot-benchmark.md) measured 84-91% median
+byte/token savings for Word and Excel editing, while Electron and live GitHub browser navigation
+used the safe full-response fallback and showed no meaningful savings.
+
+> **Snapshot response compatibility:** Complete snapshots still return the compact `tree`, but no
+> longer serialize the redundant full-detail `elements` copy. Consumers that read that former
+> duplicate should migrate to `tree`, or call `ui_find` when they need a flat result.
+
 ### Response examples
 
 The first automatic view and a reset both return a complete tree:
