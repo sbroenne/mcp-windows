@@ -350,8 +350,9 @@ Capture a compact tree ("snapshot") of a window. This is the **orient primitive*
 
 Savings depend on how stable an application's accessibility tree is. The
 [five-workload benchmark](docs/incremental-snapshot-benchmark.md) measured 84-94% median
-byte/token savings for Electron, Word, and Excel changes. Full-page live GitHub navigation used the
-safe full-response fallback, while a scoped same-page browser form regression produced diffs.
+byte/token savings for Electron, Word, and Excel changes. Edge used the safe full-response fallback
+for all live GitHub navigations; Chrome returned three diffs in 20 navigations. A scoped same-page
+browser form regression produced diffs in both browsers.
 
 > **Snapshot response compatibility:** Complete snapshots still return the compact `tree`, but no
 > longer serialize the redundant full-detail `elements` copy. Consumers that read that former

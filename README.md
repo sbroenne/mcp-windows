@@ -113,8 +113,9 @@ The first response has `kind=full`; later responses have `kind=diff` when a shor
 space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
 remain the default, and separate `wincli` commands do not share remembered views.
 [The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-94% median
-byte/token savings in Electron, Word, and Excel. Full-page live GitHub navigation correctly used
-full responses; scoped same-page browser form changes can still produce diffs.
+byte/token savings in Electron, Word, and Excel. Edge used full responses for live GitHub navigation;
+Chrome returned three small updates in 20 navigations. Scoped same-page browser form changes can
+produce diffs more consistently.
 
 **Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
 longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read

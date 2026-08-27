@@ -140,6 +140,9 @@ internal static class SnapshotBenchmarkRunner
                         snapshot.Success,
                         $"{scenario.Name} {arm} sample {sample} action {actionIndex + 1} snapshot failed: " +
                         snapshot.ErrorMessage);
+                    Assert.DoesNotContain(
+                        snapshot.Diagnostics?.Warnings ?? [],
+                        warning => warning.Contains("truncated", StringComparison.OrdinalIgnoreCase));
                     snapshotMs += snapshotClock.Elapsed.TotalMilliseconds;
 
                     var json = JsonSerializer.Serialize(snapshot, WindowsToolsBase.JsonOptions);

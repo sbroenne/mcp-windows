@@ -19,11 +19,11 @@ synthetic TodoMVC page.
 | Workload | Environment | Full bytes | Auto bytes | Byte savings | Full tokens | Auto tokens | Token savings | Auto full/diff |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | Electron form navigation | Electron 44.0.0 | 64,261 | 3,731 | 94.2% | 19,104 | 1,095 | 94.3% | 0/20 |
-| GitHub repository navigation | Edge 152.0.4191.41 | 113,440 | 78,146 | n/a | 35,489 | 24,315 | n/a | 20/0 |
-| GitHub repository navigation | Chrome 151.0.7922.174 | 172,795 | 172,838 | n/a | 53,950 | 54,417 | n/a | 20/0 |
+| GitHub repository navigation | Edge 152.0.4191.41 | 170,352 | 170,461 | n/a | 53,485 | 53,512 | n/a | 20/0 |
+| GitHub repository navigation | Chrome 151.0.7922.174 | 66,281 | 63,665 | 3.9% | 20,682 | 19,932 | 3.6% | 17/3 |
 | Word document editing | Word 16.0.20326.20100 | 9,200 | 1,440 | 84.3% | 2,848 | 396 | 86.1% | 0/20 |
 | Excel worksheet editing | Excel 16.0.20326.20100 | 13,248 | 1,352 | 89.8% | 4,048 | 376 | 90.7% | 0/20 |
-| **Mode-effect aggregate** | | **372,944** | **292,758** | **21.5%** | **115,439** | **91,306** | **20.9%** | **40/60** |
+| **Mode-effect aggregate** | | **323,342** | **240,540** | **25.6%** | **100,167** | **75,284** | **24.8%** | **37/63** |
 
 Bytes and tokens are medians of the total payload for four post-action snapshots in one run. The
 mode-effect aggregate sums the five full medians and substitutes the corresponding full median for
@@ -33,12 +33,12 @@ four observations, each workflow has equal weight. Tokens are a SharpToken `cl10
 approximation, not universal model billing tokens.
 
 The measured benefit is strong but not universal. Electron, Word, and Excel produced a diff after
-every action, reducing median payloads by 84-94%. Both live GitHub navigation runs selected the safe
-full-response fallback every time. Their observed full and automatic payloads differ because GitHub's
-live accessibility tree varied between arms, so no browser-navigation savings percentage is reported.
-Across this deliberately mixed workload set, the normalized mode effect was 21.5% by bytes and 20.9%
-by approximate tokens. A separate regression confirms that a same-page GitHub search-field edit
-returns a scoped diff in both Edge and Chrome; it is not included as another benchmark workload.
+every action, reducing median payloads by 84-94%. Edge used the safe full-response fallback after all
+20 live GitHub navigations. Chrome returned three diffs and 17 full responses, reducing its median
+payload by 3.9% by bytes and 3.6% by approximate tokens. Across this deliberately mixed workload set,
+the normalized mode effect was 25.6% by bytes and 24.8% by approximate tokens. A separate regression
+confirms that a same-page GitHub search-field edit returns a scoped diff in both Edge and Chrome; it
+is not included as another benchmark workload.
 
 ## Chromium noise spike
 
@@ -65,11 +65,19 @@ unwraps low-information layout containers with one child. Action references are 
 and are renewed after navigation. Playwright's loose role-and-name matching is suitable for test
 assertions, but not for carrying an action ID across duplicate controls.
 
-The next safe experiment is therefore post-capture cleanup, not Windows content-view filtering:
-remove only unnamed layout containers that are proven to have no action of their own, keep all their
-children, and continue returning a full snapshot whenever duplicate controls cannot be matched
-one-to-one. This requires retaining cached action-capability information during tree construction;
-click coordinates alone are not proof that a UI Automation element is actionable.
+We therefore tested post-capture cleanup rather than Windows content-view filtering. The experiment
+unwrapped only unnamed one-child `Pane` and `Group` containers when the
+wrapper and child had the same bounds, visibility, and enabled state, the wrapper had no developer
+ID, and Windows reported no supported action pattern. It preserved GitHub's Code and Issues controls
+in both browsers, but still produced 40 complete responses and no diffs. Checking action patterns
+also added provider calls to each candidate wrapper. The cleanup was rejected because it added work
+without improving incremental responses.
+
+This experiment also exposed a benchmark problem. Chromium's recommended depth of 15 reached the
+browser frame but not GitHub's page controls. The browser scenarios now explicitly use depth 20 and
+wait until a real page control appears before each measured snapshot. An integration test verifies
+that GitHub's Code control is present. The browser and aggregate results in this document are the
+corrected page-content measurements.
 
 [playwright-aria]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshot.ts
 [playwright-distiller]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshotDistiller.ts
@@ -94,15 +102,16 @@ The workflows are:
 
 - **Electron:** navigate the real Electron harness through Forms, Data, Settings, and Home.
 - **Edge and Chrome:** navigate the public `microsoft/vscode` GitHub repository through Issues,
-  Pull requests, Actions, and Code in isolated browser profiles.
+  Pull requests, Actions, and Code in isolated browser profiles. These scenarios use depth 20 so the
+  snapshot includes the webpage, not only the browser frame.
 - **Word:** edit, append to, undo in, and edit a dedicated temporary RTF document.
 - **Excel:** enter four values into a dedicated temporary CSV workbook.
 
 | Workload | Action-only ms | Full snapshot ms | Auto snapshot ms |
 |---|---:|---:|---:|
 | Electron | 928.1 | 5,037.4 | 5,023.0 |
-| Edge | 6,250.1 | 10,432.3 | 7,483.8 |
-| Chrome | 7,102.8 | 16,403.1 | 16,518.8 |
+| Edge | 5,394.6 | 24,571.8 | 24,205.0 |
+| Chrome | 5,935.4 | 8,242.2 | 9,541.4 |
 | Word | 16.9 | 1,797.3 | 1,692.8 |
 | Excel | 6.8 | 2,530.2 | 2,440.3 |
 
@@ -139,41 +148,41 @@ that run.
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 8,773.0 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 6,183.0 | 7,793.6 | 77,133 | 23,507 | 4/0 |
-| 1 | auto | 5,783.6 | 7,517.1 | 77,767 | 23,867 | 4/0 |
-| 2 | full | 7,572.8 | 10,432.3 | 113,440 | 35,489 | 4/0 |
-| 2 | auto | 5,899.8 | 7,502.0 | 78,146 | 24,315 | 4/0 |
-| 2 | action-only | 6,250.1 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 5,949.3 | 7,003.8 | 78,002 | 24,261 | 4/0 |
-| 3 | action-only | 5,944.9 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 6,960.0 | 10,616.8 | 113,631 | 35,552 | 4/0 |
-| 4 | action-only | 6,163.8 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 6,919.5 | 10,774.4 | 113,636 | 35,553 | 4/0 |
-| 4 | auto | 6,169.0 | 7,334.9 | 78,247 | 24,350 | 4/0 |
-| 5 | full | 5,932.8 | 7,426.0 | 78,357 | 24,375 | 4/0 |
-| 5 | auto | 5,784.2 | 7,483.8 | 78,419 | 24,398 | 4/0 |
-| 5 | action-only | 6,359.0 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 8,127.6 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 5,217.3 | 24,571.8 | 168,713 | 52,268 | 4/0 |
+| 1 | auto | 7,012.7 | 25,134.7 | 170,282 | 53,458 | 4/0 |
+| 2 | full | 7,194.6 | 25,931.7 | 170,183 | 53,426 | 4/0 |
+| 2 | auto | 5,720.9 | 23,570.3 | 170,378 | 53,488 | 4/0 |
+| 2 | action-only | 4,894.2 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 6,473.2 | 23,322.0 | 170,461 | 53,512 | 4/0 |
+| 3 | action-only | 6,283.5 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 5,137.3 | 24,305.6 | 170,352 | 53,485 | 4/0 |
+| 4 | action-only | 5,394.6 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 6,478.9 | 24,709.7 | 171,439 | 53,488 | 4/0 |
+| 4 | auto | 8,114.6 | 24,205.0 | 172,305 | 53,571 | 4/0 |
+| 5 | full | 6,691.4 | 24,102.3 | 172,109 | 53,512 | 4/0 |
+| 5 | auto | 6,564.4 | 24,337.1 | 172,503 | 53,632 | 4/0 |
+| 5 | action-only | 5,357.0 | 0.0 | 0 | 0 | 0/0 |
 
 ### Chrome
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 7,304.0 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 6,795.9 | 15,661.7 | 173,877 | 53,950 | 4/0 |
-| 1 | auto | 7,028.7 | 15,330.7 | 180,674 | 56,868 | 4/0 |
-| 2 | full | 6,831.1 | 16,400.5 | 172,795 | 54,400 | 4/0 |
-| 2 | auto | 7,083.1 | 16,518.8 | 172,838 | 54,417 | 4/0 |
-| 2 | action-only | 7,382.6 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 6,953.6 | 16,931.8 | 171,350 | 54,029 | 4/0 |
-| 3 | action-only | 6,991.2 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 6,630.2 | 16,745.5 | 170,335 | 53,694 | 4/0 |
-| 4 | action-only | 7,027.2 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 7,275.9 | 17,990.8 | 184,807 | 57,722 | 4/0 |
-| 4 | auto | 7,618.8 | 16,310.5 | 159,729 | 49,996 | 4/0 |
-| 5 | full | 7,517.2 | 16,403.1 | 159,594 | 49,950 | 4/0 |
-| 5 | auto | 6,667.5 | 18,039.1 | 184,929 | 57,751 | 4/0 |
-| 5 | action-only | 7,102.8 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 7,013.7 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 4,883.7 | 21,884.2 | 163,624 | 50,756 | 4/0 |
+| 1 | auto | 5,351.8 | 9,121.8 | 63,582 | 19,906 | 3/1 |
+| 2 | full | 5,796.6 | 8,220.6 | 66,281 | 20,682 | 4/0 |
+| 2 | auto | 5,944.0 | 9,541.4 | 63,564 | 19,898 | 3/1 |
+| 2 | action-only | 6,074.5 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 5,532.9 | 9,119.7 | 63,665 | 19,932 | 3/1 |
+| 3 | action-only | 5,920.2 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 5,969.0 | 9,417.4 | 65,839 | 20,544 | 4/0 |
+| 4 | action-only | 5,935.4 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 5,751.5 | 8,242.2 | 66,281 | 20,682 | 4/0 |
+| 4 | auto | 5,750.0 | 21,451.4 | 164,748 | 51,987 | 4/0 |
+| 5 | full | 5,687.3 | 8,211.3 | 66,281 | 20,682 | 4/0 |
+| 5 | auto | 5,365.4 | 21,630.2 | 164,782 | 52,005 | 4/0 |
+| 5 | action-only | 5,609.3 | 0.0 | 0 | 0 | 0/0 |
 
 ### Word
 

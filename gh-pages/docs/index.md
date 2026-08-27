@@ -116,8 +116,9 @@ It's deterministic — the same command works every time.
 
 For repeated observations, automatic snapshots return a compact diff only when it is safely
 smaller than the complete tree. A five-run benchmark measured **84-94% median byte/token savings**
-for Electron, Word, and Excel changes. Full-page live GitHub navigation correctly used full
-responses, while scoped same-page browser form changes can produce diffs.
+for Electron, Word, and Excel changes. Edge used full responses for live GitHub navigation; Chrome
+returned three small updates in 20 navigations. Scoped same-page browser form changes can produce
+diffs more consistently.
 
 [Read the reproducible benchmark :material-arrow-right:](benchmark.md){ .md-button }
 

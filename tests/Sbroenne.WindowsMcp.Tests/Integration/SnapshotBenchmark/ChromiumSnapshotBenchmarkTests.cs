@@ -135,7 +135,8 @@ public sealed class ChromiumSnapshotBenchmarkTests
                 harness.Dispose();
                 session.Dispose();
                 return ValueTask.CompletedTask;
-            }));
+            },
+            MaxDepth: 20));
     }
 
     private static async Task NavigateAsync(
@@ -179,8 +180,12 @@ public sealed class ChromiumSnapshotBenchmarkTests
             $"GitHub page title did not contain '{expectedTitle}' after navigating to {url}. " +
             $"Current title: '{GetWindowTitle(session.WindowHandle)}'.");
 
-        // The title updates before Chromium finishes replacing its accessibility document.
-        await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+        await ChromiumPageWaiter.WaitForControlAsync(
+            harness,
+            session.WindowHandleString,
+            expectedTitle,
+            TimeSpan.FromSeconds(15),
+            cancellationToken);
     }
 
     private static bool IsChromeValueReadBackFailure(string? errorMessage) =>
