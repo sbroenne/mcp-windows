@@ -24,6 +24,10 @@ hide:
     Check out [Excel MCP Server](https://excelmcpserver.dev/) — the sister
     project, built the same way.
 
+!!! tip "Also building PowerPoint decks?"
+    Check out [PowerPoint MCP Server](https://powerpointmcpserver.dev/) — another
+    sister project, built the same way.
+
 ## Key features
 
 <div class="grid cards" markdown>
