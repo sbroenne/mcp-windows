@@ -341,7 +341,7 @@ Capture a compact tree ("snapshot") of a window. This is the **orient primitive*
 
 ### Capabilities
 
-- One call to see what's on screen with ids, names, types, and click coordinates
+- One call to see what's on screen with ids, names, types, click coordinates, and available value/toggle state
 - Drill into large windows via `parentElementId`
 - Prune noise with `controlTypeFilter`
 - Feed returned ids straight into `ui_click`, `ui_type`, `ui_read`, `ui_wait`
@@ -349,9 +349,9 @@ Capture a compact tree ("snapshot") of a window. This is the **orient primitive*
 - Use `mode=reset` after deliberately starting a new workflow. Separate `wincli` commands start fresh and safely return a complete view.
 
 Savings depend on how stable an application's accessibility tree is. The
-[five-workload benchmark](docs/incremental-snapshot-benchmark.md) measured 84-91% median
-byte/token savings for Word and Excel editing, while Electron and live GitHub browser navigation
-used the safe full-response fallback and showed no meaningful savings.
+[five-workload benchmark](docs/incremental-snapshot-benchmark.md) measured 84-94% median
+byte/token savings for Electron, Word, and Excel changes. Full-page live GitHub navigation used the
+safe full-response fallback, while a scoped same-page browser form regression produced diffs.
 
 > **Snapshot response compatibility:** Complete snapshots still return the compact `tree`, but no
 > longer serialize the redundant full-detail `elements` copy. Consumers that read that former

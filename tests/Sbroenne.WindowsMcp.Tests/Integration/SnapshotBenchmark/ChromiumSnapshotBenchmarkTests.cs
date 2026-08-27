@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
@@ -32,6 +33,72 @@ public sealed class ChromiumSnapshotBenchmarkTests
             (arm, sample) => CreateScenarioAsync(browser, arm, sample));
 
         _output.WriteLine(SnapshotBenchmarkRunner.FormatReport(result));
+    }
+
+    [SkippableTheory]
+    [InlineData(ChromiumBrowserKind.Edge)]
+    [InlineData(ChromiumBrowserKind.Chrome)]
+    public async Task AutoSnapshot_PublicGitHubSearchDialog_ReturnsDiff(ChromiumBrowserKind browser)
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(browser);
+
+        using var session = ChromiumBrowserSession.LaunchPublicSite(
+            browser,
+            ChromiumPublicSite.GitHubVisualStudioCode);
+        using var harness = new ChromiumAutomationHarness();
+        using var keyboard = new KeyboardInputService();
+        using var state = new SnapshotStateService();
+        var key = SnapshotRequestKey.Create(session.WindowHandleString, null, 5, "Edit");
+
+        var focusPage = await harness.AutomationService.FindAndClickAsync(
+            new ElementQuery
+            {
+                WindowHandle = session.WindowHandleString,
+                Name = "Code",
+                TimeoutMs = 10000
+            },
+            CancellationToken.None);
+        Assert.True(focusPage.Success, focusPage.ErrorMessage);
+        var closeMenu = await keyboard.PressKeyAsync("escape", cancellationToken: CancellationToken.None);
+        Assert.True(closeMenu.Success, closeMenu.Error);
+        var openSearch = await keyboard.TypeTextAsync("/", CancellationToken.None);
+        Assert.True(openSearch.Success, openSearch.Error);
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+
+        var baseline = await state.CaptureAsync(
+            key,
+            SnapshotMode.Reset,
+            token => harness.AutomationService.GetTreeAsync(
+                session.WindowHandleString, null, 5, "Edit", token),
+            CancellationToken.None);
+        Assert.Equal("full", baseline.Kind);
+
+        var type = await harness.AutomationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = session.WindowHandleString,
+                ControlType = "Edit",
+                TimeoutMs = 10000
+            },
+            "incremental snapshot",
+            clearFirst: true,
+            CancellationToken.None);
+        Assert.True(type.Success, type.ErrorMessage);
+        await Task.Delay(TimeSpan.FromSeconds(1));
+
+        var result = await state.CaptureAsync(
+            key,
+            SnapshotMode.Auto,
+            token => harness.AutomationService.GetTreeAsync(
+                session.WindowHandleString, null, 5, "Edit", token),
+            CancellationToken.None);
+
+        Assert.Equal("diff", result.Kind);
+        Assert.NotEmpty(result.Changes ?? []);
+        Assert.Contains(
+            result.Changes!,
+            change => change.Set?.TryGetValue("value", out var value) == true &&
+                      string.Equals(value as string, "incremental snapshot", StringComparison.Ordinal));
     }
 
     private static Task<SnapshotBenchmarkScenario> CreateScenarioAsync(

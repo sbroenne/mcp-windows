@@ -47,10 +47,78 @@ internal static class SnapshotDiffEngine
             return false;
         }
 
-        return sharedUniqueIdentities.All(identity =>
-            HasCompatibleOrder(
-                beforeGroups[identity][0].Children ?? [],
-                afterGroups[identity][0].Children ?? []));
+        if (!sharedUniqueIdentities.All(identity =>
+                HasCompatibleOrder(
+                    beforeGroups[identity][0].Children ?? [],
+                    afterGroups[identity][0].Children ?? [])))
+        {
+            return false;
+        }
+
+        return beforeGroups
+            .Where(pair =>
+                pair.Value.Count > 1 &&
+                afterGroups.TryGetValue(pair.Key, out var matches) &&
+                matches.Count == pair.Value.Count)
+            .All(pair =>
+                CanMatchDuplicatesByOrdinal(pair.Value) &&
+                pair.Value.Zip(afterGroups[pair.Key]).All(nodes =>
+                    HasCompatibleOrder(
+                        nodes.First.Children ?? [],
+                        nodes.Second.Children ?? [])) ||
+                pair.Value.Zip(afterGroups[pair.Key])
+                    .All(nodes => TreesEqual(nodes.First, nodes.Second)));
+    }
+
+    public static bool TryPreserveMatchedIds(
+        IReadOnlyList<UIElementCompactTree> before,
+        IReadOnlyList<UIElementCompactTree> after,
+        out UIElementCompactTree[] result)
+    {
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(after);
+
+        var aliases = new List<(string PreviousShortId, string CurrentShortId)>();
+        result = PreserveMatchedIds(before, after, aliases);
+        return ElementIdGenerator.TryTransferAliases(aliases);
+    }
+
+    private static UIElementCompactTree[] PreserveMatchedIds(
+        IReadOnlyList<UIElementCompactTree> before,
+        IReadOnlyList<UIElementCompactTree> after,
+        List<(string PreviousShortId, string CurrentShortId)> aliases)
+    {
+        var beforeGroups = GroupByIdentity(before);
+        var afterGroups = GroupByIdentity(after);
+        var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
+        var result = new UIElementCompactTree[after.Count];
+
+        for (var index = 0; index < after.Count; index++)
+        {
+            var current = after[index];
+            var identity = Identity(current);
+            var ordinal = ordinals.GetValueOrDefault(identity);
+            ordinals[identity] = ordinal + 1;
+
+            if (beforeGroups.TryGetValue(identity, out var previousMatches) &&
+                afterGroups[identity].Count == previousMatches.Count)
+            {
+                var previous = previousMatches[ordinal];
+                aliases.Add((previous.Id, current.Id));
+                current = current with
+                {
+                    Id = previous.Id,
+                    Children = PreserveMatchedIds(
+                        previous.Children ?? [],
+                        current.Children ?? [],
+                        aliases)
+                };
+            }
+
+            result[index] = current;
+        }
+
+        return result;
     }
 
     private static void CompareSiblings(
@@ -79,20 +147,24 @@ internal static class SnapshotDiffEngine
                 continue;
             }
 
-            if (oldNodes.Count == 1 && newNodes.Count == 1)
+            if (oldNodes.Count == newNodes.Count)
             {
-                var key = BuildKey(parentKey, identity, 0);
-                AddUpdateIfNeeded(key, oldNodes[0], newNodes[0], changes);
-                CompareSiblings(
-                    oldNodes[0].Children ?? [],
-                    newNodes[0].Children ?? [],
-                    key,
-                    changes);
+                for (var index = 0; index < oldNodes.Count; index++)
+                {
+                    var key = BuildKey(parentKey, identity, index);
+                    AddUpdateIfNeeded(key, oldNodes[index], newNodes[index], changes);
+                    CompareSiblings(
+                        oldNodes[index].Children ?? [],
+                        newNodes[index].Children ?? [],
+                        key,
+                        changes);
+                }
+
                 continue;
             }
 
-            // Duplicate siblings cannot be matched confidently. Reporting remove/add is safer than
-            // applying an update to the wrong control.
+            // If duplicate counts differ, ordinal matching becomes ambiguous. Reporting remove/add
+            // is safer than applying an update to the wrong control.
             for (var index = 0; index < oldNodes.Count; index++)
             {
                 changes.Add(new SnapshotChange
@@ -139,6 +211,8 @@ internal static class SnapshotDiffEngine
             !string.Equals(left.Name, right.Name, StringComparison.Ordinal) ||
             !string.Equals(left.Type, right.Type, StringComparison.Ordinal) ||
             left.Enabled != right.Enabled ||
+            !string.Equals(left.Value, right.Value, StringComparison.Ordinal) ||
+            !string.Equals(left.Toggle, right.Toggle, StringComparison.Ordinal) ||
             !NullableSequenceEqual(left.Click, right.Click))
         {
             return false;
@@ -153,6 +227,11 @@ internal static class SnapshotDiffEngine
     private static string Identity(UIElementCompactTree node) =>
         $"{node.Type}\0{node.Name ?? string.Empty}";
 
+    private static bool CanMatchDuplicatesByOrdinal(IReadOnlyList<UIElementCompactTree> nodes) =>
+        nodes.All(node =>
+            string.IsNullOrEmpty(node.Name) &&
+            node.Type is "Pane" or "Group");
+
     private static void AddUpdateIfNeeded(
         string key,
         UIElementCompactTree before,
@@ -160,11 +239,6 @@ internal static class SnapshotDiffEngine
         List<SnapshotChange> changes)
     {
         var updated = new Dictionary<string, object?>(StringComparer.Ordinal);
-        if (!string.Equals(before.Id, after.Id, StringComparison.Ordinal))
-        {
-            updated["id"] = after.Id;
-        }
-
         if (!NullableSequenceEqual(before.Click, after.Click))
         {
             updated["click"] = after.Click;
@@ -173,6 +247,16 @@ internal static class SnapshotDiffEngine
         if (before.Enabled != after.Enabled)
         {
             updated["enabled"] = after.Enabled;
+        }
+
+        if (!string.Equals(before.Value, after.Value, StringComparison.Ordinal))
+        {
+            updated["value"] = after.Value;
+        }
+
+        if (!string.Equals(before.Toggle, after.Toggle, StringComparison.Ordinal))
+        {
+            updated["toggle"] = after.Toggle;
         }
 
         if (updated.Count > 0)

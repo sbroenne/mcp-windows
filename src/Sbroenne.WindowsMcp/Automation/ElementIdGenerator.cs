@@ -19,9 +19,11 @@ public static class ElementIdGenerator
     // Thread-safe cache for mapping short IDs to full IDs
     private static readonly ConcurrentDictionary<string, string> s_shortToFull = new();
     private static readonly ConcurrentDictionary<string, string> s_fullToShort = new();
-    private static readonly Queue<(string ShortId, string FullId)> s_registrationOrder = new();
+    private static readonly ConcurrentDictionary<string, long> s_shortVersions = new();
+    private static readonly Queue<(string ShortId, string FullId, long Version)> s_registrationOrder = new();
     private static readonly Lock s_registrationLock = new();
     private static long s_counter;
+    private static long s_registrationVersion;
 
     internal static int RetainedIdCount => s_shortToFull.Count;
 
@@ -576,18 +578,41 @@ public static class ElementIdGenerator
             }
 
             var shortId = Interlocked.Increment(ref s_counter).ToString();
+            var version = Interlocked.Increment(ref s_registrationVersion);
             s_fullToShort[fullId] = shortId;
             s_shortToFull[shortId] = fullId;
-            s_registrationOrder.Enqueue((shortId, fullId));
+            s_shortVersions[shortId] = version;
+            s_registrationOrder.Enqueue((shortId, fullId, version));
 
-            while (s_registrationOrder.Count > MaxRetainedIds)
-            {
-                var expired = s_registrationOrder.Dequeue();
-                _ = s_shortToFull.TryRemove(expired.ShortId, out _);
-                _ = s_fullToShort.TryRemove(expired.FullId, out _);
-            }
+            TrimRegistrations();
 
             return shortId;
+        }
+    }
+
+    private static void TrimRegistrations()
+    {
+        while (s_registrationOrder.Count > MaxRetainedIds)
+        {
+            var expired = s_registrationOrder.Dequeue();
+            if (s_shortVersions.TryGetValue(expired.ShortId, out var currentVersion) &&
+                currentVersion == expired.Version &&
+                s_shortToFull.TryGetValue(expired.ShortId, out var mappedFullId) &&
+                string.Equals(mappedFullId, expired.FullId, StringComparison.Ordinal))
+            {
+                _ = s_shortToFull.TryRemove(expired.ShortId, out _);
+                _ = s_shortVersions.TryRemove(expired.ShortId, out _);
+                RemoveReverseMappingIfCurrent(expired.FullId, expired.ShortId);
+            }
+        }
+    }
+
+    private static void RemoveReverseMappingIfCurrent(string fullId, string shortId)
+    {
+        if (s_fullToShort.TryGetValue(fullId, out var mappedShortId) &&
+            string.Equals(mappedShortId, shortId, StringComparison.Ordinal))
+        {
+            _ = s_fullToShort.TryRemove(fullId, out _);
         }
     }
 
@@ -599,6 +624,70 @@ public static class ElementIdGenerator
         ArgumentNullException.ThrowIfNull(shortId);
 
         return s_shortToFull.TryGetValue(shortId, out var fullId) ? fullId : null;
+    }
+
+    /// <summary>
+    /// Transfers newly generated registrations to client-visible IDs from a previous snapshot.
+    /// The operation is all-or-nothing so callers can safely fall back to a full response.
+    /// </summary>
+    internal static bool TryTransferAliases(
+        IReadOnlyList<(string PreviousShortId, string CurrentShortId)> aliases)
+    {
+        ArgumentNullException.ThrowIfNull(aliases);
+
+        lock (s_registrationLock)
+        {
+            if (aliases.Any(alias =>
+                    !s_shortToFull.ContainsKey(alias.PreviousShortId) ||
+                    !s_shortToFull.ContainsKey(alias.CurrentShortId)))
+            {
+                return false;
+            }
+
+            var transfers = aliases
+                .Where(alias => !string.Equals(
+                    alias.PreviousShortId,
+                    alias.CurrentShortId,
+                    StringComparison.Ordinal))
+                .Distinct()
+                .ToArray();
+            if (transfers.Select(alias => alias.PreviousShortId).Distinct(StringComparer.Ordinal).Count() != transfers.Length ||
+                transfers.Select(alias => alias.CurrentShortId).Distinct(StringComparer.Ordinal).Count() != transfers.Length)
+            {
+                return false;
+            }
+
+            var previousIds = aliases
+                .Select(alias => alias.PreviousShortId)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (transfers.Any(alias =>
+                    previousIds.Contains(alias.CurrentShortId) ||
+                    !s_shortToFull.ContainsKey(alias.PreviousShortId) ||
+                    !s_shortToFull.ContainsKey(alias.CurrentShortId)))
+            {
+                return false;
+            }
+
+            foreach (var (previousShortId, currentShortId) in transfers)
+            {
+                var previousFullId = s_shortToFull[previousShortId];
+                var currentFullId = s_shortToFull[currentShortId];
+                if (string.Equals(previousFullId, currentFullId, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                RemoveReverseMappingIfCurrent(previousFullId, previousShortId);
+                s_shortToFull[previousShortId] = currentFullId;
+                var version = Interlocked.Increment(ref s_registrationVersion);
+                s_shortVersions[previousShortId] = version;
+                s_registrationOrder.Enqueue((previousShortId, currentFullId, version));
+            }
+
+            TrimRegistrations();
+            return true;
+        }
     }
 
     /// <summary>
@@ -639,8 +728,10 @@ public static class ElementIdGenerator
         {
             s_shortToFull.Clear();
             s_fullToShort.Clear();
+            s_shortVersions.Clear();
             s_registrationOrder.Clear();
             Interlocked.Exchange(ref s_counter, 0);
+            Interlocked.Exchange(ref s_registrationVersion, 0);
         }
     }
 }

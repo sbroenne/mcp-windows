@@ -135,6 +135,8 @@ public sealed class WindowsToolsBaseSerializationTests
             MonitorIndex = 0,
             ClickablePoint = new ClickablePoint { X = 5, Y = 5, MonitorIndex = 0 },
             SupportedPatterns = [],
+            Value = "draft",
+            ToggleState = "On",
             IsEnabled = true,
             IsOffscreen = false
         };
@@ -145,6 +147,9 @@ public sealed class WindowsToolsBaseSerializationTests
         Assert.True(root.TryGetProperty("tree", out _));
         Assert.False(root.TryGetProperty("elements", out _));
         Assert.Equal("full", root.GetProperty("kind").GetString());
+        var treeElement = root.GetProperty("tree")[0];
+        Assert.Equal("draft", treeElement.GetProperty("value").GetString());
+        Assert.Equal("On", treeElement.GetProperty("toggle").GetString());
         Assert.NotNull(result.FullTree);
     }
 

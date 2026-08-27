@@ -41,6 +41,20 @@ public sealed record UIElementCompactTree
     public required bool Enabled { get; init; }
 
     /// <summary>
+    /// Current value for controls that expose ValuePattern.
+    /// </summary>
+    [JsonPropertyName("value")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Value { get; init; }
+
+    /// <summary>
+    /// Current toggle or selection state.
+    /// </summary>
+    [JsonPropertyName("toggle")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Toggle { get; init; }
+
+    /// <summary>
     /// Child elements in the UI tree.
     /// </summary>
     [JsonPropertyName("children")]
@@ -65,6 +79,8 @@ public sealed record UIElementCompactTree
                 ? [full.ClickablePoint.X, full.ClickablePoint.Y, full.ClickablePoint.MonitorIndex]
                 : null,
             Enabled = full.IsEnabled,
+            Value = full.Value,
+            Toggle = full.ToggleState,
             Children = full.Children?.Select(FromFull).ToArray()
         };
     }

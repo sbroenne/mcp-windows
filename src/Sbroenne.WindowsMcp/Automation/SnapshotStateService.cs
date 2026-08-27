@@ -189,23 +189,22 @@ internal sealed class SnapshotStateService : IDisposable
 
             var now = _utcNow();
             var full = EnsureFull(captured);
-            lock (_stateLock)
-            {
-                Store(key, captured.Tree, now);
-            }
 
             if (mode == SnapshotMode.Reset || previous is null)
             {
+                StoreTree(key, captured.Tree, now);
                 return full;
             }
 
-            if (!RootIdsMatch(previous.Tree, captured.Tree))
+            if (!RootSemanticsMatch(previous.Tree, captured.Tree))
             {
+                StoreTree(key, captured.Tree, now);
                 return full;
             }
 
             if (!SnapshotDiffEngine.HasCompatibleOrder(previous.Tree, captured.Tree))
             {
+                StoreTree(key, captured.Tree, now);
                 return full;
             }
 
@@ -221,7 +220,23 @@ internal sealed class SnapshotStateService : IDisposable
                     : $"{changes.Length} UI change(s) since the previous automatic snapshot. Added nodes include current element ids for the next action."
             };
 
-            return IsWorthReturning(diff, full) ? diff : full;
+            if (!IsWorthReturning(diff, full))
+            {
+                StoreTree(key, captured.Tree, now);
+                return full;
+            }
+
+            if (!SnapshotDiffEngine.TryPreserveMatchedIds(
+                    previous.Tree,
+                    captured.Tree,
+                    out var rememberedTree))
+            {
+                StoreTree(key, captured.Tree, now);
+                return full;
+            }
+
+            StoreTree(key, rememberedTree, now);
+            return diff;
         }
         finally
         {
@@ -247,13 +262,13 @@ internal sealed class SnapshotStateService : IDisposable
         return System.Text.Encoding.UTF8.GetByteCount(json);
     }
 
-    private static bool RootIdsMatch(
+    private static bool RootSemanticsMatch(
         UIElementCompactTree[] previous,
         UIElementCompactTree[] current) =>
         previous.Length == current.Length &&
-        previous.Select(node => node.Id).SequenceEqual(
-            current.Select(node => node.Id),
-            StringComparer.Ordinal);
+        previous.Zip(current).All(pair =>
+            string.Equals(pair.First.Type, pair.Second.Type, StringComparison.Ordinal) &&
+            string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal));
 
     private void Store(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now)
     {
@@ -262,6 +277,14 @@ internal sealed class SnapshotStateService : IDisposable
         {
             var oldest = _entries.MinBy(pair => pair.Value.LastUsedUtc).Key;
             _entries.Remove(oldest);
+        }
+    }
+
+    private void StoreTree(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now)
+    {
+        lock (_stateLock)
+        {
+            Store(key, tree, now);
         }
     }
 

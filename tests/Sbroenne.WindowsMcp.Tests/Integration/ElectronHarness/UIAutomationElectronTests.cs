@@ -102,6 +102,37 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(hasDocument, "Electron window should contain a Document element for web content");
     }
 
+    [Fact]
+    public async Task AutoSnapshot_AfterSmallRendererChange_ReturnsDiff()
+    {
+        using var state = new SnapshotStateService();
+        var key = SnapshotRequestKey.Create(_windowHandle, null, 5, null);
+        var baseline = await state.CaptureAsync(
+            key,
+            SnapshotMode.Reset,
+            token => _automationService.GetTreeAsync(_windowHandle, null, 5, null, token),
+            CancellationToken.None);
+        Assert.Equal("full", baseline.Kind);
+
+        var click = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Navigate Forms",
+            ControlType = "Button",
+            TimeoutMs = 10000
+        });
+        Assert.True(click.Success, click.ErrorMessage);
+
+        var result = await state.CaptureAsync(
+            key,
+            SnapshotMode.Auto,
+            token => _automationService.GetTreeAsync(_windowHandle, null, 5, null, token),
+            CancellationToken.None);
+
+        Assert.Equal("diff", result.Kind);
+        Assert.NotEmpty(result.Changes ?? []);
+    }
+
     #endregion
 
     #region Find Element Tests - ARIA Labels

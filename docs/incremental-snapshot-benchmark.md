@@ -18,25 +18,27 @@ synthetic TodoMVC page.
 
 | Workload | Environment | Full bytes | Auto bytes | Byte savings | Full tokens | Auto tokens | Token savings | Auto full/diff |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| Electron form navigation | Electron 44.0.0 | 63,777 | 63,777 | 0.0% | 18,976 | 18,976 | 0.0% | 20/0 |
-| GitHub repository navigation | Edge 152.0.4191.41 | 78,989 | 78,913 | 0.1% | 24,641 | 24,608 | 0.1% | 20/0 |
-| GitHub repository navigation | Chrome 151.0.7922.174 | 172,795 | 172,838 | -0.0% | 53,950 | 54,417 | -0.9% | 20/0 |
-| Word document editing | Word 16.0.20326.20100 | 9,184 | 1,436 | 84.4% | 2,808 | 392 | 86.0% | 0/20 |
-| Excel worksheet editing | Excel 16.0.20326.20100 | 13,204 | 1,352 | 89.8% | 4,036 | 376 | 90.7% | 0/20 |
-| **Equal-workload aggregate** | | **337,949** | **318,316** | **5.8%** | **104,411** | **98,769** | **5.4%** | **60/40** |
+| Electron form navigation | Electron 44.0.0 | 64,261 | 3,731 | 94.2% | 19,104 | 1,095 | 94.3% | 0/20 |
+| GitHub repository navigation | Edge 152.0.4191.41 | 113,440 | 78,146 | n/a | 35,489 | 24,315 | n/a | 20/0 |
+| GitHub repository navigation | Chrome 151.0.7922.174 | 172,795 | 172,838 | n/a | 53,950 | 54,417 | n/a | 20/0 |
+| Word document editing | Word 16.0.20326.20100 | 9,200 | 1,440 | 84.3% | 2,848 | 396 | 86.1% | 0/20 |
+| Excel worksheet editing | Excel 16.0.20326.20100 | 13,248 | 1,352 | 89.8% | 4,048 | 376 | 90.7% | 0/20 |
+| **Mode-effect aggregate** | | **372,944** | **292,758** | **21.5%** | **115,439** | **91,306** | **20.9%** | **40/60** |
 
 Bytes and tokens are medians of the total payload for four post-action snapshots in one run. The
-aggregate sums the five workload medians; because every workload has four observations, this gives
-each workflow equal weight. Tokens are a SharpToken `cl100k_base` approximation, not universal
-model billing tokens.
+mode-effect aggregate sums the five full medians and substitutes the corresponding full median for
+an automatic arm that returned no diffs. This assigns zero incremental savings to full-only
+workloads instead of misclassifying live-site variance as a mode effect. Because every workload has
+four observations, each workflow has equal weight. Tokens are a SharpToken `cl100k_base`
+approximation, not universal model billing tokens.
 
-The measured benefit is strong but not universal. Word and Excel produced a diff after every
-action, reducing median payloads by 84-90%. Electron and both live GitHub browser runs selected the
-safe full-response fallback every time, so they produced no meaningful payload savings. The small
-positive or negative browser differences are normal variation in live GitHub content, not
-incremental savings. Across this deliberately mixed workload set, median payload savings were 5.8%
-by bytes and 5.4% by approximate tokens. The earlier 82% single-response and 91% short-workflow
-figures should therefore not be generalized across applications.
+The measured benefit is strong but not universal. Electron, Word, and Excel produced a diff after
+every action, reducing median payloads by 84-94%. Both live GitHub navigation runs selected the safe
+full-response fallback every time. Their observed full and automatic payloads differ because GitHub's
+live accessibility tree varied between arms, so no browser-navigation savings percentage is reported.
+Across this deliberately mixed workload set, the normalized mode effect was 21.5% by bytes and 20.9%
+by approximate tokens. A separate regression confirms that a same-page GitHub search-field edit
+returns a scoped diff in both Edge and Chrome; it is not included as another benchmark workload.
 
 ## Method
 
@@ -64,11 +66,11 @@ The workflows are:
 
 | Workload | Action-only ms | Full snapshot ms | Auto snapshot ms |
 |---|---:|---:|---:|
-| Electron | 955.1 | 5,069.1 | 5,012.8 |
-| Edge | 6,465.8 | 8,281.5 | 8,002.0 |
+| Electron | 928.1 | 5,037.4 | 5,023.0 |
+| Edge | 6,250.1 | 10,432.3 | 7,483.8 |
 | Chrome | 7,102.8 | 16,403.1 | 16,518.8 |
-| Word | 13.6 | 2,321.6 | 2,087.8 |
-| Excel | 19.0 | 3,032.6 | 2,980.3 |
+| Word | 16.9 | 1,797.3 | 1,692.8 |
+| Excel | 6.8 | 2,530.2 | 2,440.3 |
 
 These are median totals for four actions or snapshots, not per-call values. Automatic mode still
 captures a complete accessibility tree before comparing it, so it is designed to reduce response
@@ -83,41 +85,41 @@ that run.
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 1,145.9 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 964.7 | 5,069.1 | 63,777 | 18,976 | 4/0 |
-| 1 | auto | 1,017.8 | 5,012.8 | 63,777 | 18,976 | 4/0 |
-| 2 | full | 914.4 | 4,974.5 | 63,777 | 18,976 | 4/0 |
-| 2 | auto | 1,025.0 | 5,167.9 | 63,777 | 18,976 | 4/0 |
-| 2 | action-only | 966.3 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 1,016.5 | 4,950.3 | 63,777 | 18,976 | 4/0 |
-| 3 | action-only | 955.1 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 940.0 | 5,100.0 | 63,777 | 18,976 | 4/0 |
-| 4 | action-only | 954.6 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 954.4 | 5,089.8 | 63,777 | 18,976 | 4/0 |
-| 4 | auto | 921.6 | 5,014.9 | 63,777 | 18,976 | 4/0 |
-| 5 | full | 913.6 | 4,951.7 | 63,777 | 18,976 | 4/0 |
-| 5 | auto | 877.9 | 4,856.5 | 63,773 | 18,976 | 4/0 |
-| 5 | action-only | 933.4 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 1,120.9 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 924.4 | 5,037.4 | 64,261 | 19,104 | 4/0 |
+| 1 | auto | 1,003.2 | 5,151.4 | 3,731 | 1,095 | 0/4 |
+| 2 | full | 911.4 | 4,872.9 | 64,261 | 19,104 | 4/0 |
+| 2 | auto | 890.3 | 5,023.0 | 3,731 | 1,095 | 0/4 |
+| 2 | action-only | 928.1 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 905.3 | 4,857.5 | 3,731 | 1,095 | 0/4 |
+| 3 | action-only | 887.3 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 950.8 | 5,068.4 | 64,261 | 19,104 | 4/0 |
+| 4 | action-only | 888.7 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 903.2 | 4,825.8 | 64,261 | 19,104 | 4/0 |
+| 4 | auto | 914.1 | 4,903.8 | 3,731 | 1,095 | 0/4 |
+| 5 | full | 910.1 | 5,053.8 | 64,261 | 19,104 | 4/0 |
+| 5 | auto | 1,059.2 | 5,571.8 | 3,731 | 1,095 | 0/4 |
+| 5 | action-only | 944.1 | 0.0 | 0 | 0 | 0/0 |
 
 ### Edge
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 9,263.9 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 5,971.0 | 8,279.9 | 77,621 | 23,700 | 4/0 |
-| 1 | auto | 5,991.3 | 8,002.0 | 78,338 | 24,118 | 4/0 |
-| 2 | full | 5,785.6 | 8,386.4 | 78,820 | 24,577 | 4/0 |
-| 2 | auto | 5,814.5 | 8,107.7 | 78,913 | 24,608 | 4/0 |
-| 2 | action-only | 6,307.3 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 6,013.3 | 7,682.5 | 78,881 | 24,597 | 4/0 |
-| 3 | action-only | 6,215.9 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 6,122.7 | 8,281.5 | 78,989 | 24,641 | 4/0 |
-| 4 | action-only | 6,465.8 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 7,060.2 | 11,127.4 | 115,096 | 36,121 | 4/0 |
-| 4 | auto | 7,355.8 | 11,198.1 | 115,103 | 36,124 | 4/0 |
-| 5 | full | 6,207.1 | 8,210.4 | 79,123 | 24,678 | 4/0 |
-| 5 | auto | 6,066.0 | 7,562.7 | 79,071 | 24,660 | 4/0 |
-| 5 | action-only | 6,477.4 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 8,773.0 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 6,183.0 | 7,793.6 | 77,133 | 23,507 | 4/0 |
+| 1 | auto | 5,783.6 | 7,517.1 | 77,767 | 23,867 | 4/0 |
+| 2 | full | 7,572.8 | 10,432.3 | 113,440 | 35,489 | 4/0 |
+| 2 | auto | 5,899.8 | 7,502.0 | 78,146 | 24,315 | 4/0 |
+| 2 | action-only | 6,250.1 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 5,949.3 | 7,003.8 | 78,002 | 24,261 | 4/0 |
+| 3 | action-only | 5,944.9 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 6,960.0 | 10,616.8 | 113,631 | 35,552 | 4/0 |
+| 4 | action-only | 6,163.8 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 6,919.5 | 10,774.4 | 113,636 | 35,553 | 4/0 |
+| 4 | auto | 6,169.0 | 7,334.9 | 78,247 | 24,350 | 4/0 |
+| 5 | full | 5,932.8 | 7,426.0 | 78,357 | 24,375 | 4/0 |
+| 5 | auto | 5,784.2 | 7,483.8 | 78,419 | 24,398 | 4/0 |
+| 5 | action-only | 6,359.0 | 0.0 | 0 | 0 | 0/0 |
 
 ### Chrome
 
@@ -143,41 +145,41 @@ that run.
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 59.0 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 11.5 | 2,296.4 | 9,128 | 2,840 | 4/0 |
-| 1 | auto | 9.6 | 2,182.3 | 1,436 | 388 | 0/4 |
-| 2 | full | 13.4 | 2,745.9 | 9,160 | 2,808 | 4/0 |
-| 2 | auto | 9.4 | 2,084.9 | 1,436 | 400 | 0/4 |
-| 2 | action-only | 13.6 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 9.0 | 2,348.9 | 1,440 | 388 | 0/4 |
-| 3 | action-only | 8.6 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 25.9 | 2,781.3 | 9,184 | 2,808 | 4/0 |
-| 4 | action-only | 19.1 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 13.0 | 2,293.8 | 9,232 | 2,792 | 4/0 |
-| 4 | auto | 8.6 | 1,987.3 | 1,436 | 408 | 0/4 |
-| 5 | full | 10.7 | 2,321.6 | 9,232 | 2,760 | 4/0 |
-| 5 | auto | 9.7 | 2,087.8 | 1,436 | 392 | 0/4 |
-| 5 | action-only | 11.0 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 38.4 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 8.6 | 1,797.3 | 9,128 | 2,856 | 4/0 |
+| 1 | auto | 6.9 | 1,719.0 | 1,440 | 396 | 0/4 |
+| 2 | full | 6.9 | 1,785.5 | 9,128 | 2,848 | 4/0 |
+| 2 | auto | 7.3 | 1,667.0 | 1,436 | 404 | 0/4 |
+| 2 | action-only | 11.4 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 7.0 | 1,682.3 | 1,436 | 392 | 0/4 |
+| 3 | action-only | 17.4 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 7.9 | 1,734.7 | 9,200 | 2,856 | 4/0 |
+| 4 | action-only | 16.9 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 8.4 | 1,886.9 | 9,200 | 2,800 | 4/0 |
+| 4 | auto | 8.0 | 1,692.8 | 1,440 | 404 | 0/4 |
+| 5 | full | 7.7 | 1,808.2 | 9,204 | 2,836 | 4/0 |
+| 5 | auto | 8.2 | 1,800.6 | 1,440 | 380 | 0/4 |
+| 5 | action-only | 11.3 | 0.0 | 0 | 0 | 0/0 |
 
 ### Excel
 
 | Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
 |---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 34.0 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 9.2 | 3,244.6 | 13,045 | 4,005 | 4/0 |
-| 1 | auto | 4.1 | 2,888.2 | 1,352 | 376 | 0/4 |
-| 2 | full | 5.5 | 3,032.6 | 13,080 | 4,084 | 4/0 |
-| 2 | auto | 4.6 | 2,880.2 | 1,352 | 376 | 0/4 |
-| 2 | action-only | 19.0 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 6.9 | 4,536.9 | 1,354 | 386 | 0/4 |
-| 3 | action-only | 21.4 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 4.5 | 2,893.1 | 13,204 | 4,088 | 4/0 |
-| 4 | action-only | 13.6 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 4.5 | 3,064.3 | 13,204 | 4,036 | 4/0 |
-| 4 | auto | 3.7 | 3,141.1 | 1,352 | 376 | 0/4 |
-| 5 | full | 4.1 | 2,843.7 | 13,204 | 4,020 | 4/0 |
-| 5 | auto | 3.6 | 2,980.3 | 1,352 | 376 | 0/4 |
-| 5 | action-only | 18.4 | 0.0 | 0 | 0 | 0/0 |
+| 1 | action-only | 29.9 | 0.0 | 0 | 0 | 0/0 |
+| 1 | full | 6.1 | 3,235.9 | 13,088 | 4,036 | 4/0 |
+| 1 | auto | 4.7 | 2,440.3 | 1,352 | 376 | 0/4 |
+| 2 | full | 4.9 | 2,495.5 | 13,124 | 4,048 | 4/0 |
+| 2 | auto | 4.2 | 2,479.2 | 1,356 | 376 | 0/4 |
+| 2 | action-only | 7.7 | 0.0 | 0 | 0 | 0/0 |
+| 3 | auto | 3.8 | 2,338.6 | 1,356 | 376 | 0/4 |
+| 3 | action-only | 4.5 | 0.0 | 0 | 0 | 0/0 |
+| 3 | full | 5.5 | 2,649.8 | 13,248 | 4,048 | 4/0 |
+| 4 | action-only | 4.6 | 0.0 | 0 | 0 | 0/0 |
+| 4 | full | 4.6 | 2,530.2 | 13,252 | 4,028 | 4/0 |
+| 4 | auto | 3.8 | 2,494.3 | 1,352 | 384 | 0/4 |
+| 5 | full | 4.9 | 2,516.2 | 13,248 | 4,084 | 4/0 |
+| 5 | auto | 3.4 | 2,403.5 | 1,352 | 380 | 0/4 |
+| 5 | action-only | 6.8 | 0.0 | 0 | 0 | 0/0 |
 
 ## Reproduce
 
@@ -206,7 +208,8 @@ Each test writes a Markdown report containing medians and raw samples to
 - Live GitHub content, network conditions, application builds, accessibility trees, and machine
   load vary. This benchmark characterizes these runs; it is not a fixed performance promise.
 - The browser accessibility trees varied substantially between runs, especially in Chrome. The
-  safe fallback prevented an oversized or structurally unsafe diff from being returned.
+  safe fallback prevented an oversized or structurally unsafe diff from being returned. Browser
+  savings therefore require a stable same-page or scoped observation, not full-page navigation.
 - Office actions edit temporary local files through keyboard input. They do not exercise every
   ribbon, dialog, formula, or workbook feature.
 - Electron uses the repository's deterministic harness rather than a large third-party Electron

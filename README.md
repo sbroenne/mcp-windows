@@ -112,9 +112,9 @@ For repeated views through the long-running MCP server, call `ui_snapshot` with 
 The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
 space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
 remain the default, and separate `wincli` commands do not share remembered views.
-[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-91% median
-byte/token savings in Word and Excel, while Electron and live GitHub browser workflows correctly
-fell back to full responses and showed no meaningful savings.
+[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-94% median
+byte/token savings in Electron, Word, and Excel. Full-page live GitHub navigation correctly used
+full responses; scoped same-page browser form changes can still produce diffs.
 
 **Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
 longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read

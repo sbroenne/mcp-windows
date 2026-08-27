@@ -58,7 +58,7 @@ public sealed record UIElementInfo
     public string? Value { get; init; }
 
     /// <summary>
-    /// Current toggle state for elements with TogglePattern.
+    /// Current toggle or selection state for check boxes and radio buttons.
     /// </summary>
     public string? ToggleState { get; init; }
 

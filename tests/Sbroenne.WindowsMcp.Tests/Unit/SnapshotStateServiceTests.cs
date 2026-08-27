@@ -3,6 +3,7 @@ using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
+[Collection("ElementIdRegistry")]
 public sealed class SnapshotStateServiceTests
 {
     private static readonly SnapshotRequestKey Key = new(
@@ -57,17 +58,45 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
-    public async Task Auto_ReturnsFullWhenRootElementIdentityChanges()
+    public async Task Auto_RootElementIdChurnWithStableSemanticIdentity_ReturnsDiff()
+    {
+        ElementIdGenerator.Clear();
+        try
+        {
+            using var service = new SnapshotStateService();
+            var beforeId = ElementIdGenerator.RegisterFullId("window:1|runtime:1|path:cached");
+            var afterId = ElementIdGenerator.RegisterFullId("window:1|runtime:2|path:cached");
+            var initial = LargeResult("Window");
+            var before = initial with
+            {
+                Tree = [initial.Tree![0] with { Id = beforeId }]
+            };
+            var after = before with
+            {
+                Tree = [before.Tree![0] with { Id = afterId }]
+            };
+
+            _ = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
+            var result = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
+
+            Assert.Equal("diff", result.Kind);
+            Assert.Empty(result.Changes!);
+            Assert.Equal(
+                "window:1|runtime:2|path:cached",
+                ElementIdGenerator.ResolveFullId(beforeId));
+        }
+        finally
+        {
+            ElementIdGenerator.Clear();
+        }
+    }
+
+    [Fact]
+    public async Task Auto_ReturnsFullWhenRootSemanticIdentityChanges()
     {
         var service = new SnapshotStateService();
         var before = LargeResult("Window");
-        var after = before with
-        {
-            Tree =
-            [
-                before.Tree![0] with { Id = "replacement-root" }
-            ]
-        };
+        var after = LargeResult("Replacement window");
 
         _ = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
         var result = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
@@ -365,7 +394,8 @@ public sealed class SnapshotStateServiceTests
         UIElementCompactTree[]? children = null) =>
         new()
         {
-            Id = id,
+            Id = ElementIdGenerator.RegisterFullId(
+                $"window:42|runtime:{id}|path:cached|sel:Window~{name}"),
             Name = name,
             Type = "Window",
             Click = [1, 2, 0],

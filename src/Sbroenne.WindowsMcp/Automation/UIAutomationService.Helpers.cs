@@ -305,8 +305,14 @@ public sealed partial class UIAutomationService
                 // Skip expensive pattern detection when tree walking/finding - patterns only
                 // needed when performing actions, not for discovery/navigation
                 SupportedPatterns = fromCachedElement ? [] : element.GetSupportedPatternNames(),
-                Value = fromCachedElement ? null : element.TryGetValue(),
-                ToggleState = fromCachedElement ? null : element.GetToggleState(),
+                Value = !fromCachedElement || string.Equals(controlType, "Edit", StringComparison.Ordinal)
+                    ? element.TryGetValue()
+                    : null,
+                ToggleState = string.Equals(controlType, "RadioButton", StringComparison.Ordinal)
+                    ? element.GetSelectionStateName()
+                    : !fromCachedElement || string.Equals(controlType, "CheckBox", StringComparison.Ordinal)
+                        ? element.GetToggleState()
+                        : null,
                 IsEnabled = isEnabled,
                 IsOffscreen = isOffscreen,
                 Children = children
