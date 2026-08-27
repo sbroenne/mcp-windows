@@ -67,6 +67,7 @@ Sbroenne.WindowsMcp.LLM.Tests/
 ├── conftest.py                            # Shared fixtures (server, agents, providers)
 ├── pyproject.toml                         # Python project config and dependencies
 ├── test_notepad_ui.py                     # Notepad discard/save workflows
+├── test_incremental_snapshot_workflow.py  # Repeated structural inspection across model tiers
 ├── test_calculator_workflow.py            # Calculator keyboard + UI tests
 ├── test_window_workflow.py                # Multi-window management
 ├── test_paint_workflow.py                 # Paint workflows (skipped)
@@ -97,6 +98,7 @@ Multi-step workflow tests that verify end-to-end user scenarios. Run with `gpt-5
 | Test File | Description |
 |-----------|-------------|
 | `test_notepad_ui.py` | Notepad text editing with discard and save workflows |
+| `test_incremental_snapshot_workflow.py` | Incremental UI snapshots with Sonnet, Haiku, GPT-5 mini, and Gemini Flash |
 | `test_calculator_workflow.py` | Calculator operations via keyboard and UI clicks |
 | `test_window_workflow.py` | Multi-window management across Notepad instances |
 

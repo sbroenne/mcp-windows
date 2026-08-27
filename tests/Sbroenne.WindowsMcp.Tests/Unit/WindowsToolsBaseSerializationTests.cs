@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
@@ -119,6 +120,32 @@ public sealed class WindowsToolsBaseSerializationTests
         var root = Parse(result);
         Assert.False(root.GetProperty("success").GetBoolean());
         Assert.Contains("act failed:", root.GetProperty("error").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompactTreeSerialization_DoesNotRepeatFullElements()
+    {
+        var full = new UIElementInfo
+        {
+            ElementId = "1",
+            Name = "Save",
+            ControlType = "Button",
+            BoundingRect = new BoundingRect { X = 0, Y = 0, Width = 10, Height = 10 },
+            MonitorRelativeRect = new MonitorRelativeRect { X = 0, Y = 0, Width = 10, Height = 10 },
+            MonitorIndex = 0,
+            ClickablePoint = new ClickablePoint { X = 5, Y = 5, MonitorIndex = 0 },
+            SupportedPatterns = [],
+            IsEnabled = true,
+            IsOffscreen = false
+        };
+        var result = UIAutomationResult.CreateSuccessCompactTree("get_tree", [full]);
+
+        var root = Parse(WindowsToolsBase.SerializeUIResult(result, includeDiagnostics: false));
+
+        Assert.True(root.TryGetProperty("tree", out _));
+        Assert.False(root.TryGetProperty("elements", out _));
+        Assert.Equal("full", root.GetProperty("kind").GetString());
+        Assert.NotNull(result.FullTree);
     }
 
     private static int CountProperties(JsonElement obj)

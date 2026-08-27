@@ -54,7 +54,8 @@ public static partial class UIBatchTool
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). Used for every step unless a step overrides it. REQUIRED.</param>
     /// <param name="steps">JSON array of step objects (see remarks). REQUIRED.</param>
     /// <param name="stopOnError">Stop at the first failing step (default: true). Set false to run every step regardless.</param>
-    /// <param name="withSnapshot">When true, attach the window's element tree after the batch completes so you can verify the final state. Default: false.</param>
+    /// <param name="withSnapshot">When true, attach a snapshot after the batch completes so you can verify the final state. Default: false.</param>
+    /// <param name="snapshotMode">Post-batch snapshot mode when withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
     /// <param name="includeDiagnostics">Reserved for parity; batch responses are already compact. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result whose JSON payload lists per-step outcomes. <c>IsError</c> is true unless every executed step succeeded.</returns>
@@ -64,6 +65,7 @@ public static partial class UIBatchTool
         string steps,
         [DefaultValue(true)] bool stopOnError,
         [DefaultValue(false)] bool withSnapshot,
+        [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -77,6 +79,12 @@ public static partial class UIBatchTool
         {
             return WindowsToolsBase.FailResult(
                 "steps is required: a JSON array of step objects, e.g. [{\"action\":\"click\",\"name\":\"Submit\"}].");
+        }
+
+        if (!SnapshotStateService.TryParseMode(snapshotMode, out var parsedSnapshotMode))
+        {
+            return WindowsToolsBase.FailResult(
+                $"snapshotMode must be one of: full, auto, reset (got '{snapshotMode}').");
         }
 
         BatchStep[]? parsedSteps;
@@ -140,20 +148,33 @@ public static partial class UIBatchTool
             }
         }
 
-        UIElementCompactTree[]? postTree = null;
+        UIAutomationResult? postSnapshot = null;
+        string? postSnapshotWarning = null;
         if (withSnapshot)
         {
             try
             {
-                var snapshot = await WindowsToolsBase.UIAutomationService.GetTreeAsync(windowHandle, null, 5, null, cancellationToken);
-                if (snapshot.Success && snapshot.Tree is { Length: > 0 })
+                var snapshot = await WindowsToolsBase.CaptureSnapshotAsync(
+                    windowHandle,
+                    parentElementId: null,
+                    maxDepth: 5,
+                    controlTypeFilter: null,
+                    parsedSnapshotMode,
+                    cancellationToken);
+                if (snapshot.Success)
                 {
-                    postTree = snapshot.Tree;
+                    postSnapshot = snapshot;
+                }
+                else
+                {
+                    postSnapshotWarning = snapshot.ErrorMessage ??
+                        "The batch succeeded, but its optional follow-up snapshot failed.";
                 }
             }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
             {
-                // Snapshot is best-effort; never fail the batch because the trailing snapshot failed.
+                postSnapshotWarning =
+                    $"The batch succeeded, but its optional follow-up snapshot failed: {ex.Message}";
             }
         }
 
@@ -164,7 +185,10 @@ public static partial class UIBatchTool
             StepsSucceeded = succeeded,
             Stopped = stopped ? true : null,
             Steps = results,
-            PostActionTree = postTree
+            PostActionKind = postSnapshot?.Kind,
+            PostActionTree = postSnapshot?.Tree,
+            PostActionChanges = postSnapshot?.Changes,
+            PostActionWarning = postSnapshotWarning
         };
 
         var json = JsonSerializer.Serialize(batchResult, WindowsToolsBase.JsonOptions);
@@ -174,6 +198,23 @@ public static partial class UIBatchTool
             Content = [new TextContentBlock { Text = json }]
         };
     }
+
+    /// <summary>Calls the snapshot-aware overload with a complete post-batch snapshot.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string steps,
+        bool stopOnError,
+        bool withSnapshot,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle,
+            steps,
+            stopOnError,
+            withSnapshot,
+            "full",
+            includeDiagnostics,
+            cancellationToken);
 
     private static async Task<BatchStepResult> ExecuteStepAsync(
         int index,

@@ -40,7 +40,8 @@ public static partial class UIMacroTool
     /// <param name="steps">ui_batch steps JSON array. Required for save.</param>
     /// <param name="windowHandle">Target window handle for replay. Required for run.</param>
     /// <param name="stopOnError">For run: stop at the first failing step (default: true).</param>
-    /// <param name="withSnapshot">For run: attach the window's element tree after replay (default: false).</param>
+    /// <param name="withSnapshot">For run: attach a snapshot after replay (default: false).</param>
+    /// <param name="snapshotMode">For run with withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
     /// <param name="includeDiagnostics">Reserved for parity; responses are already compact. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result with the JSON payload. For run it is the ui_batch result; otherwise the macro management result. <c>IsError</c> reflects success.</returns>
@@ -52,6 +53,7 @@ public static partial class UIMacroTool
         [DefaultValue(null)] string? windowHandle,
         [DefaultValue(true)] bool stopOnError,
         [DefaultValue(false)] bool withSnapshot,
+        [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -74,7 +76,9 @@ public static partial class UIMacroTool
                     return ToCallToolResult(await service.DeleteAsync(name ?? "", cancellationToken));
 
                 case MacroAction.Run:
-                    return await RunAsync(service, name, windowHandle, stopOnError, withSnapshot, includeDiagnostics, cancellationToken);
+                    return await RunAsync(
+                        service, name, windowHandle, stopOnError, withSnapshot, snapshotMode,
+                        includeDiagnostics, cancellationToken);
 
                 default:
                     return ToCallToolResult(MacroResult.Failure(action.ToString(), $"Unsupported macro action: {action}."));
@@ -92,6 +96,7 @@ public static partial class UIMacroTool
         string? windowHandle,
         bool stopOnError,
         bool withSnapshot,
+        string snapshotMode,
         bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -115,8 +120,30 @@ public static partial class UIMacroTool
 
         // Replay through the identical batch engine so a macro run == the equivalent ui_batch call.
         return await UIBatchTool.ExecuteAsync(
-            windowHandle, stepsJson, stopOnError, withSnapshot, includeDiagnostics, cancellationToken);
+            windowHandle, stepsJson, stopOnError, withSnapshot, snapshotMode, includeDiagnostics,
+            cancellationToken);
     }
+
+    /// <summary>Calls the snapshot-aware overload with a complete post-run snapshot.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        MacroAction action,
+        string? name,
+        string? steps,
+        string? windowHandle,
+        bool stopOnError,
+        bool withSnapshot,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            action,
+            name,
+            steps,
+            windowHandle,
+            stopOnError,
+            withSnapshot,
+            "full",
+            includeDiagnostics,
+            cancellationToken);
 
     private static CallToolResult ToCallToolResult(MacroResult result) =>
         new()

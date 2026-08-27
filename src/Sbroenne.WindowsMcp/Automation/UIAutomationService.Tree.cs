@@ -58,13 +58,22 @@ public sealed partial class UIAutomationService
 
                 // Use single-call bulk fetch: get ALL elements in one COM call, then reconstruct tree
                 // This is dramatically faster than per-level FindAllBuildCache calls
-                UIElementInfo? tree;
-                tree = BuildTreeWithBulkFetch(rootElement, effectiveMaxDepth, controlTypeSet, strategy.UsePostHocFiltering, ref elementsScanned);
+                var trees = BuildTreeWithBulkFetch(
+                    rootElement,
+                    effectiveMaxDepth,
+                    controlTypeSet,
+                    strategy.UsePostHocFiltering,
+                    ref elementsScanned);
 
                 var wasTruncated = elementsScanned > MaxElementsToScan;
 
                 stopwatch.Stop();
-                LogSearchPerformance(_logger, "get_tree", elementsScanned, stopwatch.ElapsedMilliseconds, tree != null ? 1 : 0);
+                LogSearchPerformance(
+                    _logger,
+                    "get_tree",
+                    elementsScanned,
+                    stopwatch.ElapsedMilliseconds,
+                    trees?.Length ?? 0);
 
                 if (wasTruncated)
                 {
@@ -73,7 +82,7 @@ public sealed partial class UIAutomationService
 
                 string? windowTitle = rootElement.GetName();
 
-                if (tree == null)
+                if (trees is null || trees.Length == 0)
                 {
                     return UIAutomationResult.CreateFailure(
                         "get_tree",
@@ -96,7 +105,7 @@ public sealed partial class UIAutomationService
                     };
                 }
 
-                return UIAutomationResult.CreateSuccessCompactTree("get_tree", [tree], diagnostics);
+                return UIAutomationResult.CreateSuccessCompactTree("get_tree", trees, diagnostics);
             }, cancellationToken);
         }
         catch (COMException ex)
@@ -394,7 +403,7 @@ public sealed partial class UIAutomationService
     /// This caches the ENTIRE subtree including children relationships in one COM call.
     /// We then traverse using GetCachedChildren() which reads from cache (no COM calls).
     /// </summary>
-    private UIElementInfo? BuildTreeWithBulkFetch(
+    private UIElementInfo[]? BuildTreeWithBulkFetch(
         UIA.IUIAutomationElement rootElement,
         int maxDepth,
         HashSet<string>? controlTypeFilter,
@@ -438,7 +447,7 @@ public sealed partial class UIAutomationService
     /// Recursively builds tree from cached element using GetCachedChildren().
     /// This makes NO COM calls since all data is already cached.
     /// </summary>
-    private UIElementInfo? BuildTreeFromCachedElement(
+    private UIElementInfo[] BuildTreeFromCachedElement(
         UIA.IUIAutomationElement element,
         UIA.IUIAutomationElement rootElement,
         int maxDepth,
@@ -451,7 +460,7 @@ public sealed partial class UIAutomationService
 
         if (elementsScanned > MaxElementsToScan || currentDepth > maxDepth)
         {
-            return null;
+            return [];
         }
 
         var controlTypeName = element.GetCachedControlTypeName().ToLowerInvariant();
@@ -487,10 +496,7 @@ public sealed partial class UIAutomationService
                         child, rootElement, maxDepth, currentDepth + 1,
                         controlTypeFilter, usePostHocFiltering, ref elementsScanned);
 
-                    if (childInfo != null)
-                    {
-                        childInfos.Add(childInfo);
-                    }
+                    childInfos.AddRange(childInfo);
                 }
             }
         }
@@ -500,36 +506,56 @@ public sealed partial class UIAutomationService
         {
             if (!matchesFilter && childInfos.Count == 0)
             {
-                return null;
+                return [];
             }
 
             var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
             if (elementInfo == null)
             {
-                return childInfos.Count == 1 ? childInfos[0] : null;
+                return [.. childInfos];
             }
 
-            return childInfos.Count > 0 ? elementInfo with { Children = [.. childInfos] } : elementInfo;
+            return
+            [
+                childInfos.Count > 0
+                    ? elementInfo with { Children = [.. childInfos] }
+                    : elementInfo
+            ];
         }
 
         // Inline filtering: only include if matches
         if (!matchesFilter)
         {
-            return childInfos.Count switch
+            if (childInfos.Count == 0)
             {
-                0 => null,
-                1 => childInfos[0],
-                _ => childInfos[0]
-            };
+                return [];
+            }
+
+            if (childInfos.Count == 1)
+            {
+                return [childInfos[0]];
+            }
+
+            // Preserve the non-matching ancestor when it is the only way to keep several matching
+            // descendant branches connected. Dropping all but childInfos[0] silently lost controls.
+            var ancestor = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
+            return ancestor is null
+                ? [.. childInfos]
+                : [ancestor with { Children = [.. childInfos] }];
         }
 
         var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, null, fromCachedElement: true);
         if (info == null)
         {
-            return null;
+            return [.. childInfos];
         }
 
-        return childInfos.Count > 0 ? info with { Children = [.. childInfos] } : info;
+        return
+        [
+            childInfos.Count > 0
+                ? info with { Children = [.. childInfos] }
+                : info
+        ];
     }
 
     private static HashSet<string>? ParseControlTypeFilter(string? filter)

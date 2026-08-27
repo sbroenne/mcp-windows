@@ -7,6 +7,7 @@ using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Clipboard;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Macros;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Processes;
 using Sbroenne.WindowsMcp.Window;
 
@@ -47,6 +48,7 @@ public static class WindowsToolsBase
     private static readonly ClipboardService _clipboardService = new(_uiAutomationThread);
     private static readonly MacroService _macroService = new();
     private static readonly ProcessService _processService = new();
+    private static readonly SnapshotStateService _snapshotStateService = new();
 
     /// <summary>Gets the monitor service.</summary>
     public static MonitorService MonitorService => _monitorService;
@@ -98,6 +100,9 @@ public static class WindowsToolsBase
 
     /// <summary>Gets the process (list &amp; kill) service.</summary>
     public static ProcessService ProcessService => _processService;
+
+    /// <summary>Gets the process-local memory used by automatic UI snapshots.</summary>
+    internal static SnapshotStateService SnapshotStateService => _snapshotStateService;
 
     /// <summary>
     /// JSON serializer options for tool response serialization, optimized for LLM token efficiency.
@@ -312,8 +317,7 @@ public static class WindowsToolsBase
 
     /// <summary>
     /// Perceive/act fusion: when <paramref name="withSnapshot"/> is set and the action succeeded,
-    /// captures the target window's post-action element tree and attaches it to the result as
-    /// <see cref="UIAutomationResult.PostActionTree"/>. Best-effort - a snapshot failure never
+    /// captures the target window's complete post-action view. Best-effort - a snapshot failure never
     /// turns a successful action into a failure.
     /// </summary>
     /// <param name="result">The action result to augment.</param>
@@ -321,10 +325,26 @@ public static class WindowsToolsBase
     /// <param name="withSnapshot">Whether the caller requested the fused snapshot.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The original result, augmented with a post-action tree when applicable.</returns>
-    public static async Task<UIAutomationResult> WithPostActionSnapshotAsync(
+    public static Task<UIAutomationResult> WithPostActionSnapshotAsync(
         UIAutomationResult result,
         string? windowHandle,
         bool withSnapshot,
+        CancellationToken cancellationToken) =>
+        WithPostActionSnapshotAsync(
+            result,
+            windowHandle,
+            withSnapshot,
+            SnapshotMode.Full,
+            cancellationToken);
+
+    /// <summary>
+    /// Captures a complete, automatic, or reset post-action view after a successful action.
+    /// </summary>
+    internal static async Task<UIAutomationResult> WithPostActionSnapshotAsync(
+        UIAutomationResult result,
+        string? windowHandle,
+        bool withSnapshot,
+        SnapshotMode snapshotMode,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(result);
@@ -336,18 +356,75 @@ public static class WindowsToolsBase
 
         try
         {
-            var snapshot = await UIAutomationService.GetTreeAsync(windowHandle, null, 5, null, cancellationToken);
-            if (snapshot.Success && snapshot.Tree is { Length: > 0 })
+            var snapshot = await CaptureSnapshotAsync(
+                windowHandle,
+                parentElementId: null,
+                maxDepth: 5,
+                controlTypeFilter: null,
+                snapshotMode,
+                cancellationToken);
+            if (snapshot.Success)
             {
-                return result with { PostActionTree = snapshot.Tree };
+                return result with
+                {
+                    PostActionKind = snapshot.Kind,
+                    PostActionTree = snapshot.Tree,
+                    PostActionChanges = snapshot.Changes
+                };
             }
+
+            return result with
+            {
+                PostActionWarning = snapshot.ErrorMessage ?? "The action succeeded, but its optional follow-up snapshot failed."
+            };
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
-            // Fusion is a convenience; never fail the underlying action because the snapshot failed.
+            return result with
+            {
+                PostActionWarning = $"The action succeeded, but its optional follow-up snapshot failed: {ex.Message}"
+            };
         }
 
-        return result;
+    }
+
+    /// <summary>
+    /// Captures a complete or automatic incremental snapshot using process-local memory.
+    /// </summary>
+    internal static Task<UIAutomationResult> CaptureSnapshotAsync(
+        string? windowHandle,
+        string? parentElementId,
+        int maxDepth,
+        string? controlTypeFilter,
+        SnapshotMode mode,
+        CancellationToken cancellationToken)
+    {
+        var effectiveWindowHandle = windowHandle;
+        if (string.IsNullOrWhiteSpace(effectiveWindowHandle) &&
+            string.IsNullOrWhiteSpace(parentElementId))
+        {
+            var foregroundWindow = NativeMethods.GetForegroundWindow();
+            effectiveWindowHandle = foregroundWindow == nint.Zero
+                ? null
+                : foregroundWindow.ToInt64().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var key = SnapshotRequestKey.Create(
+            effectiveWindowHandle,
+            parentElementId,
+            maxDepth,
+            controlTypeFilter);
+
+        return SnapshotStateService.CaptureAsync(
+            key,
+            mode,
+            token => UIAutomationService.GetTreeAsync(
+                effectiveWindowHandle,
+                parentElementId,
+                maxDepth,
+                controlTypeFilter,
+                token),
+            cancellationToken);
     }
 
     private static int GetTimeoutFromEnvironment()

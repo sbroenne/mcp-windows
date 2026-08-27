@@ -45,6 +45,9 @@ public sealed class ToolCatalogTests
         Assert.Contains("windowHandle", ParameterNames(tools["file_open"]));
         Assert.Contains("action", ParameterNames(tools["clipboard"]));
         Assert.Contains("steps", ParameterNames(tools["ui_macro"]));
+        Assert.Contains("mode", ParameterNames(tools["ui_snapshot"]));
+        Assert.Contains("snapshotMode", ParameterNames(tools["ui_click"]));
+        Assert.Contains("snapshotMode", ParameterNames(tools["ui_batch"]));
     }
 
     [Fact]

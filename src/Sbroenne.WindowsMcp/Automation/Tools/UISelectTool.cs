@@ -35,7 +35,8 @@ public static partial class UISelectTool
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
     /// <param name="foundIndex">Return Nth matching control (1-based, default: 1).</param>
-    /// <param name="withSnapshot">When true, attach the window's post-action element tree (perceive/act fusion) so you can verify the new state without a separate ui_snapshot call. Default: false.</param>
+    /// <param name="withSnapshot">When true, attach a post-action snapshot so you can verify the new state without another tool call. Default: false.</param>
+    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the select operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
@@ -51,6 +52,7 @@ public static partial class UISelectTool
         [DefaultValue(null)] string? className,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool withSnapshot,
+        [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
@@ -73,6 +75,12 @@ public static partial class UISelectTool
             return foundIndexError;
         }
 
+        if (!SnapshotStateService.TryParseMode(snapshotMode, out var parsedSnapshotMode))
+        {
+            return WindowsToolsBase.FailResult(
+                $"snapshotMode must be one of: full, auto, reset (got '{snapshotMode}').");
+        }
+
         try
         {
             var query = new ElementQuery
@@ -88,7 +96,8 @@ public static partial class UISelectTool
             };
 
             var result = await WindowsToolsBase.UIAutomationService.FindAndSelectAsync(query, value, cancellationToken);
-            result = await WindowsToolsBase.WithPostActionSnapshotAsync(result, windowHandle, withSnapshot, cancellationToken);
+            result = await WindowsToolsBase.WithPostActionSnapshotAsync(
+                result, windowHandle, withSnapshot, parsedSnapshotMode, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
@@ -96,4 +105,22 @@ public static partial class UISelectTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Calls the snapshot-aware overload with a complete post-action snapshot.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string value,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        int foundIndex,
+        bool withSnapshot,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle, value, name, nameContains, namePattern, controlType, automationId,
+            className, foundIndex, withSnapshot, "full", includeDiagnostics, cancellationToken);
 }

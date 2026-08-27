@@ -98,7 +98,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Tool | Description |
 |------|-------------|
 | `app` | Launch applications |
-| `ui_snapshot` | Capture a compact element tree of a window (orient primitive) |
+| `ui_snapshot` | Capture a compact element tree; optionally return only changes after the first view |
 | `ui_find` | Find UI elements by name, type, or ID (with timeout/retry via `timeoutMs`) |
 | `ui_click` | Click buttons, tabs, checkboxes |
 | `ui_type` | Type text into edit controls |
@@ -326,7 +326,7 @@ of the target (or window root) is used automatically.
 
 ## 🌳 UI Snapshot (`ui_snapshot`)
 
-Capture a compact, interactive-elements-only tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. Token-optimized (hierarchical, depth-bounded, content-view filtered for Chromium/Electron).
+Capture a compact tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. The response is hierarchical, depth-bounded, and content-view filtered for Chromium/Electron.
 
 ### Parameters
 
@@ -336,6 +336,7 @@ Capture a compact, interactive-elements-only tree ("snapshot") of a window. This
 | `parentElementId` | Scope the snapshot to a subtree (id from a prior snapshot/find) | No |
 | `maxDepth` | Max tree depth (default framework-aware; capped at 20) | No (default: 5) |
 | `controlTypeFilter` | Comma-separated control types to keep (e.g. 'Button,Edit') | No |
+| `mode` | `full` for a complete view, `auto` for remembered smaller updates, or `reset` to start a new remembered view | No (default: `full`) |
 | `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
 
 ### Capabilities
@@ -344,6 +345,31 @@ Capture a compact, interactive-elements-only tree ("snapshot") of a window. This
 - Drill into large windows via `parentElementId`
 - Prune noise with `controlTypeFilter`
 - Feed returned ids straight into `ui_click`, `ui_type`, `ui_read`, `ui_wait`
+- Use `mode=auto` for repeated checks. The first response is complete; later responses contain only changes when that is clearly smaller.
+- Use `mode=reset` after deliberately starting a new workflow. Separate `wincli` commands start fresh and safely return a complete view.
+
+### Response examples
+
+The first automatic view and a reset both return a complete tree:
+
+```json
+{"success":true,"kind":"full","tree":[{"id":"1","name":"Window","type":"Window","click":[400,300,0],"enabled":true}]}
+```
+
+A useful update returns only the change:
+
+```json
+{"success":true,"kind":"diff","changes":[{"op":"add","key":"root/Menu:File#0","node":{"id":"7","name":"File","type":"Menu","click":[50,20,0],"enabled":true}}]}
+```
+
+No change is explicit and very small:
+
+```json
+{"success":true,"kind":"diff","changes":[]}
+```
+
+If a change list would be close to the complete response size, the server safely returns
+`kind="full"` instead.
 
 ---
 
@@ -407,6 +433,7 @@ Run a sequence of UI automation steps against a window in a single call. Built f
 | `steps` | JSON array of step objects (see below). | Yes |
 | `stopOnError` | Stop at the first failing step (default: `true`). | No |
 | `withSnapshot` | Attach the window element tree after the batch completes. | No |
+| `snapshotMode` | `full` (default), `auto`, or `reset` for the attached view. | No |
 
 ### Step actions
 
@@ -447,7 +474,9 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 
 ### Perceive/act fusion (`withSnapshot`)
 
-`ui_click`, `ui_type`, and `ui_select` accept `withSnapshot=true`. On success they attach the window's post-action element tree as `postActionTree`, so an agent can verify the new state without a separate `ui_snapshot` call.
+`ui_click`, `ui_type`, `ui_select`, `ui_batch`, and `ui_macro` accept `withSnapshot=true`.
+By default they attach the complete window tree as `postActionTree`, preserving existing behavior.
+Set `snapshotMode=auto` to receive `postActionChanges` when a remembered update is clearly smaller.
 
 ---
 

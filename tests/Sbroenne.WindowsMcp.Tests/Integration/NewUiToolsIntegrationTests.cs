@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
+using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
@@ -15,6 +16,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests run against the controlled WinForms harness.
 /// </summary>
 [Collection("UITestHarness")]
+[Trait("Category", "Integration")]
 public sealed class NewUiToolsIntegrationTests : IDisposable
 {
     private readonly UITestHarnessFixture _fixture;
@@ -71,6 +73,83 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
 
         Assert.True(result.Success, $"Filtered snapshot failed: {result.ErrorMessage}");
         Assert.NotNull(result.Tree);
+    }
+
+    [Fact]
+    public async Task Snapshot_WithControlTypeFilter_PreservesMatchingSiblingBranches()
+    {
+        var result = await _automationService.GetTreeAsync(_windowHandle, null, 8, "Button", CancellationToken.None);
+
+        Assert.True(result.Success, $"Filtered snapshot failed: {result.ErrorMessage}");
+        var names = Flatten(result.Tree ?? [])
+            .Where(element => element.Type == "Button")
+            .Select(element => element.Name)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains("Submit", names);
+        Assert.Contains("Cancel", names);
+    }
+
+    [Fact]
+    public async Task SnapshotTool_DefaultCallReturnsFullWithoutDuplicateElements()
+    {
+        var result = await UISnapshotTool.ExecuteAsync(
+            _windowHandle,
+            parentElementId: null,
+            maxDepth: 5,
+            controlTypeFilter: null,
+            includeDiagnostics: false,
+            CancellationToken.None);
+        var json = ExtractText(result);
+        using var document = System.Text.Json.JsonDocument.Parse(json);
+
+        Assert.False(result.IsError);
+        Assert.Equal("full", document.RootElement.GetProperty("kind").GetString());
+        Assert.True(document.RootElement.TryGetProperty("tree", out _));
+        Assert.False(document.RootElement.TryGetProperty("elements", out _));
+    }
+
+    [Fact]
+    public async Task SnapshotTool_AutoReturnsDiffAfterResetBaseline()
+    {
+        _ = await UISnapshotTool.ExecuteAsync(
+            _windowHandle,
+            parentElementId: null,
+            maxDepth: 5,
+            controlTypeFilter: null,
+            mode: "reset",
+            includeDiagnostics: false,
+            CancellationToken.None);
+
+        var result = await UISnapshotTool.ExecuteAsync(
+            _windowHandle,
+            parentElementId: null,
+            maxDepth: 5,
+            controlTypeFilter: null,
+            mode: "auto",
+            includeDiagnostics: false,
+            CancellationToken.None);
+        using var document = System.Text.Json.JsonDocument.Parse(ExtractText(result));
+
+        Assert.False(result.IsError);
+        Assert.Equal("diff", document.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(0, document.RootElement.GetProperty("changes").GetArrayLength());
+        Assert.False(document.RootElement.TryGetProperty("tree", out _));
+    }
+
+    [Fact]
+    public async Task SnapshotTool_InvalidModeReturnsClearError()
+    {
+        var result = await UISnapshotTool.ExecuteAsync(
+            _windowHandle,
+            parentElementId: null,
+            maxDepth: 5,
+            controlTypeFilter: null,
+            mode: "unknown",
+            includeDiagnostics: false,
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Contains("full, auto, reset", ExtractText(result), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -171,4 +250,19 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
         Assert.True(findResult.Items!.Length > 0, "Setup find returned no elements.");
         return findResult.Items![0].Id;
     }
+
+    private static IEnumerable<UIElementCompactTree> Flatten(IEnumerable<UIElementCompactTree> roots)
+    {
+        foreach (var root in roots)
+        {
+            yield return root;
+            foreach (var child in Flatten(root.Children ?? []))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private static string ExtractText(ModelContextProtocol.Protocol.CallToolResult result) =>
+        result.Content.OfType<ModelContextProtocol.Protocol.TextContentBlock>().Single().Text;
 }

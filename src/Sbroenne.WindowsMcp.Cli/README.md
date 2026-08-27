@@ -63,7 +63,7 @@ wincli <group> [<action>] [--option value] [--flag]
 wincli window find --title Notepad
 
 # 2. Inspect the accessible element tree
-wincli ui snapshot --window 12345
+wincli ui snapshot --window 12345 --mode full
 
 # 3. Act on controls semantically; --with-snapshot returns the updated tree in the same call
 wincli ui type  --window 12345 --automation-id UsernameInput --text "me" --clear-first

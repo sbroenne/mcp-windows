@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Diagnostics;
 using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
@@ -12,6 +13,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// that is byte-for-byte identical to the MCP server for the same operation.
 /// </summary>
 [Collection("UITestHarness")]
+[Trait("Category", "Integration")]
 public sealed class CliIntegrationTests
 {
     private readonly UITestHarnessFixture _fixture;
@@ -53,6 +55,30 @@ public sealed class CliIntegrationTests
     {
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
+    }
+
+    private static async Task<(int Code, string Stdout, string Stderr)> RunSeparateProcessAsync(
+        params string[] args)
+    {
+        var executable = Path.ChangeExtension(typeof(CommandDispatcher).Assembly.Location, ".exe");
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = executable,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (var arg in args)
+        {
+            startInfo.ArgumentList.Add(arg);
+        }
+
+        using var process = Process.Start(startInfo)
+            ?? throw new InvalidOperationException($"Could not start {executable}.");
+        var stdout = await process.StandardOutput.ReadToEndAsync();
+        var stderr = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return (process.ExitCode, stdout, stderr);
     }
 
     [Fact]
@@ -136,6 +162,38 @@ public sealed class CliIntegrationTests
 
         Assert.Equal(0, code);
         Assert.True(SuccessOf(stdout), stdout);
+    }
+
+    [Fact]
+    public async Task Cli_UiSnapshot_ForwardsAutomaticMode()
+    {
+        var (resetCode, resetOutput, _) = await RunAsync(
+            "ui", "snapshot", "--window", _windowHandle, "--mode", "reset");
+        var (autoCode, autoOutput, _) = await RunAsync(
+            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+
+        using var resetDocument = JsonDocument.Parse(resetOutput);
+        using var autoDocument = JsonDocument.Parse(autoOutput);
+        Assert.Equal(0, resetCode);
+        Assert.Equal("full", resetDocument.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(0, autoCode);
+        Assert.Equal("diff", autoDocument.RootElement.GetProperty("kind").GetString());
+    }
+
+    [Fact]
+    public async Task Cli_UiSnapshot_SeparateProcessesDoNotShareRememberedViews()
+    {
+        var first = await RunSeparateProcessAsync(
+            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+        var second = await RunSeparateProcessAsync(
+            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+
+        using var firstDocument = JsonDocument.Parse(first.Stdout);
+        using var secondDocument = JsonDocument.Parse(second.Stdout);
+        Assert.Equal(0, first.Code);
+        Assert.Equal("full", firstDocument.RootElement.GetProperty("kind").GetString());
+        Assert.Equal(0, second.Code);
+        Assert.Equal("full", secondDocument.RootElement.GetProperty("kind").GetString());
     }
 
     [Fact]

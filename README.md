@@ -86,7 +86,7 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 | Tool | Purpose |
 |------|---------|
-| `ui_snapshot` | Capture a compact element tree of a window (orient first) |
+| `ui_snapshot` | Capture a compact element tree; `mode=auto` returns smaller updates after the first view |
 | `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
@@ -108,6 +108,11 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 Full reference: [FEATURES.md](FEATURES.md)
 
+For repeated views through the long-running MCP server, call `ui_snapshot` with `mode=auto`.
+The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
+space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
+remain the default, and separate `wincli` commands do not share remembered views.
+
 ## Command-line interface (`wincli`)
 
 The server ships with a **twin command-line entry point**, `wincli`, in
@@ -122,7 +127,7 @@ stateless — there is no server session to keep alive.
 
 ```powershell
 wincli window find --title Notepad           # -> window handle
-wincli ui snapshot --window 12345            # accessible element tree
+wincli ui snapshot --window 12345 --mode full  # complete accessible element tree
 wincli ui click --window 12345 --name Submit --with-snapshot
 wincli clipboard set --text "hello"          # write the clipboard
 wincli macro run --name login --window 12345 # replay a saved workflow

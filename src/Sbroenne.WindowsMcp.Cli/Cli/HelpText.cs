@@ -67,19 +67,23 @@ internal static class HelpText
                      --state --exclude-title --discard-changes
 
         ui snapshot --window <h> [--parent <id>] [--max-depth <n>] [--control-type <t>]
+                    [--mode full|auto|reset]
+            full returns the complete tree (default). auto returns changes after the first view when
+            smaller. reset forgets the remembered view. Separate wincli calls start fresh, so auto
+            safely returns a complete tree unless commands later share a running server process.
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
                      [--sort-by-prominence] [--in-region x,y,w,h] [--near-element <id>]
                      [--visible-only] [--content-view-only] [--timeout-ms <n>]
-        ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>] [--double-click] [--with-snapshot]
-        ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first] [--with-snapshot]
-        ui select   --window <h> --value <s> [selectors] [--with-snapshot]
+        ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>] [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
+        ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first] [--with-snapshot] [--snapshot-mode full|auto|reset]
+        ui select   --window <h> --value <s> [selectors] [--with-snapshot] [--snapshot-mode full|auto|reset]
         ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>] [--format raw|article]
         ui read-table --window <h> [selectors|--element-id <id>] [--max-rows <n>] [--max-columns <n>]
         ui wait     [--window <h>] [--mode appear|disappear|...] [--element-id <id>]
                      [--desired-state <s>] [selectors] [--timeout-ms <n>]
         ui batch    --window <h> --steps '<json>' | --steps-file <path>
-                     [--continue-on-error] [--with-snapshot]
+                     [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]
             selectors: --name --name-contains --name-pattern --control-type --automation-id --class-name
 
         keyboard <action> --window <h> [options]
@@ -117,7 +121,8 @@ internal static class HelpText
 
         macro <action> [options]
             actions: save (--name --steps '<json>'|--steps-file <path>), run (--name --window <h>
-                     [--continue-on-error] [--with-snapshot]), list, get (--name), delete (--name)
+                     [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]),
+                     list, get (--name), delete (--name)
             Persist a ui_batch steps array under a name, then replay it later against any window.
             Replay uses the identical batch engine, so a macro run == the equivalent ui batch call.
 

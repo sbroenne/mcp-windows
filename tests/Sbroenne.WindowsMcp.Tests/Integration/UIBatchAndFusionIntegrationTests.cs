@@ -12,8 +12,10 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// Tests drive the real tool entry points against the controlled WinForms harness.
 /// </summary>
 [Collection("UITestHarness")]
+[Trait("Category", "Integration")]
 public sealed class UIBatchAndFusionIntegrationTests
 {
+    private static readonly string[] SnapshotKinds = ["full", "diff"];
     private readonly UITestHarnessFixture _fixture;
     private readonly string _windowHandle;
 
@@ -114,7 +116,7 @@ public sealed class UIBatchAndFusionIntegrationTests
     }
 
     [Fact]
-    public async Task Batch_WithSnapshot_AttachesPostActionTree()
+    public async Task Batch_WithSnapshot_AttachesPostActionSnapshot()
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
@@ -126,8 +128,31 @@ public sealed class UIBatchAndFusionIntegrationTests
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Batch failed: {ExtractText(result)}");
+        Assert.Equal("full", batch.PostActionKind);
         Assert.NotNull(batch.PostActionTree);
-        Assert.True(batch.PostActionTree!.Length >= 1);
+        Assert.Null(batch.PostActionChanges);
+    }
+
+    [Fact]
+    public async Task Batch_InvalidSnapshotModeFailsBeforeRunningSteps()
+    {
+        var steps = JsonSerializer.Serialize(new object[]
+        {
+            new { action = "click", name = "Submit", controlType = "Button" },
+        });
+
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle,
+            steps,
+            stopOnError: true,
+            withSnapshot: true,
+            snapshotMode: "invalid",
+            includeDiagnostics: false,
+            CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(0, _fixture.Form!.SubmitClickCount);
+        Assert.Contains("full, auto, reset", ExtractText(result), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -278,7 +303,7 @@ public sealed class UIBatchAndFusionIntegrationTests
     }
 
     [Fact]
-    public async Task Click_WithSnapshot_AttachesPostActionTree()
+    public async Task Click_WithSnapshot_AttachesPostActionSnapshot()
     {
         var result = await UIClickTool.ExecuteAsync(
             _windowHandle,
@@ -298,8 +323,45 @@ public sealed class UIBatchAndFusionIntegrationTests
         var text = ExtractText(result);
         var doc = JsonDocument.Parse(text);
         Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), $"Click failed: {text}");
-        Assert.True(doc.RootElement.TryGetProperty("postActionTree", out var tree), "Expected postActionTree on fused click result.");
-        Assert.True(tree.GetArrayLength() >= 1);
+        Assert.Equal("full", doc.RootElement.GetProperty("postActionKind").GetString());
+        Assert.True(doc.RootElement.TryGetProperty("postActionTree", out _));
+        Assert.False(doc.RootElement.TryGetProperty("postActionChanges", out _));
+    }
+
+    [Fact]
+    public async Task Click_WithAutomaticSnapshot_UsesDiffOrSafeFullFallback()
+    {
+        _ = await UISnapshotTool.ExecuteAsync(
+            _windowHandle, null, 5, null, "reset", false, CancellationToken.None);
+
+        var result = await UIClickTool.ExecuteAsync(
+            _windowHandle,
+            name: "Submit",
+            nameContains: null,
+            namePattern: null,
+            controlType: "Button",
+            automationId: null,
+            className: null,
+            elementId: null,
+            foundIndex: 1,
+            withSnapshot: true,
+            snapshotMode: "auto",
+            includeDiagnostics: false,
+            doubleClick: false,
+            CancellationToken.None);
+
+        var payload = ExtractText(result);
+        Assert.False(result.IsError, payload);
+        using var document = JsonDocument.Parse(payload);
+        Assert.True(
+            document.RootElement.TryGetProperty("postActionKind", out var kindElement),
+            payload);
+        var kind = kindElement.GetString();
+        Assert.Contains(kind, SnapshotKinds);
+        Assert.True(
+            kind == "diff"
+                ? document.RootElement.TryGetProperty("postActionChanges", out _)
+                : document.RootElement.TryGetProperty("postActionTree", out _));
     }
 
     [Fact]
