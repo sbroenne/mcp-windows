@@ -40,6 +40,40 @@ Across this deliberately mixed workload set, the normalized mode effect was 21.5
 by approximate tokens. A separate regression confirms that a same-page GitHub search-field edit
 returns a scoped diff in both Edge and Chrome; it is not included as another benchmark workload.
 
+## Chromium noise spike
+
+We tested whether Windows UI Automation's smaller "content view" could remove Chromium layout noise
+before snapshots were compared. The same GitHub navigation workflow was run five times per arm with
+that view enabled.
+
+| Browser | Full bytes | Auto bytes | Full tokens | Auto tokens | Auto full/diff |
+|---|---:|---:|---:|---:|---:|
+| Edge | 78,233 | 78,618 | 24,366 | 24,485 | 20/0 |
+| Chrome | 162,258 | 162,349 | 51,213 | 51,244 | 20/0 |
+
+This did not produce a single diff. More importantly, a safety check found that the content-view
+tree contained the browser frame but omitted GitHub's page controls, including the Code link, in
+both Edge and Chrome. Chrome's median full payload was about 6% smaller than the original control
+view, but the missing page made that reduction unusable. The experiment was therefore rejected and
+is not enabled in production. Edge's live tree differed too much between runs to make a reliable
+size comparison.
+
+Playwright's [ARIA snapshot implementation][playwright-aria] supports a safer direction. It creates
+a small role, name, text, and state tree rather than comparing raw browser nodes. Its
+[distiller][playwright-distiller] joins adjacent text, normalizes whitespace, removes empty text, and
+unwraps low-information layout containers with one child. Action references are handled separately
+and are renewed after navigation. Playwright's loose role-and-name matching is suitable for test
+assertions, but not for carrying an action ID across duplicate controls.
+
+The next safe experiment is therefore post-capture cleanup, not Windows content-view filtering:
+remove only unnamed layout containers that are proven to have no action of their own, keep all their
+children, and continue returning a full snapshot whenever duplicate controls cannot be matched
+one-to-one. This requires retaining cached action-capability information during tree construction;
+click coordinates alone are not proof that a UI Automation element is actionable.
+
+[playwright-aria]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshot.ts
+[playwright-distiller]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshotDistiller.ts
+
 ## Method
 
 Each scenario executes the same four state changes under three arms:
