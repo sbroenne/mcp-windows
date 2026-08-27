@@ -7,6 +7,9 @@ let lastSavePath: string | null = null;
 
 // Chromium 117+ requires the explicit "complete" mode for reliable Windows UIA exposure.
 app.commandLine.appendSwitch('force-renderer-accessibility', 'complete');
+// Chromium 150 no longer exposes renderer descendants through Windows UIA reliably without
+// the native provider enabled. Electron 43 embeds that Chromium version.
+app.commandLine.appendSwitch('enable-features', 'UiaProvider');
 
 function createWindow(): void {
     mainWindow = new BrowserWindow({
