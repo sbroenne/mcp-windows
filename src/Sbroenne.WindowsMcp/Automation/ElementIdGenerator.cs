@@ -133,11 +133,17 @@ public static class ElementIdGenerator
     {
         var current = element;
         nint topLevelHandle = IntPtr.Zero;
+        var desktopRoot = UIA3Automation.Instance.RootElement;
 
         while (current != null)
         {
             try
             {
+                if (current.IsSameElement(desktopRoot))
+                {
+                    break;
+                }
+
                 var hwnd = current.GetNativeWindowHandle();
                 if (hwnd != 0)
                 {
@@ -165,10 +171,10 @@ public static class ElementIdGenerator
 
         try
         {
-            var windowHandle = GetTopLevelWindowHandle(element);
+            var windowHandle = rootElement.GetNativeWindowHandle();
             if (windowHandle == 0)
             {
-                windowHandle = rootElement.GetNativeWindowHandle();
+                windowHandle = GetTopLevelWindowHandle(element);
             }
 
             // Get runtime ID
@@ -195,17 +201,19 @@ public static class ElementIdGenerator
     {
         try
         {
-            var windowHandle = GetTopLevelWindowHandle(element);
+            nint windowHandle;
+            try
+            {
+                windowHandle = rootElement.GetCachedNativeWindowHandle();
+            }
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            {
+                windowHandle = rootElement.GetNativeWindowHandle();
+            }
+
             if (windowHandle == 0)
             {
-                try
-                {
-                    windowHandle = rootElement.GetCachedNativeWindowHandle();
-                }
-                catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-                {
-                    windowHandle = rootElement.GetNativeWindowHandle();
-                }
+                windowHandle = GetTopLevelWindowHandle(element);
             }
 
             // Get runtime ID - try cached first
@@ -240,10 +248,10 @@ public static class ElementIdGenerator
     {
         try
         {
-            var windowHandle = GetTopLevelWindowHandle(element);
+            var windowHandle = rootElement.GetNativeWindowHandle();
             if (windowHandle == 0)
             {
-                windowHandle = rootElement.GetNativeWindowHandle();
+                windowHandle = GetTopLevelWindowHandle(element);
             }
 
             // Get runtime ID
