@@ -397,6 +397,23 @@ public static class WindowsToolsBase
         int maxDepth,
         string? controlTypeFilter,
         SnapshotMode mode,
+        CancellationToken cancellationToken) =>
+        CaptureSnapshotAsync(
+            windowHandle,
+            parentElementId,
+            maxDepth,
+            controlTypeFilter,
+            mode,
+            includeDiagnostics: false,
+            cancellationToken);
+
+    internal static Task<UIAutomationResult> CaptureSnapshotAsync(
+        string? windowHandle,
+        string? parentElementId,
+        int maxDepth,
+        string? controlTypeFilter,
+        SnapshotMode mode,
+        bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         var effectiveWindowHandle = windowHandle;
@@ -424,6 +441,7 @@ public static class WindowsToolsBase
                 maxDepth,
                 controlTypeFilter,
                 token),
+            includeDiagnostics,
             cancellationToken);
     }
 

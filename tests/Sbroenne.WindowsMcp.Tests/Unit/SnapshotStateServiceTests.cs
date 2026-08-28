@@ -215,6 +215,40 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
+    public async Task Auto_SizeThresholdMatchesDiagnosticsRequestedByCaller()
+    {
+        var diagnostics = new UIAutomationDiagnostics
+        {
+            DurationMs = 1,
+            WindowTitle = new string('d', 10_000)
+        };
+        var snapshot = LargeResult("Window") with { Diagnostics = diagnostics };
+
+        using var defaultService = new SnapshotStateService();
+        _ = await defaultService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), CancellationToken.None);
+        var withoutDiagnostics = await defaultService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), CancellationToken.None);
+
+        using var diagnosticService = new SnapshotStateService();
+        _ = await diagnosticService.CaptureAsync(
+            Key,
+            SnapshotMode.Auto,
+            _ => Task.FromResult(snapshot),
+            includeDiagnostics: true,
+            CancellationToken.None);
+        var withDiagnostics = await diagnosticService.CaptureAsync(
+            Key,
+            SnapshotMode.Auto,
+            _ => Task.FromResult(snapshot),
+            includeDiagnostics: true,
+            CancellationToken.None);
+
+        Assert.Equal("diff", withoutDiagnostics.Kind);
+        Assert.Equal("full", withDiagnostics.Kind);
+    }
+
+    [Fact]
     public async Task Auto_RootElementIdChurnWithStableSemanticIdentity_ReturnsDiff()
     {
         ElementIdGenerator.Clear();

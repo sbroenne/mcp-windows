@@ -78,6 +78,7 @@ public static partial class UISnapshotTool
                 maxDepth,
                 controlTypeFilter,
                 parsedMode,
+                includeDiagnostics,
                 cancellationToken);
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Text.Json;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tools;
 
@@ -154,11 +153,25 @@ internal sealed class SnapshotStateService : IDisposable
         SnapshotMode mode,
         Func<CancellationToken, Task<UIAutomationResult>> capture,
         CancellationToken cancellationToken) =>
+        await CaptureAsync(
+            key,
+            mode,
+            capture,
+            includeDiagnostics: false,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<UIAutomationResult> CaptureAsync(
+        SnapshotRequestKey key,
+        SnapshotMode mode,
+        Func<CancellationToken, Task<UIAutomationResult>> capture,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
         await CaptureCoreAsync(
             key,
             mode,
             capture,
             cleanDisplay: true,
+            includeDiagnostics,
             cancellationToken).ConfigureAwait(false);
 
     internal async Task<UIAutomationResult> CaptureWithoutDisplayCleanupAsync(
@@ -171,6 +184,7 @@ internal sealed class SnapshotStateService : IDisposable
             mode,
             capture,
             cleanDisplay: false,
+            includeDiagnostics: false,
             cancellationToken).ConfigureAwait(false);
 
     private async Task<UIAutomationResult> CaptureCoreAsync(
@@ -178,6 +192,7 @@ internal sealed class SnapshotStateService : IDisposable
         SnapshotMode mode,
         Func<CancellationToken, Task<UIAutomationResult>> capture,
         bool cleanDisplay,
+        bool includeDiagnostics,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(capture);
@@ -260,7 +275,7 @@ internal sealed class SnapshotStateService : IDisposable
                     : $"{displayChanges.Length} UI change(s) since the previous automatic snapshot. Added nodes include current element ids for the next action."
             };
 
-            if (!IsWorthReturning(diff, full))
+            if (!IsWorthReturning(diff, full, includeDiagnostics))
             {
                 StoreTree(key, comparableTree, now);
                 return full;
@@ -314,16 +329,19 @@ internal sealed class SnapshotStateService : IDisposable
     private static int CountElements(IEnumerable<UIElementCompactTree> tree) =>
         tree.Sum(node => 1 + CountElements(node.Children ?? []));
 
-    private static bool IsWorthReturning(UIAutomationResult diff, UIAutomationResult full)
+    private static bool IsWorthReturning(
+        UIAutomationResult diff,
+        UIAutomationResult full,
+        bool includeDiagnostics)
     {
-        var diffBytes = SerializedByteCount(diff);
-        var fullBytes = SerializedByteCount(full);
+        var diffBytes = SerializedByteCount(diff, includeDiagnostics);
+        var fullBytes = SerializedByteCount(full, includeDiagnostics);
         return diffBytes * 100L < fullBytes * DiffSizePercentThreshold;
     }
 
-    private static int SerializedByteCount(UIAutomationResult result)
+    private static int SerializedByteCount(UIAutomationResult result, bool includeDiagnostics)
     {
-        var json = JsonSerializer.Serialize(result, WindowsToolsBase.JsonOptions);
+        var json = WindowsToolsBase.SerializeUIResult(result, includeDiagnostics);
         return System.Text.Encoding.UTF8.GetByteCount(json);
     }
 
