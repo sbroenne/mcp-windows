@@ -32,6 +32,7 @@ GITHUB_TREE = "https://github.com/sbroenne/mcp-windows/tree/main/"
 # they resolve on the website instead of 404-ing.
 SITE_PAGE_MAP = {
     "FEATURES.md": "/features/",
+    "docs/incremental-snapshot-benchmark.md": "/benchmark/",
     "vscode-extension/CHANGELOG.md": "/changelog/",
     "CONTRIBUTING.md": "/contributing/",
     "plugin/skills/windows-automation/SKILL.md": "/skills/",
@@ -117,6 +118,16 @@ def _strip_to_first_h2(text: str, *, demote_h1: bool = True) -> str:
     return "\n".join(body).strip() + "\n"
 
 
+def _strip_first_h1(text: str) -> str:
+    """Remove the first H1 while retaining the document introduction."""
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("# "):
+            del lines[index]
+            break
+    return "\n".join(lines).strip() + "\n"
+
+
 def _read(rel: str) -> str:
     path = REPO_ROOT / rel
     if not path.is_file():
@@ -137,6 +148,12 @@ def on_pre_build(config, **kwargs):  # noqa: D401 - MkDocs hook signature
         "features.md",
         "FEATURES.md",
         _strip_to_first_h2(_read("FEATURES.md")),
+    )
+
+    _write(
+        "benchmark.md",
+        "docs/incremental-snapshot-benchmark.md",
+        _strip_first_h1(_read("docs/incremental-snapshot-benchmark.md")),
     )
 
     # vscode-extension/CHANGELOG.md -> changelog (drop title + intro, keep

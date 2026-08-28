@@ -32,7 +32,8 @@ public static partial class UIClickTool
     /// <param name="className">Element class name (e.g., 'Chrome_WidgetWin_1' for Chromium).</param>
     /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, clicks that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
-    /// <param name="withSnapshot">When true, attach the window's post-action element tree (perceive/act fusion) so you can verify the new state without a separate ui_snapshot call. Default: false.</param>
+    /// <param name="withSnapshot">When true, attach a post-action snapshot so you can verify the new state without another tool call. Default: false.</param>
+    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this action starts a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="doubleClick">Double-click the element instead of single-clicking. Use for list/grid items that open on double-click - no coordinates needed. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -49,6 +50,7 @@ public static partial class UIClickTool
         [DefaultValue(null)] string? elementId,
         [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool withSnapshot,
+        [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
         [DefaultValue(false)] bool doubleClick,
         CancellationToken cancellationToken)
@@ -67,6 +69,12 @@ public static partial class UIClickTool
             return foundIndexError;
         }
 
+        if (!SnapshotStateService.TryParseMode(snapshotMode, out var parsedSnapshotMode))
+        {
+            return WindowsToolsBase.FailResult(
+                $"snapshotMode must be one of: full, auto, reset (got '{snapshotMode}').");
+        }
+
         try
         {
             if (!string.IsNullOrWhiteSpace(elementId))
@@ -74,7 +82,8 @@ public static partial class UIClickTool
                 var byIdResult = doubleClick
                     ? await WindowsToolsBase.UIAutomationService.DoubleClickElementAsync(elementId, windowHandle, cancellationToken)
                     : await WindowsToolsBase.UIAutomationService.ClickElementAsync(elementId, windowHandle, cancellationToken);
-                byIdResult = await WindowsToolsBase.WithPostActionSnapshotAsync(byIdResult, windowHandle, withSnapshot, cancellationToken);
+                byIdResult = await WindowsToolsBase.WithPostActionSnapshotAsync(
+                    byIdResult, windowHandle, withSnapshot, parsedSnapshotMode, cancellationToken);
                 return WindowsToolsBase.ToCallToolResult(byIdResult, includeDiagnostics);
             }
 
@@ -93,7 +102,8 @@ public static partial class UIClickTool
             var result = doubleClick
                 ? await WindowsToolsBase.UIAutomationService.FindAndDoubleClickAsync(query, cancellationToken)
                 : await WindowsToolsBase.UIAutomationService.FindAndClickAsync(query, cancellationToken);
-            result = await WindowsToolsBase.WithPostActionSnapshotAsync(result, windowHandle, withSnapshot, cancellationToken);
+            result = await WindowsToolsBase.WithPostActionSnapshotAsync(
+                result, windowHandle, withSnapshot, parsedSnapshotMode, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
@@ -101,4 +111,24 @@ public static partial class UIClickTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Calls the snapshot-aware overload with a complete post-action snapshot.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        string? elementId,
+        int foundIndex,
+        bool withSnapshot,
+        bool includeDiagnostics,
+        bool doubleClick,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle, name, nameContains, namePattern, controlType, automationId, className,
+            elementId, foundIndex, withSnapshot, "full", includeDiagnostics, doubleClick,
+            cancellationToken);
 }

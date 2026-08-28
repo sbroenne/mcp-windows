@@ -38,16 +38,45 @@ internal sealed class ChromiumBrowserSession : IDisposable
     [DllImport("user32.dll")]
     private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern nint CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool Process32First(nint hSnapshot, ref ProcessEntry32 lppe);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool Process32Next(nint hSnapshot, ref ProcessEntry32 lppe);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(nint hObject);
+
     private const uint WmClose = 0x0010;
+    private const uint Th32csSnapProcess = 0x00000002;
+    private static readonly nint InvalidHandleValue = new(-1);
 
     private readonly Process _browserProcess;
+    private readonly Process? _windowProcess;
     private readonly string _browserProcessName;
     private readonly string? _userDataDirectory;
     private bool _disposed;
 
-    private ChromiumBrowserSession(Process browserProcess, nint windowHandle, string browserProcessName, string? userDataDirectory)
+    private ChromiumBrowserSession(
+        Process browserProcess,
+        nint windowHandle,
+        string browserProcessName,
+        string? userDataDirectory,
+        IReadOnlySet<int> existingProcessIds)
     {
         _browserProcess = browserProcess;
+        _ = NativeMethods.GetWindowThreadProcessId(windowHandle, out var windowProcessId);
+        _windowProcess = windowProcessId > 0 &&
+            windowProcessId != browserProcess.Id &&
+            IsTestOwnedProcess(unchecked((int)windowProcessId), browserProcess.Id, existingProcessIds)
+            ? Process.GetProcessById(unchecked((int)windowProcessId))
+            : null;
         _browserProcessName = browserProcessName;
         _userDataDirectory = userDataDirectory;
         WindowHandle = windowHandle;
@@ -81,7 +110,32 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new Uri(pagePath).AbsoluteUri,
             "MCP Chromium Browser Test Page",
             TimeSpan.FromSeconds(15),
-            [new ReadyElement("Primary navigation"), new ReadyElement("Docs Search", "Edit"), new ReadyElement("Sign in", "Button")]));
+            [new ReadyElement("Primary navigation"), new ReadyElement("Docs Search"), new ReadyElement("Sign in", "Button")]));
+    }
+
+    internal static ChromiumBrowserSession LaunchLocalPageForReadinessFailureTest(
+        ChromiumBrowserKind browser)
+    {
+        var pagePath = FindLocalPagePath();
+        return Launch(browser, new BrowserTarget(
+            "intentional readiness failure",
+            new Uri(pagePath).AbsoluteUri,
+            "MCP Chromium Browser Test Page",
+            TimeSpan.FromMilliseconds(500),
+            [new ReadyElement("Control that does not exist")]));
+    }
+
+    internal static ChromiumBrowserSession LaunchLocalPageForWindowFailureTest(
+        ChromiumBrowserKind browser)
+    {
+        var pagePath = FindLocalPagePath();
+        return Launch(browser, new BrowserTarget(
+            "intentional window discovery failure",
+            new Uri(pagePath).AbsoluteUri,
+            "Window title that does not exist",
+            TimeSpan.FromMilliseconds(500),
+            [],
+            WindowTimeout: TimeSpan.FromMilliseconds(500)));
     }
 
     public static ChromiumBrowserSession LaunchPublicSite(ChromiumBrowserKind browser, ChromiumPublicSite site)
@@ -94,6 +148,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 "TodoMVC",
                 TimeSpan.FromSeconds(20),
                 [new ReadyElement("What needs to be done?", "Edit")]),
+            ChromiumPublicSite.GitHubVisualStudioCode => new BrowserTarget(
+                "GitHub microsoft/vscode",
+                "https://github.com/microsoft/vscode",
+                "microsoft/vscode",
+                TimeSpan.FromSeconds(30),
+                [new ReadyElement("Code")],
+                AppMode: false),
             _ => throw new ArgumentOutOfRangeException(nameof(site), site, "Unsupported Chromium public site."),
         });
     }
@@ -116,6 +177,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
         var userDataDirectory = PrepareUserDataDirectory(browserExecutable, browserDescriptor);
 
         var existingWindows = SnapshotBrowserWindows(browserDescriptor.ProcessName);
+        var existingProcessIds = SnapshotBrowserProcessIds(browserDescriptor.ProcessName);
 
         var process = new Process
         {
@@ -128,16 +190,46 @@ internal sealed class ChromiumBrowserSession : IDisposable
             }
         };
 
-        if (!process.Start())
+        ChromiumBrowserSession? session = null;
+        try
         {
-            throw new InvalidOperationException($"Failed to start {browserDescriptor.DisplayName} for Chromium browser smoke tests.");
-        }
+            if (!process.Start())
+            {
+                throw new InvalidOperationException($"Failed to start {browserDescriptor.DisplayName} for Chromium browser smoke tests.");
+            }
 
-        var windowHandle = WaitForWindow(process.Id, target.TitleFragment, existingWindows, browserDescriptor.ProcessName);
-        var session = new ChromiumBrowserSession(process, windowHandle, browserDescriptor.ProcessName, userDataDirectory);
-        session.BringToFront();
-        WaitForPageReady(target, session.WindowHandleString);
-        return session;
+            var windowHandle = WaitForWindow(
+                process.Id,
+                target.TitleFragment,
+                existingWindows,
+                existingProcessIds,
+                browserDescriptor.ProcessName,
+                target.WindowTimeout ?? LaunchTimeout);
+            session = new ChromiumBrowserSession(
+                process,
+                windowHandle,
+                browserDescriptor.ProcessName,
+                userDataDirectory,
+                existingProcessIds);
+            session.BringToFront();
+            WaitForPageReady(target, session.WindowHandleString);
+            return session;
+        }
+        catch
+        {
+            if (session is not null)
+            {
+                session.Dispose();
+            }
+            else
+            {
+                EnsureProcessExited(process);
+                DeleteUserDataDirectory(userDataDirectory);
+                process.Dispose();
+            }
+
+            throw;
+        }
     }
 
     public void BringToFront()
@@ -172,8 +264,10 @@ internal sealed class ChromiumBrowserSession : IDisposable
         }
         finally
         {
-            EnsureBrowserExited();
-            DeleteUserDataDirectory();
+            EnsureProcessExited(_windowProcess);
+            EnsureProcessExited(_browserProcess);
+            DeleteUserDataDirectory(_userDataDirectory);
+            _windowProcess?.Dispose();
             _browserProcess.Dispose();
         }
 
@@ -182,8 +276,14 @@ internal sealed class ChromiumBrowserSession : IDisposable
     private static string? FindBrowserExecutable(ChromiumBrowserKind browser)
     {
         var descriptor = GetBrowserDescriptor(browser);
+        var overridePath = Environment.GetEnvironmentVariable(
+            browser == ChromiumBrowserKind.Chrome
+                ? "MCP_TEST_CHROME_PATH"
+                : "MCP_TEST_EDGE_PATH");
 
-        return descriptor.CandidatePaths.FirstOrDefault(File.Exists);
+        return !string.IsNullOrWhiteSpace(overridePath) && File.Exists(overridePath)
+            ? overridePath
+            : descriptor.CandidatePaths.FirstOrDefault(File.Exists);
     }
 
     private static string CreateUserDataDirectory()
@@ -415,11 +515,16 @@ internal sealed class ChromiumBrowserSession : IDisposable
             pollInterval: TimeSpan.FromMilliseconds(100));
     }
 
-    private void EnsureBrowserExited()
+    private static void EnsureProcessExited(Process? process)
     {
+        if (process is null)
+        {
+            return;
+        }
+
         try
         {
-            if (_browserProcess.HasExited)
+            if (process.HasExited)
             {
                 return;
             }
@@ -429,15 +534,15 @@ internal sealed class ChromiumBrowserSession : IDisposable
             return;
         }
 
-        if (_browserProcess.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds))
+        if (process.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds))
         {
             return;
         }
 
         try
         {
-            _browserProcess.Kill(entireProcessTree: true);
-            _browserProcess.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds);
+            process.Kill(entireProcessTree: true);
+            process.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds);
         }
         catch
         {
@@ -445,9 +550,9 @@ internal sealed class ChromiumBrowserSession : IDisposable
         }
     }
 
-    private void DeleteUserDataDirectory()
+    private static void DeleteUserDataDirectory(string? userDataDirectory)
     {
-        if (string.IsNullOrWhiteSpace(_userDataDirectory) || !Directory.Exists(_userDataDirectory))
+        if (string.IsNullOrWhiteSpace(userDataDirectory) || !Directory.Exists(userDataDirectory))
         {
             return;
         }
@@ -457,7 +562,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
             {
                 try
                 {
-                    Directory.Delete(_userDataDirectory, recursive: true);
+                    Directory.Delete(userDataDirectory, recursive: true);
                     return true;
                 }
                 catch (IOException)
@@ -488,10 +593,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     private static string BuildLaunchArguments(BrowserTarget target, string userDataDirectory)
     {
+        var targetArgument = target.AppMode
+            ? $"--app=\"{target.Url}\""
+            : $"\"{target.Url}\"";
         string[] arguments =
         [
             "--new-window",
-            $"--app=\"{target.Url}\"",
+            targetArgument,
             $"--user-data-dir=\"{userDataDirectory}\"",
             "--no-first-run",
             "--no-default-browser-check",
@@ -517,11 +625,12 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new WindowActivator(),
             new ElevationDetector(),
             NullLogger<UIAutomationService>.Instance);
+        string? missingReadyElement = null;
 
         var ready = TestWait.Until(
             condition: () =>
             {
-                if (IsReady(target, automationService, windowHandle))
+                if (IsReady(target, automationService, windowHandle, out missingReadyElement))
                 {
                     return true;
                 }
@@ -535,11 +644,16 @@ internal sealed class ChromiumBrowserSession : IDisposable
         if (!ready)
         {
             throw new InvalidOperationException(
-                $"Timed out waiting for Chromium target '{target.Name}' to become ready without Edge first-run UI interference.");
+                $"Timed out waiting for Chromium target '{target.Name}' to become ready without Edge first-run UI interference. " +
+                $"Missing control: {missingReadyElement ?? "unknown"}.");
         }
     }
 
-    private static bool IsReady(BrowserTarget target, UIAutomationService automationService, string windowHandle)
+    private static bool IsReady(
+        BrowserTarget target,
+        UIAutomationService automationService,
+        string windowHandle,
+        out string? missingReadyElement)
     {
         foreach (var readyElement in target.ReadyElements)
         {
@@ -551,12 +665,21 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 TimeoutMs = 1000,
             }).GetAwaiter().GetResult();
 
-            if (!result.Success || result.Items is not { Length: > 0 })
+            if (!result.Success ||
+                result.Items is not { Length: > 0 } ||
+                !result.Items.Any(item =>
+                    string.Equals(item.Name, readyElement.Name, StringComparison.Ordinal) &&
+                    (readyElement.ControlType is null ||
+                     string.Equals(item.Type, readyElement.ControlType, StringComparison.Ordinal))))
             {
+                missingReadyElement = readyElement.ControlType is null
+                    ? readyElement.Name
+                    : $"{readyElement.ControlType} '{readyElement.Name}'";
                 return false;
             }
         }
 
+        missingReadyElement = null;
         return true;
     }
 
@@ -609,7 +732,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
         return false;
     }
 
-    private static nint WaitForWindow(int processId, string titleFragment, HashSet<string> existingWindows, string browserProcessName)
+    private static nint WaitForWindow(
+        int processId,
+        string titleFragment,
+        HashSet<string> existingWindows,
+        IReadOnlySet<int> existingProcessIds,
+        string browserProcessName,
+        TimeSpan timeout)
     {
         var enumerator = new WindowEnumerator(new ElevationDetector());
 
@@ -628,7 +757,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
                     ?? windows.FirstOrDefault(window =>
                         string.Equals(window.ProcessName, browserProcessName, StringComparison.OrdinalIgnoreCase) &&
                         window.Title.Contains(titleFragment, StringComparison.OrdinalIgnoreCase) &&
-                        !existingWindows.Contains(window.Handle));
+                        !existingWindows.Contains(window.Handle) &&
+                        IsTestOwnedProcess(window.ProcessId, processId, existingProcessIds));
 
                 if (match is null ||
                     !WindowHandleParser.TryParse(match.Handle, out foundHandle) ||
@@ -640,7 +770,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
                 return true;
             },
-            timeout: LaunchTimeout,
+            timeout: timeout,
             pollInterval: TimeSpan.FromMilliseconds(200));
 
         if (found)
@@ -651,12 +781,118 @@ internal sealed class ChromiumBrowserSession : IDisposable
         throw new InvalidOperationException($"Timed out waiting for Chromium browser test window '{titleFragment}'.");
     }
 
+    internal static bool IsTestOwnedProcess(
+        int candidateProcessId,
+        int launchedProcessId,
+        IReadOnlySet<int> existingProcessIds)
+    {
+        if (existingProcessIds.Contains(candidateProcessId))
+        {
+            return false;
+        }
+
+        return candidateProcessId == launchedProcessId ||
+            IsDescendantProcess(candidateProcessId, launchedProcessId);
+    }
+
+    private static bool IsDescendantProcess(int candidateProcessId, int ancestorProcessId)
+    {
+        var parentsByProcessId = SnapshotProcessParents();
+        var visited = new HashSet<int>();
+        var currentProcessId = candidateProcessId;
+
+        while (visited.Add(currentProcessId) &&
+               parentsByProcessId.TryGetValue(currentProcessId, out var parentProcessId) &&
+               parentProcessId > 0)
+        {
+            if (parentProcessId == ancestorProcessId)
+            {
+                return true;
+            }
+
+            currentProcessId = parentProcessId;
+        }
+
+        return false;
+    }
+
+    private static Dictionary<int, int> SnapshotProcessParents()
+    {
+        var snapshot = CreateToolhelp32Snapshot(Th32csSnapProcess, 0);
+        if (snapshot == InvalidHandleValue)
+        {
+            return [];
+        }
+
+        try
+        {
+            var result = new Dictionary<int, int>();
+            var entry = new ProcessEntry32
+            {
+                Size = checked((uint)Marshal.SizeOf<ProcessEntry32>())
+            };
+
+            if (!Process32First(snapshot, ref entry))
+            {
+                return result;
+            }
+
+            do
+            {
+                result[unchecked((int)entry.ProcessId)] =
+                    unchecked((int)entry.ParentProcessId);
+            }
+            while (Process32Next(snapshot, ref entry));
+
+            return result;
+        }
+        finally
+        {
+            _ = CloseHandle(snapshot);
+        }
+    }
+
+    private static HashSet<int> SnapshotBrowserProcessIds(string browserProcessName)
+    {
+        var processes = Process.GetProcessesByName(browserProcessName);
+        try
+        {
+            return processes.Select(process => process.Id).ToHashSet();
+        }
+        finally
+        {
+            foreach (var process in processes)
+            {
+                process.Dispose();
+            }
+        }
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ProcessEntry32
+    {
+        public uint Size;
+        public uint Usage;
+        public uint ProcessId;
+        public nint DefaultHeapId;
+        public uint ModuleId;
+        public uint Threads;
+        public uint ParentProcessId;
+        public int PriorityClassBase;
+        public uint Flags;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string ExecutableFile;
+    }
+
     private sealed record BrowserTarget(
         string Name,
         string Url,
         string TitleFragment,
         TimeSpan ReadyTimeout,
-        IReadOnlyList<ReadyElement> ReadyElements);
+        IReadOnlyList<ReadyElement> ReadyElements,
+        bool AppMode = true,
+        TimeSpan? WindowTimeout = null);
     private sealed record BrowserDescriptor(string DisplayName, string ProcessName, IReadOnlyList<string> CandidatePaths);
     private sealed record ReadyElement(string Name, string? ControlType = null);
     private sealed record PopupSignal(string SignalText, IReadOnlyList<string> DismissButtons);

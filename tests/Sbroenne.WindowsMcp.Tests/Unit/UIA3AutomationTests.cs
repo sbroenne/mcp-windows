@@ -15,4 +15,11 @@ public sealed class UIA3AutomationTests
         Assert.Equal(TimeSpan.FromSeconds(10), automation.TransactionTimeout);
         Assert.True(automation.ConnectionRecoveryEnabled);
     }
+
+    [Fact]
+    public void ActionPatternAvailabilityPropertyIds_MatchWindowsUia()
+    {
+        Assert.Equal(30028, UIA3PropertyIds.IsExpandCollapsePatternAvailable);
+        Assert.Equal(30033, UIA3PropertyIds.IsRangeValuePatternAvailable);
+    }
 }

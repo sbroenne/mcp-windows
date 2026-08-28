@@ -114,6 +114,15 @@ themes change.
 Windows MCP Server asks Windows directly: *"What buttons exist?"* Windows knows.
 It's deterministic — the same command works every time.
 
+For repeated observations, automatic snapshots compare a simplified semantic view and return a
+compact diff only when it is safely smaller. A five-run benchmark measured **84-96% median
+byte/token savings** for Electron, Word, and Excel changes. The same Playwright-style view reduced
+realistic Chrome navigation by **13.1% in bytes and 13.4% in approximate tokens**, even though 18 of
+20 responses were complete simplified views. A later strict Chrome run measured the conservative
+display cleanup on the same captures: another **10.6% fewer bytes and 13.6% fewer tokens**.
+
+[Read the reproducible benchmark :material-arrow-right:](benchmark.md){ .md-button }
+
 ## Tested with real AI models
 
 Tool descriptions that seem clear to humans often confuse AI. Parameters get

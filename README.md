@@ -86,7 +86,7 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 | Tool | Purpose |
 |------|---------|
-| `ui_snapshot` | Capture a compact element tree of a window (orient first) |
+| `ui_snapshot` | Capture a compact element tree; `mode=auto` returns smaller updates after the first view |
 | `ui_find` | Discover elements in a window (with timeout/retry) |
 | `ui_click` | Click buttons, checkboxes, menu items by name |
 | `ui_type` | Type into text fields |
@@ -108,6 +108,23 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 Full reference: [FEATURES.md](FEATURES.md)
 
+Use the default `mode=full` for one inspection. For repeated views of the same window or a known
+subtree through the long-running MCP server, use `mode=auto` from the first view; `full` is not
+remembered.
+The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
+space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start a new comparison,
+and use `parentElementId` only to revisit a subtree returned by an earlier snapshot or find. Separate
+`wincli` commands do not share remembered views.
+[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
+byte/token savings in Electron, Word, and Excel. A Playwright-style semantic view improved realistic
+Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of 20
+responses were complete simplified views. A later strict Chrome run found that conservative display
+cleanup alone removed another 10.6% of bytes and 13.6% of tokens from automatic responses.
+
+**Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
+longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read
+that undocumented duplicate should migrate to `tree` (or use `ui_find` for a flat result).
+
 ## Command-line interface (`wincli`)
 
 The server ships with a **twin command-line entry point**, `wincli`, in
@@ -122,7 +139,7 @@ stateless — there is no server session to keep alive.
 
 ```powershell
 wincli window find --title Notepad           # -> window handle
-wincli ui snapshot --window 12345            # accessible element tree
+wincli ui snapshot --window 12345 --mode full  # complete accessible element tree
 wincli ui click --window 12345 --name Submit --with-snapshot
 wincli clipboard set --text "hello"          # write the clipboard
 wincli macro run --name login --window 12345 # replay a saved workflow
@@ -181,6 +198,7 @@ Requires GitHub authentication (`GITHUB_TOKEN` or an existing `gh` login) and a 
 | Document | Description |
 |----------|-------------|
 | [FEATURES.md](FEATURES.md) | Complete tool reference — all actions, parameters, examples |
+| [Incremental snapshot benchmark](docs/incremental-snapshot-benchmark.md) | Five-run Electron, Chrome, Word, and Excel measurements |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Build instructions, coding guidelines, PR process |
 | [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) | How to run LLM integration tests |
 | [Release Setup](.github/RELEASE_SETUP.md) | Azure OIDC and GitHub Actions configuration |

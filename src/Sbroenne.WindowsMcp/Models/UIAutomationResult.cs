@@ -42,6 +42,27 @@ public sealed record UIAutomationResult
     public UIElementCompactTree[]? Tree { get; init; }
 
     /// <summary>
+    /// Internal full-fidelity tree used by services that need properties omitted from compact responses.
+    /// This value is never serialized to an MCP client.
+    /// </summary>
+    [JsonIgnore]
+    public UIElementInfo[]? FullTree { get; init; }
+
+    /// <summary>
+    /// Snapshot response form: full for a complete tree or diff for changes from the remembered tree.
+    /// </summary>
+    [JsonPropertyName("kind")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Kind { get; init; }
+
+    /// <summary>
+    /// Changes from the previous remembered tree when <see cref="Kind"/> is diff.
+    /// </summary>
+    [JsonPropertyName("changes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SnapshotChange[]? Changes { get; init; }
+
+    /// <summary>
     /// Post-action window snapshot ("perceive/act fusion"). When an interactive tool is called
     /// with withSnapshot=true, this carries the window's element tree captured immediately after
     /// the action succeeded, so agents can verify the new state without a separate ui_snapshot call.
@@ -50,6 +71,21 @@ public sealed record UIAutomationResult
     [JsonPropertyName("postActionTree")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompactTree[]? PostActionTree { get; init; }
+
+    /// <summary>Post-action snapshot form: full or diff.</summary>
+    [JsonPropertyName("postActionKind")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionKind { get; init; }
+
+    /// <summary>Post-action changes when <see cref="PostActionKind"/> is diff.</summary>
+    [JsonPropertyName("postActionChanges")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SnapshotChange[]? PostActionChanges { get; init; }
+
+    /// <summary>Warning when an optional post-action snapshot could not be captured.</summary>
+    [JsonPropertyName("postActionWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionWarning { get; init; }
 
     /// <summary>
     /// Number of elements found.
@@ -281,12 +317,12 @@ public sealed record UIAutomationResult
     /// <summary>
     /// Creates a success result with compact tree structure (token-optimized for hierarchical views).
     /// Use this for GetTree actions to reduce response token count while preserving hierarchy.
-    /// Also populates Elements for internal use by services like AnnotatedScreenshotService.
+    /// Also retains a non-serialized full tree for internal services like AnnotatedScreenshotService.
     /// </summary>
     /// <param name="action">The action performed.</param>
     /// <param name="elements">The full elements with children (will be converted to compact tree).</param>
     /// <param name="diagnostics">Optional diagnostics.</param>
-    /// <returns>A success result with compact tree structure (Tree) and full Elements for internal use.</returns>
+    /// <returns>A success result with compact tree structure and a non-serialized internal full tree.</returns>
     public static UIAutomationResult CreateSuccessCompactTree(string action, UIElementInfo[] elements, UIAutomationDiagnostics? diagnostics = null)
     {
         ArgumentNullException.ThrowIfNull(elements);
@@ -299,7 +335,8 @@ public sealed record UIAutomationResult
             Success = true,
             Action = action,
             Tree = compactTree,
-            Elements = elements, // Keep full elements for internal use (e.g., AnnotatedScreenshotService)
+            FullTree = elements,
+            Kind = "full",
             ElementCount = totalCount,
             UsageHint = $"Tree contains {totalCount} elements. To act on one, call ui_click/ui_type/ui_read with its name, automationId, or controlType (add foundIndex to disambiguate). Use ui_find to fetch full details for a specific element.",
             Diagnostics = diagnostics

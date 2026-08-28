@@ -55,6 +55,11 @@ public sealed class ElectronHarnessFixture : IDisposable
     /// </summary>
     public int? ProcessId => _electronProcess?.Id;
 
+    /// <summary>
+    /// Gets the Electron executable version used by the harness.
+    /// </summary>
+    public string ElectronVersion { get; }
+
     public ElectronHarnessFixture()
     {
         // Find the Electron harness directory relative to the test assembly
@@ -101,6 +106,8 @@ public sealed class ElectronHarnessFixture : IDisposable
 
         // Ensure npm packages are installed
         EnsureNodeModulesInstalled();
+        var electronExePath = Path.Combine(_electronHarnessPath, "node_modules", "electron", "dist", "electron.exe");
+        ElectronVersion = FileVersionInfo.GetVersionInfo(electronExePath).FileVersion ?? "unknown";
 
         try
         {
@@ -117,7 +124,9 @@ public sealed class ElectronHarnessFixture : IDisposable
     private void EnsureNodeModulesInstalled()
     {
         var nodeModulesPath = Path.Combine(_electronHarnessPath, "node_modules");
-        if (!Directory.Exists(nodeModulesPath))
+        var electronModulePath = Path.Combine(nodeModulesPath, "electron", "index.js");
+        var typeScriptCompilerPath = Path.Combine(nodeModulesPath, ".bin", "tsc.cmd");
+        if (!File.Exists(electronModulePath) || !File.Exists(typeScriptCompilerPath))
         {
             // Run npm install (use cmd.exe /c to find npm on Windows)
             var npmProcess = new Process
@@ -125,7 +134,7 @@ public sealed class ElectronHarnessFixture : IDisposable
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = "/c npm install",
+                    Arguments = "/c npm install --include=dev",
                     WorkingDirectory = _electronHarnessPath,
                     UseShellExecute = false,
                     CreateNoWindow = true,
@@ -145,6 +154,41 @@ public sealed class ElectronHarnessFixture : IDisposable
             {
                 var error = npmProcess.StandardError.ReadToEnd();
                 throw new InvalidOperationException($"npm install failed: {error}");
+            }
+        }
+
+        // Electron downloads its binary lazily when the package is first required. The fixture
+        // launches electron.exe directly, so resolve the package once before checking that path.
+        var electronExePath = Path.Combine(nodeModulesPath, "electron", "dist", "electron.exe");
+        if (!File.Exists(electronExePath))
+        {
+            var installProcess = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "node.exe",
+                    Arguments = "-e \"require('electron')\"",
+                    WorkingDirectory = _electronHarnessPath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                }
+            };
+
+            installProcess.Start();
+            if (!installProcess.WaitForExit(TimeSpan.FromMinutes(5)))
+            {
+                installProcess.Kill(entireProcessTree: true);
+                throw new InvalidOperationException("Electron binary download timed out");
+            }
+
+            if (installProcess.ExitCode != 0 || !File.Exists(electronExePath))
+            {
+                var error = installProcess.StandardError.ReadToEnd();
+                var output = installProcess.StandardOutput.ReadToEnd();
+                throw new InvalidOperationException(
+                    $"Electron binary download failed: {error}\n{output}");
             }
         }
 

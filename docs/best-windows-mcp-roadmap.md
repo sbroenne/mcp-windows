@@ -39,7 +39,7 @@ Three moats:
 ## The 6 pillars
 
 ### 1. Perception: a single "desktop snapshot" primitive
-- `ui_snapshot` — a compact, interactive-elements-only tree for a window (or subtree),
+- `ui_snapshot` — a compact tree for a window or subtree, with optional remembered change-only updates,
   depth-bounded and content-view filtered. The "orient" verb agents reach for first.
 - Stable element `ref`s returned in the snapshot that every action tool accepts.
 - Diff snapshots — return only what changed since the last snapshot (token savings on long

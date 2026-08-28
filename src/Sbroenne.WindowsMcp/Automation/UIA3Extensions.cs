@@ -598,6 +598,7 @@ public static class UIA3Extensions
             var pattern = element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
             return pattern?.CurrentValue;
         }
+
         catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
             return null;
@@ -717,6 +718,23 @@ public static class UIA3Extensions
                 UIA.ToggleState.ToggleState_Indeterminate => "Indeterminate",
                 _ => null
             };
+        }
+        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Gets selection state using the SelectionItem pattern.
+    /// </summary>
+    public static string? GetSelectionStateName(this UIA.IUIAutomationElement element)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        try
+        {
+            var pattern = element.GetPattern<UIA.IUIAutomationSelectionItemPattern>(UIA3PatternIds.SelectionItem);
+            return pattern is null ? null : pattern.CurrentIsSelected != 0 ? "On" : "Off";
         }
         catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {

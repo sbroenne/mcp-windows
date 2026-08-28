@@ -205,14 +205,14 @@ public sealed class AnnotatedScreenshotService
             controlTypeFilter: null, // No filter - we'll filter after flattening
             cancellationToken);
 
-        if (!result.Success || result.Elements == null)
+        if (!result.Success || result.FullTree == null)
         {
             return result;
         }
 
         // GetTreeAsync returns a hierarchical tree - flatten it to get all elements
         var allElements = new List<UIElementInfo>();
-        foreach (var element in result.Elements)
+        foreach (var element in result.FullTree)
         {
             FlattenTree(element, allElements);
         }

@@ -222,6 +222,21 @@ public sealed record BatchResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompactTree[]? PostActionTree { get; init; }
 
+    /// <summary>Post-batch snapshot form: full or diff.</summary>
+    [JsonPropertyName("postActionKind")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionKind { get; init; }
+
+    /// <summary>Post-batch changes when <see cref="PostActionKind"/> is diff.</summary>
+    [JsonPropertyName("postActionChanges")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public SnapshotChange[]? PostActionChanges { get; init; }
+
+    /// <summary>Warning when an optional post-batch snapshot could not be captured.</summary>
+    [JsonPropertyName("postActionWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionWarning { get; init; }
+
     /// <summary>Top-level error (e.g. invalid steps JSON) when the batch could not run.</summary>
     [JsonPropertyName("error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

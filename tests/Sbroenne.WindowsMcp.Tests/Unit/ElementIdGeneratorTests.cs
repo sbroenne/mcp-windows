@@ -8,6 +8,7 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 /// Tests focus on the resolve/parse paths that don't require live COM objects.
 /// </summary>
 [SupportedOSPlatform("windows")]
+[Collection("ElementIdRegistry")]
 public class ElementIdGeneratorTests
 {
     [Fact]

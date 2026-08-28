@@ -270,6 +270,7 @@ internal static class CommandDispatcher
             Window(a),
             stopOnError,
             a.GetFlag("with-snapshot", "snapshot"),
+            a.GetString("snapshot-mode") ?? "full",
             a.GetFlag("include-diagnostics", "diagnostics"),
             ct);
         return Emit.Result(result);
@@ -289,6 +290,7 @@ internal static class CommandDispatcher
                         a.GetString("parent-element-id", "parent"),
                         a.GetInt("max-depth", "depth") ?? 5,
                         a.GetString("control-type-filter", "control-type"),
+                        a.GetString("mode") ?? "full",
                         diag,
                         ct);
                     return Emit.Result(result);
@@ -331,6 +333,7 @@ internal static class CommandDispatcher
                         a.GetString("element-id"),
                         a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("with-snapshot", "snapshot"),
+                        a.GetString("snapshot-mode") ?? "full",
                         diag,
                         a.GetFlag("double-click", "dblclick"),
                         ct);
@@ -358,6 +361,7 @@ internal static class CommandDispatcher
                         a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("clear-first", "clear"),
                         a.GetFlag("with-snapshot", "snapshot"),
+                        a.GetString("snapshot-mode") ?? "full",
                         diag,
                         ct);
                     return Emit.Result(result);
@@ -382,6 +386,7 @@ internal static class CommandDispatcher
                         a.GetString("class-name"),
                         a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("with-snapshot", "snapshot"),
+                        a.GetString("snapshot-mode") ?? "full",
                         diag,
                         ct);
                     return Emit.Result(result);
@@ -468,6 +473,7 @@ internal static class CommandDispatcher
                         steps,
                         stopOnError,
                         a.GetFlag("with-snapshot", "snapshot"),
+                        a.GetString("snapshot-mode") ?? "full",
                         diag,
                         ct);
                     return Emit.Result(result);

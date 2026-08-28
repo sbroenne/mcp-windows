@@ -45,6 +45,9 @@ public sealed class ToolCatalogTests
         Assert.Contains("windowHandle", ParameterNames(tools["file_open"]));
         Assert.Contains("action", ParameterNames(tools["clipboard"]));
         Assert.Contains("steps", ParameterNames(tools["ui_macro"]));
+        Assert.Contains("mode", ParameterNames(tools["ui_snapshot"]));
+        Assert.Contains("snapshotMode", ParameterNames(tools["ui_click"]));
+        Assert.Contains("snapshotMode", ParameterNames(tools["ui_batch"]));
     }
 
     [Fact]
@@ -81,6 +84,48 @@ public sealed class ToolCatalogTests
                 $"{tool.Name} description must contain a 'Keywords:' line"));
     }
 
+    [Fact]
+    public void SnapshotDescriptions_ExplainWhenToUseModesAndKnownSubtrees()
+    {
+        var tools = ToolCatalog.GetTools().ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        var snapshot = tools["ui_snapshot"];
+
+        Assert.StartsWith("MODE RULE (REQUIRED):", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("mode='auto' on BOTH snapshot calls", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("Never omit mode", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("Use full for a one-time inspection", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("use auto on the first check", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("full is not remembered", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("Use reset when starting a new comparison", snapshot.Description, StringComparison.Ordinal);
+
+        var mode = Parameter(snapshot, "mode");
+        Assert.Equal("full", mode.GetProperty("default").GetString());
+        Assert.Contains("same window or subtree", mode.GetProperty("description").GetString(), StringComparison.Ordinal);
+        Assert.Contains("auto on BOTH the first and later snapshots", mode.GetProperty("description").GetString(), StringComparison.Ordinal);
+
+        var parent = Parameter(snapshot, "parentElementId");
+        Assert.Contains("known subtree", parent.GetProperty("description").GetString(), StringComparison.Ordinal);
+        Assert.Contains("earlier snapshot or find", parent.GetProperty("description").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void PostActionSnapshotDescriptions_ExplainWhenToUseEachMode()
+    {
+        var tools = ToolCatalog.GetTools().ToDictionary(tool => tool.Name, StringComparer.Ordinal);
+        foreach (var toolName in new[] { "ui_click", "ui_type", "ui_select", "ui_batch", "ui_macro" })
+        {
+            var mode = Parameter(tools[toolName], "snapshotMode");
+
+            Assert.Equal("full", mode.GetProperty("default").GetString());
+            Assert.Contains("one verification", mode.GetProperty("description").GetString(), StringComparison.Ordinal);
+            Assert.Contains("repeated checks", mode.GetProperty("description").GetString(), StringComparison.Ordinal);
+            Assert.Contains("new comparison", mode.GetProperty("description").GetString(), StringComparison.Ordinal);
+        }
+    }
+
     private static IEnumerable<string> ParameterNames(ToolCatalogEntry entry) =>
         entry.InputSchema.GetProperty("properties").EnumerateObject().Select(property => property.Name);
+
+    private static JsonElement Parameter(ToolCatalogEntry entry, string name) =>
+        entry.InputSchema.GetProperty("properties").GetProperty(name);
 }

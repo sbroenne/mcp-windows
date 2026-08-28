@@ -1,3 +1,4 @@
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
@@ -108,5 +109,93 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
         Assert.True(result.Success, $"Find failed: {result.ErrorMessage}");
         Assert.NotEmpty(result.Items!);
         Assert.False(result.Diagnostics!.UsedContentView, "Explicit contentViewOnly=false must scan the control view.");
+    }
+
+    [SkippableTheory]
+    [InlineData(ChromiumBrowserKind.Edge)]
+    [InlineData(ChromiumBrowserKind.Chrome)]
+    [Trait("Category", "RequiresInternet")]
+    public async Task Tree_Depth20_IncludesGitHubPageControls(ChromiumBrowserKind browser)
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(browser);
+
+        using var session = ChromiumBrowserSession.LaunchPublicSite(
+            browser,
+            ChromiumPublicSite.GitHubVisualStudioCode);
+        using var harness = new ChromiumAutomationHarness();
+
+        await ChromiumPageWaiter.WaitForControlAsync(
+            harness,
+            session.WindowHandleString,
+            "Code",
+            TimeSpan.FromSeconds(15),
+            controlType: null,
+            CancellationToken.None);
+        var result = await harness.AutomationService.GetTreeAsync(
+            session.WindowHandleString, null, 20, null);
+
+        Assert.True(result.Success, result.ErrorMessage);
+        var nodes = Flatten(result.FullTree).ToArray();
+        Assert.Contains(
+            nodes,
+            node => node.ControlType is not ("Window" or "Pane") &&
+                    node.Name?.Contains("Code", StringComparison.Ordinal) == true);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "RequiresInternet")]
+    public async Task SemanticTree_ChromePreservesPageControlsAndRemovesLayoutNoise()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+
+        using var session = ChromiumBrowserSession.LaunchPublicSite(
+            ChromiumBrowserKind.Chrome,
+            ChromiumPublicSite.GitHubVisualStudioCode);
+        using var harness = new ChromiumAutomationHarness();
+        await ChromiumPageWaiter.WaitForControlAsync(
+            harness,
+            session.WindowHandleString,
+            "Code",
+            TimeSpan.FromSeconds(15),
+            controlType: null,
+            CancellationToken.None);
+        var result = await harness.AutomationService.GetTreeAsync(
+            session.WindowHandleString, null, 20, null);
+
+        Assert.True(result.Success, result.ErrorMessage);
+        var complete = FlattenCompact(result.Tree).ToArray();
+        var semanticTree = SnapshotDiffEngine.CreateSemanticTree(result.Tree!);
+        var semantic = FlattenCompact(semanticTree).ToArray();
+
+        Assert.True(semantic.Length < complete.Length);
+        Assert.Contains(
+            semantic,
+            node => node.Type is not ("Window" or "Pane") &&
+                    node.Name?.Contains("Code", StringComparison.Ordinal) == true);
+    }
+
+    private static IEnumerable<UIElementInfo> Flatten(IEnumerable<UIElementInfo>? roots)
+    {
+        foreach (var root in roots ?? [])
+        {
+            yield return root;
+            foreach (var descendant in Flatten(root.Children))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static IEnumerable<UIElementCompactTree> FlattenCompact(
+        IEnumerable<UIElementCompactTree>? roots)
+    {
+        foreach (var root in roots ?? [])
+        {
+            yield return root;
+            foreach (var descendant in FlattenCompact(root.Children))
+            {
+                yield return descendant;
+            }
+        }
     }
 }
