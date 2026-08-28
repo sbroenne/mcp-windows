@@ -36,7 +36,7 @@ public static partial class UISelectTool
     /// <param name="className">Element class name.</param>
     /// <param name="foundIndex">Return Nth matching control (1-based, default: 1).</param>
     /// <param name="withSnapshot">When true, attach a post-action snapshot so you can verify the new state without another tool call. Default: false.</param>
-    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
+    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this action starts a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the select operation's success status and element information. <c>IsError</c> reflects operation success.</returns>

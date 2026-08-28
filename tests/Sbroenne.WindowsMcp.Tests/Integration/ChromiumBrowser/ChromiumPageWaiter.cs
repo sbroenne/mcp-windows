@@ -10,6 +10,7 @@ internal static class ChromiumPageWaiter
         string windowHandle,
         string expectedName,
         TimeSpan timeout,
+        string? controlType,
         CancellationToken cancellationToken = default)
     {
         var clock = Stopwatch.StartNew();
@@ -23,13 +24,18 @@ internal static class ChromiumPageWaiter
                 {
                     WindowHandle = windowHandle,
                     Name = expectedName,
+                    ControlType = controlType,
                     ContentViewOnly = false,
                     MaxDepth = 20,
                     TimeoutMs = 1000
                 },
                 cancellationToken);
 
-            if (lastResult.Success)
+            if (lastResult.Success &&
+                lastResult.Items?.Any(item =>
+                    string.Equals(item.Name, expectedName, StringComparison.Ordinal) &&
+                    (controlType is null ||
+                     string.Equals(item.Type, controlType, StringComparison.Ordinal))) == true)
             {
                 await Task.Delay(250, cancellationToken);
                 return;
@@ -42,4 +48,18 @@ internal static class ChromiumPageWaiter
             $"The Chromium page did not contain '{expectedName}' within {timeout.TotalSeconds:F0} seconds. " +
             $"Last error: {lastResult?.ErrorMessage ?? "none"}");
     }
+
+    public static Task WaitForControlAsync(
+        ChromiumAutomationHarness harness,
+        string windowHandle,
+        string expectedName,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default) =>
+        WaitForControlAsync(
+            harness,
+            windowHandle,
+            expectedName,
+            timeout,
+            controlType: null,
+            cancellationToken);
 }

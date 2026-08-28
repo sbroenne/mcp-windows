@@ -33,7 +33,7 @@ public static partial class UIClickTool
     /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, clicks that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
     /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
     /// <param name="withSnapshot">When true, attach a post-action snapshot so you can verify the new state without another tool call. Default: false.</param>
-    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
+    /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this action starts a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="doubleClick">Double-click the element instead of single-clicking. Use for list/grid items that open on double-click - no coordinates needed. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

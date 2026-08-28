@@ -6,6 +6,8 @@ namespace Sbroenne.WindowsMcp.Models;
 public sealed record UIElementInfo
 {
     internal bool IsSemanticLayoutOnly { get; init; }
+    internal bool IsDirectlyActionable { get; init; }
+    internal bool HasDeveloperIdentifier { get; init; }
 
     /// <summary>
     /// Composite identifier for subsequent operations.

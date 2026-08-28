@@ -127,8 +127,10 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
         await ChromiumPageWaiter.WaitForControlAsync(
             harness,
             session.WindowHandleString,
-            "microsoft/vscode",
-            TimeSpan.FromSeconds(15));
+            "Code",
+            TimeSpan.FromSeconds(15),
+            controlType: null,
+            CancellationToken.None);
         var result = await harness.AutomationService.GetTreeAsync(
             session.WindowHandleString, null, 20, null);
 
@@ -153,8 +155,10 @@ public sealed class ChromiumContentViewTests : IClassFixture<ChromiumReadOnlySes
         await ChromiumPageWaiter.WaitForControlAsync(
             harness,
             session.WindowHandleString,
-            "microsoft/vscode",
-            TimeSpan.FromSeconds(15));
+            "Code",
+            TimeSpan.FromSeconds(15),
+            controlType: null,
+            CancellationToken.None);
         var result = await harness.AutomationService.GetTreeAsync(
             session.WindowHandleString, null, 20, null);
 

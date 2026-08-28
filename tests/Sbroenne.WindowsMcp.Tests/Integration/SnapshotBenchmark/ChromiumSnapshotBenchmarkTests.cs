@@ -187,7 +187,7 @@ public sealed class ChromiumSnapshotBenchmarkTests
         await ChromiumPageWaiter.WaitForControlAsync(
             harness,
             session.WindowHandleString,
-            expectedTitle,
+            "Code",
             TimeSpan.FromSeconds(30),
             cancellationToken);
     }

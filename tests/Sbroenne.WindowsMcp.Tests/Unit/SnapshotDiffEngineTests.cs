@@ -514,6 +514,118 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
+    public void CreateDisplayTree_OmitsClicksOnlyFromNonActionableLeaves()
+    {
+        var text = Node("text", "Ready", "Text");
+        var button = Node("button", "Save", "Button") with
+        {
+            IsDirectlyActionable = true
+        };
+        var container = Node("group", "Options", "Group", Node("child", "Choice", "Text"));
+
+        var display = SnapshotDiffEngine.CreateDisplayTree([text, button, container]);
+
+        Assert.Null(display[0].Click);
+        Assert.NotNull(display[1].Click);
+        Assert.NotNull(display[2].Click);
+        Assert.Null(Assert.Single(display[2].Children!).Click);
+        Assert.NotNull(text.Click);
+    }
+
+    [Fact]
+    public void CreateDisplayTree_RemovesOnlyRedundantSafeLeaves()
+    {
+        var repeatedText = Node("label", "Save", "Text");
+        var actionableRepeatedText = repeatedText with
+        {
+            Id = "actionable-label",
+            IsDirectlyActionable = true
+        };
+        var identifiedRepeatedText = repeatedText with
+        {
+            Id = "identified-label",
+            HasDeveloperIdentifier = true
+        };
+        var statefulRepeatedText = repeatedText with
+        {
+            Id = "stateful-label",
+            Toggle = "On"
+        };
+        var emptyImage = Node("image", null, "Image");
+        var namedImage = Node("named-image", "Logo", "Image");
+        var tree = new[]
+        {
+            Node(
+                "root",
+                "Save",
+                "Button",
+                repeatedText,
+                actionableRepeatedText,
+                identifiedRepeatedText,
+                statefulRepeatedText,
+                emptyImage,
+                namedImage)
+        };
+
+        var display = SnapshotDiffEngine.CreateDisplayTree(tree);
+        var children = Assert.Single(display).Children!;
+
+        Assert.DoesNotContain(children, child => child.Id == repeatedText.Id);
+        Assert.DoesNotContain(children, child => child.Id == emptyImage.Id);
+        Assert.Contains(children, child => child.Id == actionableRepeatedText.Id);
+        Assert.Contains(children, child => child.Id == identifiedRepeatedText.Id);
+        Assert.Contains(children, child => child.Id == statefulRepeatedText.Id);
+        Assert.Contains(children, child => child.Id == namedImage.Id);
+        Assert.Equal(6, tree[0].Children!.Length);
+    }
+
+    [Fact]
+    public void CompareDisplayTrees_CleansAddedSubtreesAndCoordinateOnlyUpdates()
+    {
+        var added = Node(
+            "button",
+            "Save",
+            "Button",
+            Node("label", "Save", "Text"),
+            Node("status", "Ready", "Text")) with
+        {
+            IsDirectlyActionable = true
+        };
+        var before = new[]
+        {
+            Node(
+                "root",
+                "Window",
+                "Window",
+                Node("status", "Ready", "Text"),
+                Node("query", "Query", "Edit") with { Value = "old" })
+        };
+        var after = new[]
+        {
+            Node(
+                "root",
+                "Window",
+                "Window",
+                Node("status", "Ready", "Text") with { Click = [3, 4, 0] },
+                Node("query", "Query", "Edit") with { Click = [5, 6, 0], Value = "new" },
+                added)
+        };
+
+        var display = SnapshotDiffEngine.Compare(
+            SnapshotDiffEngine.CreateDisplayTree(before),
+            SnapshotDiffEngine.CreateDisplayTree(after));
+
+        Assert.Equal(2, display.Count);
+        var displayedAdd = Assert.Single(display, change => change.Op == "add");
+        Assert.Equal(["Ready"], displayedAdd.Node!.Children!.Select(child => child.Name));
+        Assert.Null(Assert.Single(displayedAdd.Node.Children!).Click);
+        var displayedUpdate = Assert.Single(display, change => change.Op == "update");
+        var displayedSet = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(displayedUpdate.Set);
+        Assert.Equal("new", Assert.Single(displayedSet).Value);
+        Assert.False(displayedSet.ContainsKey("click"));
+    }
+
+    [Fact]
     public void CreateComparableTree_NormalizesOnlyTopLevelWindowName()
     {
         var semantic = new[]

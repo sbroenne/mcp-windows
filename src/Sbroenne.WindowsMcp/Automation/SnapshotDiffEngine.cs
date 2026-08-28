@@ -21,6 +21,59 @@ internal static class SnapshotDiffEngine
         return CreateSemanticTree(semanticTree, isRoot: true, normalizeWindowName: true);
     }
 
+    public static UIElementCompactTree[] CreateDisplayTree(
+        IReadOnlyList<UIElementCompactTree> semanticTree)
+    {
+        ArgumentNullException.ThrowIfNull(semanticTree);
+        return CreateDisplayTree(semanticTree, parentName: null);
+    }
+
+    private static UIElementCompactTree[] CreateDisplayTree(
+        IReadOnlyList<UIElementCompactTree> tree,
+        string? parentName)
+    {
+        var result = new List<UIElementCompactTree>(tree.Count);
+        foreach (var node in tree)
+        {
+            var children = CreateDisplayTree(node.Children ?? [], node.Name);
+            var displayNode = node with
+            {
+                Click = !node.IsDirectlyActionable && children.Length == 0
+                    ? null
+                    : node.Click,
+                Children = children.Length == 0 ? null : children
+            };
+
+            if (!IsRedundantLeaf(displayNode, parentName))
+            {
+                result.Add(displayNode);
+            }
+        }
+
+        return [.. result];
+    }
+
+    private static bool IsRedundantLeaf(UIElementCompactTree node, string? parentName)
+    {
+        if (node.Children is { Length: > 0 } ||
+            node.IsDirectlyActionable ||
+            node.HasDeveloperIdentifier ||
+            !node.Enabled ||
+            node.Value is not null ||
+            node.Toggle is not null)
+        {
+            return false;
+        }
+
+        var repeatsParent =
+            !string.IsNullOrWhiteSpace(node.Name) &&
+            string.Equals(node.Name, parentName, StringComparison.Ordinal);
+        var isNamelessImage =
+            string.Equals(node.Type, "Image", StringComparison.Ordinal) &&
+            string.IsNullOrWhiteSpace(node.Name);
+        return repeatsParent || isNamelessImage;
+    }
+
     private static UIElementCompactTree[] CreateSemanticTree(
         IReadOnlyList<UIElementCompactTree> tree,
         bool isRoot,
@@ -198,7 +251,11 @@ internal static class SnapshotDiffEngine
                 for (var index = 0; index < oldNodes.Count; index++)
                 {
                     var key = BuildKey(parentKey, identity, index);
-                    AddUpdateIfNeeded(key, oldNodes[index], newNodes[index], changes);
+                    AddUpdateIfNeeded(
+                        key,
+                        oldNodes[index],
+                        newNodes[index],
+                        changes);
                     CompareSiblings(
                         oldNodes[index].Children ?? [],
                         newNodes[index].Children ?? [],

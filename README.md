@@ -108,14 +108,18 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 Full reference: [FEATURES.md](FEATURES.md)
 
-For repeated views through the long-running MCP server, call `ui_snapshot` with `mode=auto`.
+Use the default `mode=full` for one inspection. For repeated views of the same window or a known
+subtree through the long-running MCP server, use `mode=auto` from the first view; `full` is not
+remembered.
 The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
-space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start over. Complete views
-remain the default, and separate `wincli` commands do not share remembered views.
+space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start a new comparison,
+and use `parentElementId` only to revisit a subtree returned by an earlier snapshot or find. Separate
+`wincli` commands do not share remembered views.
 [The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
 byte/token savings in Electron, Word, and Excel. A Playwright-style semantic view improved realistic
 Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of 20
-responses were complete simplified views.
+responses were complete simplified views. A later strict Chrome run found that conservative display
+cleanup alone removed another 10.6% of bytes and 13.6% of tokens from automatic responses.
 
 **Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
 longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read

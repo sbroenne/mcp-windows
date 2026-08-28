@@ -326,34 +326,36 @@ of the target (or window root) is used automatically.
 
 ## 🌳 UI Snapshot (`ui_snapshot`)
 
-Capture a compact tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. The response is hierarchical, depth-bounded, and content-view filtered for Chromium/Electron.
+Capture a compact tree ("snapshot") of a window. This is the **orient primitive**: call it first on an unfamiliar window instead of guessing selectors or relying on screenshots. The response is hierarchical, depth-bounded, and token-optimized.
 
 ### Parameters
 
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle (foreground window if omitted) | No |
-| `parentElementId` | Scope the snapshot to a subtree (id from a prior snapshot/find) | No |
+| `parentElementId` | Revisit a known subtree using an id from an earlier snapshot/find | No |
 | `maxDepth` | Max tree depth (default framework-aware; capped at 20) | No (default: 5) |
 | `controlTypeFilter` | Comma-separated control types to keep (e.g. 'Button,Edit') | No |
-| `mode` | `full` for a complete view, `auto` for remembered smaller updates, or `reset` to start a new remembered view | No (default: `full`) |
+| `mode` | `full` for one complete view, `auto` for repeated checks of the same target, or `reset` to start a new comparison | No (default: `full`) |
 | `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
 
 ### Capabilities
 
 - One call to see what's on screen with ids, names, types, click coordinates, and available value/toggle state
-- Drill into large windows via `parentElementId`
+- Revisit a known part of a large window via `parentElementId`
 - Prune noise with `controlTypeFilter`
 - Feed returned ids straight into `ui_click`, `ui_type`, `ui_read`, `ui_wait`
-- Use `mode=auto` for repeated checks. The first response is a complete simplified view; later responses contain only changes when that is clearly smaller.
-- Use `mode=reset` after deliberately starting a new workflow. Separate `wincli` commands start fresh and safely return a complete view.
+- Use `mode=full` for a one-time inspection.
+- Use `mode=auto` from the first check when the task will inspect the same window or known subtree again. `full` is not remembered. The first automatic response is complete; later responses contain only changes when that is clearly smaller.
+- Use `mode=reset` when starting a new comparison. Separate `wincli` commands start fresh and safely return a complete view.
 
 Savings depend on how stable an application's accessibility tree is. The
 [four-workload benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
 byte/token savings for Electron, Word, and Excel changes. A Playwright-style semantic view improved
 realistic Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of
 20 responses were complete simplified views. Short live regressions still cover both Chrome and Edge
-because their Windows accessibility output is not identical.
+because their Windows accessibility output is not identical. A later strict Chrome run measured the
+additional conservative display cleanup separately: 10.6% fewer bytes and 13.6% fewer tokens.
 
 > **Snapshot response compatibility:** Complete snapshots still return the compact `tree`, but no
 > longer serialize the redundant full-detail `elements` copy. Consumers that read that former

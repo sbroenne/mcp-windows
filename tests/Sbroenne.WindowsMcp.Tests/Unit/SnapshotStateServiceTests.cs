@@ -97,6 +97,109 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
+    public async Task Auto_CleansDisplayWithoutChangingExplicitFullSnapshots()
+    {
+        using var service = new SnapshotStateService();
+        var repeatedLabel = TypedNode("label", "Save", "Text", runtimeId: 2);
+        var emptyImage = TypedNode("image", null, "Image", runtimeId: 3);
+        var root = TypedNode(
+            "root",
+            "Save",
+            "Button",
+            runtimeId: 1,
+            children: [repeatedLabel, emptyImage]) with
+        {
+            IsDirectlyActionable = true
+        };
+        var snapshot = Result(root);
+
+        var automatic = await service.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), CancellationToken.None);
+        var complete = await service.CaptureAsync(
+            Key, SnapshotMode.Full, _ => Task.FromResult(snapshot), CancellationToken.None);
+
+        var automaticRoot = Assert.Single(automatic.Tree!);
+        Assert.Null(automaticRoot.Children);
+        Assert.NotNull(automaticRoot.Click);
+        Assert.Equal(2, complete.Tree![0].Children!.Length);
+        Assert.NotNull(complete.Tree[0].Children![0].Click);
+    }
+
+    [Fact]
+    public async Task BenchmarkCaptureWithoutDisplayCleanup_ReturnsAutomaticSemanticOutput()
+    {
+        using var service = new SnapshotStateService();
+        var repeatedLabel = TypedNode("label", "Save", "Text", runtimeId: 2);
+        var emptyImage = TypedNode("image", null, "Image", runtimeId: 3);
+        var root = TypedNode(
+            "root",
+            "Save",
+            "Button",
+            runtimeId: 1,
+            children: [repeatedLabel, emptyImage]) with
+        {
+            IsDirectlyActionable = true
+        };
+
+        var result = await service.CaptureWithoutDisplayCleanupAsync(
+            Key,
+            SnapshotMode.Auto,
+            _ => Task.FromResult(Result(root)),
+            CancellationToken.None);
+
+        var resultRoot = Assert.Single(result.Tree!);
+        Assert.Equal(2, resultRoot.Children!.Length);
+        Assert.NotNull(resultRoot.Children[0].Click);
+    }
+
+    [Fact]
+    public async Task Auto_DisplayRedundancyTransitionsReturnRemoveAndAdd()
+    {
+        var filler = Enumerable.Range(1, 20)
+            .Select(index => TypedNode(
+                $"filler-{index}",
+                $"Status {index}",
+                "Text",
+                runtimeId: 100 + index))
+            .ToArray();
+        var redundantLabel = TypedNode("label", "Save", "Text", runtimeId: 2);
+        var meaningfulLabel = redundantLabel with { Toggle = "On" };
+        var before = Result(TypedNode(
+            "root",
+            "Save",
+            "Button",
+            runtimeId: 1,
+            children: [meaningfulLabel, .. filler]) with
+        {
+            IsDirectlyActionable = true
+        });
+        var after = Result(before.Tree![0] with
+        {
+            Children = [redundantLabel, .. filler]
+        });
+
+        using var removalService = new SnapshotStateService();
+        _ = await removalService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
+        var removal = await removalService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
+
+        var removed = Assert.Single(removal.Changes!);
+        Assert.Equal("remove", removed.Op);
+        Assert.EndsWith("/Text:Save#0", removed.Key, StringComparison.Ordinal);
+
+        using var additionService = new SnapshotStateService();
+        _ = await additionService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
+        var addition = await additionService.CaptureAsync(
+            Key, SnapshotMode.Auto, _ => Task.FromResult(before), CancellationToken.None);
+
+        var added = Assert.Single(addition.Changes!);
+        Assert.Equal("add", added.Op);
+        Assert.Equal("On", added.Node!.Toggle);
+    }
+
+    [Fact]
     public async Task Auto_ReturnsFullWhenDiffIsNotAtLeastTwentyPercentSmaller()
     {
         var service = new SnapshotStateService();

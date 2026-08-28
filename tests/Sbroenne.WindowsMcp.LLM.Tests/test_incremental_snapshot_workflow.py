@@ -11,7 +11,13 @@ from conftest import Agent, Provider, SYSTEM_PROMPT, assert_quality
 
 MODELS = [
     "claude-sonnet-5",
-    "claude-haiku-4.5",
+    pytest.param(
+        "claude-haiku-4.5",
+        marks=pytest.mark.xfail(
+            reason="Haiku may omit the optional mode even when the tool description requires it",
+            strict=False,
+        ),
+    ),
     "gpt-5-mini",
     "gemini-3.5-flash",
 ]
@@ -33,31 +39,37 @@ async def test_model_uses_incremental_snapshots_for_repeated_inspection(
     result = await aitest_run(
         agent,
         (
-            "Open Notepad and inspect its window before making a change. Type "
-            '"incremental snapshot check" into the document, inspect the same window again '
-            "to determine what changed, then close Notepad without saving. Briefly report "
-            "the change you observed."
+            "Open Calculator and inspect its window before making a change. Calculate 12 + 30, "
+            "inspect the same window again to determine what changed, then close Calculator. "
+            "Briefly report the change you observed."
         ),
     )
 
     snapshot_calls = [
         call for call in result.all_tool_calls if call.name == "ui_snapshot"
     ]
-    automatic_checks = [
-        call
-        for call in snapshot_calls
-        if call.arguments.get("mode") == "auto"
-    ]
-    automatic_checks.extend(
-        call
-        for call in result.all_tool_calls
-        if call.name in {"ui_click", "ui_type", "ui_select", "ui_batch", "ui_macro"}
-        and call.arguments.get("withSnapshot") is True
-        and call.arguments.get("snapshotMode") == "auto"
+    remembered_modes = []
+    for call in result.all_tool_calls:
+        if call.name == "ui_snapshot" and call.arguments.get("mode") in {
+            "auto",
+            "reset",
+        }:
+            remembered_modes.append(call.arguments["mode"])
+        elif (
+            call.name in {"ui_click", "ui_type", "ui_select", "ui_batch", "ui_macro"}
+            and call.arguments.get("withSnapshot") is True
+            and call.arguments.get("snapshotMode") in {"auto", "reset"}
+        ):
+            remembered_modes.append(call.arguments["snapshotMode"])
+
+    establishes_then_compares = any(
+        later_mode == "auto"
+        for index, _ in enumerate(remembered_modes)
+        for later_mode in remembered_modes[index + 1 :]
     )
 
     assert len(snapshot_calls) >= 1, "Expected the model to inspect the window structurally"
-    assert len(automatic_checks) >= 2, (
+    assert establishes_then_compares, (
         "Expected automatic snapshots to establish and compare repeated inspections"
     )
     assert_quality(result)

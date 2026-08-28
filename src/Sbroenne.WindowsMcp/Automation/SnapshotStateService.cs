@@ -153,6 +153,31 @@ internal sealed class SnapshotStateService : IDisposable
         SnapshotRequestKey key,
         SnapshotMode mode,
         Func<CancellationToken, Task<UIAutomationResult>> capture,
+        CancellationToken cancellationToken) =>
+        await CaptureCoreAsync(
+            key,
+            mode,
+            capture,
+            cleanDisplay: true,
+            cancellationToken).ConfigureAwait(false);
+
+    internal async Task<UIAutomationResult> CaptureWithoutDisplayCleanupAsync(
+        SnapshotRequestKey key,
+        SnapshotMode mode,
+        Func<CancellationToken, Task<UIAutomationResult>> capture,
+        CancellationToken cancellationToken) =>
+        await CaptureCoreAsync(
+            key,
+            mode,
+            capture,
+            cleanDisplay: false,
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task<UIAutomationResult> CaptureCoreAsync(
+        SnapshotRequestKey key,
+        SnapshotMode mode,
+        Func<CancellationToken, Task<UIAutomationResult>> capture,
+        bool cleanDisplay,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(capture);
@@ -170,7 +195,8 @@ internal sealed class SnapshotStateService : IDisposable
             return unidentifiedCapture.Success && unidentifiedCapture.Tree is not null
                 ? EnsureSemanticFull(
                     unidentifiedCapture,
-                    SnapshotDiffEngine.CreateSemanticTree(unidentifiedCapture.Tree))
+                    SnapshotDiffEngine.CreateSemanticTree(unidentifiedCapture.Tree),
+                    cleanDisplay)
                 : unidentifiedCapture;
         }
 
@@ -195,7 +221,7 @@ internal sealed class SnapshotStateService : IDisposable
             var now = _utcNow();
             var semanticTree = SnapshotDiffEngine.CreateSemanticTree(captured.Tree);
             var comparableTree = SnapshotDiffEngine.CreateComparableTree(semanticTree);
-            var full = EnsureSemanticFull(captured, semanticTree);
+            var full = EnsureSemanticFull(captured, semanticTree, cleanDisplay);
 
             if (mode == SnapshotMode.Reset || previous is null)
             {
@@ -215,17 +241,23 @@ internal sealed class SnapshotStateService : IDisposable
                 return full;
             }
 
-            var changes = SnapshotDiffEngine.Compare(previous.Tree, comparableTree).ToArray();
+            var displayChanges = cleanDisplay
+                ? SnapshotDiffEngine.Compare(
+                    SnapshotDiffEngine.CreateDisplayTree(previous.Tree),
+                    SnapshotDiffEngine.CreateDisplayTree(comparableTree)).ToArray()
+                : SnapshotDiffEngine.Compare(previous.Tree, comparableTree).ToArray();
             var diff = captured with
             {
                 Tree = null,
                 FullTree = null,
                 Kind = "diff",
-                ElementCount = CountElements(semanticTree),
-                Changes = changes,
-                UsageHint = changes.Length == 0
+                ElementCount = CountElements(cleanDisplay
+                    ? SnapshotDiffEngine.CreateDisplayTree(semanticTree)
+                    : semanticTree),
+                Changes = displayChanges,
+                UsageHint = displayChanges.Length == 0
                     ? "No UI changes since the previous automatic snapshot."
-                    : $"{changes.Length} UI change(s) since the previous automatic snapshot. Added nodes include current element ids for the next action."
+                    : $"{displayChanges.Length} UI change(s) since the previous automatic snapshot. Added nodes include current element ids for the next action."
             };
 
             if (!IsWorthReturning(diff, full))
@@ -259,12 +291,16 @@ internal sealed class SnapshotStateService : IDisposable
 
     private static UIAutomationResult EnsureSemanticFull(
         UIAutomationResult result,
-        UIElementCompactTree[] semanticTree)
+        UIElementCompactTree[] semanticTree,
+        bool cleanDisplay)
     {
-        var elementCount = CountElements(semanticTree);
+        var displayTree = cleanDisplay
+            ? SnapshotDiffEngine.CreateDisplayTree(semanticTree)
+            : semanticTree;
+        var elementCount = CountElements(displayTree);
         return result with
         {
-            Tree = semanticTree,
+            Tree = displayTree,
             Kind = "full",
             Changes = null,
             Elements = null,

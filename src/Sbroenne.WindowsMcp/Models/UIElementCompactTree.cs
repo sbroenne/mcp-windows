@@ -12,6 +12,12 @@ public sealed record UIElementCompactTree
     [JsonIgnore]
     internal bool IsSemanticLayoutOnly { get; init; }
 
+    [JsonIgnore]
+    internal bool IsDirectlyActionable { get; init; }
+
+    [JsonIgnore]
+    internal bool HasDeveloperIdentifier { get; init; }
+
     /// <summary>
     /// Element ID for subsequent operations (use with elementId parameter).
     /// </summary>
@@ -77,6 +83,8 @@ public sealed record UIElementCompactTree
         {
             Id = full.ElementId,
             IsSemanticLayoutOnly = full.IsSemanticLayoutOnly,
+            IsDirectlyActionable = full.IsDirectlyActionable,
+            HasDeveloperIdentifier = full.HasDeveloperIdentifier,
             Name = full.Name,
             Type = full.ControlType,
             Click = full.ClickablePoint != null

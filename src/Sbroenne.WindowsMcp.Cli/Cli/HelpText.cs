@@ -68,9 +68,10 @@ internal static class HelpText
 
         ui snapshot --window <h> [--parent <id>] [--max-depth <n>] [--control-type <t>]
                     [--mode full|auto|reset]
-            full returns the complete tree (default). auto starts with a complete simplified view,
-            then returns changes when smaller. reset forgets the remembered view. Separate wincli
-            calls start fresh, so auto safely returns a complete simplified view.
+            Use full for one complete inspection (default). For repeated checks of the same window
+            or --parent subtree, use auto from the first check; full is not remembered. Use reset,
+            then auto, to begin a new comparison. --parent revisits an earlier snapshot/find id.
+            Separate wincli calls start fresh, so auto safely returns a complete simplified view.
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
                      [--sort-by-prominence] [--in-region x,y,w,h] [--near-element <id>]
@@ -84,6 +85,7 @@ internal static class HelpText
                      [--desired-state <s>] [selectors] [--timeout-ms <n>]
         ui batch    --window <h> --steps '<json>' | --steps-file <path>
                      [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]
+            For --with-snapshot, use full once, auto for repeated checks, or reset to begin a new comparison.
             selectors: --name --name-contains --name-pattern --control-type --automation-id --class-name
 
         keyboard <action> --window <h> [options]

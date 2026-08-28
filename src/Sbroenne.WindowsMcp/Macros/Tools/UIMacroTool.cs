@@ -41,7 +41,7 @@ public static partial class UIMacroTool
     /// <param name="windowHandle">Target window handle for replay. Required for run.</param>
     /// <param name="stopOnError">For run: stop at the first failing step (default: true).</param>
     /// <param name="withSnapshot">For run: attach a snapshot after replay (default: false).</param>
-    /// <param name="snapshotMode">For run with withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
+    /// <param name="snapshotMode">For run with withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this run starts a new comparison.</param>
     /// <param name="includeDiagnostics">Reserved for parity; responses are already compact. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result with the JSON payload. For run it is the ui_batch result; otherwise the macro management result. <c>IsError</c> reflects success.</returns>

@@ -214,6 +214,7 @@ public sealed class UIA3Automation : IDisposable
         // This allows LLM to know element capabilities without expensive GetCurrentPattern calls
         request.AddProperty(UIA3PropertyIds.IsInvokePatternAvailable);
         request.AddProperty(UIA3PropertyIds.IsExpandCollapsePatternAvailable);
+        request.AddProperty(UIA3PropertyIds.IsRangeValuePatternAvailable);
         request.AddProperty(UIA3PropertyIds.IsScrollItemPatternAvailable);
         request.AddProperty(UIA3PropertyIds.IsSelectionItemPatternAvailable);
         request.AddProperty(UIA3PropertyIds.IsTogglePatternAvailable);
@@ -302,7 +303,8 @@ internal static class UIA3PropertyIds
     // Pattern availability properties - O(1) way to check if patterns are supported
     // These enable LLM to know what actions are possible without expensive GetCurrentPattern calls
     internal const int IsInvokePatternAvailable = 30031;
-    internal const int IsExpandCollapsePatternAvailable = 30033;
+    internal const int IsExpandCollapsePatternAvailable = 30028;
+    internal const int IsRangeValuePatternAvailable = 30033;
     internal const int IsScrollItemPatternAvailable = 30035;
     internal const int IsSelectionItemPatternAvailable = 30036;
     internal const int IsTogglePatternAvailable = 30041;

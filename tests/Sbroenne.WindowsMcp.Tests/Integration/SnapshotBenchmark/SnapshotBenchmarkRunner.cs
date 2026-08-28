@@ -39,6 +39,8 @@ internal sealed record SnapshotBenchmarkRun(
     int Tokens,
     int ComparableFullBytes,
     int ComparableFullTokens,
+    int ComparableSemanticBytes,
+    int ComparableSemanticTokens,
     int FullResponses,
     int DiffResponses);
 
@@ -83,7 +85,8 @@ internal static class SnapshotBenchmarkRunner
                 await using var scenario = await createScenario(arm, sample).ConfigureAwait(false);
                 environment ??= scenario.Environment;
 
-                var state = new SnapshotStateService();
+                using var state = new SnapshotStateService();
+                using var semanticState = new SnapshotStateService();
                 var baselineHandle = GetCurrentWindowHandle(scenario);
                 var key = SnapshotRequestKey.Create(
                 baselineHandle,
@@ -93,14 +96,30 @@ internal static class SnapshotBenchmarkRunner
 
                 if (arm == SnapshotBenchmarkArm.Auto)
                 {
+                    UIAutomationResult? capturedBaseline = null;
                     var baseline = await state.CaptureAsync(
                         key,
                         SnapshotMode.Reset,
-                        token => scenario.AutomationService.GetTreeAsync(
-                            baselineHandle, null, scenario.MaxDepth, scenario.ControlTypeFilter, token),
+                        async token =>
+                        {
+                            capturedBaseline = await scenario.AutomationService.GetTreeAsync(
+                                baselineHandle, null, scenario.MaxDepth, scenario.ControlTypeFilter, token)
+                                .ConfigureAwait(false);
+                            return capturedBaseline;
+                        },
                         cancellationToken).ConfigureAwait(false);
                     Assert.True(baseline.Success, $"Could not establish auto baseline: {baseline.ErrorMessage}");
                     Assert.Equal("full", baseline.Kind);
+                    Assert.NotNull(capturedBaseline);
+
+                    var semanticBaseline = await semanticState.CaptureWithoutDisplayCleanupAsync(
+                        key,
+                        SnapshotMode.Reset,
+                        _ => Task.FromResult(capturedBaseline),
+                        cancellationToken).ConfigureAwait(false);
+                    Assert.True(
+                        semanticBaseline.Success,
+                        $"Could not establish semantic auto baseline: {semanticBaseline.ErrorMessage}");
                 }
 
                 var actionMs = 0.0;
@@ -109,6 +128,8 @@ internal static class SnapshotBenchmarkRunner
                 var tokens = 0;
                 var comparableFullBytes = 0;
                 var comparableFullTokens = 0;
+                var comparableSemanticBytes = 0;
+                var comparableSemanticTokens = 0;
                 var fullResponses = 0;
                 var diffResponses = 0;
 
@@ -164,6 +185,30 @@ internal static class SnapshotBenchmarkRunner
                     var comparableJson = JsonSerializer.Serialize(capturedFull, WindowsToolsBase.JsonOptions);
                     comparableFullBytes += System.Text.Encoding.UTF8.GetByteCount(comparableJson);
                     comparableFullTokens += TokenEncoding.Encode(comparableJson).Count;
+                    if (arm == SnapshotBenchmarkArm.Auto)
+                    {
+                        Assert.NotNull(capturedFull);
+                        var semanticSnapshot = await semanticState.CaptureWithoutDisplayCleanupAsync(
+                            key,
+                            SnapshotMode.Auto,
+                            _ => Task.FromResult(capturedFull),
+                            cancellationToken).ConfigureAwait(false);
+                        Assert.True(
+                            semanticSnapshot.Success,
+                            $"{scenario.Name} semantic auto sample {sample} action {actionIndex + 1} failed: " +
+                            semanticSnapshot.ErrorMessage);
+                        var semanticJson = JsonSerializer.Serialize(
+                            semanticSnapshot,
+                            WindowsToolsBase.JsonOptions);
+                        comparableSemanticBytes += System.Text.Encoding.UTF8.GetByteCount(semanticJson);
+                        comparableSemanticTokens += TokenEncoding.Encode(semanticJson).Count;
+                    }
+                    else
+                    {
+                        comparableSemanticBytes += System.Text.Encoding.UTF8.GetByteCount(json);
+                        comparableSemanticTokens += TokenEncoding.Encode(json).Count;
+                    }
+
                     fullResponses += string.Equals(snapshot.Kind, "full", StringComparison.Ordinal) ? 1 : 0;
                     diffResponses += string.Equals(snapshot.Kind, "diff", StringComparison.Ordinal) ? 1 : 0;
                 }
@@ -177,6 +222,8 @@ internal static class SnapshotBenchmarkRunner
                     tokens,
                     comparableFullBytes,
                     comparableFullTokens,
+                    comparableSemanticBytes,
+                    comparableSemanticTokens,
                     fullResponses,
                     diffResponses));
             }
@@ -220,23 +267,32 @@ internal static class SnapshotBenchmarkRunner
             Reduction(run.ComparableFullBytes, run.Bytes)));
         var tokenSavings = Median(autoRuns.Select(run =>
             Reduction(run.ComparableFullTokens, run.Tokens)));
+        var displayByteSavings = Median(autoRuns.Select(run =>
+            Reduction(run.ComparableSemanticBytes, run.Bytes)));
+        var displayTokenSavings = Median(autoRuns.Select(run =>
+            Reduction(run.ComparableSemanticTokens, run.Tokens)));
 
         _ = builder.AppendLine();
         _ = builder.AppendLine(
             CultureInfo.InvariantCulture,
             $"**Median paired auto savings versus the same captures returned in full:** " +
             $"{byteSavings:F1}% bytes, {tokenSavings:F1}% tokens.");
+        _ = builder.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"**Median paired display-cleanup savings versus automatic semantic output:** " +
+            $"{displayByteSavings:F1}% bytes, {displayTokenSavings:F1}% tokens.");
         _ = builder.AppendLine();
         _ = builder.AppendLine("## Raw samples");
         _ = builder.AppendLine();
-        _ = builder.AppendLine("| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full | Diff |");
-        _ = builder.AppendLine("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|");
+        _ = builder.AppendLine("| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Before-cleanup auto bytes | Before-cleanup auto tokens | Full | Diff |");
+        _ = builder.AppendLine("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
         foreach (var run in result.Runs)
         {
             _ = builder.AppendLine(
                 CultureInfo.InvariantCulture,
                 $"| {run.Sample} | {ArmName(run.Arm)} | {run.ActionMs:F1} | {run.SnapshotMs:F1} | " +
                 $"{run.Bytes} | {run.Tokens} | {run.ComparableFullBytes} | {run.ComparableFullTokens} | " +
+                $"{run.ComparableSemanticBytes} | {run.ComparableSemanticTokens} | " +
                 $"{run.FullResponses} | {run.DiffResponses} |");
         }
 
@@ -259,6 +315,8 @@ internal static class SnapshotBenchmarkRunner
             Assert.Equal(0, run.SnapshotMs);
             Assert.Equal(0, run.ComparableFullBytes);
             Assert.Equal(0, run.ComparableFullTokens);
+            Assert.Equal(0, run.ComparableSemanticBytes);
+            Assert.Equal(0, run.ComparableSemanticTokens);
         });
         Assert.All(full, run =>
         {
@@ -266,6 +324,8 @@ internal static class SnapshotBenchmarkRunner
             Assert.True(run.Tokens > 0);
             Assert.True(run.ComparableFullBytes >= run.Bytes);
             Assert.True(run.ComparableFullTokens >= run.Tokens);
+            Assert.True(run.ComparableSemanticBytes >= run.Bytes);
+            Assert.True(run.ComparableSemanticTokens >= run.Tokens);
             Assert.True(run.FullResponses > 0);
         });
         Assert.All(auto, run =>
@@ -274,6 +334,8 @@ internal static class SnapshotBenchmarkRunner
             Assert.True(run.Tokens > 0);
             Assert.True(run.ComparableFullBytes >= run.Bytes);
             Assert.True(run.ComparableFullTokens >= run.Tokens);
+            Assert.True(run.ComparableSemanticBytes >= run.Bytes);
+            Assert.True(run.ComparableSemanticTokens >= run.Tokens);
             Assert.True(run.FullResponses + run.DiffResponses > 0);
         });
     }

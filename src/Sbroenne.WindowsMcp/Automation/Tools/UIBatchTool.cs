@@ -55,7 +55,7 @@ public static partial class UIBatchTool
     /// <param name="steps">JSON array of step objects (see remarks). REQUIRED.</param>
     /// <param name="stopOnError">Stop at the first failing step (default: true). Set false to run every step regardless.</param>
     /// <param name="withSnapshot">When true, attach a snapshot after the batch completes so you can verify the final state. Default: false.</param>
-    /// <param name="snapshotMode">Post-batch snapshot mode when withSnapshot=true: full (default), auto (changes after the first view), or reset.</param>
+    /// <param name="snapshotMode">Post-batch snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this batch starts a new comparison.</param>
     /// <param name="includeDiagnostics">Reserved for parity; batch responses are already compact. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result whose JSON payload lists per-step outcomes. <c>IsError</c> is true unless every executed step succeeded.</returns>

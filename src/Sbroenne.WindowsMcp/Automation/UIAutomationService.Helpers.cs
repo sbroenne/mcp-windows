@@ -299,6 +299,7 @@ public sealed partial class UIAutomationService
                 controlType is "Pane" or "Group" &&
                 string.IsNullOrWhiteSpace(name) &&
                 string.IsNullOrWhiteSpace(automationId);
+            var isDirectlyActionable = fromCachedElement && HasCachedDirectAction(element);
 
             var info = new UIElementInfo
             {
@@ -312,7 +313,9 @@ public sealed partial class UIAutomationService
                 ClickablePoint = ClickablePoint.FromCenter(monitorRelativeRect, monitorIndex),
                 SupportedPatterns = fromCachedElement ? [] : element.GetSupportedPatternNames(),
                 IsSemanticLayoutOnly = isSemanticLayoutCandidate &&
-                    !HasCachedDirectAction(element),
+                    !isDirectlyActionable,
+                IsDirectlyActionable = isDirectlyActionable,
+                HasDeveloperIdentifier = !string.IsNullOrWhiteSpace(automationId),
                 Value = !fromCachedElement || string.Equals(controlType, "Edit", StringComparison.Ordinal)
                     ? element.TryGetValue()
                     : null,
@@ -341,6 +344,7 @@ public sealed partial class UIAutomationService
         // into view; it does not make an otherwise anonymous layout container a user-facing action.
         return element.GetCachedPropertyValue(UIA3PropertyIds.IsInvokePatternAvailable) is true ||
                element.GetCachedPropertyValue(UIA3PropertyIds.IsExpandCollapsePatternAvailable) is true ||
+               element.GetCachedPropertyValue(UIA3PropertyIds.IsRangeValuePatternAvailable) is true ||
                element.GetCachedPropertyValue(UIA3PropertyIds.IsSelectionItemPatternAvailable) is true ||
                element.GetCachedPropertyValue(UIA3PropertyIds.IsTogglePatternAvailable) is true ||
                element.GetCachedPropertyValue(UIA3PropertyIds.IsValuePatternAvailable) is true;

@@ -137,6 +137,31 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task AutomaticSnapshot_PreservesSliderClickCoordinates()
+    {
+        using var state = new SnapshotStateService();
+        var key = SnapshotRequestKey.Create(
+            _windowHandle,
+            parentElementId: null,
+            maxDepth: 8,
+            controlTypeFilter: null);
+
+        var result = await state.CaptureAsync(
+            key,
+            SnapshotMode.Reset,
+            token => _automationService.GetTreeAsync(
+                _windowHandle,
+                parentElementId: null,
+                maxDepth: 8,
+                controlTypeFilter: null,
+                token),
+            CancellationToken.None);
+
+        var slider = Assert.Single(Flatten(result.Tree ?? []), node => node.Type == "Slider");
+        Assert.NotNull(slider.Click);
+    }
+
+    [Fact]
     public async Task SnapshotTool_InvalidModeReturnsClearError()
     {
         var result = await UISnapshotTool.ExecuteAsync(

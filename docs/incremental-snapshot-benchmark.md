@@ -40,6 +40,47 @@ the four equally weighted workloads, the average reductions were 70.6% and 71.4%
 regression confirms that a same-page GitHub search-field edit returns a scoped diff in both Edge and
 Chrome; it is not included as another benchmark workload.
 
+## Further Chromium cleanup
+
+A second five-run Chrome experiment measured conservative display cleanup separately from the
+semantic wrapper removal above. Readiness now requires an exact page control returned by Windows UI
+Automation; a partial match against the browser tab title no longer counts as a ready webpage. The
+run used Chrome for Testing `151.0.7922.174` and the same four GitHub destinations.
+
+| Comparison | Byte savings | Token savings | Auto full/diff |
+|---|---:|---:|---:|
+| Display cleanup versus the same automatic semantic responses before cleanup | 10.6% | 13.6% | 20/0 |
+| Cleaned automatic responses versus the same raw full captures | 16.5% | 19.3% | 20/0 |
+
+The first row is the decision metric: cleanup alone exceeded the 5% keep threshold. It removes click
+coordinates from leaf items that Windows says cannot be acted on. It also removes a child label that
+exactly repeats its parent's label, and blank leaf images, but only when they have no action, state,
+developer identifier, or children. Readable text, values, toggle state, controls, and element IDs
+remain. Explicit `mode=full` output is unchanged.
+
+All 20 responses were complete automatic views because each action navigated to a different page.
+That makes this a useful worst case: the savings do not depend on a navigation being mistaken for a
+small update. Each automatic capture was also serialized before display cleanup, so live page
+variation cannot become fake savings.
+
+| Sample | Before-cleanup bytes | Cleaned bytes | Before-cleanup tokens | Cleaned tokens |
+|---:|---:|---:|---:|---:|
+| 1 | 203,733 | 181,985 | 64,092 | 55,398 |
+| 2 | 205,271 | 183,416 | 64,547 | 55,806 |
+| 3 | 207,081 | 185,179 | 64,504 | 55,764 |
+| 4 | 204,782 | 183,025 | 63,892 | 55,191 |
+| 5 | 187,203 | 167,313 | 58,206 | 50,304 |
+
+Two other Chromium experiments were rejected:
+
+- **Page-only snapshots:** Chrome 152 exposed the address-bar popup as a webpage root in one run,
+  while Edge 152 exposed no dependable webpage root. A screen-position fallback could select another
+  application covering the page. Because this could return the wrong content, page-only scope is not
+  shipped and whole-window snapshots remain the default.
+- **Cache-only Windows elements:** asking Windows to return cached properties without live automation
+  objects made the Electron safety test fail with `0x80004005`. The speed comparison was stopped
+  because correctness had already failed; normal cached tree capture remains in use.
+
 ## Chromium noise spike
 
 We tested whether Windows UI Automation's smaller "content view" could remove Chromium layout noise
@@ -74,14 +115,15 @@ in both browsers, but still produced 40 complete responses and no diffs. Checkin
 also added provider calls to each candidate wrapper. The cleanup was rejected because it added work
 without improving incremental responses.
 
-The production approach instead keeps two views of the same capture. Explicit full mode retains the
-complete Windows accessibility tree and all IDs. Automatic mode compares and, when necessary,
-returns a simplified tree that removes unnamed `Pane` and `Group` containers only when they have no
-developer ID and no direct Invoke, Expand/Collapse, Selection, Toggle, or Value action. Chromium's
-widely reported `ScrollItem` capability merely brings a node into view, so it does not make an
-otherwise anonymous wrapper a user-facing action. Named controls and direct action references remain
-in the tree, and uncertain duplicate controls still force a complete response. A live Chrome test
-checks that GitHub page controls survive this projection.
+The production approach instead keeps an internal comparison view and a smaller response view from
+the same capture. Explicit full mode retains the complete Windows accessibility tree and all IDs.
+Automatic mode removes unnamed `Pane` and `Group` containers only when they have no developer ID and
+no direct Invoke, Expand/Collapse, Selection, Toggle, or Value action. It then applies the conservative
+display cleanup measured above. Chromium's widely reported `ScrollItem` capability merely brings a
+node into view, so it does not make an otherwise anonymous wrapper a user-facing action. Named
+controls and direct action references remain in the tree, and uncertain duplicate controls still
+force a complete response. A live Chrome test checks that GitHub page controls survive this
+projection.
 
 This experiment also exposed a benchmark problem. Chromium's recommended depth of 15 reached the
 browser frame but not GitHub's page controls. The browser scenarios now explicitly use depth 20 and
@@ -224,6 +266,8 @@ sequentially because they share the foreground desktop:
 ```powershell
 $project = '.\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj'
 $env:MCP_TEST_CHROME = '1'
+# Optional: pin an official build when the installed Chromium version does not expose page controls.
+# $env:MCP_TEST_CHROME_PATH = 'C:\path\to\chrome.exe'
 $env:MCP_SNAPSHOT_BENCHMARK_OUTPUT = "$env:TEMP\mcp-windows-snapshot-benchmark"
 
 dotnet build $project
