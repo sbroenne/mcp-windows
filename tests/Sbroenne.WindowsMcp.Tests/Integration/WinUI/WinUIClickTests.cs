@@ -172,11 +172,12 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_ClickTestButton_IncrementsCount()
     {
         // Navigate to Editor page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        var navigation = await _automationService.FindAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
         });
+        Assert.True(navigation.Success, $"Editor navigation failed: {navigation.ErrorMessage}");
 
         var editorReady = await _automationService.WaitForElementAsync(
             new ElementQuery
@@ -194,6 +195,7 @@ public sealed class WinUIClickTests : IDisposable
             {
                 WindowHandle = _windowHandle,
                 AutomationId = "ClickTestButton",
+                TimeoutMs = 5000,
             });
             Assert.True(result.Success, $"Click test button click failed: {result.ErrorMessage}");
             await Task.Delay(50);
