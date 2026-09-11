@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -41,6 +42,10 @@ class ValidateNpmLockfilesTests(unittest.TestCase):
         )
         if stage:
             self.git("add", "--force", "--", path)
+            config = target.parent / ".npmrc"
+            if not config.exists():
+                config.write_text("omit-lockfile-registry-resolved=true\n", encoding="utf-8")
+                self.git("add", "--force", "--", str(config.relative_to(self.root)))
         return target
 
     def validate(self, *arguments, cwd=None):
@@ -160,6 +165,73 @@ class ValidateNpmLockfilesTests(unittest.TestCase):
             result = self.validate(cwd=directory)
         self.assertEqual(result.returncode, 1)
         self.assertIn("Git", result.stderr)
+
+    def test_requires_tracked_project_config_not_a_parent_or_untracked_config(self):
+        self.write_lockfile()
+        self.write_lockfile("nested/package-lock.json")
+        self.git("rm", "--cached", "--", "nested/.npmrc")
+        result = self.validate()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("nested/.npmrc", result.stderr)
+        (self.root / "nested" / ".npmrc").unlink()
+        self.assertEqual(self.validate().returncode, 1)
+
+    def test_rejects_missing_false_and_overridden_project_setting(self):
+        self.write_lockfile()
+        for content in (
+            "fund=false\n",
+            "omit-lockfile-registry-resolved=false\n",
+            "omit-lockfile-registry-resolved=true\nomit-lockfile-registry-resolved=false\n",
+            "# omit-lockfile-registry-resolved=true\n",
+        ):
+            with self.subTest(content=content):
+                (self.root / ".npmrc").write_text(content, encoding="utf-8")
+                result = self.validate()
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(".npmrc", result.stderr)
+
+    def test_config_check_preserves_other_settings_without_exposing_them(self):
+        self.write_lockfile()
+        content = (
+            "//mirror.invalid/:_authToken=private\n"
+            "fund=false\n"
+            "omit-lockfile-registry-resolved = true # portable lockfile\n"
+        )
+        config = self.root / ".npmrc"
+        config.write_text(content, encoding="utf-8")
+        result = self.validate()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(config.read_text(encoding="utf-8"), content)
+        self.assertNotIn("mirror.invalid", result.stdout + result.stderr)
+        self.assertNotIn("private", result.stdout + result.stderr)
+
+    def test_staged_config_check_cannot_be_bypassed_by_unstaged_repair(self):
+        self.write_lockfile()
+        config = self.root / ".npmrc"
+        config.write_text("omit-lockfile-registry-resolved=false\n", encoding="utf-8")
+        self.git("add", "--", ".npmrc")
+        config.write_text("omit-lockfile-registry-resolved=true\n", encoding="utf-8")
+        self.assertEqual(self.validate().returncode, 0)
+        result = self.validate("--staged")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(".npmrc", result.stderr)
+
+    def test_each_npm_installing_workflow_job_validates_before_install(self):
+        workflows = SCRIPT_PATH.parents[1] / ".github" / "workflows"
+        installing_jobs = 0
+        for workflow in workflows.glob("*.yml"):
+            text = workflow.read_text(encoding="utf-8")
+            jobs = text.split("\njobs:\n", 1)[-1]
+            for job in re.split(r"(?m)^  [\w-]+:\s*$", jobs):
+                install = re.search(r"\bnpm (?:ci|install)\b", job)
+                if install:
+                    installing_jobs += 1
+                    with self.subTest(workflow=workflow.name):
+                        self.assertIn(
+                            "python scripts/validate_npm_lockfiles.py",
+                            job[:install.start()],
+                        )
+        self.assertGreaterEqual(installing_jobs, 3)
 
     def test_pre_commit_hook_checks_staged_lockfiles(self):
         scripts = self.root / "scripts"

@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 
 LOCKFILE_NAMES = {"package-lock.json", "npm-shrinkwrap.json"}
 REMOTE_LOCATION = re.compile(r"^(?!file:)(?:[a-z][a-z0-9+.-]*:|//)", re.IGNORECASE)
+PORTABILITY_SETTING = re.compile(r"^omit-lockfile-registry-resolved\s*=\s*(.*?)\s*(?:[#;].*)?$")
 
 
 def git(*arguments, cwd=None):
@@ -43,6 +44,22 @@ def validate(staged):
         and "node_modules" not in PurePosixPath(path).parts
     })
     errors = []
+    for config in sorted({str(PurePosixPath(path).parent / ".npmrc") for path in lockfiles}):
+        if config not in tracked:
+            errors.append(f"{config}: project .npmrc must be tracked.")
+            continue
+        try:
+            content = git("show", f":{config}", cwd=root) if staged else (root / config).read_bytes()
+            settings = [
+                match.group(1) for line in content.decode("utf-8-sig").splitlines()
+                if (match := PORTABILITY_SETTING.fullmatch(line.strip()))
+            ]
+        except (OSError, UnicodeError):
+            errors.append(f"{config}: cannot read project .npmrc.")
+            continue
+        if not settings or settings[-1] != "true":
+            errors.append(f"{config}: must set omit-lockfile-registry-resolved=true.")
+
     for path in lockfiles:
         try:
             content = git("show", f":{path}", cwd=root) if staged else (root / path).read_bytes()

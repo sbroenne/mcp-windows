@@ -76,8 +76,11 @@ python -m unittest scripts.tests.test_validate_npm_lockfiles
 ```
 
 The existing CI build-and-test job runs both checks with two-minute timeouts.
+Each npm-installing CI, integration, and release job also validates before installing.
 The guard discovers tracked `package-lock.json` and `npm-shrinkwrap.json` files,
 including new nested projects, and ignores `node_modules` and untracked files.
+It requires a tracked `.npmrc` with the setting enabled in each discovered project,
+without reading or changing user or machine configuration.
 Diagnostics identify the lockfile but never print its download addresses.
 
 An optional pre-commit hook checks the staged lockfiles, so unstaged repairs cannot
