@@ -12,7 +12,7 @@ public sealed class UITestHarnessForm : Form
     // Form Controls Tab
     private readonly TextBox _usernameInput;
     private readonly TextBox _passwordInput;
-    private readonly Button _submitButton;
+    private Button _submitButton;
     private readonly Button _cancelButton;
     private readonly Label _submitMouseInputLabel;
     private readonly CheckBox _checkBox1;
@@ -742,6 +742,38 @@ public sealed class UITestHarnessForm : Form
     /// <see cref="Control.BeginInvoke(Delegate)"/> rather than <c>Invoke</c>.
     /// </summary>
     public void ShowSaveDialogForTesting() => ShowSaveDialog();
+
+    /// <summary>
+    /// Opens the Open dialog directly so tests can exercise browser-to-native-dialog handoff.
+    /// </summary>
+    public void ShowOpenDialogForTesting() => ShowOpenDialog();
+
+    /// <summary>
+    /// Replaces the Submit control with a new control that has the same accessible selector.
+    /// Used to prove that an old element id is rejected instead of silently retargeted.
+    /// </summary>
+    public void ReplaceSubmitButtonForTesting()
+    {
+        var parent = _submitButton.Parent;
+        if (parent == null)
+        {
+            return;
+        }
+
+        var replacement = new Button
+        {
+            Text = _submitButton.Text,
+            Location = _submitButton.Location,
+            Size = _submitButton.Size,
+            Name = _submitButton.Name,
+        };
+        replacement.Click += (_, _) => SubmitClickCount++;
+
+        parent.Controls.Remove(_submitButton);
+        _submitButton.Dispose();
+        _submitButton = replacement;
+        parent.Controls.Add(replacement);
+    }
 
     private void UpdateStatus(string message)
     {

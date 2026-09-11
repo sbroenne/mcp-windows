@@ -48,7 +48,25 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<KeyboardControlResult> TypeTextAsync(string text, CancellationToken cancellationToken = default)
+    public Task<KeyboardControlResult> TypeTextAsync(
+        string text,
+        CancellationToken cancellationToken = default) =>
+        TypeTextCoreAsync(text, expectedForegroundWindow: null, cancellationToken);
+
+    /// <summary>
+    /// Types text only while the specified top-level window remains foreground.
+    /// The guard is checked immediately before every SendInput chunk.
+    /// </summary>
+    internal Task<KeyboardControlResult> TypeTextAsync(
+        string text,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        TypeTextCoreAsync(text, expectedForegroundWindow, cancellationToken);
+
+    private async Task<KeyboardControlResult> TypeTextCoreAsync(
+        string text,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Handle null or empty text
         if (string.IsNullOrEmpty(text))
@@ -69,7 +87,7 @@ public sealed class KeyboardInputService : IDisposable
             var chunk = text.Substring(offset, currentChunkSize);
 
             // Type the chunk
-            var chunkResult = TypeChunk(chunk);
+            var chunkResult = TypeChunk(chunk, expectedForegroundWindow);
             if (!chunkResult.Success)
             {
                 return chunkResult;
@@ -94,8 +112,13 @@ public sealed class KeyboardInputService : IDisposable
     /// Types a single chunk of text using KEYEVENTF_UNICODE.
     /// </summary>
     /// <param name="chunk">The text chunk to type.</param>
+    /// <param name="expectedForegroundWindow">
+    /// Optional top-level window that must remain foreground.
+    /// </param>
     /// <returns>The result of the operation.</returns>
-    private static KeyboardControlResult TypeChunk(string chunk)
+    private static KeyboardControlResult TypeChunk(
+        string chunk,
+        nint? expectedForegroundWindow)
     {
         var inputs = new List<INPUT>();
 
@@ -146,6 +169,13 @@ public sealed class KeyboardInputService : IDisposable
         if (inputs.Count == 0)
         {
             return KeyboardControlResult.CreateTypeSuccess(0);
+        }
+
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before text input was sent.");
         }
 
         // Send all inputs at once
@@ -210,7 +240,41 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public Task<KeyboardControlResult> PressKeyAsync(string keyName, ModifierKey modifiers = ModifierKey.None, int repeat = 1, CancellationToken cancellationToken = default)
+    public Task<KeyboardControlResult> PressKeyAsync(
+        string keyName,
+        ModifierKey modifiers = ModifierKey.None,
+        int repeat = 1,
+        CancellationToken cancellationToken = default) =>
+        PressKeyCoreAsync(
+            keyName,
+            modifiers,
+            repeat,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    /// <summary>
+    /// Presses a key only if the specified top-level window is still foreground immediately
+    /// before the atomic SendInput call.
+    /// </summary>
+    internal Task<KeyboardControlResult> PressKeyAsync(
+        string keyName,
+        ModifierKey modifiers,
+        int repeat,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        PressKeyCoreAsync(
+            keyName,
+            modifiers,
+            repeat,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private Task<KeyboardControlResult> PressKeyCoreAsync(
+        string keyName,
+        ModifierKey modifiers,
+        int repeat,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Validate key name
         if (string.IsNullOrWhiteSpace(keyName))
@@ -237,6 +301,17 @@ public sealed class KeyboardInputService : IDisposable
         if (repeat < 1)
         {
             repeat = 1;
+        }
+
+        if (expectedForegroundWindow.HasValue)
+        {
+            return Task.FromResult(PressKeyGuarded(
+                keyName,
+                virtualKeyCode,
+                modifiers,
+                repeat,
+                expectedForegroundWindow.Value,
+                cancellationToken));
         }
 
         // Determine if this is an extended key
@@ -277,6 +352,124 @@ public sealed class KeyboardInputService : IDisposable
             // Always release modifiers that we pressed
             _modifierKeyManager.ReleaseModifiers(pressedModifiers);
         }
+    }
+
+    private KeyboardControlResult PressKeyGuarded(
+        string keyName,
+        int virtualKeyCode,
+        ModifierKey modifiers,
+        int repeat,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
+    {
+        var inputs = new List<INPUT>();
+        var pressedModifiers = new List<int>();
+
+        AddGuardedModifierInput(
+            inputs,
+            pressedModifiers,
+            modifiers,
+            ModifierKey.Ctrl,
+            NativeConstants.VK_CONTROL);
+        AddGuardedModifierInput(
+            inputs,
+            pressedModifiers,
+            modifiers,
+            ModifierKey.Shift,
+            NativeConstants.VK_SHIFT);
+        AddGuardedModifierInput(
+            inputs,
+            pressedModifiers,
+            modifiers,
+            ModifierKey.Alt,
+            NativeConstants.VK_MENU);
+        AddGuardedModifierInput(
+            inputs,
+            pressedModifiers,
+            modifiers,
+            ModifierKey.Win,
+            NativeConstants.VK_LWIN);
+
+        var isExtended = VirtualKeyMapper.IsExtendedKey(virtualKeyCode);
+        var extendedFlag = isExtended ? NativeConstants.KEYEVENTF_EXTENDEDKEY : 0u;
+        for (var index = 0; index < repeat; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            inputs.Add(CreateKeyboardInput((ushort)virtualKeyCode, 0, extendedFlag));
+            inputs.Add(CreateKeyboardInput(
+                (ushort)virtualKeyCode,
+                0,
+                extendedFlag | NativeConstants.KEYEVENTF_KEYUP));
+        }
+
+        for (var index = pressedModifiers.Count - 1; index >= 0; index--)
+        {
+            inputs.Add(CreateKeyboardInput(
+                (ushort)pressedModifiers[index],
+                0,
+                NativeConstants.KEYEVENTF_KEYUP));
+        }
+
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before the key press was sent.");
+        }
+
+        var inputArray = inputs.ToArray();
+        var result = NativeMethods.SendInput(
+            (uint)inputArray.Length,
+            inputArray,
+            INPUT.Size);
+        if (result != inputArray.Length)
+        {
+            var error = Marshal.GetLastWin32Error();
+            var (errorCode, errorMessage) = MapSendInputError(error);
+            return KeyboardControlResult.CreateFailure(errorCode, errorMessage);
+        }
+
+        return KeyboardControlResult.CreatePressSuccess(
+            keyName.ToLowerInvariant());
+    }
+
+    private void AddGuardedModifierInput(
+        List<INPUT> inputs,
+        List<int> pressedModifiers,
+        ModifierKey requestedModifiers,
+        ModifierKey modifier,
+        int virtualKeyCode)
+    {
+        if (!requestedModifiers.HasFlag(modifier) ||
+            _modifierKeyManager.IsKeyPressed(virtualKeyCode))
+        {
+            return;
+        }
+
+        inputs.Add(CreateKeyboardInput((ushort)virtualKeyCode, 0, 0));
+        pressedModifiers.Add(virtualKeyCode);
+    }
+
+    private static bool IsExpectedForegroundWindow(
+        nint? expectedForegroundWindow)
+    {
+        if (!expectedForegroundWindow.HasValue)
+        {
+            return true;
+        }
+
+        var expectedRoot = NativeMethods.GetAncestor(
+            expectedForegroundWindow.Value,
+            NativeConstants.GA_ROOT);
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundRoot = NativeMethods.GetAncestor(
+            foreground,
+            NativeConstants.GA_ROOT);
+        return foreground != IntPtr.Zero &&
+            (expectedRoot != IntPtr.Zero
+                ? expectedRoot
+                : expectedForegroundWindow.Value) ==
+            (foregroundRoot != IntPtr.Zero ? foregroundRoot : foreground);
     }
 
     /// <inheritdoc />

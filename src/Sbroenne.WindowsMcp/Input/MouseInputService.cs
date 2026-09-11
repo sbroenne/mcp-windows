@@ -12,7 +12,12 @@ public sealed class MouseInputService
     private readonly ModifierKeyManager _modifierKeyManager = new();
     /// <inheritdoc />
     public Task<MouseControlResult> MoveAsync(int x, int y, CancellationToken cancellationToken = default) =>
-        MoveCoreAsync(x, y, extraFlags: 0, cancellationToken);
+        MoveCoreAsync(
+            x,
+            y,
+            extraFlags: 0,
+            expectedForegroundWindow: null,
+            cancellationToken);
 
     /// <summary>
     /// Moves the cursor as part of a held-button stroke. Sets <c>MOUSEEVENTF_MOVE_NOCOALESCE</c> so Windows
@@ -20,9 +25,19 @@ public sealed class MouseInputService
     /// with the next one, which would cut across the corner between them.
     /// </summary>
     private Task<MouseControlResult> MoveForStrokeAsync(int x, int y, CancellationToken cancellationToken) =>
-        MoveCoreAsync(x, y, NativeConstants.MOUSEEVENTF_MOVE_NOCOALESCE, cancellationToken);
+        MoveCoreAsync(
+            x,
+            y,
+            NativeConstants.MOUSEEVENTF_MOVE_NOCOALESCE,
+            expectedForegroundWindow: null,
+            cancellationToken);
 
-    private static Task<MouseControlResult> MoveCoreAsync(int x, int y, uint extraFlags, CancellationToken cancellationToken)
+    private static Task<MouseControlResult> MoveCoreAsync(
+        int x,
+        int y,
+        uint extraFlags,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Validate coordinates against virtual screen bounds
         var (isValid, screenBounds) = CoordinateNormalizer.ValidateCoordinates(x, y);
@@ -56,6 +71,14 @@ public sealed class MouseInputService
             },
         };
 
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return Task.FromResult(MouseControlResult.CreateFailure(
+                MouseControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before the pointer move was sent.",
+                screenBounds));
+        }
+
         // Send the input
         var inputSpan = new INPUT[] { input };
         var result = NativeMethods.SendInput(1, inputSpan, INPUT.Size);
@@ -78,7 +101,41 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public Task<MouseControlResult> ClickAsync(int? x, int? y, ModifierKey modifiers = ModifierKey.None, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> ClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers = ModifierKey.None,
+        CancellationToken cancellationToken = default) =>
+        ClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    /// <summary>
+    /// Clicks only while the specified top-level window remains foreground.
+    /// The guard is checked immediately before pointer movement and click SendInput calls.
+    /// </summary>
+    internal Task<MouseControlResult> ClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        ClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private Task<MouseControlResult> ClickCoreAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         ScreenBounds? screenBounds = null;
 
@@ -97,7 +154,12 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = MoveAsync(x.Value, y.Value, cancellationToken).GetAwaiter().GetResult();
+            var moveResult = MoveCoreAsync(
+                x.Value,
+                y.Value,
+                extraFlags: 0,
+                expectedForegroundWindow,
+                cancellationToken).GetAwaiter().GetResult();
             if (!moveResult.Success)
             {
                 return Task.FromResult(moveResult);
@@ -115,6 +177,14 @@ public sealed class MouseInputService
         IReadOnlyList<int> pressedModifiers = [];
         try
         {
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return Task.FromResult(MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed before the click was sent.",
+                    screenBounds));
+            }
+
             pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
 
             // Build the INPUT structures for mouse down and mouse up
@@ -179,6 +249,28 @@ public sealed class MouseInputService
             // Always release modifiers that we pressed, even on failure
             _modifierKeyManager.ReleaseModifiers(pressedModifiers);
         }
+    }
+
+    private static bool IsExpectedForegroundWindow(
+        nint? expectedForegroundWindow)
+    {
+        if (!expectedForegroundWindow.HasValue)
+        {
+            return true;
+        }
+
+        var expectedRoot = NativeMethods.GetAncestor(
+            expectedForegroundWindow.Value,
+            NativeConstants.GA_ROOT);
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundRoot = NativeMethods.GetAncestor(
+            foreground,
+            NativeConstants.GA_ROOT);
+        return foreground != IntPtr.Zero &&
+            (expectedRoot != IntPtr.Zero
+                ? expectedRoot
+                : expectedForegroundWindow.Value) ==
+            (foregroundRoot != IntPtr.Zero ? foregroundRoot : foreground);
     }
 
     /// <summary>

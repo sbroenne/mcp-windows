@@ -198,6 +198,8 @@ internal static class CommandDispatcher
             Window(a) ?? string.Empty,
             a.GetString("path", "file-path", "file") ?? string.Empty,
             a.GetFlag("include-diagnostics", "diagnostics"),
+            a.GetString("trigger-mode", "trigger") ?? "shortcut",
+            a.GetInt("timeout-ms", "timeout") ?? 5000,
             ct);
         return Emit.Result(result);
     }
@@ -314,6 +316,10 @@ internal static class CommandDispatcher
                         a.GetString("near-element", "near"),
                         a.GetNullableBool("visible-only"),
                         a.GetNullableBool("content-view-only"),
+                        a.GetString("parent-element-id", "parent"),
+                        a.GetString("scope") ?? "window",
+                        a.GetFlag("require-unique", "unique"),
+                        a.GetNullableBool("enabled-only"),
                         a.GetInt("timeout-ms", "timeout") ?? 5000,
                         diag,
                         ct);
@@ -336,6 +342,9 @@ internal static class CommandDispatcher
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
                         a.GetFlag("double-click", "dblclick"),
+                        a.GetString("parent-element-id", "parent"),
+                        a.GetString("scope") ?? "window",
+                        a.GetFlag("require-unique", "unique"),
                         ct);
                     return Emit.Result(result);
                 }
@@ -363,6 +372,10 @@ internal static class CommandDispatcher
                         a.GetFlag("with-snapshot", "snapshot"),
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
+                        a.GetString("input-mode") ?? "auto",
+                        a.GetString("parent-element-id", "parent"),
+                        a.GetString("scope") ?? "window",
+                        a.GetFlag("require-unique", "unique"),
                         ct);
                     return Emit.Result(result);
                 }
@@ -444,6 +457,10 @@ internal static class CommandDispatcher
                         a.GetString("control-type"),
                         a.GetString("automation-id"),
                         a.GetString("class-name"),
+                        a.GetString("parent-element-id", "parent"),
+                        a.GetString("scope") ?? "window",
+                        a.GetFlag("require-unique", "unique"),
+                        a.GetNullableBool("enabled-only"),
                         a.GetInt("timeout-ms", "timeout") ?? 5000,
                         diag,
                         ct);

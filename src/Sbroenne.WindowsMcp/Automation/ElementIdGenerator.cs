@@ -77,7 +77,21 @@ public static class ElementIdGenerator
     /// </summary>
     /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
     /// <returns>The UI Automation element, or null if resolution fails.</returns>
-    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId)
+    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId) =>
+        ResolveToAutomationElement(elementId, allowSelectorFallback: true);
+
+    /// <summary>
+    /// Resolves a short element ID to the actual UI Automation element.
+    /// </summary>
+    /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
+    /// <param name="allowSelectorFallback">
+    /// Whether a stale runtime ID may fall back to an exact name/control-type search.
+    /// State-changing actions should pass <see langword="false"/>.
+    /// </param>
+    /// <returns>The UI Automation element, or null if resolution fails.</returns>
+    public static UIA.IUIAutomationElement? ResolveToAutomationElement(
+        string elementId,
+        bool allowSelectorFallback)
     {
         ArgumentNullException.ThrowIfNull(elementId);
 
@@ -110,7 +124,7 @@ public static class ElementIdGenerator
             // Last-resort: Locator-style re-resolution by name + control type. Chromium/Electron churn
             // runtime IDs and tree indices on re-render, so re-find the element by its stable semantic
             // selector when both the runtime ID and tree path have gone stale.
-            if (element == null && !string.IsNullOrEmpty(parts.Name))
+            if (allowSelectorFallback && element == null && !string.IsNullOrEmpty(parts.Name))
             {
                 element = FindBySelector(parts.WindowHandle, parts.ControlType, parts.Name!);
             }

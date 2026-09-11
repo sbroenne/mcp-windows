@@ -28,6 +28,8 @@ public static partial class UIOpenFileTool
     /// <param name="windowHandle">Application window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window, not a dialog.</param>
     /// <param name="filePath">Absolute path of an existing file to open (e.g., C:/Users/User/doc.txt). Forward/back slashes both work. REQUIRED.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
+    /// <param name="triggerMode">shortcut (default) sends Ctrl+O; wait only waits for a native Open dialog already triggered by a prior ui_click.</param>
+    /// <param name="timeoutMs">Maximum time to wait for the native dialog (default: 5000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the open operation's success status. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "file_open", Title = "📂 OPEN FILE (handles Open dialogs)", Destructive = false, OpenWorld = false)]
@@ -35,6 +37,8 @@ public static partial class UIOpenFileTool
         string windowHandle,
         string filePath,
         [DefaultValue(false)] bool includeDiagnostics,
+        [DefaultValue("shortcut")] string triggerMode,
+        [DefaultValue(5000)] int timeoutMs,
         CancellationToken cancellationToken)
     {
         const string actionName = "open";
@@ -53,7 +57,12 @@ public static partial class UIOpenFileTool
 
         try
         {
-            var result = await WindowsToolsBase.UIAutomationService.OpenFileAsync(windowHandle, filePath, cancellationToken);
+            var result = await WindowsToolsBase.UIAutomationService.OpenFileAsync(
+                windowHandle,
+                filePath,
+                triggerMode,
+                timeoutMs,
+                cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)
@@ -61,4 +70,18 @@ public static partial class UIOpenFileTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Compatibility overload using the Ctrl+O shortcut and default timeout.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string filePath,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle,
+            filePath,
+            includeDiagnostics,
+            "shortcut",
+            5000,
+            cancellationToken);
 }

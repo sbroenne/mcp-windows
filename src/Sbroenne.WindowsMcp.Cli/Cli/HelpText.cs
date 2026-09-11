@@ -75,9 +75,16 @@ internal static class HelpText
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
                      [--sort-by-prominence] [--in-region x,y,w,h] [--near-element <id>]
-                     [--visible-only] [--content-view-only] [--timeout-ms <n>]
-        ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>] [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
-        ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first] [--with-snapshot] [--snapshot-mode full|auto|reset]
+                     [--visible-only] [--enabled-only] [--content-view-only]
+                     [--scope window|active_dialog] [--parent <id>] [--require-unique]
+                     [--timeout-ms <n>]
+        ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>]
+                     [--scope window|active_dialog] [--parent <id>] [--require-unique]
+                     [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
+        ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first]
+                     [--input-mode auto|keyboard|value] [--scope window|active_dialog]
+                     [--parent <id>] [--require-unique] [--with-snapshot]
+                     [--snapshot-mode full|auto|reset]
         ui select   --window <h> --value <s> [selectors] [--with-snapshot] [--snapshot-mode full|auto|reset]
         ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>] [--format raw|article]
         ui read-table --window <h> [selectors|--element-id <id>] [--max-rows <n>] [--max-columns <n>]
@@ -107,8 +114,9 @@ internal static class HelpText
         file-save --window <h> [--path <file>]
             Save the active document; drives the Save As dialog when needed.
 
-        file-open --window <h> --path <file>
-            Open an existing file; drives the Open dialog (Ctrl+O, types the path, clicks Open).
+        file-open --window <h> --path <file> [--trigger-mode shortcut|wait] [--timeout-ms <n>]
+            Open an existing file. shortcut sends Ctrl+O; wait handles a native dialog opened by
+            a prior semantic click in a browser or desktop app.
 
         clipboard <action> [--text <s>]
             actions: get (read clipboard text), set (write --text), clear

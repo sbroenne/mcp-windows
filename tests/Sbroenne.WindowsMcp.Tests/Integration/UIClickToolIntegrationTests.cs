@@ -263,4 +263,49 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         await Task.Delay(100);
         Assert.True((_fixture.Form?.SubmitClickCount ?? 0) > initialCount);
     }
+
+    [Fact]
+    public async Task ClickElement_StaleId_DoesNotRetargetReplacementWithSameName()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var oldElementId = Assert.Single(found.Items!).Id;
+
+        _fixture.Form!.Invoke(_fixture.Form.ReplaceSubmitButtonForTesting);
+
+        var result = await _automationService.ClickElementAsync(oldElementId, _windowHandle);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form.SubmitClickCount);
+    }
+
+    [Fact]
+    public async Task FindAndClick_StaleParentId_DoesNotRetargetReplacementContainer()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var oldParentId = Assert.Single(found.Items!).Id;
+
+        _fixture.Form!.Invoke(_fixture.Form.ReplaceSubmitButtonForTesting);
+
+        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ParentElementId = oldParentId,
+            ControlType = "Button",
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form.SubmitClickCount);
+    }
 }

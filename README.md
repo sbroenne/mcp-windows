@@ -26,6 +26,12 @@ ui_click(windowHandle='123456', nameContains='Save')
 # 3. Type into fields
 ui_type(windowHandle='123456', controlType='Edit', text='Hello World')
 
+# Browser/React field: force normal focus and keyboard events when needed
+ui_type(windowHandle='123456', name='Title', text='New title', inputMode='keyboard')
+
+# Modal with duplicate labels: scope the action and require one match
+ui_click(windowHandle='123456', name='Save', scope='active_dialog', requireUnique=true)
+
 # 4. Fallback for games/canvas — screenshot + mouse
 screenshot_control(target='window', windowHandle='123456') → element coordinates
 mouse_control(action='click', x=450, y=300)
@@ -34,6 +40,9 @@ mouse_control(action='click', x=450, y=300)
 Same command works every time. Any machine. Any DPI. Any theme.
 
 Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
+For controls that open a native file picker, click the browser control first, then call
+`file_open(..., triggerMode='wait')`. Use `window_management(action='maximize')` when the page's
+responsive layout hides or replaces the intended control in a small viewport.
 
 ## Key Features
 

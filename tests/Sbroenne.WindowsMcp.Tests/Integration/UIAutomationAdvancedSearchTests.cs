@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
@@ -71,6 +72,38 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     #region FoundIndex Tests
+
+    [Fact]
+    public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task WaitForDisappear_RequireUnique_DoesNotTreatAmbiguityAsGone()
+    {
+        var result = await _automationService.WaitForElementDisappearAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
 
     [Fact]
     public async Task Find_WithFoundIndex1_ReturnsAllButtons()
@@ -158,6 +191,58 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         // Assert - Should fail with ElementNotFound
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_ReturnsAmbiguityDetails()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+        Assert.True(result.Diagnostics!.MultipleMatches!.Length > 1);
+        Assert.All(result.Diagnostics.MultipleMatches, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(item.ControlType));
+            Assert.NotNull(item.Name);
+        });
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_RedactsTextFieldValuesFromDiagnostics()
+    {
+        const string SensitiveValue = "private-field-value";
+        var typed = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "UsernameInput",
+                ControlType = "Edit",
+            },
+            SensitiveValue,
+            clearFirst: true,
+            inputMode: "value");
+        Assert.True(typed.Success, typed.ErrorMessage);
+
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Edit",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.DoesNotContain(
+            SensitiveValue,
+            JsonSerializer.Serialize(result.Diagnostics),
+            StringComparison.Ordinal);
     }
 
     #endregion

@@ -220,6 +220,11 @@ public sealed partial class UIAutomationService
                     return result with { Action = "wait_for" };
                 }
 
+                if (!IsRetryableWaitAbsence(result.ErrorType))
+                {
+                    return result with { Action = "wait_for" };
+                }
+
                 await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
                 delay = Math.Min(delay * 2, MaxDelay);
             }
@@ -265,9 +270,25 @@ public sealed partial class UIAutomationService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-                if (!result.Success || (result.Items?.Length ?? 0) == 0)
+                if (!result.Success)
                 {
-                    // Element no longer found - success!
+                    if (IsSatisfiedDisappearAbsence(result.ErrorType))
+                    {
+                        stopwatch.Stop();
+                        return UIAutomationResult.CreateSuccess(
+                            "wait_for_disappear",
+                            new UIAutomationDiagnostics
+                            {
+                                DurationMs = stopwatch.ElapsedMilliseconds,
+                                Query = query
+                            });
+                    }
+
+                    return result with { Action = "wait_for_disappear" };
+                }
+
+                if ((result.Items?.Length ?? 0) == 0)
+                {
                     stopwatch.Stop();
                     return UIAutomationResult.CreateSuccess(
                         "wait_for_disappear",
@@ -304,6 +325,14 @@ public sealed partial class UIAutomationService
             }
         }
     }
+
+    private static bool IsRetryableWaitAbsence(string? errorType) =>
+        errorType is UIAutomationErrorType.ElementNotFound or UIAutomationErrorType.WindowNotFound;
+
+    private static bool IsSatisfiedDisappearAbsence(string? errorType) =>
+        errorType is UIAutomationErrorType.ElementNotFound or
+            UIAutomationErrorType.ElementStale or
+            UIAutomationErrorType.WindowNotFound;
 
     /// <inheritdoc/>
     public async Task<UIAutomationResult> WaitForElementStateAsync(string elementId, string desiredState, int timeoutMs, CancellationToken cancellationToken = default)

@@ -17,13 +17,15 @@ public sealed partial class UIAutomationService
         {
             return await _staThread.ExecuteAsync(() =>
             {
-                var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+                var element = ElementIdGenerator.ResolveToAutomationElement(
+                    elementId,
+                    allowSelectorFallback: false);
                 if (element == null)
                 {
                     return UIAutomationResult.CreateFailure(
                         "focus",
-                        UIAutomationErrorType.ElementNotFound,
-                        $"Element not found or stale: {elementId}",
+                        UIAutomationErrorType.ElementStale,
+                        $"Element is stale: {elementId}. Refresh UI state before focusing.",
                         CreateDiagnostics(stopwatch));
                 }
 

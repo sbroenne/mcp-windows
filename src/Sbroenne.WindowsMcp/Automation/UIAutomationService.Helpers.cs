@@ -396,6 +396,39 @@ public sealed partial class UIAutomationService
         };
     }
 
+    private static UIAutomationDiagnostics CreateActionDiagnostics(
+        Stopwatch stopwatch,
+        UIA.IUIAutomationElement? element,
+        string actionPath)
+    {
+        UIAutomationTargetDiagnostics? target = null;
+        if (element != null)
+        {
+            try
+            {
+                target = new UIAutomationTargetDiagnostics
+                {
+                    Name = element.GetName(),
+                    AutomationId = element.GetAutomationId(),
+                    ControlType = element.GetControlTypeName(),
+                    IsEnabled = element.CurrentIsEnabled != 0,
+                    IsOffscreen = element.CurrentIsOffscreen != 0
+                };
+            }
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            {
+                target = null;
+            }
+        }
+
+        return new UIAutomationDiagnostics
+        {
+            DurationMs = stopwatch.ElapsedMilliseconds,
+            ActionPath = actionPath,
+            TargetElement = target
+        };
+    }
+
     private static UIAutomationDiagnostics CreateDiagnosticsWithContext(
         Stopwatch stopwatch,
         UIA.IUIAutomationElement rootElement,

@@ -33,18 +33,56 @@ public sealed partial class UIAutomationService
     /// <returns>A result describing whether the Open dialog was driven successfully.</returns>
     public async Task<UIAutomationResult> OpenFileAsync(
         string windowHandle, string filePath, CancellationToken cancellationToken = default)
+        => await OpenFileAsync(
+            windowHandle,
+            filePath,
+            triggerMode: "shortcut",
+            timeoutMs: (int)SaveDialogTimeout.TotalMilliseconds,
+            cancellationToken);
+
+    /// <summary>
+    /// Opens a file through a standard Open dialog. Use triggerMode "shortcut" to send Ctrl+O,
+    /// or "wait" when a prior semantic browser/app click is expected to open the native dialog.
+    /// </summary>
+    public async Task<UIAutomationResult> OpenFileAsync(
+        string windowHandle,
+        string filePath,
+        string triggerMode,
+        int timeoutMs,
+        CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+        var normalizedTrigger = string.IsNullOrWhiteSpace(triggerMode)
+            ? "shortcut"
+            : triggerMode.Trim().ToLowerInvariant();
 
         try
         {
+            if (normalizedTrigger is not ("shortcut" or "wait"))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Invalid triggerMode '{triggerMode}'. Valid values: shortcut, wait.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
+            }
+
+            if (timeoutMs <= 0 || timeoutMs > 60000)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open",
+                    UIAutomationErrorType.InvalidParameter,
+                    "timeoutMs must be between 1 and 60000.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
+            }
+
             if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == nint.Zero)
             {
                 return UIAutomationResult.CreateFailure(
                     "open",
                     UIAutomationErrorType.InvalidParameter,
                     $"Invalid window handle format: '{windowHandle}'",
-                    CreateDiagnostics(stopwatch));
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
             }
 
             if (string.IsNullOrWhiteSpace(filePath))
@@ -53,7 +91,7 @@ public sealed partial class UIAutomationService
                     "open",
                     UIAutomationErrorType.InvalidParameter,
                     "filePath is required for open. Provide the absolute path of an existing file.",
-                    CreateDiagnostics(stopwatch));
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
             }
 
             filePath = Path.GetFullPath(filePath);
@@ -63,42 +101,68 @@ public sealed partial class UIAutomationService
                     "open",
                     UIAutomationErrorType.PathError,
                     $"Open failed: file '{filePath}' does not exist. Provide the path of an existing file.",
-                    CreateDiagnostics(stopwatch));
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
             }
 
-            // Step 1: focus the target window.
-            if (!await FocusWindowAsync(hwnd, cancellationToken))
+            if (normalizedTrigger == "shortcut" &&
+                !await FocusWindowAsync(hwnd, cancellationToken))
             {
                 return UIAutomationResult.CreateFailure(
                     "open",
                     UIAutomationErrorType.ElementNotFound,
                     "Could not focus the target window.",
-                    CreateDiagnostics(stopwatch));
+                    CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
             }
 
-            _ = await DeterministicWait.UntilAsync(
-                () => NativeMethods.GetForegroundWindow() == hwnd,
-                TimeSpan.FromMilliseconds(500),
-                TimeSpan.FromMilliseconds(25),
-                cancellationToken: cancellationToken);
+            if (normalizedTrigger == "shortcut")
+            {
+                var foregroundReady = await DeterministicWait.UntilAsync(
+                    () => NativeMethods.GetForegroundWindow() == hwnd,
+                    TimeSpan.FromMilliseconds(500),
+                    TimeSpan.FromMilliseconds(25),
+                    cancellationToken: cancellationToken);
+                if (!foregroundReady)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "open",
+                        UIAutomationErrorType.WrongTargetWindow,
+                        "The target window could not be confirmed as foreground, so Ctrl+O was not sent.",
+                        CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
+                }
 
-            // Step 2: invoke the Open command (universal Ctrl+O).
-            await _keyboardService.PressKeyAsync("o", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                await _keyboardService.PressKeyAsync(
+                    "o",
+                    ModifierKey.Ctrl,
+                    cancellationToken: cancellationToken);
+            }
 
-            // Step 3: wait for the Open dialog.
-            var dialog = await WaitForOpenDialogAsync(hwnd, cancellationToken);
+            var dialog = await WaitForOpenDialogAsync(
+                hwnd,
+                TimeSpan.FromMilliseconds(timeoutMs),
+                allowStructuralMatch: normalizedTrigger == "shortcut",
+                cancellationToken);
             if (dialog == null)
             {
+                var candidates = await DescribeOpenDialogCandidatesAsync(hwnd, cancellationToken);
                 return UIAutomationResult.CreateFailure(
                     "open",
                     UIAutomationErrorType.Timeout,
-                    "No Open dialog appeared after Ctrl+O. The app may use a different shortcut or menu; " +
-                    "open the dialog manually with ui_click, then type the path with ui_type.",
-                    CreateDiagnostics(stopwatch));
+                    normalizedTrigger == "wait"
+                        ? "The expected native Open dialog did not appear after the prior UI action."
+                        : "No native Open dialog appeared after Ctrl+O.",
+                    CreateDiagnostics(stopwatch) with
+                    {
+                        ActionPath = normalizedTrigger,
+                        Warnings = [$"Observed candidate windows: {candidates}"]
+                    });
             }
 
-            // Step 4: fill the File name field and confirm.
-            return await FillOpenDialogAsync(dialog, filePath, stopwatch, cancellationToken);
+            return await FillOpenDialogAsync(
+                dialog,
+                filePath,
+                stopwatch,
+                normalizedTrigger,
+                cancellationToken);
         }
         catch (COMException ex)
         {
@@ -106,7 +170,7 @@ public sealed partial class UIAutomationService
                 "open",
                 COMExceptionHelper.GetErrorType(ex),
                 COMExceptionHelper.GetErrorMessage(ex, "Open"),
-                CreateDiagnostics(stopwatch));
+                CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -114,7 +178,7 @@ public sealed partial class UIAutomationService
                 "open",
                 UIAutomationErrorType.InternalError,
                 $"Open failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
+                CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
         }
     }
 
@@ -123,11 +187,14 @@ public sealed partial class UIAutomationService
     /// Mirrors <see cref="WaitForSaveDialogAsync"/> but matches Open dialog titles.
     /// </summary>
     private async Task<UIA.IUIAutomationElement?> WaitForOpenDialogAsync(
-        nint parentHwnd, CancellationToken cancellationToken)
+        nint parentHwnd,
+        TimeSpan timeout,
+        bool allowStructuralMatch,
+        CancellationToken cancellationToken)
     {
         string[] dialogPatterns = ["Open", "Select a file", "Choose File", "Browse"];
 
-        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+        var deadline = DateTime.UtcNow + timeout;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -138,6 +205,21 @@ public sealed partial class UIAutomationService
             {
                 result = await _staThread.ExecuteAsync(() =>
                 {
+                    var enabledPopup = NativeMethods.GetWindow(
+                        parentHwnd,
+                        NativeConstants.GW_ENABLEDPOPUP);
+                    if (enabledPopup != IntPtr.Zero &&
+                        enabledPopup != parentHwnd &&
+                        NativeMethods.IsWindowVisible(enabledPopup))
+                    {
+                        var popup = Uia.ElementFromHandle(enabledPopup);
+                        if (popup != null &&
+                            MatchesExpectedFileDialog(popup, dialogPatterns, allowStructuralMatch))
+                        {
+                            return popup;
+                        }
+                    }
+
                     var parentElement = Uia.ElementFromHandle(parentHwnd);
                     if (parentElement != null)
                     {
@@ -162,8 +244,10 @@ public sealed partial class UIAutomationService
                                         continue;
                                     }
 
-                                    var name = child.CurrentName ?? string.Empty;
-                                    if (MatchesOpenDialog(name, dialogPatterns))
+                                    if (MatchesExpectedFileDialog(
+                                        child,
+                                        dialogPatterns,
+                                        allowStructuralMatch))
                                     {
                                         return child;
                                     }
@@ -176,7 +260,7 @@ public sealed partial class UIAutomationService
                         }
                     }
 
-                    // Fallback: top-level shell dialog windows.
+                    // Fallback: only accept a visible top-level window owned by the requested app.
                     var topWindowCondition = Uia.CreatePropertyCondition(
                         UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
                     var topWindows = Uia.RootElement.FindAll(UIA.TreeScope.TreeScope_Children, topWindowCondition);
@@ -185,8 +269,25 @@ public sealed partial class UIAutomationService
                         for (int i = 0; i < topWindows.Length; i++)
                         {
                             var window = topWindows.GetElement(i);
-                            var name = window.CurrentName ?? string.Empty;
-                            if (MatchesOpenDialog(name, dialogPatterns))
+                            var candidateHandle = new IntPtr(window.CurrentNativeWindowHandle);
+                            var rootOwner = NativeMethods.GetAncestor(
+                                candidateHandle,
+                                NativeConstants.GA_ROOTOWNER);
+                            var parentRootOwner = NativeMethods.GetAncestor(
+                                parentHwnd,
+                                NativeConstants.GA_ROOTOWNER);
+                            var owner = NativeMethods.GetWindow(
+                                candidateHandle,
+                                NativeConstants.GW_OWNER);
+                            if (candidateHandle != parentHwnd &&
+                                owner != IntPtr.Zero &&
+                                MatchesExpectedFileDialog(
+                                    window,
+                                    dialogPatterns,
+                                    allowStructuralMatch) &&
+                                NativeMethods.IsWindowVisible(candidateHandle) &&
+                                (rootOwner == parentRootOwner ||
+                                 owner == parentHwnd))
                             {
                                 return window;
                             }
@@ -223,6 +324,36 @@ public sealed partial class UIAutomationService
         }
 
         return false;
+    }
+
+    private static bool MatchesExpectedFileDialog(
+        UIA.IUIAutomationElement dialog,
+        string[] titlePatterns,
+        bool allowStructuralMatch)
+    {
+        if (MatchesOpenDialog(dialog.CurrentName ?? string.Empty, titlePatterns))
+        {
+            return true;
+        }
+
+        if (!allowStructuralMatch)
+        {
+            return false;
+        }
+
+        // Localized Windows installations do not use English dialog titles. Standard shell file
+        // dialogs can still be identified by their file-name field and default confirmation button.
+        if (FindSaveDialogEditField(dialog) is null)
+        {
+            return false;
+        }
+
+        var defaultButtonCondition = Uia.CreateAndCondition(
+            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+            Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
+        return dialog.FindFirst(
+            UIA.TreeScope.TreeScope_Descendants,
+            defaultButtonCondition) is not null;
     }
 
     /// <summary>
@@ -271,20 +402,16 @@ public sealed partial class UIAutomationService
     /// Save and Open shell dialogs) and <see cref="WaitForDialogCloseAsync"/>.
     /// </summary>
     private async Task<UIAutomationResult> FillOpenDialogAsync(
-        UIA.IUIAutomationElement dialog, string filePath, Stopwatch stopwatch, CancellationToken cancellationToken)
+        UIA.IUIAutomationElement dialog,
+        string filePath,
+        Stopwatch stopwatch,
+        string actionPath,
+        CancellationToken cancellationToken)
     {
-        await _staThread.ExecuteAsync(() =>
-        {
-            try
-            {
-                dialog.SetFocus();
-            }
-            catch
-            {
-                // Best effort.
-            }
-            return true;
-        }, cancellationToken);
+        var dialogHwnd = await _staThread.ExecuteAsync(
+            () => NormalizeTopLevelWindowHandle(
+                new IntPtr(dialog.CurrentNativeWindowHandle)),
+            cancellationToken);
 
         UIA.IUIAutomationElement? editField = null;
         var editFieldFound = await DeterministicWait.UntilAsync(
@@ -308,12 +435,11 @@ public sealed partial class UIAutomationService
                 UIAutomationErrorType.ElementNotFound,
                 "Could not find the File name field in the Open dialog. Edit/ComboBox descendants: " +
                 controlDump,
-                CreateDiagnostics(stopwatch));
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
         }
 
         int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
         {
-            editField.TrySetFocus();
             var rect = editField.GetBoundingRectangle();
             if (rect.Width <= 0 || rect.Height <= 0)
             {
@@ -323,15 +449,7 @@ public sealed partial class UIAutomationService
             return [(int)Math.Round(rect.X + (rect.Width / 2)), (int)Math.Round(rect.Y + (rect.Height / 2))];
         }, cancellationToken);
 
-        if (editFieldCenter is { Length: 2 })
-        {
-            await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
-        }
-
-        await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
-
         var normalizedPath = filePath.Replace('/', '\\');
-        var expectedFileName = Path.GetFileName(normalizedPath);
 
         // Enter the path robustly, verify it actually landed in the File name field, and only then
         // confirm. A loaded, shared CI desktop can drop the first keystrokes right after the field
@@ -343,91 +461,254 @@ public sealed partial class UIAutomationService
         // writes are ignored), and retype until the field holds the full path before clicking Open. We
         // click the Open button rather than pressing Enter, which can commit an autocomplete suggestion.
         string? lastObservedValue = null;
+        ElementActionOutcome? lastOpenButtonOutcome = null;
+
+        // Prefer semantic assignment and invocation. This path is background-safe and avoids exposing
+        // the local path through global keyboard input when another application owns the foreground.
+        await _staThread.ExecuteAsync(
+            () =>
+            {
+                editField.TrySetValue(normalizedPath);
+                return true;
+            },
+            cancellationToken);
+        lastObservedValue = await _staThread.ExecuteAsync(
+            () => editField.GetText(),
+            cancellationToken);
+        if (PathMatches(lastObservedValue, normalizedPath))
+        {
+            lastOpenButtonOutcome = await ClickOpenButtonAsync(
+                dialog,
+                allowPhysicalFallback: false,
+                cancellationToken);
+            if (lastOpenButtonOutcome.Value.Success &&
+                await WaitForDialogCloseAsync(dialog, cancellationToken))
+            {
+                return UIAutomationResult.CreateSuccess(
+                    "open",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath + "+semantic" });
+            }
+        }
+
+        if (dialogHwnd == IntPtr.Zero || _windowActivator == null)
+        {
+            return UIAutomationResult.CreateFailure(
+                "open",
+                UIAutomationErrorType.WrongTargetWindow,
+                "The native Open dialog could not be activated before keyboard input.",
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+        }
+
+        var activated = await _windowActivator.ActivateWindowAsync(
+            dialogHwnd,
+            cancellationToken: cancellationToken);
+        if (!activated || !_windowActivator.IsForegroundWindow(dialogHwnd))
+        {
+            return UIAutomationResult.CreateFailure(
+                "open",
+                UIAutomationErrorType.WrongTargetWindow,
+                "The native Open dialog was found but could not be confirmed as foreground, so the file path was not typed.",
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+        }
+
+        await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
+            if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+            {
+                return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+            }
+
             await _staThread.ExecuteAsync(() => { editField.TrySetFocus(); return true; }, cancellationToken);
             if (editFieldCenter is { Length: 2 })
             {
-                await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
-            }
+                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+                {
+                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                }
 
-            // Wait for the edit field to actually own keyboard focus so the typed path lands in it.
-            _ = await DeterministicWait.UntilAsync(
-                async () => await _staThread.ExecuteAsync(
-                    () =>
-                    {
-                        try
-                        {
-                            return editField.CurrentHasKeyboardFocus != 0;
-                        }
-                        catch (COMException)
-                        {
-                            return false;
-                        }
-                    },
-                    cancellationToken),
-                TimeSpan.FromMilliseconds(500),
-                TimeSpan.FromMilliseconds(25),
-                cancellationToken: cancellationToken);
+                await _mouseService.ClickAsync(
+                    editFieldCenter[0],
+                    editFieldCenter[1],
+                    ModifierKey.None,
+                    dialogHwnd,
+                    cancellationToken);
+            }
 
             // Clear then type, verifying the field reads back the full path. Retype on mismatch so a
             // dropped leading character (a contended-desktop hazard) is corrected before we confirm.
             var matched = false;
             for (var typeAttempt = 0; typeAttempt < 4 && !matched; typeAttempt++)
             {
-                await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+                {
+                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                }
+
+                await _keyboardService.PressKeyAsync(
+                    "a",
+                    ModifierKey.Ctrl,
+                    1,
+                    dialogHwnd,
+                    cancellationToken);
                 _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                await _keyboardService.PressKeyAsync("Delete", cancellationToken: cancellationToken);
+                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+                {
+                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                }
+
+                await _keyboardService.PressKeyAsync(
+                    "Delete",
+                    ModifierKey.None,
+                    1,
+                    dialogHwnd,
+                    cancellationToken);
                 _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+                {
+                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                }
+
+                await _keyboardService.TypeTextAsync(
+                    normalizedPath,
+                    dialogHwnd,
+                    cancellationToken);
                 _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
 
                 lastObservedValue = await _staThread.ExecuteAsync(
                     () => editField.GetText(), cancellationToken);
-                matched = PathMatches(lastObservedValue, normalizedPath, expectedFileName);
+                matched = PathMatches(lastObservedValue, normalizedPath);
             }
 
             if (!matched)
             {
-                // Best-effort populate for dialogs that honor ValuePattern (the classic Win32 edit does
-                // not, but the Vista-style one does); harmless when ignored.
+                // Best-effort populate for dialogs that honor ValuePattern, then verify before any
+                // confirmation action.
                 await _staThread.ExecuteAsync(() => { editField.TrySetValue(normalizedPath); return true; }, cancellationToken);
+                lastObservedValue = await _staThread.ExecuteAsync(
+                    () => editField.GetText(), cancellationToken);
+                matched = PathMatches(lastObservedValue, normalizedPath);
             }
 
-            // Confirm. The edit has keyboard focus and holds the verified path, so press Enter first -
-            // the canonical confirm for the classic Win32 dialog, which does not always commit when its
-            // Open button is invoked through UIA. Fall back to clicking the Open button for dialogs that
-            // swallow Enter (e.g. when an autocomplete popup is showing). Either commit closes the dialog.
-            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
-            if (await WaitForDialogCloseAsync(dialog, cancellationToken))
+            if (!matched)
             {
-                return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
+                continue;
             }
 
-            await ClickOpenButtonAsync(dialog, cancellationToken);
+            // Confirm through the dialog's default Open button first. This avoids sending another
+            // global key when the shell exposes a reliable semantic action.
+            lastOpenButtonOutcome = await ClickOpenButtonAsync(
+                dialog,
+                allowPhysicalFallback: true,
+                cancellationToken);
+            if (lastOpenButtonOutcome.Value.Success &&
+                await WaitForDialogCloseAsync(dialog, cancellationToken))
+            {
+                return UIAutomationResult.CreateSuccess(
+                    "open",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+            }
+
+            // Some classic dialogs expose Invoke but do not commit it. The field still contains the
+            // verified absolute path, so Enter is a bounded fallback.
+            if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+            {
+                return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+            }
+
+            await _keyboardService.PressKeyAsync(
+                "Return",
+                ModifierKey.None,
+                1,
+                dialogHwnd,
+                cancellationToken);
             if (await WaitForDialogCloseAsync(dialog, cancellationToken))
             {
-                return UIAutomationResult.CreateSuccess("open", CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccess(
+                    "open",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
             }
         }
 
         return UIAutomationResult.CreateFailure(
             "open",
             UIAutomationErrorType.Timeout,
-            "Open could not be verified because the Open dialog remained open after entering " +
-            $"'{normalizedPath}'. Last File name value observed: '{lastObservedValue ?? "<null>"}'. " +
-            "The path may be invalid or the app rejected the file; open the dialog manually with " +
-            "ui_click, type the path with ui_type, then confirm.",
-            CreateDiagnostics(stopwatch));
+            "Open could not be verified because the native dialog remained open after the path " +
+            "was entered and confirmed. The app may have rejected the file.",
+            CreateDiagnostics(stopwatch) with
+            {
+                ActionPath = actionPath,
+                Warnings =
+                [
+                    $"File name field matched requested path: {PathMatches(lastObservedValue, normalizedPath)}",
+                    $"Open button outcome: {lastOpenButtonOutcome?.Success}; " +
+                    $"path={lastOpenButtonOutcome?.ActionPath ?? "<none>"}; " +
+                    $"error={lastOpenButtonOutcome?.ErrorMessage ?? "<none>"}"
+                ]
+            });
+    }
+
+    private static UIAutomationResult CreateOpenDialogForegroundFailure(
+        Stopwatch stopwatch,
+        string actionPath) =>
+        UIAutomationResult.CreateFailure(
+            "open",
+            UIAutomationErrorType.WrongTargetWindow,
+            "The native Open dialog lost foreground ownership, so no further file-path input was sent.",
+            CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+
+    private async Task<string> DescribeOpenDialogCandidatesAsync(
+        nint parentHwnd,
+        CancellationToken cancellationToken)
+    {
+        return await _staThread.ExecuteAsync(() =>
+        {
+            var descriptions = new List<string>();
+            var popup = NativeMethods.GetWindow(parentHwnd, NativeConstants.GW_ENABLEDPOPUP);
+            if (popup != IntPtr.Zero && popup != parentHwnd)
+            {
+                var popupElement = Uia.ElementFromHandle(popup);
+                descriptions.Add(
+                    $"enabledPopup(handle={popup}, name='{popupElement?.CurrentName ?? string.Empty}')");
+            }
+
+            var windows = Uia.RootElement.FindAll(
+                UIA.TreeScope.TreeScope_Children,
+                Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window));
+            var parentRootOwner = NativeMethods.GetAncestor(
+                parentHwnd,
+                NativeConstants.GA_ROOTOWNER);
+            for (var index = 0; index < Math.Min(windows?.Length ?? 0, 12); index++)
+            {
+                var window = windows!.GetElement(index);
+                var handle = new IntPtr(window.CurrentNativeWindowHandle);
+                var rootOwner = NativeMethods.GetAncestor(
+                    handle,
+                    NativeConstants.GA_ROOTOWNER);
+                var owner = NativeMethods.GetWindow(handle, NativeConstants.GW_OWNER);
+                if (handle != parentHwnd &&
+                    rootOwner != parentRootOwner &&
+                    owner != parentHwnd)
+                {
+                    continue;
+                }
+
+                descriptions.Add(
+                    $"window(handle={handle}, name='{window.CurrentName ?? string.Empty}', visible={NativeMethods.IsWindowVisible(handle)})");
+            }
+
+            return descriptions.Count == 0 ? "<none>" : string.Join("; ", descriptions);
+        }, cancellationToken);
     }
 
     /// <summary>
     /// Whether the File name field's observed text corresponds to the requested path. The shell may
-    /// show just the file name, the full path, or a value with surrounding quotes, so accept any of
-    /// those rather than requiring an exact match.
+    /// show the full path with surrounding quotes, so normalize those quotes before comparison.
+    /// Require the complete absolute path: accepting only a matching file-name suffix can hide
+    /// dropped leading keystrokes and cause the dialog to open an unintended file.
     /// </summary>
-    private static bool PathMatches(string? observed, string normalizedPath, string expectedFileName)
+    private static bool PathMatches(string? observed, string normalizedPath)
     {
         if (string.IsNullOrEmpty(observed))
         {
@@ -435,15 +716,16 @@ public sealed partial class UIAutomationService
         }
 
         var trimmed = observed.Trim().Trim('"');
-        return trimmed.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase)
-            || trimmed.Equals(expectedFileName, StringComparison.OrdinalIgnoreCase)
-            || trimmed.EndsWith(expectedFileName, StringComparison.OrdinalIgnoreCase);
+        return trimmed.Equals(normalizedPath, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
     /// Finds and clicks the Open button in an Open dialog. Mirrors <see cref="ClickSaveButtonAsync"/>.
     /// </summary>
-    private async Task<bool> ClickOpenButtonAsync(UIA.IUIAutomationElement dialog, CancellationToken cancellationToken)
+    private async Task<ElementActionOutcome> ClickOpenButtonAsync(
+        UIA.IUIAutomationElement dialog,
+        bool allowPhysicalFallback,
+        CancellationToken cancellationToken)
     {
         UIA.IUIAutomationElement? openButton = null;
         var found = await DeterministicWait.UntilAsync(
@@ -451,6 +733,22 @@ public sealed partial class UIAutomationService
             {
                 openButton = await _staThread.ExecuteAsync(() =>
                 {
+                    // AutomationId "1" is the default confirmation button in standard shell
+                    // dialogs. Prefer it over accessible name because the dialog can contain
+                    // another visible "Open" command in its navigation surface.
+                    var idCondition = Uia.CreateAndCondition(
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
+                        Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
+                    var defaultButton = dialog.FindFirst(
+                        UIA.TreeScope.TreeScope_Descendants,
+                        idCondition);
+                    if (defaultButton is not null &&
+                        defaultButton.IsEnabled() &&
+                        !defaultButton.IsOffscreen())
+                    {
+                        return defaultButton;
+                    }
+
                     string[] openButtonNames = ["Open", "&Open"];
                     foreach (var name in openButtonNames)
                     {
@@ -458,17 +756,15 @@ public sealed partial class UIAutomationService
                             Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
                             Uia.CreatePropertyCondition(UIA3PropertyIds.Name, name));
                         var button = dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
-                        if (button != null)
+                        if (button is not null &&
+                            button.IsEnabled() &&
+                            !button.IsOffscreen())
                         {
                             return button;
                         }
                     }
 
-                    // AutomationId "1" is the default OK/Open button in shell file dialogs.
-                    var idCondition = Uia.CreateAndCondition(
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                        Uia.CreatePropertyCondition(UIA3PropertyIds.AutomationId, "1"));
-                    return dialog.FindFirst(UIA.TreeScope.TreeScope_Descendants, idCondition);
+                    return null;
                 }, cancellationToken);
                 return openButton != null;
             },
@@ -481,10 +777,29 @@ public sealed partial class UIAutomationService
 
         if (!found || openButton == null)
         {
-            return false;
+            return new ElementActionOutcome(
+                false,
+                ErrorMessage: "No visible Open button was found in the native dialog.",
+                ActionPath: "open_button_find");
         }
 
-        var outcome = await ExecuteElementActionAsync(openButton, dialog, fallbackClickPoint: null, cancellationToken);
-        return outcome.Success;
+        if (!allowPhysicalFallback)
+        {
+            var invoked = await _staThread.ExecuteAsync(
+                () => openButton.TryInvoke(),
+                cancellationToken);
+            return invoked
+                ? new ElementActionOutcome(true, ActionPath: "semantic_invoke")
+                : new ElementActionOutcome(
+                    false,
+                    ErrorMessage: "The native dialog's default Open button did not support semantic invocation.",
+                    ActionPath: "semantic_invoke");
+        }
+
+        return await ExecuteElementActionAsync(
+            openButton,
+            dialog,
+            fallbackClickPoint: null,
+            cancellationToken);
     }
 }

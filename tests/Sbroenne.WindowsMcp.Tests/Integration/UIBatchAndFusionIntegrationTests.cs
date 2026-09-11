@@ -81,6 +81,35 @@ public sealed class UIBatchAndFusionIntegrationTests
     }
 
     [Fact]
+    public async Task Batch_WaitDisappear_RequireUnique_ReportsAmbiguity()
+    {
+        var steps = JsonSerializer.Serialize(new object[]
+        {
+            new
+            {
+                action = "wait",
+                mode = "disappear",
+                controlType = "Button",
+                requireUnique = true,
+                timeoutMs = 1000,
+            },
+        });
+
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle,
+            steps,
+            stopOnError: true,
+            withSnapshot: false,
+            includeDiagnostics: false,
+            CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.False(batch.Success);
+        Assert.True(result.IsError);
+        Assert.Contains("matching elements", Assert.Single(batch.Steps).Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Batch_ContinueOnError_RunsEveryStep()
     {
         var steps = JsonSerializer.Serialize(new object[]

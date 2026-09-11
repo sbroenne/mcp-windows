@@ -15,7 +15,8 @@ public sealed partial class UIAutomationService
     private readonly record struct ElementActionOutcome(
         bool Success,
         bool ElementUnavailable = false,
-        string? ErrorMessage = null);
+        string? ErrorMessage = null,
+        string? ActionPath = null);
 
     private readonly record struct ElementActionState(
         int ControlType,
@@ -131,7 +132,7 @@ public sealed partial class UIAutomationService
                     cancellationToken);
                 if (verified.Observed)
                 {
-                    return new ElementActionOutcome(true, verified.ElementUnavailable);
+                    return new ElementActionOutcome(true, verified.ElementUnavailable, ActionPath: "semantic_toggle");
                 }
 
                 return new ElementActionOutcome(
@@ -147,7 +148,7 @@ public sealed partial class UIAutomationService
                     cancellationToken);
                 if (verified.Observed)
                 {
-                    return new ElementActionOutcome(true, verified.ElementUnavailable);
+                    return new ElementActionOutcome(true, verified.ElementUnavailable, ActionPath: "semantic_select");
                 }
 
                 if (initial.ControlType == UIA3ControlTypeIds.RadioButton)
@@ -175,26 +176,40 @@ public sealed partial class UIAutomationService
 
             // Invoke has no universal state postcondition. A successful provider call is the
             // observable completion signal; do not fabricate a state that the provider lacks.
-            return new ElementActionOutcome(true);
+            return new ElementActionOutcome(true, ActionPath: "semantic_invoke");
         }
 
-        var clickablePoint = await _staThread.ExecuteAsync(
+        var physicalTarget = await _staThread.ExecuteAsync(
             () =>
             {
-                TryActivateWindowForElement(element, windowHandle: null);
-                return GetClickablePointForClick(element) ?? fallbackClickPoint;
+                var activated = ActivateWindowForElement(element, windowHandle: null);
+                return (
+                    Point: GetClickablePointForClick(element) ?? fallbackClickPoint,
+                    WindowHandle: ResolveElementWindowHandle(element),
+                    Activated: activated);
             },
             cancellationToken);
-        if (!clickablePoint.HasValue)
+        if (!physicalTarget.Point.HasValue)
         {
             return new ElementActionOutcome(
                 false,
                 ErrorMessage: $"Element (ControlType={UIA3ControlTypeIds.ToName(initial.ControlType)}) cannot be clicked: semantic pattern unavailable and no clickable point is available.");
         }
 
+        if (!physicalTarget.Activated ||
+            !IsExpectedForegroundWindow(physicalTarget.WindowHandle))
+        {
+            return new ElementActionOutcome(
+                false,
+                ErrorMessage: "The element's window could not be confirmed as foreground, so the physical click was not sent.",
+                ActionPath: "physical_click");
+        }
+
         var clickResult = await _mouseService.ClickAsync(
-            clickablePoint.Value.X,
-            clickablePoint.Value.Y,
+            physicalTarget.Point.Value.X,
+            physicalTarget.Point.Value.Y,
+            ModifierKey.None,
+            physicalTarget.WindowHandle,
             cancellationToken: cancellationToken);
         if (!clickResult.Success)
         {
@@ -210,7 +225,7 @@ public sealed partial class UIAutomationService
             cancellationToken);
 
         return physicalOutcome.Observed
-            ? new ElementActionOutcome(true, physicalOutcome.ElementUnavailable)
+            ? new ElementActionOutcome(true, physicalOutcome.ElementUnavailable, ActionPath: "physical_click")
             : new ElementActionOutcome(
                 false,
                 ErrorMessage: semanticAttempted

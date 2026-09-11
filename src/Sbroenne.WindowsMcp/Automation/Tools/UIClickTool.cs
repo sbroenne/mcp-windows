@@ -36,6 +36,9 @@ public static partial class UIClickTool
     /// <param name="snapshotMode">Post-action snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this action starts a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="doubleClick">Double-click the element instead of single-clicking. Use for list/grid items that open on double-click - no coordinates needed. Default: false.</param>
+    /// <param name="parentElementId">Limit selector search to a known parent element.</param>
+    /// <param name="scope">Search root: window (default) or active_dialog. Use active_dialog for duplicate labels in a modal/native dialog.</param>
+    /// <param name="requireUnique">Fail with ambiguity details instead of choosing the first match. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the click operation's success status and element information. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_click", Title = "Click UI Element", Destructive = true, OpenWorld = false)]
@@ -53,6 +56,9 @@ public static partial class UIClickTool
         [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
         [DefaultValue(false)] bool doubleClick,
+        [DefaultValue(null)] string? parentElementId,
+        [DefaultValue("window")] string? scope,
+        [DefaultValue(false)] bool requireUnique,
         CancellationToken cancellationToken)
     {
         const string actionName = "click";
@@ -96,6 +102,9 @@ public static partial class UIClickTool
                 ControlType = controlType,
                 AutomationId = automationId,
                 ClassName = className,
+                ParentElementId = parentElementId,
+                Scope = scope,
+                RequireUnique = requireUnique,
                 FoundIndex = Math.Max(1, foundIndex)
             };
 
@@ -130,5 +139,27 @@ public static partial class UIClickTool
         ExecuteAsync(
             windowHandle, name, nameContains, namePattern, controlType, automationId, className,
             elementId, foundIndex, withSnapshot, "full", includeDiagnostics, doubleClick,
+            null, "window", false,
             cancellationToken);
+
+    /// <summary>Compatibility overload preserving explicit snapshotMode.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        string? elementId,
+        int foundIndex,
+        bool withSnapshot,
+        string snapshotMode,
+        bool includeDiagnostics,
+        bool doubleClick,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle, name, nameContains, namePattern, controlType, automationId, className,
+            elementId, foundIndex, withSnapshot, snapshotMode, includeDiagnostics, doubleClick,
+            null, "window", false, cancellationToken);
 }

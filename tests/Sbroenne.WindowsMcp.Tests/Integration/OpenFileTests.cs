@@ -2,13 +2,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
-/// Integration tests for the generalized Open dialog handling (<see cref="UIAutomationService.OpenFileAsync"/>).
+/// Integration tests for the generalized Open dialog handling.
 /// The test harness shows a standard Open dialog on Ctrl+O, mirroring the Save flow.
 /// </summary>
 [Collection("UITestHarness")]
@@ -60,9 +61,11 @@ public sealed class OpenFileTests : IDisposable
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Open_StandardWindowsDialog_SelectsFile()
     {
+        DesktopInputTests.SkipUnlessEnabled();
+
         await TestRetry.RunAsync(async _ =>
         {
             var testFilePath = Path.Combine(_testOutputDir, $"open-{Guid.NewGuid()}.txt");
@@ -88,6 +91,86 @@ public sealed class OpenFileTests : IDisposable
             // Assert on the observed value rather than on the wait result: if the wait times out this
             // reports the expected and actual paths, which is more actionable than "the wait expired".
             Assert.Equal(testFilePath, lastOpened, ignoreCase: true);
+        });
+    }
+
+    [Fact]
+    public async Task Open_WaitForExistingDialog_SelectsFileOpenedByPriorAction()
+    {
+        var testFilePath = Path.Combine(_testOutputDir, $"handoff-{Guid.NewGuid()}.txt");
+        await File.WriteAllTextAsync(testFilePath, "content to open");
+
+        _fixture.Form!.BeginInvoke(_fixture.Form.ShowOpenDialogForTesting);
+
+        var result = await _automationService.OpenFileAsync(
+            _windowHandle,
+            testFilePath,
+            triggerMode: "wait",
+            timeoutMs: 5000);
+
+        Assert.True(
+            result.Success,
+            $"Open handoff failed: {result.ErrorMessage} Diagnostics: {string.Join("; ", result.Diagnostics?.Warnings ?? [])}");
+        Assert.Equal("wait+semantic", result.Diagnostics?.ActionPath);
+
+        Assert.True(await TestWait.UntilAsync(
+            () => string.Equals(
+                testFilePath,
+                _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form.LastOpenPath)),
+                StringComparison.OrdinalIgnoreCase),
+            TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task Open_WaitMode_DoesNotSubmitOwnedSaveDialog()
+    {
+        var testFilePath = Path.Combine(_testOutputDir, $"not-for-save-{Guid.NewGuid()}.txt");
+        await File.WriteAllTextAsync(testFilePath, "must not be saved");
+
+        _fixture.Form!.BeginInvoke(_fixture.Form.ShowSaveDialogForTesting);
+        try
+        {
+            var result = await _automationService.OpenFileAsync(
+                _windowHandle,
+                testFilePath,
+                triggerMode: "wait",
+                timeoutMs: 500);
+
+            Assert.False(result.Success);
+            Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Null(_fixture.Form.LastSavePath);
+        }
+        finally
+        {
+            _fixture.CloseOwnedDialogs();
+        }
+    }
+
+    [Fact]
+    public async Task Find_ActiveDialogScope_TargetsNativeOpenDialog()
+    {
+        _fixture.Form!.BeginInvoke(_fixture.Form.ShowOpenDialogForTesting);
+
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Scope = "active_dialog",
+                ControlType = "Edit",
+                VisibleOnly = true,
+            },
+            timeoutMs: 5000);
+
+        Assert.True(result.Success, $"Active dialog search failed: {result.ErrorMessage}");
+        Assert.NotEmpty(result.Items!);
+
+        await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Scope = "active_dialog",
+            Name = "Cancel",
+            ControlType = "Button",
+            RequireUnique = true,
         });
     }
 
