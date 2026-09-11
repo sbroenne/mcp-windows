@@ -40,6 +40,60 @@ This project adheres to the Contributor Covenant. By participating, you are expe
 
 ## Development Workflow
 
+### Portable npm Lockfiles
+
+Each npm project with a tracked lockfile must have its own `.npmrc` containing:
+
+```ini
+omit-lockfile-registry-resolved=true
+```
+
+Keep any existing project configuration when adding this setting. A repository-root
+`.npmrc` does not supply it to nested npm projects. Do not change registry, proxy,
+credentials, or user/global npm configuration for this safeguard.
+Restore/install commands should keep using inherited npm, NuGet, and Python
+package-source settings; do not add flags that replace local feeds. Explicit
+publishing destinations and pinned Git dependencies are separate and should be
+preserved.
+
+From each affected npm project directory, regenerate the lockfile with npm:
+
+```powershell
+npm install --package-lock-only --ignore-scripts
+```
+
+This omits fixed registry download addresses so installs use the environment's
+configured registry. Keep package versions and integrity hashes unchanged for
+portability-only changes; review the diff rather than deleting or hand-editing the
+lockfile. Direct URL dependencies require a separate dependency decision: the guard
+rejects their fixed `resolved` addresses too. Local file and workspace links are allowed.
+
+Run the focused checks from the repository root (Python 3.13 and Git required):
+
+```powershell
+python scripts\validate_npm_lockfiles.py
+python -m unittest scripts.tests.test_validate_npm_lockfiles
+```
+
+The existing CI build-and-test job runs both checks with two-minute timeouts.
+Each npm-installing CI, integration, and release job also validates before installing.
+The guard discovers tracked `package-lock.json` and `npm-shrinkwrap.json` files,
+including new nested projects, and ignores `node_modules` and untracked files.
+It requires a tracked `.npmrc` with the setting enabled in each discovered project,
+without reading or changing user or machine configuration.
+Diagnostics identify the lockfile but never print its download addresses.
+
+An optional pre-commit hook checks the staged lockfiles, so unstaged repairs cannot
+hide a bad staged copy. If you do not already use a hook setup, enable it locally:
+
+```powershell
+git config --local core.hooksPath .githooks
+```
+
+If you already have hooks, keep them and call
+`python scripts\validate_npm_lockfiles.py --staged` from your existing pre-commit hook
+instead. This command must succeed before the hook allows a commit.
+
 ### Branch Naming
 
 Use descriptive branch names following this pattern:
