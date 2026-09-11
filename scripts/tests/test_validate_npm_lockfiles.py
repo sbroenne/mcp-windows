@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -16,12 +17,18 @@ class ValidateNpmLockfilesTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary_directory.cleanup)
         self.root = Path(self.temporary_directory.name)
+        # Hooks export repository paths that must not redirect the temporary Git fixtures.
+        self.environment = {
+            key: value for key, value in os.environ.items()
+            if not key.upper().startswith("GIT_")
+        }
         self.git("init", "--quiet")
 
     def git(self, *arguments):
         return subprocess.run(
             ["git", *arguments],
             cwd=self.root,
+            env=self.environment,
             capture_output=True,
             check=True,
             timeout=10,
@@ -52,6 +59,7 @@ class ValidateNpmLockfilesTests(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(SCRIPT_PATH), *arguments],
             cwd=cwd or self.root,
+            env=self.environment,
             capture_output=True,
             text=True,
             timeout=15,
@@ -248,14 +256,14 @@ class ValidateNpmLockfilesTests(unittest.TestCase):
         self.write_lockfile(stage=False)
         command = ["git", "-c", "core.hooksPath=.githooks", "hook", "run", "pre-commit"]
         result = subprocess.run(
-            command, cwd=self.root, capture_output=True, text=True, timeout=15,
+            command, cwd=self.root, env=self.environment, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 1)
         self.assertIn("fixed download URL", result.stderr)
         self.assertNotIn("mirror.invalid", result.stdout + result.stderr)
         self.git("add", "--", "package-lock.json")
         result = subprocess.run(
-            command, cwd=self.root, capture_output=True, text=True, timeout=15,
+            command, cwd=self.root, env=self.environment, capture_output=True, text=True, timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
 
