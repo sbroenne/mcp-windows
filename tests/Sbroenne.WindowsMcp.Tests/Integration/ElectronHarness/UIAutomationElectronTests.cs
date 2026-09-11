@@ -102,9 +102,15 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(hasDocument, "Electron window should contain a Document element for web content");
     }
 
-    [Fact]
-    public async Task AutoSnapshot_AfterSmallRendererChange_ReturnsDiff()
+    [Theory]
+    [InlineData("Home")]
+    [InlineData("Forms")]
+    public async Task AutoSnapshot_AfterSmallRendererChange_ReturnsDiff(string initialDestination)
     {
+        await NavigateAndWaitForStatusAsync(initialDestination);
+        // Fixture.Reset restores the viewport, but leaves the previous renderer status intact.
+        await NavigateAndWaitForStatusAsync("Home");
+
         using var state = new SnapshotStateService();
         var key = SnapshotRequestKey.Create(_windowHandle, null, 5, null);
         var baseline = await state.CaptureAsync(
@@ -112,16 +118,12 @@ public sealed class UIAutomationElectronTests : IDisposable
             SnapshotMode.Reset,
             token => _automationService.GetTreeAsync(_windowHandle, null, 5, null, token),
             CancellationToken.None);
+        Assert.True(baseline.Success, baseline.ErrorMessage);
         Assert.Equal("full", baseline.Kind);
+        Assert.True(ContainsNameInTree(baseline.Tree, "Navigated to Home"));
 
-        var click = await _automationService.FindAndClickAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            Name = "Navigate Forms",
-            ControlType = "Button",
-            TimeoutMs = 10000
-        });
-        Assert.True(click.Success, click.ErrorMessage);
+        // Poll raw trees so waiting for Chromium does not advance the remembered snapshot.
+        await NavigateAndWaitForStatusAsync("Forms");
 
         var result = await state.CaptureAsync(
             key,
@@ -129,9 +131,43 @@ public sealed class UIAutomationElectronTests : IDisposable
             token => _automationService.GetTreeAsync(_windowHandle, null, 5, null, token),
             CancellationToken.None);
 
+        Assert.True(result.Success, result.ErrorMessage);
         Assert.Equal("diff", result.Kind);
-        Assert.NotEmpty(result.Changes ?? []);
+        Assert.Contains(result.Changes ?? [], change =>
+            (change.Set is not null &&
+             change.Set.TryGetValue("name", out var name) &&
+             Equals(name, "Navigated to Forms")) ||
+            ContainsNameInTree(change.Node is null ? null : [change.Node], "Navigated to Forms"));
     }
+
+    private async Task NavigateAndWaitForStatusAsync(string destination)
+    {
+        var expectedStatus = $"Navigated to {destination}";
+        var click = await _automationService.FindAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = $"Navigate {destination}",
+            ControlType = "Button",
+            TimeoutMs = 10000
+        });
+        Assert.True(click.Success, click.ErrorMessage);
+
+        UIAutomationResult? observed = null;
+        var ready = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                observed = await _automationService.GetTreeAsync(_windowHandle, null, 5, null);
+                Assert.True(observed.Success, observed.ErrorMessage);
+            },
+            condition: () => ContainsNameInTree(observed?.Tree, expectedStatus),
+            timeout: TimeSpan.FromSeconds(10));
+        Assert.True(ready, $"Electron snapshot did not contain status '{expectedStatus}'.");
+    }
+
+    private static bool ContainsNameInTree(UIElementCompactTree[]? elements, string name) =>
+        elements?.Any(element =>
+            string.Equals(element.Name, name, StringComparison.Ordinal) ||
+            ContainsNameInTree(element.Children, name)) == true;
 
     #endregion
 
