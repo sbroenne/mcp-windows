@@ -412,7 +412,7 @@ public sealed partial class UIAutomationService
                     "type",
                     UIAutomationErrorType.ElementStale,
                     $"Element with ID '{elementId}' is stale and was not retargeted by name.",
-                    CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
             nint? activationHandle = null;
@@ -424,7 +424,7 @@ public sealed partial class UIAutomationService
                         "type",
                         UIAutomationErrorType.InvalidParameter,
                         $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
-                        CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                 }
 
                 activationHandle = parsedHandle;
@@ -437,7 +437,7 @@ public sealed partial class UIAutomationService
                     "type",
                     UIAutomationErrorType.WrongTargetWindow,
                     "The resolved element no longer belongs to the requested window.",
-                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
             if (!element.IsEnabled())
@@ -447,7 +447,7 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.InvalidParameter,
                     $"Element with ID '{elementId}' is disabled and cannot receive text. " +
                     "Wait for it to become enabled or target a different field.",
-                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
             if (element.IsOffscreen())
@@ -457,7 +457,7 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.InvalidParameter,
                     $"Element with ID '{elementId}' is off-screen and cannot safely receive input. " +
                     "Refresh the UI state, scroll it into view, or target the active dialog.",
-                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
             var rootElement = GetRootElementForScroll(element);
@@ -483,13 +483,13 @@ public sealed partial class UIAutomationService
                         return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint(
                             "type",
                             "Type succeeded. Element closed its parent window.",
-                            CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                            CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                     }
 
                     return (Success: true, Result: UIAutomationResult.CreateSuccessCompact(
                         "type",
                         [info],
-                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, Element: element, RootElement: rootElement);
+                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: element, RootElement: rootElement);
                 }
 
                 if (!useKeyboard && inputMode == "auto")
@@ -503,7 +503,7 @@ public sealed partial class UIAutomationService
                         "type",
                         UIAutomationErrorType.PatternNotSupported,
                         "The element did not accept ValuePattern input. Use inputMode='keyboard' to emit normal focus and keyboard events.",
-                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                 }
             }
 
@@ -512,7 +512,7 @@ public sealed partial class UIAutomationService
             // GetForegroundWindow is unavailable to the automation process.
             _ = ActivateWindowForElement(element, activationHandle);
             element.TrySetFocus();
-            return (Success: true, Result: (UIAutomationResult?)null, UseKeyboard: true, IsPassword: isPassword, InitialValue: initialValue, Element: element, RootElement: rootElement);
+            return (Success: true, Result: (UIAutomationResult?)null, UseKeyboard: true, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: element, RootElement: rootElement);
         }, cancellationToken);
 
         if (!staResult.Success)
@@ -548,9 +548,7 @@ public sealed partial class UIAutomationService
                 CreateActionDiagnostics(stopwatch, staResult.Element, "value_pattern"));
         }
 
-        var expectedWindowHandle = await _staThread.ExecuteAsync(
-            () => ResolveElementWindowHandle(staResult.Element!),
-            cancellationToken);
+        var expectedWindowHandle = staResult.TargetWindowHandle;
         if (!IsExpectedForegroundWindow(expectedWindowHandle))
         {
             return UIAutomationResult.CreateFailure(
