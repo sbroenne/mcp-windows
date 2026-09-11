@@ -207,6 +207,15 @@ jobs:
     steps:
     - uses: actions/checkout@v7
 
+    - name: Setup Python for Lockfile Checks
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+
+    - name: Validate npm Lockfile Portability
+      timeout-minutes: 2
+      run: python scripts/validate_npm_lockfiles.py
+
     - name: Setup Node.js
       uses: actions/setup-node@v7
       with:
