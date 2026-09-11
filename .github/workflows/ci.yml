@@ -10,6 +10,12 @@ on:
       - 'scripts/star-history-bootstrap.json'
       - 'scripts/tests/test_update_star_history.py'
       - 'scripts/update_star_history.py'
+      - 'scripts/validate_npm_lockfiles.py'
+      - 'scripts/tests/test_validate_npm_lockfiles.py'
+      - '**/package-lock.json'
+      - '**/npm-shrinkwrap.json'
+      - '**/.npmrc'
+      - '.githooks/**'
       - '*.sln'
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
@@ -74,6 +80,19 @@ jobs:
 
     steps:
     - uses: actions/checkout@v7
+
+    - name: Setup Python for Lockfile Checks
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.13'
+
+    - name: Validate npm Lockfile Portability
+      timeout-minutes: 2
+      run: python scripts/validate_npm_lockfiles.py
+
+    - name: Test npm Lockfile Guard
+      timeout-minutes: 2
+      run: python -m unittest scripts.tests.test_validate_npm_lockfiles
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v6
