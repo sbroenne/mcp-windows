@@ -123,6 +123,17 @@ public sealed class UIAutomationElectronTests : IDisposable
         });
         Assert.True(click.Success, click.ErrorMessage);
 
+        var formsReady = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "Username Input",
+                ControlType = "Edit",
+                VisibleOnly = true,
+            },
+            timeoutMs: 5000);
+        Assert.True(formsReady.Success, $"Forms viewport did not become ready: {formsReady.ErrorMessage}");
+
         var result = await state.CaptureAsync(
             key,
             SnapshotMode.Auto,
