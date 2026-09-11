@@ -177,7 +177,15 @@ public sealed class WinUIClickTests : IDisposable
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
         });
-        await Task.Delay(200);
+
+        var editorReady = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "ClickTestButton",
+            },
+            timeoutMs: 5000);
+        Assert.True(editorReady.Success, $"Editor page did not become ready: {editorReady.ErrorMessage}");
 
         // Act - Click the ClickTestButton multiple times
         for (int i = 0; i < 3; i++)
