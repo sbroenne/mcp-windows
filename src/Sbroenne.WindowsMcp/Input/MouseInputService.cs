@@ -362,7 +362,41 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public async Task<MouseControlResult> DoubleClickAsync(int? x, int? y, ModifierKey modifiers = ModifierKey.None, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> DoubleClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers = ModifierKey.None,
+        CancellationToken cancellationToken = default) =>
+        DoubleClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    /// <summary>
+    /// Double-clicks only while the specified top-level window remains foreground.
+    /// The guard is checked immediately before pointer movement and double-click injection.
+    /// </summary>
+    internal Task<MouseControlResult> DoubleClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        DoubleClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private async Task<MouseControlResult> DoubleClickCoreAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         ScreenBounds? screenBounds = null;
 
@@ -381,7 +415,12 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = await MoveAsync(x.Value, y.Value, cancellationToken).ConfigureAwait(false);
+            var moveResult = await MoveCoreAsync(
+                x.Value,
+                y.Value,
+                extraFlags: 0,
+                expectedForegroundWindow,
+                cancellationToken).ConfigureAwait(false);
             if (!moveResult.Success)
             {
                 return moveResult;
@@ -396,10 +435,20 @@ public sealed class MouseInputService
         var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Press modifier keys before the double-click
-        var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+        IReadOnlyList<int> pressedModifiers = [];
 
         try
         {
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed before the double-click was sent.",
+                    screenBounds);
+            }
+
+            pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+
             // Build the INPUT structures for double-click (4 events: down, up, down, up)
             // Windows recognizes a double-click when two clicks occur within GetDoubleClickTime() milliseconds
             // at the same location. When events are queued in a single SendInput batch, they need a short settle

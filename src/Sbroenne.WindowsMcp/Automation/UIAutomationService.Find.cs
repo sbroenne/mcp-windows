@@ -14,6 +14,31 @@ public sealed partial class UIAutomationService
     /// <inheritdoc/>
     public async Task<UIAutomationResult> FindElementsAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(query);
+
+        if (query.TimeoutMs <= 0)
+        {
+            return await FindElementsOnceAsync(query, cancellationToken).ConfigureAwait(false);
+        }
+
+        var result = await WaitForElementAsync(
+            query with { TimeoutMs = 0 },
+            query.TimeoutMs,
+            cancellationToken).ConfigureAwait(false);
+
+        return result with
+        {
+            Action = "find",
+            Diagnostics = result.Diagnostics is null
+                ? null
+                : result.Diagnostics with { Query = query }
+        };
+    }
+
+    private async Task<UIAutomationResult> FindElementsOnceAsync(
+        ElementQuery query,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
 
         try

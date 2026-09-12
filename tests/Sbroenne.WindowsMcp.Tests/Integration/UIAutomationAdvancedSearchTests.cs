@@ -74,6 +74,36 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     #region FoundIndex Tests
 
     [Fact]
+    public async Task Find_WithTimeout_WaitsForElementToAppear()
+    {
+        _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+
+        try
+        {
+            var reveal = Task.Run(async () =>
+            {
+                await Task.Delay(250);
+                _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+            });
+
+            var result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "SubmitButton",
+                TimeoutMs = 2000,
+            });
+
+            await reveal;
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.NotEmpty(result.Items ?? []);
+        }
+        finally
+        {
+            _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+        }
+    }
+
+    [Fact]
     public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
     {
         var result = await _automationService.WaitForElementAsync(

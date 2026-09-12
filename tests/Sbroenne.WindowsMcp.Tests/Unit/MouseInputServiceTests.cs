@@ -20,4 +20,20 @@ public sealed class MouseInputServiceTests
         Assert.False(result.Success);
         Assert.Equal(MouseControlErrorCode.WrongTargetWindow, result.ErrorCode);
     }
+
+    [Fact]
+    public async Task DoubleClickAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
+    {
+        var service = new MouseInputService();
+
+        var result = await service.DoubleClickAsync(
+            x: null,
+            y: null,
+            ModifierKey.None,
+            new nint(-1),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(MouseControlErrorCode.WrongTargetWindow, result.ErrorCode);
+    }
 }

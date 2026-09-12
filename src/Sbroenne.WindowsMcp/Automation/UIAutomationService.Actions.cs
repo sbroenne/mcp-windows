@@ -1372,7 +1372,17 @@ public sealed partial class UIAutomationService
                     "double_click",
                     UIAutomationErrorType.ElementStale,
                     $"Element with ID '{elementId}' is stale. Refresh UI state before double-clicking.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
+            }
+
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (!IsRequestedWindowHandleCompatible(elementWindowHandle, activationHandle))
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "double_click",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The resolved element no longer belongs to the requested window.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             // A double-click is always physical input, so a window that could not be brought to the foreground
@@ -1384,7 +1394,7 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.WindowNotFound,
                     "The element's window could not be activated and confirmed as the foreground window, so the double-click was not sent. " +
                     "Activate the window first with window_management(action='activate') and retry.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             if (!element.IsEnabled())
@@ -1394,7 +1404,17 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.InvalidParameter,
                     $"Element with ID '{elementId}' is disabled and cannot be double-clicked. " +
                     "Wait for it to become enabled (e.g., after filling required fields) or target a different element.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
+            }
+
+            if (element.IsOffscreen())
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "double_click",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is off-screen and cannot be safely double-clicked. " +
+                    "Refresh the UI state, scroll it into view, or target the active dialog.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             var root = GetRootElementForScroll(element);
@@ -1405,7 +1425,7 @@ public sealed partial class UIAutomationService
                 GetElementState(element),
                 GetObservableFingerprint(root));
 
-            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, Initial: initial);
+            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
         }, cancellationToken);
 
         if (prepared.Failure != null)
@@ -1425,7 +1445,9 @@ public sealed partial class UIAutomationService
         var clickResult = await _mouseService.DoubleClickAsync(
             prepared.Point.Value.X,
             prepared.Point.Value.Y,
-            cancellationToken: cancellationToken);
+            ModifierKey.None,
+            prepared.WindowHandle,
+            cancellationToken);
         if (!clickResult.Success)
         {
             return UIAutomationResult.CreateFailure(

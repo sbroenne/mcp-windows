@@ -255,12 +255,7 @@ public sealed class UITestHarnessForm : Form
             Name = "SubmitMouseInputLabel",
         };
         buttonsGroup.Controls.Add(_submitMouseInputLabel);
-        _submitButton.Click += (_, _) => { SubmitClickCount++; UpdateStatus($"Submit clicked ({SubmitClickCount} times)"); };
-        _submitButton.MouseUp += (_, _) =>
-        {
-            SubmitMouseInputCount++;
-            _submitMouseInputLabel.Text = SubmitMouseInputCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        };
+        WireSubmitButton(_submitButton);
         buttonsGroup.Controls.Add(_submitButton);
 
         _physicalFallbackTarget = new Panel
@@ -767,12 +762,29 @@ public sealed class UITestHarnessForm : Form
             Size = _submitButton.Size,
             Name = _submitButton.Name,
         };
-        replacement.Click += (_, _) => SubmitClickCount++;
+        WireSubmitButton(replacement);
 
         parent.Controls.Remove(_submitButton);
         _submitButton.Dispose();
         _submitButton = replacement;
         parent.Controls.Add(replacement);
+    }
+
+    public void SetSubmitButtonVisibleForTesting(bool visible) =>
+        _submitButton.Visible = visible;
+
+    private void WireSubmitButton(Button button)
+    {
+        button.Click += (_, _) =>
+        {
+            SubmitClickCount++;
+            UpdateStatus($"Submit clicked ({SubmitClickCount} times)");
+        };
+        button.MouseUp += (_, _) =>
+        {
+            SubmitMouseInputCount++;
+            _submitMouseInputLabel.Text = SubmitMouseInputCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        };
     }
 
     private void UpdateStatus(string message)
