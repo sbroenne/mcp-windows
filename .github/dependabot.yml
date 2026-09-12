@@ -17,6 +17,10 @@ updates:
   # VS Code extension npm dependencies
   - package-ecosystem: "npm"
     directory: "/vscode-extension"
+    # Keep API types aligned with engines.vscode; update both together.
+    ignore:
+      - dependency-name: "@types/vscode"
+        versions: [">1.125.0"]
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
