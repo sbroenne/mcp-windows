@@ -10,7 +10,12 @@ namespace Sbroenne.WindowsMcp.Input;
 public class ModifierKeyManager
 {
     /// <inheritdoc/>
-    public IReadOnlyList<int> PressModifiers(ModifierKey modifiers)
+    public IReadOnlyList<int> PressModifiers(ModifierKey modifiers) =>
+        PressModifiers(modifiers, expectedForegroundWindow: null);
+
+    internal IReadOnlyList<int> PressModifiers(
+        ModifierKey modifiers,
+        nint? expectedForegroundWindow)
     {
         var pressedKeys = new List<int>();
 
@@ -19,7 +24,9 @@ public class ModifierKeyManager
             return pressedKeys;
         }
 
-        if (modifiers.HasFlag(ModifierKey.Ctrl) && !IsKeyPressed(NativeConstants.VK_CONTROL))
+        if (modifiers.HasFlag(ModifierKey.Ctrl) &&
+            !IsKeyPressed(NativeConstants.VK_CONTROL) &&
+            IsExpectedForegroundWindow(expectedForegroundWindow))
         {
             if (SendKeyInput(NativeConstants.VK_CONTROL, keyUp: false))
             {
@@ -27,7 +34,9 @@ public class ModifierKeyManager
             }
         }
 
-        if (modifiers.HasFlag(ModifierKey.Shift) && !IsKeyPressed(NativeConstants.VK_SHIFT))
+        if (modifiers.HasFlag(ModifierKey.Shift) &&
+            !IsKeyPressed(NativeConstants.VK_SHIFT) &&
+            IsExpectedForegroundWindow(expectedForegroundWindow))
         {
             if (SendKeyInput(NativeConstants.VK_SHIFT, keyUp: false))
             {
@@ -35,7 +44,9 @@ public class ModifierKeyManager
             }
         }
 
-        if (modifiers.HasFlag(ModifierKey.Alt) && !IsKeyPressed(NativeConstants.VK_MENU))
+        if (modifiers.HasFlag(ModifierKey.Alt) &&
+            !IsKeyPressed(NativeConstants.VK_MENU) &&
+            IsExpectedForegroundWindow(expectedForegroundWindow))
         {
             if (SendKeyInput(NativeConstants.VK_MENU, keyUp: false))
             {
@@ -43,7 +54,9 @@ public class ModifierKeyManager
             }
         }
 
-        if (modifiers.HasFlag(ModifierKey.Win) && !IsKeyPressed(NativeConstants.VK_LWIN))
+        if (modifiers.HasFlag(ModifierKey.Win) &&
+            !IsKeyPressed(NativeConstants.VK_LWIN) &&
+            IsExpectedForegroundWindow(expectedForegroundWindow))
         {
             if (SendKeyInput(NativeConstants.VK_LWIN, keyUp: false))
             {
@@ -52,6 +65,25 @@ public class ModifierKeyManager
         }
 
         return pressedKeys;
+    }
+
+    private static bool IsExpectedForegroundWindow(nint? expectedForegroundWindow)
+    {
+        if (!expectedForegroundWindow.HasValue)
+        {
+            return true;
+        }
+
+        var expectedRoot = NativeMethods.GetAncestor(
+            expectedForegroundWindow.Value,
+            NativeConstants.GA_ROOT);
+        var foreground = NativeMethods.GetForegroundWindow();
+        var foregroundRoot = NativeMethods.GetAncestor(
+            foreground,
+            NativeConstants.GA_ROOT);
+        return foreground != IntPtr.Zero &&
+            (expectedRoot != IntPtr.Zero ? expectedRoot : expectedForegroundWindow.Value) ==
+            (foregroundRoot != IntPtr.Zero ? foregroundRoot : foreground);
     }
 
     /// <inheritdoc/>

@@ -290,9 +290,11 @@ public sealed class CliIntegrationTests
     }
 
     [Trait("Category", "RequiresDesktop")]
-    [Fact]
+    [SkippableFact]
     public async Task Cli_FileOpen_DrivesOpenDialog()
     {
+        DesktopInputTests.SkipUnlessEnabled();
+
         var testFilePath = Path.Combine(Path.GetTempPath(), $"wincli-open-{Guid.NewGuid():N}.txt");
         await File.WriteAllTextAsync(testFilePath, "cli open content");
         try

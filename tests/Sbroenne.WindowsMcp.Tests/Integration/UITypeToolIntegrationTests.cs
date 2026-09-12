@@ -118,6 +118,25 @@ public sealed class UITypeToolIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task FindAndType_RequireUnique_DoesNotFallThroughAfterAmbiguousEditSearch()
+    {
+        var typeResult = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                RequireUnique = true,
+            },
+            text: "must-not-be-typed",
+            clearFirst: true,
+            inputMode: "value");
+
+        Assert.False(typeResult.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, typeResult.ErrorType);
+        Assert.Equal(string.Empty, _fixture.Form?.UsernameText);
+        Assert.Equal(string.Empty, _fixture.Form?.PasswordText);
+    }
+
+    [Fact]
     public async Task FindAndType_ClearFirst_ReplacesExistingText()
     {
         // Arrange - type initial text

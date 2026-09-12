@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -13,6 +14,40 @@ public sealed partial class UIAutomationService
     /// <inheritdoc/>
     public async Task<UIAutomationResult> FindElementsAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(query);
+
+        if (query.RequireUnique && query.FoundIndex != 1)
+        {
+            return UIAutomationResult.CreateFailure(
+                "find",
+                UIAutomationErrorType.InvalidParameter,
+                "requireUnique cannot be combined with foundIndex other than 1. Refine the selector instead.",
+                CreateDiagnostics(Stopwatch.StartNew(), query));
+        }
+
+        if (query.TimeoutMs <= 0)
+        {
+            return await FindElementsOnceAsync(query, cancellationToken).ConfigureAwait(false);
+        }
+
+        var result = await WaitForElementAsync(
+            query with { TimeoutMs = 0 },
+            query.TimeoutMs,
+            cancellationToken).ConfigureAwait(false);
+
+        return result with
+        {
+            Action = "find",
+            Diagnostics = result.Diagnostics is null
+                ? null
+                : result.Diagnostics with { Query = query }
+        };
+    }
+
+    private async Task<UIAutomationResult> FindElementsOnceAsync(
+        ElementQuery query,
+        CancellationToken cancellationToken)
+    {
         var stopwatch = Stopwatch.StartNew();
 
         try
@@ -23,27 +58,49 @@ public sealed partial class UIAutomationService
                 UIA.IUIAutomationElement? rootElement;
                 if (!string.IsNullOrEmpty(query.ParentElementId))
                 {
-                    rootElement = ElementIdGenerator.ResolveToAutomationElement(query.ParentElementId);
+                    rootElement = ElementIdGenerator.ResolveToAutomationElement(
+                        query.ParentElementId,
+                        allowSelectorFallback: false);
                     if (rootElement == null)
                     {
                         return UIAutomationResult.CreateFailure(
                             "find",
-                            UIAutomationErrorType.ElementNotFound,
-                            $"Parent element not found or stale: {query.ParentElementId}",
+                            UIAutomationErrorType.ElementStale,
+                            $"Parent element is stale: {query.ParentElementId}. Refresh UI state before searching within it.",
                             CreateDiagnostics(stopwatch, query));
                     }
                 }
                 else
                 {
-                    rootElement = GetRootElement(query.WindowHandle);
+                    var normalizedScope = string.IsNullOrWhiteSpace(query.Scope)
+                        ? "window"
+                        : query.Scope.Trim().ToLowerInvariant();
+                    if (normalizedScope is not ("window" or "active_dialog"))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "find",
+                            UIAutomationErrorType.InvalidParameter,
+                            $"Invalid scope '{query.Scope}'. Valid values: window, active_dialog.",
+                            CreateDiagnostics(stopwatch, query));
+                    }
+
+                    rootElement = normalizedScope == "active_dialog"
+                        ? GetActiveDialogRoot(query.WindowHandle)
+                        : GetRootElement(query.WindowHandle);
                 }
 
                 if (rootElement == null)
                 {
+                    var requestedActiveDialog = string.Equals(
+                        query.Scope,
+                        "active_dialog",
+                        StringComparison.OrdinalIgnoreCase);
                     return UIAutomationResult.CreateFailure(
                         "find",
                         UIAutomationErrorType.WindowNotFound,
-                        "Could not find the specified window or foreground window.",
+                        requestedActiveDialog
+                            ? "No visible enabled dialog is currently owned by the requested window."
+                            : "Could not find the specified window or foreground window.",
                         CreateDiagnostics(stopwatch, query));
                 }
 
@@ -145,6 +202,11 @@ public sealed partial class UIAutomationService
                     {
                         elementInfos.RemoveAll(e => e.IsOffscreen);
                     }
+
+                    if (query.EnabledOnly == true && elementInfos.Count > 0)
+                    {
+                        elementInfos.RemoveAll(e => !e.IsEnabled);
+                    }
                 }
 
                 // AND the caller's condition with the predefined content-view condition so FindAll
@@ -190,6 +252,11 @@ public sealed partial class UIAutomationService
                         elementInfos.RemoveAll(e => e.IsOffscreen);
                     }
 
+                    if (query.EnabledOnly == true && elementInfos.Count > 0)
+                    {
+                        elementInfos.RemoveAll(e => !e.IsEnabled);
+                    }
+
                     if (elementInfos.Count > 0)
                     {
                         LogSearchPerformance(_logger, "find (auto-relaxed to partial match)", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
@@ -232,6 +299,37 @@ public sealed partial class UIAutomationService
                         var areaB = b.BoundingRect.Width * b.BoundingRect.Height;
                         return areaB.CompareTo(areaA); // Descending order (largest first)
                     });
+                }
+
+                if (query.RequireUnique && elementInfos.Count > 1)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "find",
+                        UIAutomationErrorType.MultipleMatches,
+                        $"{elementInfos.Count} visible matching elements were found. Add automationId, " +
+                        "use scope='active_dialog' or parentElementId, or set foundIndex explicitly.",
+                        CreateDiagnosticsWithContext(
+                            stopwatch,
+                            rootElement,
+                            query,
+                            elementsScanned,
+                            windowTitle,
+                            query.WindowHandle,
+                            usedContentView) with
+                        {
+                            MultipleMatches = elementInfos
+                                .Take(10)
+                                .Select(info => new UIAutomationTargetDiagnostics
+                                {
+                                    ElementId = info.ElementId,
+                                    Name = info.Name,
+                                    AutomationId = info.AutomationId,
+                                    ControlType = info.ControlType,
+                                    IsEnabled = info.IsEnabled,
+                                    IsOffscreen = info.IsOffscreen
+                                })
+                                .ToArray()
+                        });
                 }
 
                 // Always use compact format for Find to reduce token count by ~70%
@@ -615,6 +713,43 @@ public sealed partial class UIAutomationService
         }
 
         return $"No element found matching: {string.Join(", ", criteria)}";
+    }
+
+    private UIA.IUIAutomationElement? GetActiveDialogRoot(string? windowHandle)
+    {
+        if (!WindowHandleParser.TryParse(windowHandle, out var parentHandle))
+        {
+            return null;
+        }
+
+        var popupHandle = NativeMethods.GetWindow(parentHandle, NativeConstants.GW_ENABLEDPOPUP);
+        if (popupHandle != IntPtr.Zero &&
+            popupHandle != parentHandle &&
+            NativeMethods.IsWindowVisible(popupHandle))
+        {
+            return Uia.ElementFromHandle(popupHandle);
+        }
+
+        var parent = Uia.ElementFromHandle(parentHandle);
+        if (parent == null)
+        {
+            return null;
+        }
+
+        var windows = parent.FindAll(
+            UIA.TreeScope.TreeScope_Children,
+            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window));
+        for (var index = 0; index < (windows?.Length ?? 0); index++)
+        {
+            var candidate = windows!.GetElement(index);
+            var pattern = candidate.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
+            if (pattern?.CurrentIsModal != 0)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

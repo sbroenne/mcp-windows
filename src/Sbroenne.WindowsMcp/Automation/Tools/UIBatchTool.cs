@@ -34,7 +34,7 @@ public static partial class UIBatchTool
     /// Each step is a JSON object with an "action" plus the fields that action needs:
     /// - find:     selectors (name/controlType/automationId/...). Resolves an element; its id is exposed to the next step as "$prev".
     /// - click:    selectors OR elementId, optional doubleClick.
-    /// - type:     selectors OR elementId, plus text (and optional clearFirst).
+    /// - type:     selectors OR elementId, plus text; optional clearFirst and inputMode (auto/keyboard/value).
     /// - select:   selectors, plus value (visible option text).
     /// - wait:     mode (appear/disappear/state), selectors or elementId+desiredState, optional timeoutMs.
     /// - read:     selectors or elementId (or neither, to read the whole window), optional includeChildren.
@@ -47,8 +47,12 @@ public static partial class UIBatchTool
     /// Mouse coordinates are window-relative by default; set target ('primary_screen'/'secondary_screen') or
     /// monitorIndex on a step for screen-relative coordinates. The target window is activated before each mouse
     /// step unless expectedProcessName/expectedWindowTitle is set (those verify the foreground window instead).
+    /// Selector steps also accept scope="active_dialog", parentElementId, requireUnique,
+    /// visibleOnly, and enabledOnly for reliable modal workflows.
     /// Example steps: [{"action":"type","automationId":"UsernameInput","text":"admin"},
-    /// {"action":"type","automationId":"PasswordInput","text":"secret"},{"action":"click","name":"Submit"}]
+    /// {"action":"type","automationId":"PasswordInput","text":"secret"},
+    /// {"action":"click","name":"Submit","requireUnique":true},
+    /// {"action":"wait","name":"Saved","mode":"appear"}]
     /// Drawing example: [{"action":"polyline","points":[[100,100],[300,100],[300,250],[100,100]]}]
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). Used for every step unless a step overrides it. REQUIRED.</param>
@@ -269,8 +273,19 @@ public static partial class UIBatchTool
                     }
 
                     var result = !string.IsNullOrWhiteSpace(elementId)
-                        ? await service.TypeIntoElementAsync(elementId, step.Text, step.ClearFirst, windowHandle, cancellationToken)
-                        : await service.FindAndTypeAsync(BuildQuery(step, windowHandle), step.Text, step.ClearFirst, cancellationToken);
+                        ? await service.TypeIntoElementAsync(
+                            elementId,
+                            step.Text,
+                            step.ClearFirst,
+                            windowHandle,
+                            step.InputMode ?? "auto",
+                            cancellationToken)
+                        : await service.FindAndTypeAsync(
+                            BuildQuery(step, windowHandle),
+                            step.Text,
+                            step.ClearFirst,
+                            step.InputMode ?? "auto",
+                            cancellationToken);
                     return Step(index, action, result.Success, result.Success ? "typed" : null,
                         result.ErrorMessage, elementId ?? FirstElementId(result));
                 }
@@ -522,6 +537,11 @@ public static partial class UIBatchTool
         ControlType = step.ControlType,
         AutomationId = step.AutomationId,
         ClassName = step.ClassName,
+        ParentElementId = step.ParentElementId,
+        Scope = step.Scope,
+        RequireUnique = step.RequireUnique,
+        EnabledOnly = step.EnabledOnly,
+        VisibleOnly = step.VisibleOnly,
         FoundIndex = Math.Max(1, step.FoundIndex)
     };
 

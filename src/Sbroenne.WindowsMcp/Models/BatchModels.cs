@@ -60,6 +60,30 @@ public sealed class BatchStep
     [JsonPropertyName("clearFirst")]
     public bool ClearFirst { get; set; }
 
+    /// <summary>Text input path for action=type: auto, keyboard, or value.</summary>
+    [JsonPropertyName("inputMode")]
+    public string? InputMode { get; set; }
+
+    /// <summary>Limit selector search to a known parent element.</summary>
+    [JsonPropertyName("parentElementId")]
+    public string? ParentElementId { get; set; }
+
+    /// <summary>Search root: window or active_dialog.</summary>
+    [JsonPropertyName("scope")]
+    public string? Scope { get; set; }
+
+    /// <summary>Fail when more than one element matches.</summary>
+    [JsonPropertyName("requireUnique")]
+    public bool RequireUnique { get; set; }
+
+    /// <summary>Exclude disabled elements when true.</summary>
+    [JsonPropertyName("enabledOnly")]
+    public bool? EnabledOnly { get; set; }
+
+    /// <summary>Exclude off-screen elements when true.</summary>
+    [JsonPropertyName("visibleOnly")]
+    public bool? VisibleOnly { get; set; }
+
     /// <summary>Key to press (action=key), e.g. enter, tab, f5, a.</summary>
     [JsonPropertyName("key")]
     public string? Key { get; set; }

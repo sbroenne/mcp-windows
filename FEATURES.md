@@ -205,6 +205,9 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 | `automationId` | Automation ID | No* |
 | `controlType` | Control type filter | No |
 | `foundIndex` | Click the Nth match (1-based) | No |
+| `scope` | `window` (default) or `active_dialog` | No |
+| `parentElementId` | Restrict search to a known subtree | No |
+| `requireUnique` | Fail with match details when more than one control matches | No |
 | `doubleClick` | Double-click instead of single-click | No |
 
 *Selectors are optional; without one, the first actionable match in the target window is used.
@@ -215,6 +218,9 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 - Toggle checkboxes and toggle buttons
 - Handles various control patterns automatically
 - Falls back to coordinate-based click if pattern fails
+- Filters selector-based actions to visible, enabled controls and revalidates stale element IDs before acting
+- Scope duplicate labels to the currently active modal/native dialog with `scope='active_dialog'`
+- Use `requireUnique=true` to get `multiple_matches` plus diagnostic match details instead of silently choosing
 - `doubleClick=true` double-clicks an element by name/id - no coordinates needed for list/grid items that open on double-click. UI Automation has no double-click pattern, so this is always a physical double-click at the element's clickable point.
 
 ---
@@ -234,6 +240,10 @@ Type text into edit controls and text fields.
 | `automationId` | Automation ID | No* |
 | `controlType` | Control type (default: Edit) | No |
 | `clearFirst` | Clear existing text before typing | No (default: false) |
+| `inputMode` | `auto`, `keyboard`, or `value` | No (default: auto) |
+| `scope` | `window` (default) or `active_dialog` | No |
+| `parentElementId` | Restrict search to a known subtree | No |
+| `requireUnique` | Fail when more than one field matches | No |
 
 ### Capabilities
 
@@ -241,6 +251,9 @@ Type text into edit controls and text fields.
 - Clear existing content before typing with `clearFirst=true`
 - Append text to existing content
 - Unicode support for any language
+- `auto` uses normal focus and keyboard input for Chromium/Electron so React-style input handlers observe the change
+- `keyboard` forces the normal focus/key event path; `value` forces UIA ValuePattern
+- The tool verifies the requested value became observable and fails instead of reporting an unobserved change
 
 ---
 
@@ -425,6 +438,9 @@ Wait until a UI condition is met before continuing - no blind sleeps or screensh
 | `elementId` | Element id for `mode='state'` | No |
 | `desiredState` | Target state for `mode='state'` (enabled, disabled, on, off, indeterminate, visible, offscreen) | No |
 | `timeoutMs` | Max wait in milliseconds | No (default: 5000) |
+| `scope` | `window` (default) or `active_dialog` | No |
+| `parentElementId` | Restrict appear/disappear to a known subtree | No |
+| `requireUnique` | Require exactly one matching element for appear or disappear | No |
 
 ### Capabilities
 
@@ -454,7 +470,7 @@ Each step is a JSON object with an `action` plus the fields that action needs:
 
 - `find` - selectors; resolves an element and exposes its id to the next step as `$prev`
 - `click` - selectors or `elementId`, optional `doubleClick`
-- `type` - selectors or `elementId`, plus `text` (optional `clearFirst`)
+- `type` - selectors or `elementId`, plus `text` (optional `clearFirst`, `inputMode`)
 - `select` - selectors, plus `value` (visible option text)
 - `wait` - `mode` (`appear`/`disappear`/`state`), selectors or `elementId`+`desiredState`, optional `timeoutMs`
 - `read` - selectors or `elementId` (or neither, to read the whole window), optional `includeChildren`
@@ -482,6 +498,9 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 - One round-trip for multi-step workflows (fill username + password + submit) and for multi-stroke drawing
 - Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
 - Chain steps by referencing the prior step's element with `elementId: "$prev"`
+- Add a `wait` step immediately after an action to verify consequences such as a button enabling,
+  a dialog closing, or confirmation text appearing
+- Selector steps accept `scope`, `parentElementId`, `requireUnique`, `visibleOnly`, and `enabledOnly`
 - `stopOnError=false` runs every step and reports each outcome
 - Mouse steps delegate to the same engine as `mouse_control`, so monitor resolution, foreground guards, secure-desktop and elevation checks behave identically
 
@@ -525,11 +544,15 @@ Open an existing file via the standard Windows Open dialog — the counterpart t
 | `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
 | `filePath` | Absolute path of an existing file to open (forward/back slashes both work) | Yes |
 | `includeDiagnostics` | Include timing/diagnostic details in the response (default: false) | No |
+| `triggerMode` | `shortcut` sends Ctrl+O; `wait` waits for a dialog opened by a prior click | No (default: shortcut) |
+| `timeoutMs` | Maximum wait for the native dialog | No (default: 5000) |
 
 ### Capabilities
 
 - Trigger Ctrl+O to open
 - Auto-detect Open dialog appearance (shares the Save-As dialog engine)
+- `triggerMode='wait'` supports browser-to-native-dialog handoff after `ui_click`
+- Dialog selection prefers the enabled popup owned by the requested app and reports observed candidate windows on timeout
 - Fill in the file path and click Open
 - Validates the file exists up front for deterministic behavior
 
@@ -634,7 +657,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 | `modifiers` | `ctrl`, `shift`, `alt` (comma-separated) | No |
 | `direction` / `amount` | Scroll direction and click count | For `scroll` |
 | `target` / `monitorIndex` | Monitor targeting | With coordinates |
-| `windowHandle` | Window-relative coordinate mode | No |
+| `windowHandle` | Window-relative coordinate mode and foreground guard | No |
 | `expectedWindowTitle` / `expectedProcessName` | Abort unless the foreground window matches | No |
 
 ### Capabilities
@@ -647,7 +670,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 - Multi-monitor support with DPI awareness
 - Easy targeting with `target='primary_screen'` or `'secondary_screen'`
 - Modifier key support (Ctrl+click, Shift+click, etc.)
-- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+- Wrong window detection with `windowHandle`, `expectedWindowTitle`, or `expectedProcessName`
 
 ---
 

@@ -172,12 +172,27 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_ClickTestButton_IncrementsCount()
     {
         // Navigate to Editor page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        var navigation = await _automationService.FindAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
         });
-        await Task.Delay(200);
+        Assert.True(navigation.Success, $"Editor navigation failed: {navigation.ErrorMessage}");
+
+        var editorReady = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "ClickTestButton",
+            },
+            timeoutMs: 5000);
+        Assert.True(editorReady.Success, $"Editor page did not become ready: {editorReady.ErrorMessage}");
+        var clickTarget = Assert.Single(editorReady.Items!);
+        var scrollResult = await _automationService.ScrollIntoViewAsync(
+            clickTarget.Id,
+            query: null,
+            timeoutMs: 5000);
+        Assert.True(scrollResult.Success, $"Click test button could not be scrolled into view: {scrollResult.ErrorMessage}");
 
         // Act - Click the ClickTestButton multiple times
         for (int i = 0; i < 3; i++)
@@ -186,6 +201,7 @@ public sealed class WinUIClickTests : IDisposable
             {
                 WindowHandle = _windowHandle,
                 AutomationId = "ClickTestButton",
+                TimeoutMs = 5000,
             });
             Assert.True(result.Success, $"Click test button click failed: {result.ErrorMessage}");
             await Task.Delay(50);

@@ -38,6 +38,10 @@ public static partial class UIWaitTool
     /// <param name="controlType">Control type (Button, Edit, Window, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
+    /// <param name="parentElementId">Limit appear/disappear search to a known parent element.</param>
+    /// <param name="scope">Search root: window (default) or active_dialog.</param>
+    /// <param name="requireUnique">For appear or disappear, fail if more than one element matches.</param>
+    /// <param name="enabledOnly">Exclude disabled elements when true.</param>
     /// <param name="timeoutMs">Maximum time to wait in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -54,6 +58,10 @@ public static partial class UIWaitTool
         [DefaultValue(null)] string? controlType,
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
+        [DefaultValue(null)] string? parentElementId,
+        [DefaultValue("window")] string? scope,
+        [DefaultValue(false)] bool requireUnique,
+        [DefaultValue(null)] bool? enabledOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -111,7 +119,11 @@ public static partial class UIWaitTool
                 NamePattern = namePattern,
                 ControlType = controlType,
                 AutomationId = automationId,
-                ClassName = className
+                ClassName = className,
+                ParentElementId = parentElementId,
+                Scope = scope,
+                RequireUnique = requireUnique,
+                EnabledOnly = enabledOnly
             };
 
             var result = normalizedMode == "appear"
@@ -125,4 +137,24 @@ public static partial class UIWaitTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Compatibility overload for callers using the original wait signature.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string? windowHandle,
+        string? mode,
+        string? elementId,
+        string? desiredState,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        int timeoutMs,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle, mode, elementId, desiredState, name, nameContains, namePattern,
+            controlType, automationId, className, null, "window", false, null, timeoutMs,
+            includeDiagnostics, cancellationToken);
 }

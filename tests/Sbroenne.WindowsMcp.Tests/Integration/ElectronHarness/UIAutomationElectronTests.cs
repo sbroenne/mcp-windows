@@ -368,6 +368,42 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.Equal(testText, getTextResult.Text);
     }
 
+    [Fact]
+    public async Task FindAndType_AutoMode_EmitsBrowserInputEvent()
+    {
+        const string testText = "react-style-input";
+
+        var typeResult = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "Username Input",
+                ControlType = "Edit",
+            },
+            text: testText,
+            clearFirst: true);
+
+        Assert.True(typeResult.Success, $"FindAndType failed: {typeResult.ErrorMessage}");
+        Assert.Equal("keyboard", typeResult.Diagnostics?.ActionPath);
+        Assert.Equal("Username Input", typeResult.Diagnostics?.TargetElement?.Name);
+
+        UIAutomationResult? status = null;
+        var eventObserved = await TestWait.RetryUntilAsync(
+            async () =>
+            {
+                status = await _automationService.FindElementsAsync(new ElementQuery
+                {
+                    WindowHandle = _windowHandle,
+                    Name = $"Username input observed: {testText}",
+                    ControlType = "Text",
+                });
+            },
+            () => status?.Success == true,
+            TimeSpan.FromSeconds(3));
+
+        Assert.True(eventObserved, "Browser input event was not observed after ui_type.");
+    }
+
     #endregion
 
     #region Toggle Tests

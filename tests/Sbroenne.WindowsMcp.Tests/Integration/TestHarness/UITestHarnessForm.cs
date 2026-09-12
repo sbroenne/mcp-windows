@@ -12,7 +12,7 @@ public sealed class UITestHarnessForm : Form
     // Form Controls Tab
     private readonly TextBox _usernameInput;
     private readonly TextBox _passwordInput;
-    private readonly Button _submitButton;
+    private Button _submitButton;
     private readonly Button _cancelButton;
     private readonly Label _submitMouseInputLabel;
     private readonly CheckBox _checkBox1;
@@ -255,12 +255,7 @@ public sealed class UITestHarnessForm : Form
             Name = "SubmitMouseInputLabel",
         };
         buttonsGroup.Controls.Add(_submitMouseInputLabel);
-        _submitButton.Click += (_, _) => { SubmitClickCount++; UpdateStatus($"Submit clicked ({SubmitClickCount} times)"); };
-        _submitButton.MouseUp += (_, _) =>
-        {
-            SubmitMouseInputCount++;
-            _submitMouseInputLabel.Text = SubmitMouseInputCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        };
+        WireSubmitButton(_submitButton);
         buttonsGroup.Controls.Add(_submitButton);
 
         _physicalFallbackTarget = new Panel
@@ -713,6 +708,7 @@ public sealed class UITestHarnessForm : Form
         SemanticControlMouseInputCount = 0;
         _physicalFallbackClickCount = 0;
         _physicalFallbackTarget.AccessibleName = "Physical fallback";
+        _submitButton.Name = "SubmitButton";
         _submitMouseInputLabel.Text = "0";
         CancelClickCount = 0;
         _usernameInput.Clear();
@@ -742,6 +738,58 @@ public sealed class UITestHarnessForm : Form
     /// <see cref="Control.BeginInvoke(Delegate)"/> rather than <c>Invoke</c>.
     /// </summary>
     public void ShowSaveDialogForTesting() => ShowSaveDialog();
+
+    /// <summary>
+    /// Opens the Open dialog directly so tests can exercise browser-to-native-dialog handoff.
+    /// </summary>
+    public void ShowOpenDialogForTesting() => ShowOpenDialog();
+
+    /// <summary>
+    /// Replaces the Submit control with a new control that has the same accessible selector.
+    /// Used to prove that an old element id is rejected instead of silently retargeted.
+    /// </summary>
+    public void ReplaceSubmitButtonForTesting()
+    {
+        var parent = _submitButton.Parent;
+        if (parent == null)
+        {
+            return;
+        }
+
+        var replacement = new Button
+        {
+            Text = _submitButton.Text,
+            Location = _submitButton.Location,
+            Size = _submitButton.Size,
+            Name = _submitButton.Name,
+        };
+        WireSubmitButton(replacement);
+
+        parent.Controls.Remove(_submitButton);
+        _submitButton.Dispose();
+        _submitButton = replacement;
+        parent.Controls.Add(replacement);
+    }
+
+    public void SetSubmitButtonVisibleForTesting(bool visible) =>
+        _submitButton.Visible = visible;
+
+    public void SetSubmitButtonAutomationIdForTesting(string automationId) =>
+        _submitButton.Name = automationId;
+
+    private void WireSubmitButton(Button button)
+    {
+        button.Click += (_, _) =>
+        {
+            SubmitClickCount++;
+            UpdateStatus($"Submit clicked ({SubmitClickCount} times)");
+        };
+        button.MouseUp += (_, _) =>
+        {
+            SubmitMouseInputCount++;
+            _submitMouseInputLabel.Text = SubmitMouseInputCount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        };
+    }
 
     private void UpdateStatus(string message)
     {

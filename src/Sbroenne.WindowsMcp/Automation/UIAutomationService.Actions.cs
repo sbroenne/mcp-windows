@@ -38,14 +38,19 @@ public sealed partial class UIAutomationService
 
         try
         {
-            var findResult = await FindElementsAsync(query, cancellationToken);
+            var actionQuery = query with
+            {
+                VisibleOnly = query.VisibleOnly ?? true,
+                EnabledOnly = query.EnabledOnly ?? true
+            };
+            var findResult = await FindElementsAsync(actionQuery, cancellationToken);
             if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure(
                     "click",
-                    UIAutomationErrorType.ElementNotFound,
+                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
                     findResult.ErrorMessage ?? "Element not found.",
-                    CreateDiagnostics(stopwatch));
+                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch, actionQuery));
             }
 
             var targetElement = findResult.Items[0];
@@ -106,14 +111,24 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId, allowSelectorFallback: false);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
                     "click",
-                    UIAutomationErrorType.ElementNotFound,
-                    $"Element with ID '{elementId}' could not be resolved.",
+                    UIAutomationErrorType.ElementStale,
+                    $"Element with ID '{elementId}' is stale and was not retargeted by name.",
                     CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
+            }
+
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (!IsRequestedWindowHandleCompatible(elementWindowHandle, activationHandle))
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "click",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The resolved element no longer belongs to the requested window.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
             }
 
             TryActivateWindowForElement(element, activationHandle);
@@ -125,6 +140,16 @@ public sealed partial class UIAutomationService
                     $"Element with ID '{elementId}' is disabled and cannot be clicked. " +
                     "Wait for it to become enabled (e.g., after filling required fields) or target a different element.",
                     CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
+            }
+
+            if (element.IsOffscreen())
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "click",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is off-screen and cannot be safely clicked. " +
+                    "Refresh the UI state, scroll it into view, or target the active dialog.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
             }
 
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
@@ -146,7 +171,10 @@ public sealed partial class UIAutomationService
                 "click",
                 UIAutomationErrorType.PatternNotSupported,
                 outcome.ErrorMessage ?? "The element action could not be completed.",
-                CreateDiagnostics(stopwatch));
+                CreateActionDiagnostics(
+                    stopwatch,
+                    prepared.Element,
+                    outcome.ActionPath ?? "unverified"));
         }
 
         return await _staThread.ExecuteAsync(() =>
@@ -158,16 +186,44 @@ public sealed partial class UIAutomationService
                 ? UIAutomationResult.CreateSuccessWithHint(
                     "click",
                     "Click succeeded. Element closed or changed its parent window or dialog.",
-                    CreateDiagnostics(stopwatch))
-                : UIAutomationResult.CreateSuccessCompact("click", [info], CreateDiagnostics(stopwatch));
+                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"))
+                : UIAutomationResult.CreateSuccessCompact(
+                    "click",
+                    [info],
+                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"));
         }, cancellationToken);
     }
 
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> FindAndTypeAsync(ElementQuery query, string text, bool clearFirst, CancellationToken cancellationToken = default)
+    public Task<UIAutomationResult> FindAndTypeAsync(
+        ElementQuery query,
+        string text,
+        bool clearFirst,
+        CancellationToken cancellationToken = default) =>
+        FindAndTypeAsync(query, text, clearFirst, "auto", cancellationToken);
+
+    /// <summary>
+    /// Finds a text control and enters text using auto, value, or keyboard input.
+    /// Auto prefers keyboard input for Chromium/Electron so web frameworks receive normal events.
+    /// </summary>
+    public async Task<UIAutomationResult> FindAndTypeAsync(
+        ElementQuery query,
+        string text,
+        bool clearFirst,
+        string inputMode,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         var stopwatch = Stopwatch.StartNew();
+
+        if (!TryNormalizeInputMode(inputMode, out var normalizedInputMode))
+        {
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.InvalidParameter,
+                $"Invalid inputMode '{inputMode}'. Valid values: auto, keyboard, value.",
+                CreateDiagnostics(stopwatch, query));
+        }
 
         // Normalize Windows file paths: convert forward slashes to backslashes
         // This handles paths like "D:/folder/file.txt" → "D:\folder\file.txt"
@@ -181,7 +237,12 @@ public sealed partial class UIAutomationService
 
             foreach (var searchQuery in searchQueries)
             {
-                var findResult = await FindElementsAsync(searchQuery, cancellationToken);
+                var actionQuery = searchQuery with
+                {
+                    VisibleOnly = searchQuery.VisibleOnly ?? true,
+                    EnabledOnly = searchQuery.EnabledOnly ?? true
+                };
+                var findResult = await FindElementsAsync(actionQuery, cancellationToken);
                 lastResult = findResult;
 
                 if (findResult.Success && findResult.Items is { Length: > 0 })
@@ -189,7 +250,19 @@ public sealed partial class UIAutomationService
                     var targetElement = findResult.Items[0];
                     var elementId = targetElement.Id;
 
-                    return await PerformTypeAsync(elementId, text, clearFirst, searchQuery.WindowHandle, stopwatch, cancellationToken);
+                    return await PerformTypeAsync(
+                        elementId,
+                        text,
+                        clearFirst,
+                        normalizedInputMode,
+                        actionQuery.WindowHandle,
+                        stopwatch,
+                        cancellationToken);
+                }
+
+                if (findResult.ErrorType is not null and not UIAutomationErrorType.ElementNotFound)
+                {
+                    return findResult with { Action = "type" };
                 }
             }
 
@@ -230,17 +303,50 @@ public sealed partial class UIAutomationService
     /// (from ui_find/ui_snapshot), skipping the find step. Useful for reusing a known element
     /// across multiple actions without re-querying.
     /// </summary>
-    public async Task<UIAutomationResult> TypeIntoElementAsync(string elementId, string text, bool clearFirst, string? windowHandle, CancellationToken cancellationToken = default)
+    public Task<UIAutomationResult> TypeIntoElementAsync(
+        string elementId,
+        string text,
+        bool clearFirst,
+        string? windowHandle,
+        CancellationToken cancellationToken = default) =>
+        TypeIntoElementAsync(elementId, text, clearFirst, windowHandle, "auto", cancellationToken);
+
+    /// <summary>
+    /// Types into a previously discovered element using auto, value, or keyboard input.
+    /// </summary>
+    public async Task<UIAutomationResult> TypeIntoElementAsync(
+        string elementId,
+        string text,
+        bool clearFirst,
+        string? windowHandle,
+        string inputMode,
+        CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrEmpty(elementId);
         var stopwatch = Stopwatch.StartNew();
+
+        if (!TryNormalizeInputMode(inputMode, out var normalizedInputMode))
+        {
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.InvalidParameter,
+                $"Invalid inputMode '{inputMode}'. Valid values: auto, keyboard, value.",
+                CreateDiagnostics(stopwatch));
+        }
 
         // Normalize Windows file paths for consistency with FindAndTypeAsync.
         text = PathNormalizer.NormalizeWindowsPath(text);
 
         try
         {
-            return await PerformTypeAsync(elementId, text, clearFirst, windowHandle, stopwatch, cancellationToken);
+            return await PerformTypeAsync(
+                elementId,
+                text,
+                clearFirst,
+                normalizedInputMode,
+                windowHandle,
+                stopwatch,
+                cancellationToken);
         }
         catch (COMException ex)
         {
@@ -286,19 +392,27 @@ public sealed partial class UIAutomationService
         return queries;
     }
 
-    private async Task<UIAutomationResult> PerformTypeAsync(string elementId, string text, bool clearFirst, string? windowHandle, Stopwatch stopwatch, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult> PerformTypeAsync(
+        string elementId,
+        string text,
+        bool clearFirst,
+        string inputMode,
+        string? windowHandle,
+        Stopwatch stopwatch,
+        CancellationToken cancellationToken)
     {
-        // First phase: resolve element and try ValuePattern (on STA thread)
         var staResult = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            var element = ElementIdGenerator.ResolveToAutomationElement(
+                elementId,
+                allowSelectorFallback: false);
             if (element == null)
             {
                 return (Success: false, Result: UIAutomationResult.CreateFailure(
                     "type",
-                    UIAutomationErrorType.ElementNotFound,
-                    $"Element with ID '{elementId}' could not be resolved.",
-                    CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    UIAutomationErrorType.ElementStale,
+                    $"Element with ID '{elementId}' is stale and was not retargeted by name.",
+                    CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
             nint? activationHandle = null;
@@ -310,16 +424,22 @@ public sealed partial class UIAutomationService
                         "type",
                         UIAutomationErrorType.InvalidParameter,
                         $"Invalid windowHandle '{windowHandle}'. Expected decimal string from window_management(handle).",
-                        CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        CreateDiagnostics(stopwatch)), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                 }
 
                 activationHandle = parsedHandle;
             }
 
-            // Ensure window is activated before typing
-            TryActivateWindowForElement(element, activationHandle);
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (!IsRequestedWindowHandleCompatible(elementWindowHandle, activationHandle))
+            {
+                return (Success: false, Result: UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The resolved element no longer belongs to the requested window.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+            }
 
-            // Actionability gate: a disabled field cannot receive text. Fail fast with guidance.
             if (!element.IsEnabled())
             {
                 return (Success: false, Result: UIAutomationResult.CreateFailure(
@@ -327,79 +447,94 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.InvalidParameter,
                     $"Element with ID '{elementId}' is disabled and cannot receive text. " +
                     "Wait for it to become enabled or target a different field.",
-                    CreateDiagnostics(stopwatch)), ValuePatternSucceeded: false, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
             }
 
-            // Try to set focus
-            element.TrySetFocus();
+            if (element.IsOffscreen())
+            {
+                return (Success: false, Result: UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is off-screen and cannot safely receive input. " +
+                    "Refresh the UI state, scroll it into view, or target the active dialog.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), UseKeyboard: false, IsPassword: false, InitialValue: (string?)null, TargetWindowHandle: IntPtr.Zero, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+            }
 
             var rootElement = GetRootElementForScroll(element);
+            var isPassword = element.CurrentIsPassword != 0;
+            var initialValue = ReadEditableValue(element);
+            var detectedFramework = DetectFramework(rootElement);
+            var useKeyboard = inputMode == "keyboard" ||
+                (inputMode == "auto" &&
+                 string.Equals(detectedFramework, "Chromium/Electron", StringComparison.Ordinal));
 
-            // Try ValuePattern first - need to clear manually if clearFirst
-            if (clearFirst)
+            if (!useKeyboard)
             {
-                // Try to clear via ValuePattern
-                if (element.TrySetValue(""))
+                if (clearFirst && !element.TrySetValue(""))
                 {
-                    // Then set new value
-                    if (element.TrySetValue(text))
-                    {
-                        var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
-                        if (info == null)
-                        {
-                            // Type succeeded but element became unavailable (e.g., dialog closed).
-                            // This is expected behavior for text fields that close their parent window.
-                            return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
-                        }
-                        return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
-                    }
+                    useKeyboard = inputMode == "auto";
                 }
-            }
-            else
-            {
-                if (element.TrySetValue(text))
+
+                if (!useKeyboard && element.TrySetValue(text))
                 {
                     var info = ConvertToElementInfo(element, rootElement, _coordinateConverter);
                     if (info == null)
                     {
-                        // Type succeeded but element became unavailable (e.g., dialog closed).
-                        // This is expected behavior for text fields that close their parent window.
-                        return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
+                        return (Success: true, Result: UIAutomationResult.CreateSuccessWithHint(
+                            "type",
+                            "Type succeeded. Element closed its parent window.",
+                            CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                     }
-                    return (Success: true, Result: UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch)), ValuePatternSucceeded: true, Element: element, RootElement: rootElement);
+
+                    return (Success: true, Result: UIAutomationResult.CreateSuccessCompact(
+                        "type",
+                        [info],
+                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: element, RootElement: rootElement);
+                }
+
+                if (!useKeyboard && inputMode == "auto")
+                {
+                    useKeyboard = true;
+                }
+
+                if (!useKeyboard)
+                {
+                    return (Success: false, Result: UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.PatternNotSupported,
+                        "The element did not accept ValuePattern input. Use inputMode='keyboard' to emit normal focus and keyboard events.",
+                        CreateActionDiagnostics(stopwatch, element, "value_pattern")), UseKeyboard: false, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: (UIA.IUIAutomationElement?)null, RootElement: (UIA.IUIAutomationElement?)null);
                 }
             }
 
-            // Need to fall back to keyboard input
-            return (Success: true, Result: (UIAutomationResult?)null, ValuePatternSucceeded: false, Element: element, RootElement: rootElement);
+            // Request foreground activation, but use the target element's actual keyboard-focus
+            // state below as the final safety gate. Some UI providers can focus correctly even when
+            // GetForegroundWindow is unavailable to the automation process.
+            _ = ActivateWindowForElement(element, activationHandle);
+            element.TrySetFocus();
+            return (Success: true, Result: (UIAutomationResult?)null, UseKeyboard: true, IsPassword: isPassword, InitialValue: initialValue, TargetWindowHandle: elementWindowHandle, Element: element, RootElement: rootElement);
         }, cancellationToken);
 
-        // Check if we already have a result (success or element not found)
         if (!staResult.Success)
         {
             return staResult.Result!;
         }
 
-        if (staResult.ValuePatternSucceeded)
+        if (!staResult.UseKeyboard)
         {
             if (staResult.Element == null)
             {
                 return staResult.Result!;
             }
 
-            var isPassword = await _staThread.ExecuteAsync(
-                () => staResult.Element.CurrentIsPassword != 0,
-                cancellationToken);
-            if (isPassword)
+            if (staResult.IsPassword)
             {
-                // UIA intentionally does not expose password values. The successful provider
-                // SetValue call is the strongest observable completion signal available.
                 return staResult.Result!;
             }
 
             var verified = await WaitForElementConditionAsync(
                 staResult.Element,
-                () => string.Equals(staResult.Element.TryGetValue(), text, StringComparison.Ordinal),
+                () => string.Equals(ReadEditableValue(staResult.Element), text, StringComparison.Ordinal),
                 cancellationToken);
             if (verified.Observed)
             {
@@ -410,31 +545,182 @@ public sealed partial class UIAutomationService
                 "type",
                 UIAutomationErrorType.PatternNotSupported,
                 "ValuePattern accepted the text, but the requested value was not observable before the bounded timeout.",
-                CreateDiagnostics(stopwatch));
+                CreateActionDiagnostics(stopwatch, staResult.Element, "value_pattern"));
         }
 
-        // Fall back to keyboard input (outside STA thread)
+        var expectedWindowHandle = staResult.TargetWindowHandle;
+        if (!IsExpectedForegroundWindow(expectedWindowHandle))
+        {
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.WrongTargetWindow,
+                "The target window is not foreground, so no keyboard input was sent.",
+                CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+        }
+
+        var focusReady = await WaitForElementConditionAsync(
+            staResult.Element!,
+            () => staResult.Element!.CurrentHasKeyboardFocus != 0,
+            cancellationToken,
+            TimeSpan.FromMilliseconds(750));
+        if (!focusReady.Observed)
+        {
+            var clickPoint = await _staThread.ExecuteAsync(
+                () => GetPhysicalClickPoint(staResult.Element!),
+                cancellationToken);
+            if (clickPoint.HasValue)
+            {
+                if (!IsExpectedForegroundWindow(expectedWindowHandle))
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.WrongTargetWindow,
+                        "The target window lost foreground ownership before the focus click.",
+                        CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+                }
+
+                var click = await _mouseService.ClickAsync(
+                    clickPoint.Value.X,
+                    clickPoint.Value.Y,
+                    ModifierKey.None,
+                    expectedWindowHandle,
+                    cancellationToken: cancellationToken);
+                if (!click.Success)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.WrongTargetWindow,
+                        "The text field could not be focused before keyboard input.",
+                        CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+                }
+            }
+
+            focusReady = await WaitForElementConditionAsync(
+                staResult.Element!,
+                () => staResult.Element!.CurrentHasKeyboardFocus != 0,
+                cancellationToken,
+                TimeSpan.FromMilliseconds(750));
+            if (!focusReady.Observed)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The text field did not obtain keyboard focus, so no text was sent.",
+                    CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+            }
+        }
+
         if (clearFirst)
         {
-            await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, 1, cancellationToken);
+            if (!IsExpectedForegroundWindow(expectedWindowHandle))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The target window lost foreground ownership before clearing the field.",
+                    CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+            }
+
+            await _keyboardService.PressKeyAsync(
+                "a",
+                ModifierKey.Ctrl,
+                1,
+                expectedWindowHandle,
+                cancellationToken);
+            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+            if (!IsExpectedForegroundWindow(expectedWindowHandle))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The target window lost foreground ownership while clearing the field.",
+                    CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+            }
+
+            await _keyboardService.PressKeyAsync(
+                "Delete",
+                ModifierKey.None,
+                1,
+                expectedWindowHandle,
+                cancellationToken);
             _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
         }
 
-        await _keyboardService.TypeTextAsync(text, cancellationToken);
+        if (!IsExpectedForegroundWindow(expectedWindowHandle))
+        {
+            return UIAutomationResult.CreateFailure(
+                "type",
+                UIAutomationErrorType.WrongTargetWindow,
+                "The target window lost foreground ownership before text input.",
+                CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+        }
 
-        // Get final element info (on STA thread)
+        var keyboardResult = await _keyboardService.TypeTextAsync(
+            text,
+            expectedWindowHandle,
+            cancellationToken);
+        if (!keyboardResult.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "type",
+                keyboardResult.ErrorCode == KeyboardControlErrorCode.WrongTargetWindow
+                    ? UIAutomationErrorType.WrongTargetWindow
+                    : UIAutomationErrorType.InternalError,
+                keyboardResult.Error ?? "Keyboard input failed.",
+                CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+        }
+
+        if (!staResult.IsPassword)
+        {
+            var observed = await WaitForElementConditionAsync(
+                staResult.Element!,
+                () =>
+                {
+                    var current = ReadEditableValue(staResult.Element!);
+                    return clearFirst
+                        ? string.Equals(current, text, StringComparison.Ordinal)
+                        : !string.Equals(current, staResult.InitialValue, StringComparison.Ordinal) &&
+                          (current?.Contains(text, StringComparison.Ordinal) == true);
+                },
+                cancellationToken);
+            if (!observed.Observed)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "type",
+                    UIAutomationErrorType.PatternNotSupported,
+                    "Keyboard input was sent, but the requested text change was not observable. " +
+                    "Refresh the UI state and verify the field still has focus.",
+                    CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+            }
+        }
+
         return await _staThread.ExecuteAsync(() =>
         {
             var info = ConvertToElementInfo(staResult.Element!, staResult.RootElement!, _coordinateConverter);
             if (info == null)
             {
-                // Type succeeded but element became unavailable (e.g., dialog closed).
-                // This is expected behavior for text fields that close their parent window.
-                return UIAutomationResult.CreateSuccessWithHint("type", "Type succeeded. Element closed its parent window.", CreateDiagnostics(stopwatch));
+                return UIAutomationResult.CreateSuccessWithHint(
+                    "type",
+                    "Type succeeded. Element closed its parent window.",
+                    CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
             }
-            return UIAutomationResult.CreateSuccessCompact("type", [info], CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateSuccessCompact(
+                "type",
+                [info],
+                CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
         }, cancellationToken);
     }
+
+    private static bool TryNormalizeInputMode(string? inputMode, out string normalized)
+    {
+        normalized = string.IsNullOrWhiteSpace(inputMode)
+            ? "auto"
+            : inputMode.Trim().ToLowerInvariant();
+        return normalized is "auto" or "keyboard" or "value";
+    }
+
+    private static string? ReadEditableValue(UIA.IUIAutomationElement element) =>
+        element.TryGetValue() ?? element.GetText();
 
     /// <inheritdoc/>
     public async Task<UIAutomationResult> FindAndSelectAsync(ElementQuery query, string value, CancellationToken cancellationToken = default)
@@ -449,9 +735,9 @@ public sealed partial class UIAutomationService
             {
                 return UIAutomationResult.CreateFailure(
                     "select",
-                    UIAutomationErrorType.ElementNotFound,
+                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
                     findResult.ErrorMessage ?? "Element not found.",
-                    CreateDiagnostics(stopwatch));
+                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch));
             }
 
             var targetElement = findResult.Items[0];
@@ -483,13 +769,15 @@ public sealed partial class UIAutomationService
     {
         return await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            var element = ElementIdGenerator.ResolveToAutomationElement(
+                elementId,
+                allowSelectorFallback: false);
             if (element == null)
             {
                 return UIAutomationResult.CreateFailure(
                     "select",
-                    UIAutomationErrorType.ElementNotFound,
-                    $"Element with ID '{elementId}' could not be resolved.",
+                    UIAutomationErrorType.ElementStale,
+                    $"Element with ID '{elementId}' is stale. Refresh UI state before selecting.",
                     CreateDiagnostics(stopwatch));
             }
 
@@ -508,7 +796,27 @@ public sealed partial class UIAutomationService
                 activationHandle = parsedHandle;
             }
 
-            // Ensure window is activated
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (!IsRequestedWindowHandleCompatible(elementWindowHandle, activationHandle))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "select",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The resolved element does not belong to the requested window or one of its owned dialogs.",
+                    CreateActionDiagnostics(stopwatch, element, "selection_pattern"));
+            }
+
+            if (!element.IsEnabled() || element.CurrentIsOffscreen != 0)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "select",
+                    UIAutomationErrorType.ElementStale,
+                    "The resolved element is no longer visible and enabled. Refresh UI state before selecting.",
+                    CreateActionDiagnostics(stopwatch, element, "selection_pattern"));
+            }
+
+            // Selection patterns are semantic UIA actions, so foreground activation is best effort.
+            // Only physical keyboard or mouse injection must require foreground confirmation.
             TryActivateWindowForElement(element, activationHandle);
 
             var rootElement = GetRootElementForScroll(element);
@@ -647,7 +955,20 @@ public sealed partial class UIAutomationService
         var requestedRoot = NativeMethods.GetAncestor(requestedWindowHandle.Value, NativeConstants.GA_ROOT);
         if (elementRoot != IntPtr.Zero && requestedRoot != IntPtr.Zero)
         {
-            return elementRoot == requestedRoot;
+            if (elementRoot == requestedRoot)
+            {
+                return true;
+            }
+
+            var elementRootOwner = NativeMethods.GetAncestor(
+                elementWindowHandle,
+                NativeConstants.GA_ROOTOWNER);
+            var requestedRootOwner = NativeMethods.GetAncestor(
+                requestedWindowHandle.Value,
+                NativeConstants.GA_ROOTOWNER);
+            return elementRootOwner != IntPtr.Zero &&
+                requestedRootOwner != IntPtr.Zero &&
+                elementRootOwner == requestedRootOwner;
         }
 
         return false;
@@ -671,7 +992,7 @@ public sealed partial class UIAutomationService
                 var hwnd = TryGetNativeWindowHandle(current);
                 if (hwnd != IntPtr.Zero)
                 {
-                    return hwnd;
+                    return NormalizeTopLevelWindowHandle(hwnd);
                 }
 
                 current = walker.GetParentElement(current);
@@ -688,7 +1009,7 @@ public sealed partial class UIAutomationService
             var rootHandle = TryGetNativeWindowHandle(root);
             if (rootHandle != IntPtr.Zero)
             {
-                return rootHandle;
+                return NormalizeTopLevelWindowHandle(rootHandle);
             }
         }
         catch
@@ -724,6 +1045,25 @@ public sealed partial class UIAutomationService
 
     private static bool TryParseElementWindowHandle(string elementId, out nint windowHandle) =>
         ElementIdGenerator.TryResolveWindowHandle(elementId, out windowHandle);
+
+    private static nint NormalizeTopLevelWindowHandle(nint windowHandle)
+    {
+        var root = NativeMethods.GetAncestor(windowHandle, NativeConstants.GA_ROOT);
+        return root != IntPtr.Zero ? root : windowHandle;
+    }
+
+    private static bool IsExpectedForegroundWindow(nint expectedWindowHandle)
+    {
+        if (expectedWindowHandle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        var foreground = NativeMethods.GetForegroundWindow();
+        return foreground != IntPtr.Zero &&
+            NormalizeTopLevelWindowHandle(foreground) ==
+            NormalizeTopLevelWindowHandle(expectedWindowHandle);
+    }
 
     private static nint TryGetNativeWindowHandle(UIA.IUIAutomationElement? element)
     {
@@ -783,11 +1123,14 @@ public sealed partial class UIAutomationService
                     return false;
                 }
 
-                _windowActivator.ActivateWindowAsync(windowHandle.Value, cancellationToken: CancellationToken.None)
+                var handleToActivate = elementWindowHandle != IntPtr.Zero
+                    ? elementWindowHandle
+                    : windowHandle.Value;
+                _windowActivator.ActivateWindowAsync(handleToActivate, cancellationToken: CancellationToken.None)
                     .GetAwaiter()
                     .GetResult();
                 return DeterministicWait.Until(
-                    () => _windowActivator.IsForegroundWindow(windowHandle.Value),
+                    () => _windowActivator.IsForegroundWindow(handleToActivate),
                     TimeSpan.FromMilliseconds(500),
                     ActionVerificationPollInterval);
             }
@@ -943,14 +1286,19 @@ public sealed partial class UIAutomationService
 
         try
         {
-            var findResult = await FindElementsAsync(query, cancellationToken);
+            var actionQuery = query with
+            {
+                VisibleOnly = query.VisibleOnly ?? true,
+                EnabledOnly = query.EnabledOnly ?? true
+            };
+            var findResult = await FindElementsAsync(actionQuery, cancellationToken);
             if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
             {
                 return UIAutomationResult.CreateFailure(
                     "double_click",
-                    UIAutomationErrorType.ElementNotFound,
+                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
                     findResult.ErrorMessage ?? "Element not found.",
-                    CreateDiagnostics(stopwatch));
+                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch, actionQuery));
             }
 
             var targetElement = findResult.Items[0];
@@ -1017,14 +1365,26 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            var element = ElementIdGenerator.ResolveToAutomationElement(
+                elementId,
+                allowSelectorFallback: false);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
                     "double_click",
-                    UIAutomationErrorType.ElementNotFound,
-                    $"Element with ID '{elementId}' could not be resolved.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    UIAutomationErrorType.ElementStale,
+                    $"Element with ID '{elementId}' is stale. Refresh UI state before double-clicking.",
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
+            }
+
+            var elementWindowHandle = ResolveElementWindowHandle(element);
+            if (!IsRequestedWindowHandleCompatible(elementWindowHandle, activationHandle))
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "double_click",
+                    UIAutomationErrorType.WrongTargetWindow,
+                    "The resolved element no longer belongs to the requested window.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             // A double-click is always physical input, so a window that could not be brought to the foreground
@@ -1036,7 +1396,7 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.WindowNotFound,
                     "The element's window could not be activated and confirmed as the foreground window, so the double-click was not sent. " +
                     "Activate the window first with window_management(action='activate') and retry.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             if (!element.IsEnabled())
@@ -1046,7 +1406,17 @@ public sealed partial class UIAutomationService
                     UIAutomationErrorType.InvalidParameter,
                     $"Element with ID '{elementId}' is disabled and cannot be double-clicked. " +
                     "Wait for it to become enabled (e.g., after filling required fields) or target a different element.",
-                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, Initial: default(ElementActionState));
+                    CreateDiagnostics(stopwatch)), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
+            }
+
+            if (element.IsOffscreen())
+            {
+                return (Failure: UIAutomationResult.CreateFailure(
+                    "double_click",
+                    UIAutomationErrorType.InvalidParameter,
+                    $"Element with ID '{elementId}' is off-screen and cannot be safely double-clicked. " +
+                    "Refresh the UI state, scroll it into view, or target the active dialog.",
+                    CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null, Point: (Point?)null, WindowHandle: IntPtr.Zero, Initial: default(ElementActionState));
             }
 
             var root = GetRootElementForScroll(element);
@@ -1057,7 +1427,7 @@ public sealed partial class UIAutomationService
                 GetElementState(element),
                 GetObservableFingerprint(root));
 
-            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, Initial: initial);
+            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
         }, cancellationToken);
 
         if (prepared.Failure != null)
@@ -1077,7 +1447,9 @@ public sealed partial class UIAutomationService
         var clickResult = await _mouseService.DoubleClickAsync(
             prepared.Point.Value.X,
             prepared.Point.Value.Y,
-            cancellationToken: cancellationToken);
+            ModifierKey.None,
+            prepared.WindowHandle,
+            cancellationToken);
         if (!clickResult.Success)
         {
             return UIAutomationResult.CreateFailure(
@@ -1423,7 +1795,12 @@ public sealed partial class UIAutomationService
     /// </summary>
     private async Task<bool> FocusWindowAsync(nint hwnd, CancellationToken cancellationToken)
     {
-        return await _staThread.ExecuteAsync(() =>
+        var activated = _windowActivator is not null &&
+            await _windowActivator.ActivateWindowAsync(
+                hwnd,
+                cancellationToken: cancellationToken);
+
+        var focused = await _staThread.ExecuteAsync(() =>
         {
             var element = Uia.ElementFromHandle(hwnd);
             if (element == null)
@@ -1441,6 +1818,8 @@ public sealed partial class UIAutomationService
                 return false;
             }
         }, cancellationToken);
+
+        return activated || focused;
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
@@ -71,6 +72,132 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     #region FoundIndex Tests
+
+    [Fact]
+    public async Task Find_WithTimeout_WaitsForElementToAppear()
+    {
+        _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+
+        try
+        {
+            var reveal = Task.Run(async () =>
+            {
+                await Task.Delay(250);
+                _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+            });
+
+            var result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "SubmitButton",
+                TimeoutMs = 2000,
+            });
+
+            await reveal;
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.NotEmpty(result.Items ?? []);
+        }
+        finally
+        {
+            _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+        }
+    }
+
+    [Fact]
+    public async Task Find_WithTimeout_PerformsFinalProbeAtDeadline()
+    {
+        const string DelayedAutomationId = "DelayedSubmitButton";
+
+        var rename = Task.Run(async () =>
+        {
+            await Task.Delay(1850);
+            _fixture.Form!.Invoke(() =>
+                _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
+        });
+
+        try
+        {
+            var result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = DelayedAutomationId,
+                TimeoutMs = 2000,
+            });
+
+            await rename;
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Single(result.Items!);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() =>
+                _fixture.Form.SetSubmitButtonAutomationIdForTesting("SubmitButton"));
+        }
+    }
+
+    [Fact]
+    public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task WaitForDisappear_RequireUnique_DoesNotTreatAmbiguityAsGone()
+    {
+        var result = await _automationService.WaitForElementDisappearAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Find_RequireUniqueWithFoundIndex_ReturnsInvalidParameter()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+            FoundIndex = 2,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Select_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.FindAndSelectAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            "unused");
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+    }
 
     [Fact]
     public async Task Find_WithFoundIndex1_ReturnsAllButtons()
@@ -158,6 +285,58 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         // Assert - Should fail with ElementNotFound
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_ReturnsAmbiguityDetails()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+        Assert.True(result.Diagnostics!.MultipleMatches!.Length > 1);
+        Assert.All(result.Diagnostics.MultipleMatches, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(item.ControlType));
+            Assert.NotNull(item.Name);
+        });
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_RedactsTextFieldValuesFromDiagnostics()
+    {
+        const string SensitiveValue = "private-field-value";
+        var typed = await _automationService.FindAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "UsernameInput",
+                ControlType = "Edit",
+            },
+            SensitiveValue,
+            clearFirst: true,
+            inputMode: "value");
+        Assert.True(typed.Success, typed.ErrorMessage);
+
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Edit",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.DoesNotContain(
+            SensitiveValue,
+            JsonSerializer.Serialize(result.Diagnostics),
+            StringComparison.Ordinal);
     }
 
     #endregion

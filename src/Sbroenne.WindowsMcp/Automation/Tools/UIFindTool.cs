@@ -40,6 +40,10 @@ public static partial class UIFindTool
     /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
     /// <param name="visibleOnly">Exclude off-screen elements. Default (unset): excluded for Chromium/Edge/Electron (which expose many hidden nodes), included elsewhere. Set false to include hidden nodes.</param>
     /// <param name="contentViewOnly">Scan only the leaner UI Automation content view (meaningful, user-facing elements) instead of the full control view. Default (unset): content view for Chromium/Edge/Electron (whose control view is bloated with structural nodes), control view elsewhere; automatically falls back to the control view if nothing is found. Set false to force the full control view.</param>
+    /// <param name="parentElementId">Limit the search to a known parent element from ui_find/ui_snapshot.</param>
+    /// <param name="scope">Search root: window (default) or active_dialog. Use active_dialog after opening a modal or native file dialog.</param>
+    /// <param name="requireUnique">Fail with ambiguity details when more than one element matches. Default: false.</param>
+    /// <param name="enabledOnly">Exclude disabled elements when true.</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -61,6 +65,10 @@ public static partial class UIFindTool
         [DefaultValue(null)] string? nearElement,
         [DefaultValue(null)] bool? visibleOnly,
         [DefaultValue(null)] bool? contentViewOnly,
+        [DefaultValue(null)] string? parentElementId,
+        [DefaultValue("window")] string? scope,
+        [DefaultValue(false)] bool requireUnique,
+        [DefaultValue(null)] bool? enabledOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -98,6 +106,10 @@ public static partial class UIFindTool
                 NearElement = nearElement,
                 VisibleOnly = visibleOnly,
                 ContentViewOnly = contentViewOnly,
+                ParentElementId = parentElementId,
+                Scope = scope,
+                RequireUnique = requireUnique,
+                EnabledOnly = enabledOnly,
                 TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
             };
 
@@ -109,4 +121,48 @@ public static partial class UIFindTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Compatibility overload for the original window-scoped find surface.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        int? exactDepth,
+        int foundIndex,
+        bool includeChildren,
+        bool sortByProminence,
+        string? inRegion,
+        string? nearElement,
+        bool? visibleOnly,
+        bool? contentViewOnly,
+        int timeoutMs,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle,
+            name,
+            nameContains,
+            namePattern,
+            controlType,
+            automationId,
+            className,
+            exactDepth,
+            foundIndex,
+            includeChildren,
+            sortByProminence,
+            inRegion,
+            nearElement,
+            visibleOnly,
+            contentViewOnly,
+            null,
+            "window",
+            false,
+            null,
+            timeoutMs,
+            includeDiagnostics,
+            cancellationToken);
 }

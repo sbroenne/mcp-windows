@@ -114,7 +114,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
     }
 
     internal static ChromiumBrowserSession LaunchLocalPageForReadinessFailureTest(
-        ChromiumBrowserKind browser)
+        ChromiumBrowserKind browser,
+        Action<int>? processStarted = null)
     {
         var pagePath = FindLocalPagePath();
         return Launch(browser, new BrowserTarget(
@@ -122,11 +123,13 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new Uri(pagePath).AbsoluteUri,
             "MCP Chromium Browser Test Page",
             TimeSpan.FromMilliseconds(500),
-            [new ReadyElement("Control that does not exist")]));
+            [new ReadyElement("Control that does not exist")]),
+            processStarted);
     }
 
     internal static ChromiumBrowserSession LaunchLocalPageForWindowFailureTest(
-        ChromiumBrowserKind browser)
+        ChromiumBrowserKind browser,
+        Action<int>? processStarted = null)
     {
         var pagePath = FindLocalPagePath();
         return Launch(browser, new BrowserTarget(
@@ -135,7 +138,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
             "Window title that does not exist",
             TimeSpan.FromMilliseconds(500),
             [],
-            WindowTimeout: TimeSpan.FromMilliseconds(500)));
+            WindowTimeout: TimeSpan.FromMilliseconds(500)),
+            processStarted);
     }
 
     public static ChromiumBrowserSession LaunchPublicSite(ChromiumBrowserKind browser, ChromiumPublicSite site)
@@ -169,7 +173,10 @@ internal sealed class ChromiumBrowserSession : IDisposable
         return LaunchLocalPage();
     }
 
-    private static ChromiumBrowserSession Launch(ChromiumBrowserKind browser, BrowserTarget target)
+    private static ChromiumBrowserSession Launch(
+        ChromiumBrowserKind browser,
+        BrowserTarget target,
+        Action<int>? processStarted = null)
     {
         var browserExecutable = FindBrowserExecutable(browser)
             ?? throw new InvalidOperationException($"{GetBrowserDisplayName(browser)} executable was not found.");
@@ -197,6 +204,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
             {
                 throw new InvalidOperationException($"Failed to start {browserDescriptor.DisplayName} for Chromium browser smoke tests.");
             }
+            processStarted?.Invoke(process.Id);
 
             var windowHandle = WaitForWindow(
                 process.Id,

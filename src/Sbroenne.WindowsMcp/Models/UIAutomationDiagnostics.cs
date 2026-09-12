@@ -38,7 +38,7 @@ public sealed record UIAutomationDiagnostics
     /// <summary>
     /// Multiple matches when exactly one expected.
     /// </summary>
-    public UIElementInfo[]? MultipleMatches { get; init; }
+    public UIAutomationTargetDiagnostics[]? MultipleMatches { get; init; }
 
     /// <summary>
     /// Warnings about potential issues (e.g., Chromium app without accessibility flag).
@@ -55,6 +55,41 @@ public sealed record UIAutomationDiagnostics
     /// view (false). Null when not applicable. Used to observe the R5 content-view optimization.
     /// </summary>
     public bool? UsedContentView { get; init; }
+
+    /// <summary>
+    /// Concrete action path used, such as semantic invoke, physical click, value pattern,
+    /// keyboard input, shortcut, or wait.
+    /// </summary>
+    public string? ActionPath { get; init; }
+
+    /// <summary>
+    /// Element that was selected for the action. Values typed into the element are never included.
+    /// </summary>
+    public UIAutomationTargetDiagnostics? TargetElement { get; init; }
+}
+
+/// <summary>
+/// Privacy-safe details about the element selected for an action.
+/// </summary>
+public sealed record UIAutomationTargetDiagnostics
+{
+    /// <summary>Opaque element ID that can be used for a subsequent action.</summary>
+    public string? ElementId { get; init; }
+
+    /// <summary>Accessible name of the selected target.</summary>
+    public string? Name { get; init; }
+
+    /// <summary>Automation ID of the selected target.</summary>
+    public string? AutomationId { get; init; }
+
+    /// <summary>UI Automation control type of the selected target.</summary>
+    public string? ControlType { get; init; }
+
+    /// <summary>Whether the selected target was enabled when inspected.</summary>
+    public bool? IsEnabled { get; init; }
+
+    /// <summary>Whether UI Automation reported the selected target as off-screen.</summary>
+    public bool? IsOffscreen { get; init; }
 }
 
 /// <summary>
@@ -170,4 +205,21 @@ public sealed record ElementQuery
     /// the search automatically falls back to the control view if the content-view scan finds nothing.
     /// </summary>
     public bool? ContentViewOnly { get; init; }
+
+    /// <summary>
+    /// Search root: "window" (default) or "active_dialog". Active dialog resolves the enabled
+    /// popup owned by <see cref="WindowHandle"/>, which avoids matching duplicate controls behind
+    /// a modal dialog.
+    /// </summary>
+    public string? Scope { get; init; }
+
+    /// <summary>
+    /// Fail with multiple_matches when more than one element matches after filtering.
+    /// </summary>
+    public bool RequireUnique { get; init; }
+
+    /// <summary>
+    /// When true, exclude disabled elements from results.
+    /// </summary>
+    public bool? EnabledOnly { get; init; }
 }

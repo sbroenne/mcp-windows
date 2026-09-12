@@ -21,14 +21,16 @@ public sealed partial class UIAutomationService
             if (!string.IsNullOrEmpty(elementId))
             {
                 element = await _staThread.ExecuteAsync(() =>
-                    ElementIdGenerator.ResolveToAutomationElement(elementId), cancellationToken);
+                    ElementIdGenerator.ResolveToAutomationElement(
+                        elementId,
+                        allowSelectorFallback: false), cancellationToken);
 
                 if (element == null)
                 {
                     return UIAutomationResult.CreateFailure(
                         "scroll_into_view",
-                        UIAutomationErrorType.ElementNotFound,
-                        $"Element with ID '{elementId}' not found.",
+                        UIAutomationErrorType.ElementStale,
+                        $"Element with ID '{elementId}' is stale. Refresh UI state before scrolling.",
                         CreateDiagnostics(stopwatch));
                 }
             }
@@ -46,7 +48,9 @@ public sealed partial class UIAutomationService
                 }
 
                 element = await _staThread.ExecuteAsync(() =>
-                    ElementIdGenerator.ResolveToAutomationElement(foundElement.ElementId), cancellationToken);
+                    ElementIdGenerator.ResolveToAutomationElement(
+                        foundElement.ElementId,
+                        allowSelectorFallback: false), cancellationToken);
             }
             else
             {
