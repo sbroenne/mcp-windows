@@ -5,6 +5,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
+using System.Text.RegularExpressions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -282,6 +283,38 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
         Assert.Equal(0, _fixture.Form.SubmitClickCount);
+    }
+
+    [Fact]
+    public async Task ClickElement_PositionOnlyId_FailsClosed()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var elementId = Assert.Single(found.Items!).Id;
+        var pathBasedElementId = await _staThread.ExecuteAsync(() =>
+        {
+            var element = ElementIdGenerator.ResolveToAutomationElement(
+                elementId,
+                allowSelectorFallback: false);
+            Assert.NotNull(element);
+            var root = UIA3Automation.Instance.ElementFromHandle(
+                nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.NotNull(root);
+            return ElementIdGenerator.GenerateId(element, root);
+        });
+        var fullId = Assert.IsType<string>(ElementIdGenerator.ResolveFullId(pathBasedElementId));
+        var positionOnlyId = ElementIdGenerator.RegisterFullId(
+            Regex.Replace(fullId, @"(?<=\|runtime:)[^|]+", "0"));
+
+        var result = await _automationService.ClickElementAsync(positionOnlyId, _windowHandle);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form!.SubmitClickCount);
     }
 
     [Fact]

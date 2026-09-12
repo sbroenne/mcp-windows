@@ -104,6 +104,38 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     [Fact]
+    public async Task Find_WithTimeout_PerformsFinalProbeAtDeadline()
+    {
+        const string DelayedAutomationId = "DelayedSubmitButton";
+
+        var rename = Task.Run(async () =>
+        {
+            await Task.Delay(1850);
+            _fixture.Form!.Invoke(() =>
+                _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
+        });
+
+        try
+        {
+            var result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = DelayedAutomationId,
+                TimeoutMs = 2000,
+            });
+
+            await rename;
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Single(result.Items!);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() =>
+                _fixture.Form.SetSubmitButtonAutomationIdForTesting("SubmitButton"));
+        }
+    }
+
+    [Fact]
     public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
     {
         var result = await _automationService.WaitForElementAsync(

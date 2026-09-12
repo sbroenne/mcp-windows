@@ -85,7 +85,7 @@ public static class ElementIdGenerator
     /// </summary>
     /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
     /// <param name="allowSelectorFallback">
-    /// Whether a stale runtime ID may fall back to an exact name/control-type search.
+    /// Whether resolution may fall back to positional tree paths or an exact name/control-type search.
     /// State-changing actions should pass <see langword="false"/>.
     /// </param>
     /// <returns>The UI Automation element, or null if resolution fails.</returns>
@@ -115,10 +115,10 @@ public static class ElementIdGenerator
                 element = FindByRuntimeId(parts.WindowHandle, runtimeId);
             }
 
-            // A tree path is positional and may now identify a replacement control. Strict
-            // state-changing resolution may use it only when the original element had no runtime ID.
+            // A tree path is positional and may now identify a replacement control.
+            // Strict state-changing resolution must fail closed without a stable runtime identity.
             if (element == null &&
-                (allowSelectorFallback || string.IsNullOrEmpty(parts.RuntimeId) || parts.RuntimeId == "0") &&
+                allowSelectorFallback &&
                 !string.IsNullOrEmpty(parts.TreePath) &&
                 parts.TreePath != "stale")
             {

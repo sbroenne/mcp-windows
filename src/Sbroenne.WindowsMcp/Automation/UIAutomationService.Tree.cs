@@ -210,7 +210,7 @@ public sealed partial class UIAutomationService
 
         try
         {
-            while (stopwatch.ElapsedMilliseconds < timeoutMs)
+            while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -225,7 +225,14 @@ public sealed partial class UIAutomationService
                     return result with { Action = "wait_for" };
                 }
 
-                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
+                var remainingMs = timeoutMs - stopwatch.ElapsedMilliseconds;
+                if (remainingMs <= 0)
+                {
+                    break;
+                }
+
+                var boundedDelay = (int)Math.Min(delay, remainingMs);
+                await DelayOrUntilStructureChangedAsync(signal, boundedDelay, cancellationToken).ConfigureAwait(false);
                 delay = Math.Min(delay * 2, MaxDelay);
             }
 

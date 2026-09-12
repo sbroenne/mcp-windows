@@ -708,6 +708,7 @@ public sealed class UITestHarnessForm : Form
         SemanticControlMouseInputCount = 0;
         _physicalFallbackClickCount = 0;
         _physicalFallbackTarget.AccessibleName = "Physical fallback";
+        _submitButton.Name = "SubmitButton";
         _submitMouseInputLabel.Text = "0";
         CancelClickCount = 0;
         _usernameInput.Clear();
@@ -772,6 +773,9 @@ public sealed class UITestHarnessForm : Form
 
     public void SetSubmitButtonVisibleForTesting(bool visible) =>
         _submitButton.Visible = visible;
+
+    public void SetSubmitButtonAutomationIdForTesting(string automationId) =>
+        _submitButton.Name = automationId;
 
     private void WireSubmitButton(Button button)
     {
