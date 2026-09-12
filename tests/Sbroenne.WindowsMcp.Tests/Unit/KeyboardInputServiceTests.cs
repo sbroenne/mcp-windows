@@ -6,6 +6,35 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class KeyboardInputServiceTests
 {
     [Fact]
+    public async Task KeyDownAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
+    {
+        using var service = new KeyboardInputService();
+
+        var result = await service.KeyDownAsync(
+            "a",
+            new nint(-1),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(KeyboardControlErrorCode.WrongTargetWindow, result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task ExecuteSequenceAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
+    {
+        using var service = new KeyboardInputService();
+
+        var result = await service.ExecuteSequenceAsync(
+            [new KeySequenceItem { Key = "a" }],
+            interKeyDelayMs: 0,
+            expectedForegroundWindow: new nint(-1),
+            cancellationToken: CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(KeyboardControlErrorCode.WrongTargetWindow, result.ErrorCode);
+    }
+
+    [Fact]
     public async Task TypeTextAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
     {
         using var service = new KeyboardInputService();

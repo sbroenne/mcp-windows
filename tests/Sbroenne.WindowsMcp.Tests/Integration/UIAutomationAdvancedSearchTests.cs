@@ -136,6 +136,38 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     [Fact]
+    public async Task Find_RequireUniqueWithFoundIndex_ReturnsInvalidParameter()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+            FoundIndex = 2,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Select_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.FindAndSelectAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            "unused");
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+    }
+
+    [Fact]
     public async Task Find_WithFoundIndex1_ReturnsAllButtons()
     {
         // FoundIndex=1 means "start from first match" which returns all matching elements

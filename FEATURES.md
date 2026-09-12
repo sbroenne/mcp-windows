@@ -440,7 +440,7 @@ Wait until a UI condition is met before continuing - no blind sleeps or screensh
 | `timeoutMs` | Max wait in milliseconds | No (default: 5000) |
 | `scope` | `window` (default) or `active_dialog` | No |
 | `parentElementId` | Restrict appear/disappear to a known subtree | No |
-| `requireUnique` | Require exactly one matching element for appear | No |
+| `requireUnique` | Require exactly one matching element for appear or disappear | No |
 
 ### Capabilities
 
@@ -657,7 +657,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 | `modifiers` | `ctrl`, `shift`, `alt` (comma-separated) | No |
 | `direction` / `amount` | Scroll direction and click count | For `scroll` |
 | `target` / `monitorIndex` | Monitor targeting | With coordinates |
-| `windowHandle` | Window-relative coordinate mode | No |
+| `windowHandle` | Window-relative coordinate mode and foreground guard | No |
 | `expectedWindowTitle` / `expectedProcessName` | Abort unless the foreground window matches | No |
 
 ### Capabilities
@@ -670,7 +670,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 - Multi-monitor support with DPI awareness
 - Easy targeting with `target='primary_screen'` or `'secondary_screen'`
 - Modifier key support (Ctrl+click, Shift+click, etc.)
-- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+- Wrong window detection with `windowHandle`, `expectedWindowTitle`, or `expectedProcessName`
 
 ---
 

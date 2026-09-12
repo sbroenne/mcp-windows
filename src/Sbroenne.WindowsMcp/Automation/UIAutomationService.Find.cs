@@ -16,6 +16,15 @@ public sealed partial class UIAutomationService
     {
         ArgumentNullException.ThrowIfNull(query);
 
+        if (query.RequireUnique && query.FoundIndex != 1)
+        {
+            return UIAutomationResult.CreateFailure(
+                "find",
+                UIAutomationErrorType.InvalidParameter,
+                "requireUnique cannot be combined with foundIndex other than 1. Refine the selector instead.",
+                CreateDiagnostics(Stopwatch.StartNew(), query));
+        }
+
         if (query.TimeoutMs <= 0)
         {
             return await FindElementsOnceAsync(query, cancellationToken).ConfigureAwait(false);

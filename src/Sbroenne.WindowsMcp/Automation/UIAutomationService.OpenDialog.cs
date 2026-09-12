@@ -130,10 +130,22 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
                 }
 
-                await _keyboardService.PressKeyAsync(
+                var shortcutResult = await _keyboardService.PressKeyAsync(
                     "o",
                     ModifierKey.Ctrl,
-                    cancellationToken: cancellationToken);
+                    1,
+                    hwnd,
+                    cancellationToken);
+                if (!shortcutResult.Success)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "open",
+                        shortcutResult.ErrorCode == KeyboardControlErrorCode.WrongTargetWindow
+                            ? UIAutomationErrorType.WrongTargetWindow
+                            : UIAutomationErrorType.InternalError,
+                        shortcutResult.Error ?? "Ctrl+O could not be sent.",
+                        CreateDiagnostics(stopwatch) with { ActionPath = normalizedTrigger });
+                }
             }
 
             var dialog = await WaitForOpenDialogAsync(

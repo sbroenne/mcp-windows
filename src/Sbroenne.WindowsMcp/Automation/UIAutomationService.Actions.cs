@@ -663,7 +663,9 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "type",
-                UIAutomationErrorType.InternalError,
+                keyboardResult.ErrorCode == KeyboardControlErrorCode.WrongTargetWindow
+                    ? UIAutomationErrorType.WrongTargetWindow
+                    : UIAutomationErrorType.InternalError,
                 keyboardResult.Error ?? "Keyboard input failed.",
                 CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
         }
@@ -733,9 +735,9 @@ public sealed partial class UIAutomationService
             {
                 return UIAutomationResult.CreateFailure(
                     "select",
-                    UIAutomationErrorType.ElementNotFound,
+                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
                     findResult.ErrorMessage ?? "Element not found.",
-                    CreateDiagnostics(stopwatch));
+                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch));
             }
 
             var targetElement = findResult.Items[0];

@@ -40,7 +40,7 @@ public static partial class UIWaitTool
     /// <param name="className">Element class name.</param>
     /// <param name="parentElementId">Limit appear/disappear search to a known parent element.</param>
     /// <param name="scope">Search root: window (default) or active_dialog.</param>
-    /// <param name="requireUnique">For appear, fail if more than one element matches.</param>
+    /// <param name="requireUnique">For appear or disappear, fail if more than one element matches.</param>
     /// <param name="enabledOnly">Exclude disabled elements when true.</param>
     /// <param name="timeoutMs">Maximum time to wait in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query) in response. Default: false.</param>

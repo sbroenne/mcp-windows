@@ -50,7 +50,7 @@ public static partial class MouseControlTool
     /// <param name="monitorIndex">Monitor index (0-based). Alternative to target for 3+ monitor setups. Use screenshot_control action='list_monitors' to find indices.</param>
     /// <param name="expectedWindowTitle">Expected window title (partial match). If specified, operation fails if foreground window title doesn't match.</param>
     /// <param name="expectedProcessName">Expected process name. If specified, operation fails if foreground window's process doesn't match.</param>
-    /// <param name="windowHandle">Window handle for window-relative coordinates. When provided, x/y are relative to the window's top-left corner.</param>
+    /// <param name="windowHandle">Window handle for window-relative coordinates and foreground safety. When provided, x/y are relative to the window's top-left corner and input is aborted if that window loses foreground ownership.</param>
     /// <param name="points">JSON array of [x,y] pairs for action='polyline', e.g. '[[650,430],[750,480],[750,620]]'. At least 2 points. Drawn as ONE continuous stroke.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload including success status, cursor position, monitor context, and 'target_window' for click actions. <c>IsError</c> reflects operation success.</returns>
@@ -79,6 +79,22 @@ public static partial class MouseControlTool
             using var timeoutCts = new CancellationTokenSource(WindowsToolsBase.TimeoutMs);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var linkedToken = linkedCts.Token;
+            nint? expectedForegroundWindow = null;
+            nint? requestedWindowHandle = null;
+
+            if (!string.IsNullOrWhiteSpace(windowHandle))
+            {
+                if (!WindowHandleParser.TryParse(windowHandle, out var parsedWindowHandle) ||
+                    parsedWindowHandle == IntPtr.Zero)
+                {
+                    return ToCallToolResult(MouseControlResult.CreateFailure(
+                        MouseControlErrorCode.InvalidCoordinates,
+                        $"Invalid windowHandle: '{windowHandle}'. Expected decimal string from window_management."));
+                }
+
+                requestedWindowHandle = parsedWindowHandle;
+                expectedForegroundWindow = parsedWindowHandle;
+            }
 
             // Pre-flight check: verify target window if expected values are specified
             if (!string.IsNullOrEmpty(expectedWindowTitle) || !string.IsNullOrEmpty(expectedProcessName))
@@ -88,6 +104,8 @@ public static partial class MouseControlTool
                 {
                     return ToCallToolResult(targetCheckResult);
                 }
+
+                expectedForegroundWindow ??= NativeMethods.GetForegroundWindow();
             }
 
             // Parse the polyline point list up front so a malformed list fails before anything moves
@@ -111,13 +129,7 @@ public static partial class MouseControlTool
 
             if (isWindowRelativeMode)
             {
-                if (!WindowHandleParser.TryParse(windowHandle, out nint parsedWindowHandle) || parsedWindowHandle == nint.Zero)
-                {
-                    var result = MouseControlResult.CreateFailure(
-                        MouseControlErrorCode.InvalidCoordinates,
-                        $"Invalid windowHandle: '{windowHandle}'. Expected decimal string from window_management.");
-                    return ToCallToolResult(result);
-                }
+                var parsedWindowHandle = requestedWindowHandle!.Value;
 
                 // Get window rect
                 if (!NativeMethods.GetWindowRect(parsedWindowHandle, out var windowRect))
@@ -358,35 +370,35 @@ public static partial class MouseControlTool
             switch (action)
             {
                 case MouseAction.Move:
-                    operationResult = await HandleMoveAsync(absoluteX, absoluteY, linkedToken);
+                    operationResult = await HandleMoveAsync(absoluteX, absoluteY, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.Click:
-                    operationResult = await HandleClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
+                    operationResult = await HandleClickAsync(absoluteX, absoluteY, modifiers, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.DoubleClick:
-                    operationResult = await HandleDoubleClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
+                    operationResult = await HandleDoubleClickAsync(absoluteX, absoluteY, modifiers, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.RightClick:
-                    operationResult = await HandleRightClickAsync(absoluteX, absoluteY, modifiers, linkedToken);
+                    operationResult = await HandleRightClickAsync(absoluteX, absoluteY, modifiers, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.MiddleClick:
-                    operationResult = await HandleMiddleClickAsync(absoluteX, absoluteY, linkedToken);
+                    operationResult = await HandleMiddleClickAsync(absoluteX, absoluteY, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.Drag:
-                    operationResult = await HandleDragAsync(absoluteX, absoluteY, absoluteEndX, absoluteEndY, button, linkedToken);
+                    operationResult = await HandleDragAsync(absoluteX, absoluteY, absoluteEndX, absoluteEndY, button, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.Polyline:
-                    operationResult = await HandlePolylineAsync(absolutePoints, button, modifiers, linkedToken);
+                    operationResult = await HandlePolylineAsync(absolutePoints, button, modifiers, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.Scroll:
-                    operationResult = await HandleScrollAsync(absoluteX, absoluteY, direction, amount, linkedToken);
+                    operationResult = await HandleScrollAsync(absoluteX, absoluteY, direction, amount, expectedForegroundWindow, linkedToken);
                     break;
 
                 case MouseAction.GetPosition:
@@ -467,7 +479,11 @@ public static partial class MouseControlTool
             IsError = true
         };
 
-    private static async Task<MouseControlResult> HandleMoveAsync(int? x, int? y, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleMoveAsync(
+        int? x,
+        int? y,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (!x.HasValue || !y.HasValue)
         {
@@ -476,10 +492,21 @@ public static partial class MouseControlTool
                 "Move action requires both x and y coordinates");
         }
 
-        return await WindowsToolsBase.MouseInputService.MoveAsync(x.Value, y.Value, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.MoveAsync(
+                x.Value,
+                y.Value,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.MoveAsync(x.Value, y.Value, cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandleClickAsync(int? x, int? y, string? modifiersString, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleClickAsync(
+        int? x,
+        int? y,
+        string? modifiersString,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
         {
@@ -509,10 +536,22 @@ public static partial class MouseControlTool
         }
 
         var modifierKeys = ParseModifiers(modifiersString);
-        return await WindowsToolsBase.MouseInputService.ClickAsync(x, y, modifierKeys, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.ClickAsync(
+                x,
+                y,
+                modifierKeys,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.ClickAsync(x, y, modifierKeys, cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandleDoubleClickAsync(int? x, int? y, string? modifiersString, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleDoubleClickAsync(
+        int? x,
+        int? y,
+        string? modifiersString,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
         {
@@ -542,10 +581,22 @@ public static partial class MouseControlTool
         }
 
         var modifierKeys = ParseModifiers(modifiersString);
-        return await WindowsToolsBase.MouseInputService.DoubleClickAsync(x, y, modifierKeys, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.DoubleClickAsync(
+                x,
+                y,
+                modifierKeys,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.DoubleClickAsync(x, y, modifierKeys, cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandleRightClickAsync(int? x, int? y, string? modifiersString, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleRightClickAsync(
+        int? x,
+        int? y,
+        string? modifiersString,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
         {
@@ -575,10 +626,21 @@ public static partial class MouseControlTool
         }
 
         var modifierKeys = ParseModifiers(modifiersString);
-        return await WindowsToolsBase.MouseInputService.RightClickAsync(x, y, modifierKeys, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.RightClickAsync(
+                x,
+                y,
+                modifierKeys,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.RightClickAsync(x, y, modifierKeys, cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandleMiddleClickAsync(int? x, int? y, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleMiddleClickAsync(
+        int? x,
+        int? y,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
         {
@@ -607,10 +669,23 @@ public static partial class MouseControlTool
                 "Cannot middle-click on elevated (administrator) window. The target window requires elevated privileges that this tool does not have.");
         }
 
-        return await WindowsToolsBase.MouseInputService.MiddleClickAsync(x, y, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.MiddleClickAsync(
+                x,
+                y,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.MiddleClickAsync(x, y, cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandleDragAsync(int? startX, int? startY, int? endX, int? endY, string? buttonString, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleDragAsync(
+        int? startX,
+        int? startY,
+        int? endX,
+        int? endY,
+        string? buttonString,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (!startX.HasValue || !startY.HasValue)
         {
@@ -641,10 +716,30 @@ public static partial class MouseControlTool
         }
 
         var mouseButton = ParseMouseButton(buttonString);
-        return await WindowsToolsBase.MouseInputService.DragAsync(startX.Value, startY.Value, endX.Value, endY.Value, mouseButton, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.DragAsync(
+                startX.Value,
+                startY.Value,
+                endX.Value,
+                endY.Value,
+                mouseButton,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.DragAsync(
+                startX.Value,
+                startY.Value,
+                endX.Value,
+                endY.Value,
+                mouseButton,
+                cancellationToken);
     }
 
-    private static async Task<MouseControlResult> HandlePolylineAsync(List<Coordinates>? points, string? buttonString, string? modifiersString, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandlePolylineAsync(
+        List<Coordinates>? points,
+        string? buttonString,
+        string? modifiersString,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (points is null || points.Count < 2)
         {
@@ -669,7 +764,18 @@ public static partial class MouseControlTool
 
         var mouseButton = ParseMouseButton(buttonString);
         var modifierKeys = ParseModifiers(modifiersString);
-        return await WindowsToolsBase.MouseInputService.StrokeAsync(points, mouseButton, modifierKeys, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.StrokeAsync(
+                points,
+                mouseButton,
+                modifierKeys,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.StrokeAsync(
+                points,
+                mouseButton,
+                modifierKeys,
+                cancellationToken);
     }
 
     /// <summary>
@@ -714,7 +820,13 @@ public static partial class MouseControlTool
         return true;
     }
 
-    private static async Task<MouseControlResult> HandleScrollAsync(int? x, int? y, string? directionString, int amount, CancellationToken cancellationToken)
+    private static async Task<MouseControlResult> HandleScrollAsync(
+        int? x,
+        int? y,
+        string? directionString,
+        int amount,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(directionString))
         {
@@ -758,7 +870,20 @@ public static partial class MouseControlTool
                 "Cannot scroll in elevated (administrator) window. The target window requires elevated privileges that this tool does not have.");
         }
 
-        return await WindowsToolsBase.MouseInputService.ScrollAsync(scrollDirection.Value, amount, x, y, cancellationToken);
+        return expectedForegroundWindow.HasValue
+            ? await WindowsToolsBase.MouseInputService.ScrollAsync(
+                scrollDirection.Value,
+                amount,
+                x,
+                y,
+                expectedForegroundWindow.Value,
+                cancellationToken)
+            : await WindowsToolsBase.MouseInputService.ScrollAsync(
+                scrollDirection.Value,
+                amount,
+                x,
+                y,
+                cancellationToken);
     }
 
     private static MouseControlResult GetCurrentPosition()

@@ -94,9 +94,11 @@ public sealed class OpenFileTests : IDisposable
         });
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Open_WaitForExistingDialog_SelectsFileOpenedByPriorAction()
     {
+        DesktopInputTests.SkipUnlessEnabled();
+
         var testFilePath = Path.Combine(_testOutputDir, $"handoff-{Guid.NewGuid()}.txt");
         await File.WriteAllTextAsync(testFilePath, "content to open");
 

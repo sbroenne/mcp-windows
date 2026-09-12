@@ -104,23 +104,23 @@ public static partial class KeyboardControlTool
             switch (action)
             {
                 case KeyboardAction.Type:
-                    operationResult = await HandleTypeAsync(text, clearFirst, linkedToken);
+                    operationResult = await HandleTypeAsync(text, clearFirst, handle, linkedToken);
                     break;
 
                 case KeyboardAction.Press:
-                    operationResult = await HandlePressAsync(key, modifiers, repeat, linkedToken);
+                    operationResult = await HandlePressAsync(key, modifiers, repeat, handle, linkedToken);
                     break;
 
                 case KeyboardAction.KeyDown:
-                    operationResult = await HandleKeyDownAsync(key, linkedToken);
+                    operationResult = await HandleKeyDownAsync(key, handle, linkedToken);
                     break;
 
                 case KeyboardAction.KeyUp:
-                    operationResult = await HandleKeyUpAsync(key, linkedToken);
+                    operationResult = await HandleKeyUpAsync(key, handle, linkedToken);
                     break;
 
                 case KeyboardAction.Sequence:
-                    operationResult = await HandleSequenceAsync(sequence, interKeyDelayMs, linkedToken);
+                    operationResult = await HandleSequenceAsync(sequence, interKeyDelayMs, handle, linkedToken);
                     break;
 
                 case KeyboardAction.ReleaseAll:
@@ -184,7 +184,11 @@ public static partial class KeyboardControlTool
             IsError = true
         };
 
-    private static async Task<KeyboardControlResult> HandleTypeAsync(string? text, bool clearFirst, CancellationToken cancellationToken)
+    private static async Task<KeyboardControlResult> HandleTypeAsync(
+        string? text,
+        bool clearFirst,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Check for secure desktop
         if (WindowsToolsBase.SecureDesktopDetector.IsSecureDesktopActive())
@@ -205,11 +209,16 @@ public static partial class KeyboardControlTool
         // If clearFirst is true, select all existing content first (Ctrl+A)
         if (clearFirst)
         {
-            var selectAllResult = await WindowsToolsBase.KeyboardInputService.PressKeyAsync("a", ModifierKey.Ctrl, 1, cancellationToken);
+            var selectAllResult = await WindowsToolsBase.KeyboardInputService.PressKeyAsync(
+                "a",
+                ModifierKey.Ctrl,
+                1,
+                expectedForegroundWindow,
+                cancellationToken);
             if (!selectAllResult.Success)
             {
                 return KeyboardControlResult.CreateFailure(
-                    KeyboardControlErrorCode.SendInputFailed,
+                    selectAllResult.ErrorCode,
                     $"Failed to select all before typing: {selectAllResult.Error}");
             }
 
@@ -219,10 +228,18 @@ public static partial class KeyboardControlTool
         // Normalize Windows file paths: convert forward slashes to backslashes
         var normalizedText = PathNormalizer.NormalizeWindowsPath(text);
 
-        return await WindowsToolsBase.KeyboardInputService.TypeTextAsync(normalizedText, cancellationToken);
+        return await WindowsToolsBase.KeyboardInputService.TypeTextAsync(
+            normalizedText,
+            expectedForegroundWindow,
+            cancellationToken);
     }
 
-    private static async Task<KeyboardControlResult> HandlePressAsync(string? key, string? modifiers, int repeat, CancellationToken cancellationToken)
+    private static async Task<KeyboardControlResult> HandlePressAsync(
+        string? key,
+        string? modifiers,
+        int repeat,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -246,7 +263,12 @@ public static partial class KeyboardControlTool
         }
 
         var modifierKey = ParseModifiers(modifiers);
-        var result = await WindowsToolsBase.KeyboardInputService.PressKeyAsync(key, modifierKey, repeat, cancellationToken);
+        var result = await WindowsToolsBase.KeyboardInputService.PressKeyAsync(
+            key,
+            modifierKey,
+            repeat,
+            expectedForegroundWindow,
+            cancellationToken);
 
         if (result.Success)
         {
@@ -281,7 +303,10 @@ public static partial class KeyboardControlTool
         return result;
     }
 
-    private static async Task<KeyboardControlResult> HandleKeyDownAsync(string? key, CancellationToken cancellationToken)
+    private static async Task<KeyboardControlResult> HandleKeyDownAsync(
+        string? key,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -304,10 +329,16 @@ public static partial class KeyboardControlTool
                 "Cannot send keyboard input to an elevated (administrator) window. Run this tool as administrator or interact with a non-elevated window.");
         }
 
-        return await WindowsToolsBase.KeyboardInputService.KeyDownAsync(key, cancellationToken);
+        return await WindowsToolsBase.KeyboardInputService.KeyDownAsync(
+            key,
+            expectedForegroundWindow,
+            cancellationToken);
     }
 
-    private static async Task<KeyboardControlResult> HandleKeyUpAsync(string? key, CancellationToken cancellationToken)
+    private static async Task<KeyboardControlResult> HandleKeyUpAsync(
+        string? key,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(key))
         {
@@ -316,10 +347,17 @@ public static partial class KeyboardControlTool
                 "The 'key' parameter is required for key_up action");
         }
 
-        return await WindowsToolsBase.KeyboardInputService.KeyUpAsync(key, cancellationToken);
+        return await WindowsToolsBase.KeyboardInputService.KeyUpAsync(
+            key,
+            expectedForegroundWindow,
+            cancellationToken);
     }
 
-    private static async Task<KeyboardControlResult> HandleSequenceAsync(string? sequenceJson, int? interKeyDelayMs, CancellationToken cancellationToken)
+    private static async Task<KeyboardControlResult> HandleSequenceAsync(
+        string? sequenceJson,
+        int? interKeyDelayMs,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(sequenceJson))
         {
@@ -354,7 +392,11 @@ public static partial class KeyboardControlTool
                 $"Invalid sequence JSON: {ex.Message}. CORRECT FORMAT: JSON array with 'key' property.");
         }
 
-        var result = await WindowsToolsBase.KeyboardInputService.ExecuteSequenceAsync(sequence, interKeyDelayMs, cancellationToken);
+        var result = await WindowsToolsBase.KeyboardInputService.ExecuteSequenceAsync(
+            sequence,
+            interKeyDelayMs,
+            expectedForegroundWindow,
+            cancellationToken);
 
         if (result.Success)
         {

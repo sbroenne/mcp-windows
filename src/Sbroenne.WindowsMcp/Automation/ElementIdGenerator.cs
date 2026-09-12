@@ -115,8 +115,12 @@ public static class ElementIdGenerator
                 element = FindByRuntimeId(parts.WindowHandle, runtimeId);
             }
 
-            // Fall back to tree path if runtime ID didn't work
-            if (element == null && !string.IsNullOrEmpty(parts.TreePath) && parts.TreePath != "stale")
+            // A tree path is positional and may now identify a replacement control. Strict
+            // state-changing resolution may use it only when the original element had no runtime ID.
+            if (element == null &&
+                (allowSelectorFallback || string.IsNullOrEmpty(parts.RuntimeId) || parts.RuntimeId == "0") &&
+                !string.IsNullOrEmpty(parts.TreePath) &&
+                parts.TreePath != "stale")
             {
                 element = FindByTreePath(parts.WindowHandle, parts.TreePath);
             }

@@ -19,17 +19,33 @@ public sealed class MouseInputService
             expectedForegroundWindow: null,
             cancellationToken);
 
+    internal Task<MouseControlResult> MoveAsync(
+        int x,
+        int y,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        MoveCoreAsync(
+            x,
+            y,
+            extraFlags: 0,
+            expectedForegroundWindow,
+            cancellationToken);
+
     /// <summary>
     /// Moves the cursor as part of a held-button stroke. Sets <c>MOUSEEVENTF_MOVE_NOCOALESCE</c> so Windows
     /// delivers this vertex to the target even when the target thread is busy; a plain move may be coalesced
     /// with the next one, which would cut across the corner between them.
     /// </summary>
-    private Task<MouseControlResult> MoveForStrokeAsync(int x, int y, CancellationToken cancellationToken) =>
+    private Task<MouseControlResult> MoveForStrokeAsync(
+        int x,
+        int y,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken) =>
         MoveCoreAsync(
             x,
             y,
             NativeConstants.MOUSEEVENTF_MOVE_NOCOALESCE,
-            expectedForegroundWindow: null,
+            expectedForegroundWindow,
             cancellationToken);
 
     private static Task<MouseControlResult> MoveCoreAsync(
@@ -185,7 +201,17 @@ public sealed class MouseInputService
                     screenBounds));
             }
 
-            pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+            pressedModifiers = _modifierKeyManager.PressModifiers(
+                modifiers,
+                expectedForegroundWindow);
+
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return Task.FromResult(MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed while preparing the click.",
+                    screenBounds));
+            }
 
             // Build the INPUT structures for mouse down and mouse up
             var inputs = new INPUT[]
@@ -447,7 +473,17 @@ public sealed class MouseInputService
                     screenBounds);
             }
 
-            pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+            pressedModifiers = _modifierKeyManager.PressModifiers(
+                modifiers,
+                expectedForegroundWindow);
+
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed while preparing the double-click.",
+                    screenBounds);
+            }
 
             // Build the INPUT structures for double-click (4 events: down, up, down, up)
             // Windows recognizes a double-click when two clicks occur within GetDoubleClickTime() milliseconds
@@ -549,7 +585,37 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public Task<MouseControlResult> RightClickAsync(int? x, int? y, ModifierKey modifiers = ModifierKey.None, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> RightClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers = ModifierKey.None,
+        CancellationToken cancellationToken = default) =>
+        RightClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    internal Task<MouseControlResult> RightClickAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        RightClickCoreAsync(
+            x,
+            y,
+            modifiers,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private Task<MouseControlResult> RightClickCoreAsync(
+        int? x,
+        int? y,
+        ModifierKey modifiers,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         ScreenBounds? screenBounds = null;
 
@@ -568,7 +634,12 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = MoveAsync(x.Value, y.Value, cancellationToken).GetAwaiter().GetResult();
+            var moveResult = MoveCoreAsync(
+                x.Value,
+                y.Value,
+                extraFlags: 0,
+                expectedForegroundWindow,
+                cancellationToken).GetAwaiter().GetResult();
             if (!moveResult.Success)
             {
                 return Task.FromResult(moveResult);
@@ -583,10 +654,28 @@ public sealed class MouseInputService
         var targetWindowInfo = GetTargetWindowInfoAtPoint(currentPos.X, currentPos.Y);
 
         // Press modifier keys before the click
-        var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+        var pressedModifiers = _modifierKeyManager.PressModifiers(
+            modifiers,
+            expectedForegroundWindow);
 
         try
         {
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return Task.FromResult(MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed before the right-click was sent.",
+                    screenBounds));
+            }
+
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return Task.FromResult(MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed while preparing the right-click.",
+                    screenBounds));
+            }
+
             // Build the INPUT structures for right mouse down and right mouse up
             var inputs = new INPUT[]
             {
@@ -652,7 +741,32 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public Task<MouseControlResult> MiddleClickAsync(int? x, int? y, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> MiddleClickAsync(
+        int? x,
+        int? y,
+        CancellationToken cancellationToken = default) =>
+        MiddleClickCoreAsync(
+            x,
+            y,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    internal Task<MouseControlResult> MiddleClickAsync(
+        int? x,
+        int? y,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        MiddleClickCoreAsync(
+            x,
+            y,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private Task<MouseControlResult> MiddleClickCoreAsync(
+        int? x,
+        int? y,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         ScreenBounds? screenBounds = null;
 
@@ -671,7 +785,12 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = MoveAsync(x.Value, y.Value, cancellationToken).GetAwaiter().GetResult();
+            var moveResult = MoveCoreAsync(
+                x.Value,
+                y.Value,
+                extraFlags: 0,
+                expectedForegroundWindow,
+                cancellationToken).GetAwaiter().GetResult();
             if (!moveResult.Success)
             {
                 return Task.FromResult(moveResult);
@@ -722,6 +841,14 @@ public sealed class MouseInputService
             },
         };
 
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return Task.FromResult(MouseControlResult.CreateFailure(
+                MouseControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before the middle-click was sent.",
+                screenBounds));
+        }
+
         // Send the input
         var result = NativeMethods.SendInput(2, inputs, INPUT.Size);
 
@@ -745,7 +872,27 @@ public sealed class MouseInputService
 
     /// <inheritdoc />
     public Task<MouseControlResult> DragAsync(int startX, int startY, int endX, int endY, MouseButton button = MouseButton.Left, CancellationToken cancellationToken = default) =>
-        StrokeAsync([new Coordinates(startX, startY), new Coordinates(endX, endY)], button, ModifierKey.None, cancellationToken);
+        StrokeCoreAsync(
+            [new Coordinates(startX, startY), new Coordinates(endX, endY)],
+            button,
+            ModifierKey.None,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    internal Task<MouseControlResult> DragAsync(
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        MouseButton button,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        StrokeCoreAsync(
+            [new Coordinates(startX, startY), new Coordinates(endX, endY)],
+            button,
+            ModifierKey.None,
+            expectedForegroundWindow,
+            cancellationToken);
 
     /// <summary>
     /// Presses a mouse button at the first point, moves through every remaining point, and releases at the last -
@@ -757,7 +904,8 @@ public sealed class MouseInputService
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A result whose final position is the last point, with target window info sampled at the first point.</returns>
     /// <remarks>
-    /// <see cref="DragAsync"/> is the two-point case of this method, so drag and stroke can never diverge.
+    /// <see cref="DragAsync(int, int, int, int, MouseButton, CancellationToken)"/> is the two-point
+    /// case of this method, so drag and stroke can never diverge.
     /// Every move after the press is sent with <c>MOUSEEVENTF_MOVE_NOCOALESCE</c> so no vertex is dropped when the
     /// target thread is busy. The button is always released in a <c>finally</c> block, even when a move fails partway through.
     /// </remarks>
@@ -765,7 +913,33 @@ public sealed class MouseInputService
         IReadOnlyList<Coordinates> points,
         MouseButton button = MouseButton.Left,
         ModifierKey modifiers = ModifierKey.None,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await StrokeCoreAsync(
+            points,
+            button,
+            modifiers,
+            expectedForegroundWindow: null,
+            cancellationToken).ConfigureAwait(false);
+
+    internal Task<MouseControlResult> StrokeAsync(
+        IReadOnlyList<Coordinates> points,
+        MouseButton button,
+        ModifierKey modifiers,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        StrokeCoreAsync(
+            points,
+            button,
+            modifiers,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private async Task<MouseControlResult> StrokeCoreAsync(
+        IReadOnlyList<Coordinates> points,
+        MouseButton button,
+        ModifierKey modifiers,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (points is null || points.Count < 2)
         {
@@ -791,7 +965,12 @@ public sealed class MouseInputService
         }
 
         // Step 1: Move to the first point
-        var moveToStartResult = await MoveAsync(points[0].X, points[0].Y, cancellationToken);
+        var moveToStartResult = await MoveCoreAsync(
+            points[0].X,
+            points[0].Y,
+            extraFlags: 0,
+            expectedForegroundWindow,
+            cancellationToken).ConfigureAwait(false);
         if (!moveToStartResult.Success)
         {
             return moveToStartResult;
@@ -819,7 +998,9 @@ public sealed class MouseInputService
                 break;
         }
 
-        var pressedModifiers = _modifierKeyManager.PressModifiers(modifiers);
+        var pressedModifiers = _modifierKeyManager.PressModifiers(
+            modifiers,
+            expectedForegroundWindow);
         var result = MouseControlResult.CreateFailure(
             MouseControlErrorCode.UnexpectedError,
             "Stroke could not complete.",
@@ -828,6 +1009,15 @@ public sealed class MouseInputService
 
         try
         {
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                result = MouseControlResult.CreateFailure(
+                    MouseControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed before the stroke was sent.",
+                    screenBounds);
+                goto Finish;
+            }
+
             // Step 2: Press the mouse button down
             var buttonDownInput = new INPUT[]
             {
@@ -866,7 +1056,11 @@ public sealed class MouseInputService
             // Step 3: Trace through the remaining points with the button held
             for (var i = 1; i < points.Count; i++)
             {
-                var moveResult = await MoveForStrokeAsync(points[i].X, points[i].Y, cancellationToken);
+                var moveResult = await MoveForStrokeAsync(
+                    points[i].X,
+                    points[i].Y,
+                    expectedForegroundWindow,
+                    cancellationToken);
                 if (!moveResult.Success)
                 {
                     result = moveResult;
@@ -928,7 +1122,42 @@ public sealed class MouseInputService
     }
 
     /// <inheritdoc />
-    public Task<MouseControlResult> ScrollAsync(ScrollDirection direction, int amount, int? x, int? y, CancellationToken cancellationToken = default)
+    public Task<MouseControlResult> ScrollAsync(
+        ScrollDirection direction,
+        int amount,
+        int? x,
+        int? y,
+        CancellationToken cancellationToken = default) =>
+        ScrollCoreAsync(
+            direction,
+            amount,
+            x,
+            y,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    internal Task<MouseControlResult> ScrollAsync(
+        ScrollDirection direction,
+        int amount,
+        int? x,
+        int? y,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        ScrollCoreAsync(
+            direction,
+            amount,
+            x,
+            y,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private Task<MouseControlResult> ScrollCoreAsync(
+        ScrollDirection direction,
+        int amount,
+        int? x,
+        int? y,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         ScreenBounds? screenBounds = null;
 
@@ -947,7 +1176,12 @@ public sealed class MouseInputService
             }
 
             // Move to the coordinates first
-            var moveResult = MoveAsync(x.Value, y.Value, cancellationToken).GetAwaiter().GetResult();
+            var moveResult = MoveCoreAsync(
+                x.Value,
+                y.Value,
+                extraFlags: 0,
+                expectedForegroundWindow,
+                cancellationToken).GetAwaiter().GetResult();
             if (!moveResult.Success)
             {
                 return Task.FromResult(moveResult);
@@ -1017,6 +1251,14 @@ public sealed class MouseInputService
                 },
             },
         };
+
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return Task.FromResult(MouseControlResult.CreateFailure(
+                MouseControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before scrolling was sent.",
+                screenBounds));
+        }
 
         // Send the input
         var result = NativeMethods.SendInput(1, inputs, INPUT.Size);

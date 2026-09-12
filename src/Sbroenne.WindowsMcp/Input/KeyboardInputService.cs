@@ -424,6 +424,13 @@ public sealed class KeyboardInputService : IDisposable
             INPUT.Size);
         if (result != inputArray.Length)
         {
+            var insertedModifierCount = Math.Min((int)result, pressedModifiers.Count);
+            if (insertedModifierCount > 0)
+            {
+                _modifierKeyManager.ReleaseModifiers(
+                    pressedModifiers.Take(insertedModifierCount).ToArray());
+            }
+
             var error = Marshal.GetLastWin32Error();
             var (errorCode, errorMessage) = MapSendInputError(error);
             return KeyboardControlResult.CreateFailure(errorCode, errorMessage);
@@ -473,7 +480,21 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public Task<KeyboardControlResult> KeyDownAsync(string keyName, CancellationToken cancellationToken = default)
+    public Task<KeyboardControlResult> KeyDownAsync(
+        string keyName,
+        CancellationToken cancellationToken = default) =>
+        KeyDownCoreAsync(keyName, expectedForegroundWindow: null, cancellationToken);
+
+    internal Task<KeyboardControlResult> KeyDownAsync(
+        string keyName,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        KeyDownCoreAsync(keyName, expectedForegroundWindow, cancellationToken);
+
+    private Task<KeyboardControlResult> KeyDownCoreAsync(
+        string keyName,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Validate key name
         if (string.IsNullOrWhiteSpace(keyName))
@@ -510,6 +531,13 @@ public sealed class KeyboardInputService : IDisposable
             CreateKeyboardInput((ushort)virtualKeyCode, 0, extendedFlag)
         };
 
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return Task.FromResult(KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before the key-down event was sent."));
+        }
+
         var result = NativeMethods.SendInput(1, inputs, INPUT.Size);
 
         if (result != 1)
@@ -529,7 +557,21 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public Task<KeyboardControlResult> KeyUpAsync(string keyName, CancellationToken cancellationToken = default)
+    public Task<KeyboardControlResult> KeyUpAsync(
+        string keyName,
+        CancellationToken cancellationToken = default) =>
+        KeyUpCoreAsync(keyName, expectedForegroundWindow: null, cancellationToken);
+
+    internal Task<KeyboardControlResult> KeyUpAsync(
+        string keyName,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        KeyUpCoreAsync(keyName, expectedForegroundWindow, cancellationToken);
+
+    private Task<KeyboardControlResult> KeyUpCoreAsync(
+        string keyName,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         // Validate key name
         if (string.IsNullOrWhiteSpace(keyName))
@@ -559,6 +601,13 @@ public sealed class KeyboardInputService : IDisposable
         {
             CreateKeyboardInput((ushort)heldKeyState.VirtualKeyCode, 0, extendedFlag | NativeConstants.KEYEVENTF_KEYUP)
         };
+
+        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+        {
+            return Task.FromResult(KeyboardControlResult.CreateFailure(
+                KeyboardControlErrorCode.WrongTargetWindow,
+                "The foreground window changed before the key-up event was sent."));
+        }
 
         var result = NativeMethods.SendInput(1, inputs, INPUT.Size);
 
@@ -617,7 +666,32 @@ public sealed class KeyboardInputService : IDisposable
     }
 
     /// <inheritdoc />
-    public async Task<KeyboardControlResult> ExecuteSequenceAsync(IReadOnlyList<KeySequenceItem> sequence, int? interKeyDelayMs = null, CancellationToken cancellationToken = default)
+    public Task<KeyboardControlResult> ExecuteSequenceAsync(
+        IReadOnlyList<KeySequenceItem> sequence,
+        int? interKeyDelayMs = null,
+        CancellationToken cancellationToken = default) =>
+        ExecuteSequenceCoreAsync(
+            sequence,
+            interKeyDelayMs,
+            expectedForegroundWindow: null,
+            cancellationToken);
+
+    internal Task<KeyboardControlResult> ExecuteSequenceAsync(
+        IReadOnlyList<KeySequenceItem> sequence,
+        int? interKeyDelayMs,
+        nint expectedForegroundWindow,
+        CancellationToken cancellationToken = default) =>
+        ExecuteSequenceCoreAsync(
+            sequence,
+            interKeyDelayMs,
+            expectedForegroundWindow,
+            cancellationToken);
+
+    private async Task<KeyboardControlResult> ExecuteSequenceCoreAsync(
+        IReadOnlyList<KeySequenceItem> sequence,
+        int? interKeyDelayMs,
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
         if (sequence == null || sequence.Count == 0)
         {
@@ -635,7 +709,18 @@ public sealed class KeyboardInputService : IDisposable
             var itemDelay = item.DelayMs ?? delay;
 
             // Press the key with modifiers
-            var result = await PressKeyAsync(item.Key, item.Modifiers, 1, cancellationToken).ConfigureAwait(false);
+            var result = expectedForegroundWindow.HasValue
+                ? await PressKeyAsync(
+                    item.Key,
+                    item.Modifiers,
+                    1,
+                    expectedForegroundWindow.Value,
+                    cancellationToken).ConfigureAwait(false)
+                : await PressKeyAsync(
+                    item.Key,
+                    item.Modifiers,
+                    1,
+                    cancellationToken).ConfigureAwait(false);
 
             if (!result.Success)
             {
