@@ -12,14 +12,17 @@ public sealed class ChromiumBrowserSessionCleanupTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Edge);
         var before = BrowserProcessIds();
+        var launchedProcessId = 0;
 
         Assert.Throws<InvalidOperationException>(
             () => ChromiumBrowserSession.LaunchLocalPageForReadinessFailureTest(
-                ChromiumBrowserKind.Edge));
+                ChromiumBrowserKind.Edge,
+                processId => launchedProcessId = processId));
 
-        AssertBrowserProcessesRestored(
+        AssertLaunchedBrowserProcessesExited(
             before,
-            "A failed Chromium readiness check changed the pre-existing browser processes.");
+            launchedProcessId,
+            "A failed Chromium readiness check left a test-owned browser process running.");
     }
 
     [SkippableFact]
@@ -27,14 +30,17 @@ public sealed class ChromiumBrowserSessionCleanupTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Edge);
         var before = BrowserProcessIds();
+        var launchedProcessId = 0;
 
         Assert.Throws<InvalidOperationException>(
             () => ChromiumBrowserSession.LaunchLocalPageForWindowFailureTest(
-                ChromiumBrowserKind.Edge));
+                ChromiumBrowserKind.Edge,
+                processId => launchedProcessId = processId));
 
-        AssertBrowserProcessesRestored(
+        AssertLaunchedBrowserProcessesExited(
             before,
-            "A failed Chromium window search changed the pre-existing browser processes.");
+            launchedProcessId,
+            "A failed Chromium window search left a test-owned browser process running.");
     }
 
     [Fact]
@@ -46,12 +52,18 @@ public sealed class ChromiumBrowserSessionCleanupTests
         Assert.True(ChromiumBrowserSession.IsTestOwnedProcess(43, 43, existingProcessIds));
     }
 
-    private static void AssertBrowserProcessesRestored(
+    private static void AssertLaunchedBrowserProcessesExited(
         HashSet<int> before,
+        int launchedProcessId,
         string failureMessage)
     {
+        Assert.NotEqual(0, launchedProcessId);
         var restored = TestWait.Until(
-            condition: () => BrowserProcessIds().SetEquals(before),
+            condition: () => BrowserProcessIds().All(processId =>
+                !ChromiumBrowserSession.IsTestOwnedProcess(
+                    processId,
+                    launchedProcessId,
+                    before)),
             timeout: TimeSpan.FromSeconds(10),
             pollInterval: TimeSpan.FromMilliseconds(200));
 

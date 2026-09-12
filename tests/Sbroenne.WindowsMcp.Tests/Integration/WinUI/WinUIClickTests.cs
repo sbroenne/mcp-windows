@@ -187,6 +187,12 @@ public sealed class WinUIClickTests : IDisposable
             },
             timeoutMs: 5000);
         Assert.True(editorReady.Success, $"Editor page did not become ready: {editorReady.ErrorMessage}");
+        var clickTarget = Assert.Single(editorReady.Items!);
+        var scrollResult = await _automationService.ScrollIntoViewAsync(
+            clickTarget.Id,
+            query: null,
+            timeoutMs: 5000);
+        Assert.True(scrollResult.Success, $"Click test button could not be scrolled into view: {scrollResult.ErrorMessage}");
 
         // Act - Click the ClickTestButton multiple times
         for (int i = 0; i < 3; i++)
