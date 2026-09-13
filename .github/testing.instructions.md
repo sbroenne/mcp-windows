@@ -18,6 +18,23 @@
 
 ## Test Harnesses
 
+### Fresh CLI/MCP Usage Evaluations
+
+`tests/usage_evals/` is a separate pytest-skill-engineering consumer for learning whether and how
+Windows MCP should improve, and for finding reusable framework gaps. Do not copy or migrate the
+older LLM scenarios into it. See its README for current framework prerequisites and live-run gates.
+
+Its deterministic checks run without models or desktop access:
+
+```powershell
+uv run --project tests\usage_evals pytest tests\usage_evals\tests\unit -q
+```
+
+Live runs require separate approval of the model and execution budget, built CLI/MCP executables,
+and an exclusive disposable interactive desktop. They verify actual files and unchanged targets,
+record route and evidence limitations, and keep baseline/candidate outcomes separate. Collection
+must not launch applications or call a model. Do not count default-skipped live cases as coverage.
+
 ### Electron Test Harness (Chromium/CEF Apps)
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/`

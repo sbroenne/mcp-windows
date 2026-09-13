@@ -1,0 +1,30 @@
+[project]
+name = "windows-usage-evals"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.3",
+    "pytest-skill-engineering",
+    "psutil>=7.0",
+]
+
+[tool.uv.sources]
+pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "cfdef4f29f66b8595c14fe1b32d8e85f040db792" }
+
+[dependency-groups]
+dev = ["ruff>=0.15"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+addopts = "--strict-markers"
+markers = ["usage_live: manually approved Windows desktop and model usage"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]

@@ -16,6 +16,18 @@ internal static class CommandDispatcher
 {
     public static async Task<int> DispatchAsync(ParsedArgs args, CancellationToken ct)
     {
+        if (args.Has("help"))
+        {
+            var help = HelpText.ForCommand(args.Group);
+            if (help is null)
+            {
+                return Emit.Usage($"unknown command '{args.Group}'.");
+            }
+
+            Console.Out.WriteLine(help);
+            return ExitCodes.Success;
+        }
+
         switch (args.Group)
         {
             case "app":

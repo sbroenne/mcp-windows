@@ -36,10 +36,17 @@ wincli <group> [<action>] [--option value] [--flag]
 | Command | Purpose |
 | --- | --- |
 | `wincli --help` | Command map + common workflow |
+| `wincli <group> [<action>] --help` | Group options and examples, without running the action |
 | `wincli tools` | Every command with its options |
 | `wincli tools --json` | Machine-readable tool manifest (names, descriptions, JSON input schemas) — ideal for agents |
 | `wincli guidance` | The full automation guide (same text the MCP host receives) |
 | `wincli --version` | Version |
+
+Help is handled before required arguments or automation. For example,
+`wincli keyboard press --help` shows the key/modifier syntax, and
+`wincli file-save --window 12345 --help` does not save anything.
+Command aliases also support `--help`. A literal option value such as
+`--text=--help` remains data, not a help request.
 
 ### Command groups
 
