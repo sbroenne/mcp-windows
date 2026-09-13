@@ -137,8 +137,11 @@ public sealed class SystemResources
             ## The Standard Workflow: Launch App, Then Interact
 
             1. **Launch the application** with `app` - inspect `launchStatus` and any returned `window` or `windows`
-            2. **Discover controls** with `ui_snapshot` or `ui_find`
-            3. **Use the handle and returned element ID** for targeted actions
+            2. **Resolve the intended window**. Only after selecting the intended handle may handle-based discovery proceed.
+               If the handle is missing or ambiguous, use `window_management` to inspect candidates or rediscover the target.
+               If no handle is identified, do not call handle-based tools.
+            3. **Discover controls** with `ui_snapshot` or `ui_find`; verify the intended content before acting
+            4. **Use the handle and returned element ID** for targeted actions
 
             `started` may have no window. `windowObserved` reports a visible process-owned window.
             `possibleHandoff` reports a clean launcher exit with a matching pre-existing instance,

@@ -62,8 +62,10 @@ wincli <group> [<action>] [--option value] [--flag]
 `windowObserved` (a visible process-owned window), `possibleHandoff` (clean exit with
 a matching pre-existing instance), or `exitedWithoutWindow` (failure to establish either).
 A possible handoff does not prove delivery or loaded content. Multiple matching windows
-are listed in `windows` without selecting `window`; inspect the intended target before
-using its handle. No status guarantees focus, input readiness, or URL/document readiness.
+are listed in `windows` without selecting `window`. If the intended handle is missing
+or ambiguous, inspect candidates or rediscover with `wincli window find`; do not use
+handle-based commands until the target is identified. Then verify the intended content.
+No status guarantees focus, input readiness, or URL/document readiness.
 Observed nonzero exits fail even when another instance is open.
 
 ## Typical workflow

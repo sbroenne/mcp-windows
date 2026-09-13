@@ -62,7 +62,7 @@ window state. For an expected change that takes time, use `ui_wait` with a bound
 do not replay the click and do not change its `outcomeVerified` field. A snapshot
 is an observation, not proof of an application-specific outcome.
 
-Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
+Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then inspect `launchStatus` and `window`/`windows`. If the intended handle is missing or ambiguous, inspect candidates or rediscover with `window_management`; do not call handle-based tools until the target is identified. A possible handoff does not confirm URL delivery or loaded content. Verify the intended page, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
 For controls that open a native file picker, click the browser control first, then call
 `file_open(..., triggerMode='wait')`. Use `window_management(action='maximize')` when the page's
 responsive layout hides or replaces the intended control in a small viewport.

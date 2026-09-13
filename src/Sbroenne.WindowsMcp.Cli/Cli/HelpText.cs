@@ -81,6 +81,7 @@ internal static class HelpText
         app --path <exe> [--args <a>|--arguments <a>] [--working-dir <d>] [--no-wait] [--timeout-ms <n>]
             Observe launchStatus: started, windowObserved, possibleHandoff, or exitedWithoutWindow.
             A window handle is optional; multiple windows are listed without selecting a target.
+            If missing or ambiguous, inspect candidates or rediscover with window find; do not use handle-based commands until the intended target is identified.
             Handoff delivery, loaded content, focus, and input readiness are not verified.
             For child arguments beginning with --, use --args="--new-window target"
             (or --arguments="--new-window target"). Separate --args "--new-window target"

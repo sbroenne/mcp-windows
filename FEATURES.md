@@ -84,6 +84,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 
 - Edge, Chrome, and other Chromium apps are auto-detected and searched with the deeper Chromium strategy.
 - Launch with `app(programPath='msedge.exe', arguments='https://example.com')` or find an existing browser window first.
+- Inspect `launchStatus` and `window`/`windows` before handle-based calls. If the intended handle is missing or ambiguous, inspect candidates or rediscover with `window_management`; stop handle-based steps until the target is identified. Verify the intended page before acting.
 - Page links, buttons, and form fields usually surface visible text or ARIA labels as the UIA `name`, so start with `ui_find`, `ui_click`, and `ui_type`.
 - For authenticated or SSO-only sites, prefer reusing an already-open signed-in Edge/Chrome window first. A Chromium launcher helper exiting immediately is often normal existing-session behavior, so check the browser window before retrying the launch.
 - Keep discovery compact: `screenshot_control` already returns annotated element metadata without image bytes unless you opt in.
@@ -135,7 +136,7 @@ Every tool listed above is available through **two equal entry points that share
 
 ## � App (`app`)
 
-Launch applications and get their window handles for subsequent operations.
+Launch applications and observe process/window status. A selected window handle is optional.
 
 ### Parameters
 
@@ -149,8 +150,8 @@ Launch applications and get their window handles for subsequent operations.
 ### Capabilities
 
 - Launch applications by name or full path
-- Automatic window detection after launch
-- Returns window handle for use with other tools
+- Observe visible windows belonging to the launched process or a matching pre-launch instance
+- Return a selected window only when uniquely identified; otherwise inspect candidates or rediscover the target
 - Configurable startup parameters
 
 ### Launch observations (MCP and CLI)
@@ -176,14 +177,20 @@ Nonzero exits observed during the wait fail even when another instance is open.
 Multiple matching windows are listed without selecting an arbitrary `window`.
 
 No launch status guarantees foreground focus, input readiness, or requested content.
-Inspect the intended window with `ui_read` / `ui_wait` before acting; activate it explicitly
+If the handle is missing or ambiguous, use `window_management` to inspect candidates or
+rediscover the target; do not call handle-based tools until the intended handle is identified.
+Then inspect the intended content with `ui_read` / `ui_wait` before acting; activate it explicitly
 with `window_management` when needed. A running process without a window can still exit later;
 `started` is an observation, not a guarantee of future success.
 
 ### Example
 
 ```
-app(programPath='notepad.exe') → handle='123456'
+app(programPath='notepad.exe')
+→ Example only: { "success": true, "launchStatus": "windowObserved", "window": { "handle": "123456", ... } }
+# Continue only after identifying the intended handle; a launch may omit it.
+ui_find(windowHandle='123456', controlType='Edit')
+# Select the intended input's observed ID and verify the document before typing.
 ui_type(windowHandle='123456', elementId='<discovered-input-id>', text='Hello World')
 ```
 

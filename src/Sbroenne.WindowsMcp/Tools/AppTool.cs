@@ -31,7 +31,9 @@ public static partial class AppTool
     /// Examples: app(programPath='notepad.exe'), app(programPath='calc.exe'), app(programPath='msedge.exe', arguments='https://example.com').
     /// A returned window is observed, not guaranteed focused or ready for input. Verify the intended
     /// page/document with ui_read or ui_wait before acting. Activate the window explicitly if needed.
-    /// Launch a browser with a URL, then use ui_find/ui_click/ui_type with the returned handle to automate page content.
+    /// Launch a browser with a URL, then inspect launchStatus and window/windows. If the intended handle is
+    /// missing or ambiguous, use window_management to identify the target before calling handle-based tools.
+    /// Only after selecting the intended handle and verifying the page, use ui_find/ui_click/ui_type.
     /// Edge (msedge.exe) and Chrome (chrome.exe) page content is fully automatable: links, buttons, and form fields
     /// surface as ARIA/visible-text UIA names. Browser chrome (address bar, tabs) is best-effort — use keyboard shortcuts.
     ///
@@ -48,7 +50,7 @@ public static partial class AppTool
     /// <param name="waitForWindow">Wait for the application window to appear before returning (default: true). Set to false for background processes.</param>
     /// <param name="timeoutMs">Timeout in milliseconds to wait for the window to appear (default: 5000).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>A call result containing a text content block with the JSON payload of the launch operation, including the window handle for subsequent operations. <c>IsError</c> reflects operation success.</returns>
+    /// <returns>A call result containing a text content block with JSON launch observations. A selected window handle is optional; multiple candidates may be returned without selecting a window. Delivery and content readiness are not verified. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "app", Title = "Launch Application", Destructive = true, OpenWorld = false)]
     public static async partial Task<CallToolResult> ExecuteAsync(
         string programPath,
