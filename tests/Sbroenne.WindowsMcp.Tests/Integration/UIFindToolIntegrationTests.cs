@@ -153,9 +153,8 @@ public sealed class UIFindToolIntegrationTests : IDisposable
         var elementId = findResult.Items![0].Id;
         Assert.NotNull(elementId);
 
-        // Element IDs are now short numeric values (e.g., "1", "2", "3")
-        Assert.True(int.TryParse(elementId, out int parsedId), $"Element ID should be numeric: {elementId}");
-        Assert.True(parsedId > 0, $"Element ID should be positive: {parsedId}");
+        Assert.True(ElementIdGenerator.TryResolveWindowHandle(elementId, out var owner));
+        Assert.Equal(_fixture.TestWindowHandle, owner);
 
         // Now test the round trip via ElementIdGenerator - THIS IS THE CRITICAL TEST
         var resolvedElement = await _staThread.ExecuteAsync(() =>
@@ -232,7 +231,7 @@ public sealed class UIFindToolIntegrationTests : IDisposable
     public async Task Find_CheckBoxes_ReturnsMultipleCheckBoxes()
     {
         // Ensure we're on the Form Controls tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",
@@ -257,7 +256,7 @@ public sealed class UIFindToolIntegrationTests : IDisposable
     public async Task Find_RadioButtons_ReturnsRadioButtons()
     {
         // Ensure we're on the Form Controls tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",
@@ -288,7 +287,7 @@ public sealed class UIFindToolIntegrationTests : IDisposable
     public async Task Find_ComboBox_ReturnsComboBox()
     {
         // Ensure we're on the Form Controls tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",

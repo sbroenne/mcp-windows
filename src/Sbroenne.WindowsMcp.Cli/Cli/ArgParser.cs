@@ -53,6 +53,16 @@ internal sealed class ParsedArgs
                 }
 
                 var key = body.ToLowerInvariant();
+                // Child arguments beginning with -- are ambiguous with the next CLI option.
+                // Require the equals form rather than silently launching without arguments.
+                if (key is "args" or "arguments"
+                    && (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal)))
+                {
+                    throw new ArgumentException(
+                        $"--{key} requires a value. For child arguments beginning with '--', " +
+                        $"use --{key}=\"--new-window target\" (one token). No application was launched.");
+                }
+
                 // Look ahead: if the next token is a value (not another --option), consume it.
                 if (i + 1 < args.Length && !args[i + 1].StartsWith("--", StringComparison.Ordinal))
                 {
@@ -79,6 +89,9 @@ internal sealed class ParsedArgs
 
     /// <summary>True when the option was supplied (with or without a value).</summary>
     public bool Has(string key) => _options.ContainsKey(key);
+
+    /// <summary>Option names supplied by the caller, for strict command validation.</summary>
+    internal IEnumerable<string> OptionNames => _options.Keys;
 
     /// <summary>Returns the raw string value for an option, or null when absent.</summary>
     public string? GetString(string key) => _options.TryGetValue(key, out var v) ? v : null;

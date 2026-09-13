@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 /// <summary>
 /// Integration tests for the newly exposed UI Automation capabilities:
-/// ui_snapshot (GetTreeAsync), ui_wait (WaitForElement*), ui_select (FindAndSelectAsync),
+/// ui_snapshot (GetTreeAsync), ui_wait (WaitForElement*), ui_select (SelectElementAsync),
 /// and elementId reuse (ClickElementAsync / TypeIntoElementAsync).
 /// Tests run against the controlled WinForms harness.
 /// </summary>
@@ -97,6 +97,7 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
             parentElementId: null,
             maxDepth: 5,
             controlTypeFilter: null,
+            mode: "full",
             includeDiagnostics: false,
             CancellationToken.None);
         var json = ExtractText(result);
@@ -232,7 +233,7 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
             ControlType = "ComboBox",
         };
 
-        var result = await _automationService.FindAndSelectAsync(query, "Science", CancellationToken.None);
+        var result = await _automationService.ObserveAndSelectAsync(query, "Science", CancellationToken.None);
 
         Assert.True(result.Success, $"Select failed: {result.ErrorMessage}");
     }
@@ -262,7 +263,7 @@ public sealed class NewUiToolsIntegrationTests : IDisposable
             ControlType = "Edit",
         });
 
-        var result = await _automationService.TypeIntoElementAsync(elementId, "hello-by-id", clearFirst: true, _windowHandle, CancellationToken.None);
+        var result = await _automationService.TypeIntoElementAsync(elementId, "hello-by-id", clearFirst: true, _windowHandle, "auto", CancellationToken.None);
 
         Assert.True(result.Success, $"Type-by-id failed: {result.ErrorMessage}");
     }

@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace Sbroenne.WindowsMcp.Catalog;
 
 /// <summary>
-/// Applies an allow/deny filter to the MCP tools registered in a service collection.
+/// Applies an allow/deny filter and strict argument validation to registered MCP tools.
 /// </summary>
 /// <remarks>
 /// The MCP SDK's <c>WithToolsFromAssembly()</c> registers every discovered tool as an
@@ -16,7 +16,7 @@ namespace Sbroenne.WindowsMcp.Catalog;
 public static class ToolFilter
 {
     /// <summary>
-    /// Removes tool registrations that fall outside the include list or inside the exclude list.
+    /// Removes excluded registrations and guards surviving tools against unknown request arguments.
     /// </summary>
     /// <param name="services">The service collection already populated with tools.</param>
     /// <param name="include">
@@ -67,7 +67,7 @@ public static class ToolFilter
             if (allowed)
             {
                 kept.Add(name);
-                survivors.Add(tool);
+                survivors.Add(tool is StrictArgumentTool ? tool : new StrictArgumentTool(tool));
             }
             else
             {
@@ -75,18 +75,15 @@ public static class ToolFilter
             }
         }
 
-        // Only rewrite the registrations when the filter actually changed something.
-        if (removed.Count > 0)
+        // Guard even an unfiltered surface: SDK method binding otherwise ignores unknown arguments.
+        foreach (var descriptor in toolDescriptors)
         {
-            foreach (var descriptor in toolDescriptors)
-            {
-                services.Remove(descriptor);
-            }
+            services.Remove(descriptor);
+        }
 
-            foreach (var tool in survivors)
-            {
-                services.AddSingleton(tool);
-            }
+        foreach (var tool in survivors)
+        {
+            services.AddSingleton(tool);
         }
 
         var unknown = includeSet.Concat(excludeSet)

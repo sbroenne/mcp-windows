@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -92,6 +93,7 @@ public sealed class SaveTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
+        Assert.True(File.Exists(testFilePath), "Save must observe the requested file before reporting success.");
 
         // Wait for the harness to finish writing the file. Waiting on the content rather than on
         // File.Exists also rules out observing a file that exists but has not been flushed yet.
@@ -117,6 +119,45 @@ public sealed class SaveTests : IDisposable
         Assert.Contains("Test file created at", content);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Save_MissingDialogAndFileChange_DoesNotReportSuccess(bool existingFile)
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Save without a handler" };
+            target.Show();
+            return target.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"not-saved-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            if (existingFile)
+            {
+                await File.WriteAllTextAsync(path, "Unchanged existing file");
+            }
+
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+
+            Assert.False(result.Success);
+            Assert.Equal(Models.UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Contains("could not be verified", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.Equal(existingFile, File.Exists(path));
+            if (existingFile)
+            {
+                Assert.Equal("Unchanged existing file", await File.ReadAllTextAsync(path));
+            }
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => target?.Dispose());
+        }
+    }
+
     [Fact]
     public async Task Save_InvalidWindowHandle_ReturnsError()
     {
@@ -126,6 +167,208 @@ public sealed class SaveTests : IDisposable
         // Assert
         Assert.False(result.Success);
         Assert.Contains("Invalid window handle", result.ErrorMessage);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Save_ModelessOwnedDialog_VerifiesCurrentFilename(
+        bool replaceFilenameField, bool changeDirectory)
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        System.Windows.Forms.Form? dialog = null;
+        var filenameReplaced = false;
+        var path = Path.Combine(_testOutputDir, $"modeless-save-{Guid.NewGuid():N}.txt");
+        var wrongDirectory = Path.Combine(_testOutputDir, Guid.NewGuid().ToString("N"));
+        var wrongPath = Path.Combine(wrongDirectory, Path.GetFileName(path));
+        Directory.CreateDirectory(wrongDirectory);
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Modeless save owner", KeyPreview = true };
+            target.Controls.Add(new System.Windows.Forms.TextBox());
+            target.KeyDown += (_, e) =>
+            {
+                if (!e.Control || e.KeyCode != System.Windows.Forms.Keys.S)
+                {
+                    return;
+                }
+
+                e.SuppressKeyPress = true;
+                dialog = new System.Windows.Forms.Form { Text = "Save As" };
+                var filename = new System.Windows.Forms.TextBox
+                {
+                    Name = "FileNameControlHost",
+                    AccessibleName = "File name:",
+                    Width = 260
+                };
+                filename.TextChanged += (_, _) =>
+                {
+                    if (filename.Text != path)
+                    {
+                        return;
+                    }
+
+                    if (changeDirectory)
+                    {
+                        filename.Text = wrongPath;
+                        return;
+                    }
+
+                    if (!replaceFilenameField)
+                    {
+                        return;
+                    }
+
+                    var original = filename;
+                    filename = new System.Windows.Forms.TextBox
+                    {
+                        Name = original.Name,
+                        AccessibleName = original.AccessibleName,
+                        Bounds = original.Bounds,
+                        Text = original.Text
+                    };
+                    dialog.Controls.Add(filename);
+                    dialog.Controls.Remove(original);
+                    original.Dispose();
+                    filename.Focus();
+                    filenameReplaced = true;
+                };
+                var save = new System.Windows.Forms.Button { Text = "Save", Top = 40 };
+                save.Click += (_, _) =>
+                {
+                    File.WriteAllText(filename.Text, "Modeless dialog saved");
+                    dialog.Close();
+                };
+                dialog.Controls.Add(filename);
+                dialog.Controls.Add(save);
+                dialog.Show(target);
+            };
+            target.Show(fixtureForm);
+            return target.Handle;
+        });
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+            Assert.Equal(replaceFilenameField, (bool)fixtureForm.Invoke(() => filenameReplaced));
+            if (changeDirectory)
+            {
+                Assert.False(result.Success);
+                Assert.Contains("filename field", result.ErrorMessage, StringComparison.Ordinal);
+                Assert.False(File.Exists(wrongPath), "Save must not confirm a path in another directory.");
+                Assert.False(File.Exists(path));
+            }
+            else
+            {
+                Assert.True(result.Success, result.ErrorMessage);
+                Assert.Equal("Modeless dialog saved", await File.ReadAllTextAsync(path));
+            }
+        }
+        finally
+        {
+            fixtureForm.Invoke(() =>
+            {
+                dialog?.Dispose();
+                target?.Dispose();
+            });
+        }
+    }
+
+    [Fact]
+    public async Task Save_DoesNotConfirmAnUnrelatedWindow()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? unrelated = null;
+        var unrelatedHandle = (nint)fixtureForm.Invoke(() =>
+        {
+            unrelated = new System.Windows.Forms.Form { Text = "Confirm Save As" };
+            var status = new System.Windows.Forms.Label
+            {
+                Name = "ForeignConfirmStatus",
+                Text = "Untouched",
+                AutoSize = true
+            };
+            var confirm = new System.Windows.Forms.Button { Text = "Yes", Top = 40 };
+            confirm.Click += (_, _) => status.Text = "Confirmed";
+            unrelated.Controls.Add(status);
+            unrelated.Controls.Add(confirm);
+            unrelated.Show(fixtureForm);
+            return unrelated.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"owned-save-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            var result = await _automationService.SaveAsync(_windowHandle, path);
+            var failureState = result.Success ? null : await _automationService.GetTextAsync(
+                null, _windowHandle, includeChildren: true);
+            Assert.True(result.Success,
+                $"{result.ErrorMessage}. Window text: {failureState?.Text ?? failureState?.ErrorMessage}. " +
+                $"Keyboard: {fixtureForm.Invoke(() => fixtureForm.LastKeyDownForTesting)}. " +
+                $"Files in the owned output directory: {string.Join(", ", Directory.GetFiles(_testOutputDir))}");
+            Assert.True(File.Exists(path));
+
+            var foreignWindow = WindowHandleParser.Format(unrelatedHandle);
+            var found = await _automationService.FindElementsAsync(new Models.ElementQuery
+            {
+                WindowHandle = foreignWindow,
+                AutomationId = "ForeignConfirmStatus",
+                RequireUnique = true
+            });
+            Assert.True(found.Success, found.ErrorMessage);
+            var read = await _automationService.GetTextAsync(
+                Assert.Single(found.Items!).Id, foreignWindow, includeChildren: false);
+            Assert.True(read.Success, read.ErrorMessage);
+            Assert.Equal("Untouched", read.Text);
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => unrelated?.Dispose());
+        }
+    }
+
+    [Fact]
+    public async Task Save_AcceptedDialogWithoutFile_DoesNotReportSuccess()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        string? acceptedPath = null;
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Save without writing", KeyPreview = true };
+            target.KeyDown += (_, e) =>
+            {
+                if (e.Control && e.KeyCode == System.Windows.Forms.Keys.S)
+                {
+                    e.SuppressKeyPress = true;
+                    using var dialog = new System.Windows.Forms.SaveFileDialog();
+                    if (dialog.ShowDialog(target) == System.Windows.Forms.DialogResult.OK)
+                    {
+                        acceptedPath = dialog.FileName;
+                    }
+                }
+            };
+            target.Show();
+            return target.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"accepted-not-saved-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+
+            Assert.Equal(path, (string?)fixtureForm.Invoke(() => acceptedPath));
+            Assert.False(result.Success);
+            Assert.Equal(Models.UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Contains("could not be verified", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => target?.Dispose());
+        }
     }
 
     [Fact]

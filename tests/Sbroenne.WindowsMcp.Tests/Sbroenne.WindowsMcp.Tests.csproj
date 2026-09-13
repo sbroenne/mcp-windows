@@ -41,6 +41,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp\Sbroenne.WindowsMcp.csproj" />
     <ProjectReference Include="..\..\src\Sbroenne.WindowsMcp.Cli\Sbroenne.WindowsMcp.Cli.csproj" />
+    <ProjectReference Include="..\Sbroenne.WindowsMcp.Cli.TestFixture\Sbroenne.WindowsMcp.Cli.TestFixture.csproj" />
     <!--
       The WinUI 3 harness is launched as a separate process by ModernTestHarnessFixture, which locates
       it by probing the harness project's own bin directory. We only need it *built*, not referenced:

@@ -9,13 +9,22 @@ namespace Sbroenne.WindowsMcp.Cli;
 
 /// <summary>
 /// Routes a parsed command line to the matching tool. Every handler delegates to the exact same
-/// <c>ExecuteAsync</c> method the MCP server registers, so the CLI and the MCP server are guaranteed
-/// to behave identically - the CLI is only a thin argument-to-tool adapter.
+/// <c>ExecuteAsync</c> method the MCP server registers. Targeting validation rejects removed
+/// selectors and unknown arguments rather than silently widening an operation.
 /// </summary>
 internal static class CommandDispatcher
 {
+    internal static Task<int> DispatchAsync(
+        ParsedArgs args, TextWriter output, TextWriter error, CancellationToken ct) =>
+        Emit.WithWritersAsync(output, error, () => DispatchAsync(args, ct));
+
     public static async Task<int> DispatchAsync(ParsedArgs args, CancellationToken ct)
     {
+        var optionError = ValidateNonUiOptions(args);
+        if (optionError is not null)
+        {
+            return Emit.Usage(optionError);
+        }
         switch (args.Group)
         {
             case "app":
@@ -51,6 +60,34 @@ internal static class CommandDispatcher
             default:
                 return Emit.Usage($"unknown command '{args.Group}'.");
         }
+    }
+
+    internal static string? ValidateNonUiOptions(ParsedArgs args)
+    {
+        const string WindowOptions = "window handle";
+        const string Diagnostics = "include-diagnostics diagnostics";
+        var options = args.Group switch
+        {
+            "app" => "path program program-path args arguments working-dir cwd working-directory no-wait wait-for-window timeout-ms timeout",
+            "window" or "window-management" => $"{WindowOptions} title process process-name filter regex include-all-desktops all-desktops x y width height timeout-ms timeout target monitor-index monitor state exclude-title discard-changes",
+            "keyboard" => $"{WindowOptions} text key modifiers repeat sequence inter-key-delay-ms delay-ms delay clear-first clear",
+            "mouse" => $"{WindowOptions} target x y end-x endx end-y endy direction amount modifiers button monitor-index monitor expected-window-title expected-title expected-process-name expected-process points",
+            "screenshot" => $"{WindowOptions} action no-annotate annotate target monitor-index monitor region-x region-y region-width region-height include-cursor cursor image-format format quality output-mode output-path out include-image",
+            "file-save" or "filesave" or "save" => $"{WindowOptions} path file-path file {Diagnostics}",
+            "file-open" or "fileopen" or "open" => $"{WindowOptions} path file-path file {Diagnostics} trigger-mode trigger timeout-ms timeout",
+            "process" or "proc" => "name pid sort-by sort limit force",
+            "clipboard" or "clip" => "text",
+            "macro" or "ui-macro" => $"{WindowOptions} steps steps-file name continue-on-error no-stop-on-error stop-on-error with-snapshot snapshot snapshot-mode {Diagnostics} since",
+            _ => null,
+        };
+        if (options is null)
+        {
+            return null;
+        }
+
+        var allowed = options.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknown = args.OptionNames.FirstOrDefault(option => !allowed.Contains(option));
+        return unknown is null ? null : $"Unknown --{unknown} option for {args.Group}. See wincli tools for supported options.";
     }
 
     private static string? Window(ParsedArgs a) => a.GetString("window", "handle");
@@ -274,12 +311,19 @@ internal static class CommandDispatcher
             a.GetFlag("with-snapshot", "snapshot"),
             a.GetString("snapshot-mode") ?? "full",
             a.GetFlag("include-diagnostics", "diagnostics"),
-            ct);
+            ct,
+            a.GetString("since"));
         return Emit.Result(result);
     }
 
     private static async Task<int> UiAsync(ParsedArgs a, CancellationToken ct)
     {
+        var targetingError = ValidateUiTargeting(a);
+        if (targetingError is not null)
+        {
+            return Emit.Usage(targetingError);
+        }
+
         var window = Window(a) ?? string.Empty;
         var diag = a.GetFlag("include-diagnostics", "diagnostics");
 
@@ -294,7 +338,8 @@ internal static class CommandDispatcher
                         a.GetString("control-type-filter", "control-type"),
                         a.GetString("mode") ?? "full",
                         diag,
-                        ct);
+                        ct,
+                        a.GetString("since"));
                     return Emit.Result(result);
                 }
 
@@ -330,22 +375,13 @@ internal static class CommandDispatcher
                 {
                     var result = await UIClickTool.ExecuteAsync(
                         window,
-                        a.GetString("name"),
-                        a.GetString("name-contains"),
-                        a.GetString("name-pattern"),
-                        a.GetString("control-type"),
-                        a.GetString("automation-id"),
-                        a.GetString("class-name"),
-                        a.GetString("element-id"),
-                        a.GetInt("found-index", "index") ?? 1,
+                        a.GetString("element-id")!,
                         a.GetFlag("with-snapshot", "snapshot"),
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
                         a.GetFlag("double-click", "dblclick"),
-                        a.GetString("parent-element-id", "parent"),
-                        a.GetString("scope") ?? "window",
-                        a.GetFlag("require-unique", "unique"),
-                        ct);
+                        ct,
+                        a.GetString("since"));
                     return Emit.Result(result);
                 }
 
@@ -360,23 +396,14 @@ internal static class CommandDispatcher
                     var result = await UITypeTool.ExecuteAsync(
                         window,
                         text,
-                        a.GetString("name"),
-                        a.GetString("name-contains"),
-                        a.GetString("name-pattern"),
-                        a.GetString("control-type"),
-                        a.GetString("automation-id"),
-                        a.GetString("class-name"),
-                        a.GetString("element-id"),
-                        a.GetInt("found-index", "index") ?? 1,
+                        a.GetString("element-id")!,
                         a.GetFlag("clear-first", "clear"),
                         a.GetFlag("with-snapshot", "snapshot"),
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
                         a.GetString("input-mode") ?? "auto",
-                        a.GetString("parent-element-id", "parent"),
-                        a.GetString("scope") ?? "window",
-                        a.GetFlag("require-unique", "unique"),
-                        ct);
+                        ct,
+                        a.GetString("since"));
                     return Emit.Result(result);
                 }
 
@@ -391,17 +418,12 @@ internal static class CommandDispatcher
                     var result = await UISelectTool.ExecuteAsync(
                         window,
                         value,
-                        a.GetString("name"),
-                        a.GetString("name-contains"),
-                        a.GetString("name-pattern"),
-                        a.GetString("control-type"),
-                        a.GetString("automation-id"),
-                        a.GetString("class-name"),
-                        a.GetInt("found-index", "index") ?? 1,
+                        a.GetString("element-id")!,
                         a.GetFlag("with-snapshot", "snapshot"),
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
-                        ct);
+                        ct,
+                        a.GetString("since"));
                     return Emit.Result(result);
                 }
 
@@ -409,14 +431,7 @@ internal static class CommandDispatcher
                 {
                     var result = await UIReadTool.ExecuteAsync(
                         window,
-                        a.GetString("name"),
-                        a.GetString("name-contains"),
-                        a.GetString("name-pattern"),
-                        a.GetString("control-type"),
-                        a.GetString("automation-id"),
-                        a.GetString("class-name"),
                         a.GetString("element-id"),
-                        a.GetInt("found-index", "index") ?? 1,
                         a.GetFlag("include-children", "children"),
                         a.GetString("language", "lang"),
                         a.GetString("format"),
@@ -429,14 +444,7 @@ internal static class CommandDispatcher
                 {
                     var result = await UIReadTableTool.ExecuteAsync(
                         window,
-                        a.GetString("name"),
-                        a.GetString("name-contains"),
-                        a.GetString("name-pattern"),
-                        a.GetString("control-type"),
-                        a.GetString("automation-id"),
-                        a.GetString("class-name"),
-                        a.GetString("element-id"),
-                        a.GetInt("found-index", "index") ?? 1,
+                        a.GetString("element-id")!,
                         a.GetInt("max-rows", "rows") ?? 200,
                         a.GetInt("max-columns", "cols") ?? 50,
                         diag,
@@ -492,7 +500,8 @@ internal static class CommandDispatcher
                         a.GetFlag("with-snapshot", "snapshot"),
                         a.GetString("snapshot-mode") ?? "full",
                         diag,
-                        ct);
+                        ct,
+                        a.GetString("since"));
                     return Emit.Result(result);
                 }
 
@@ -500,5 +509,63 @@ internal static class CommandDispatcher
                 return Emit.Usage(
                     "ui requires an operation: snapshot, find, click, type, select, read, read-table, wait, or batch.");
         }
+
+    }
+
+    private static string? ValidateUiTargeting(ParsedArgs a)
+    {
+        foreach (var option in new[] { "element-id", "id" })
+        {
+            if (a.Has(option) && string.IsNullOrWhiteSpace(a.GetString(option)))
+            {
+                return $"--{option} requires a non-empty element ID value. Omit the ID only for an explicit whole-window read.";
+            }
+        }
+        const string Common = "window handle include-diagnostics diagnostics";
+        const string Selectors = "name name-contains name-pattern control-type automation-id class-name parent-element-id parent scope require-unique unique enabled-only";
+        const string Snapshots = "with-snapshot snapshot snapshot-mode since";
+        var accepted = a.Action switch
+        {
+            "click" => $"element-id double-click dblclick {Snapshots}",
+            "type" => $"element-id text clear-first clear input-mode {Snapshots}",
+            "select" => $"element-id value {Snapshots}",
+            "read" => "element-id include-children children language lang format",
+            "read-table" => "element-id max-rows rows max-columns cols",
+            "wait" => $"{Selectors} element-id desired-state state mode timeout-ms timeout",
+            "find" => $"{Selectors} exact-depth found-index index include-children children sort-by-prominence prominence in-region region near-element near visible-only content-view-only timeout-ms timeout",
+            "snapshot" => "parent-element-id parent max-depth depth control-type-filter control-type mode since",
+            "batch" => $"steps steps-file continue-on-error no-stop-on-error stop-on-error {Snapshots}",
+            _ => ""
+        };
+        var allowed = (Common + " " + accepted).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknown = a.OptionNames.FirstOrDefault(option => !allowed.Contains(option));
+        if (unknown is not null)
+        {
+            return $"Unknown or removed --{unknown} option for ui {a.Action}. Selectors are only supported by discovery and appear/disappear waits.";
+        }
+        var stateWait = a.Action == "wait" &&
+            string.Equals(a.GetString("mode")?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
+        var targeted = a.Action is "click" or "type" or "select" or "read-table" || stateWait;
+        if (targeted || a.Action == "read")
+        {
+            foreach (var option in new[]
+            {
+                    "name", "name-contains", "name-pattern", "control-type", "automation-id", "class-name",
+                    "found-index", "index", "parent-element-id", "parent", "scope", "require-unique", "unique",
+                    "near-element", "near", "enabled-only", "visible-only",
+                })
+            {
+                if (a.Has(option))
+                {
+                    return $"--{option} is a discovery selector, not an action target. Use ui find then --element-id.";
+                }
+            }
+        }
+        if (targeted && string.IsNullOrWhiteSpace(a.GetString("element-id")))
+        {
+            return "This action requires --element-id from ui find or ui snapshot.";
+        }
+        return null;
     }
 }

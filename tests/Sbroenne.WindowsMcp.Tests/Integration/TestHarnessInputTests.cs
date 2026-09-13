@@ -9,7 +9,8 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// These tests verify that input actually reaches the target and produces expected results.
 /// </summary>
 [Collection("TestHarness")]
-public class TestHarnessInputTests : IDisposable
+[Trait("Category", "RequiresDesktop")]
+public class TestHarnessInputTests : DesktopInputTestBase, IDisposable
 {
     private readonly TestHarnessFixture _fixture;
     private readonly MouseInputService _mouseInputService;
@@ -35,7 +36,7 @@ public class TestHarnessInputTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Click_OnTestButton_IncrementsClickCount()
     {
         // Arrange
@@ -52,7 +53,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(initialCount + 1, newCount);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Click_OnTestButton2_IncrementsButton2Count()
     {
         // Arrange
@@ -69,7 +70,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(initialCount + 1, newCount);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DoubleClick_OnTestButton_IncrementsClickCount()
     {
         // Note: Windows Forms buttons don't fire DoubleClick event by default.
@@ -92,7 +93,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.True(newCount >= initialCount + 1, $"Expected at least {initialCount + 1} clicks, got {newCount}");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task TypeText_InTextBox_TextAppearsInTextBox()
     {
         // Arrange
@@ -111,7 +112,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(testText, inputText);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task PressKey_Enter_KeyIsDetected()
     {
         // Arrange
@@ -128,7 +129,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(System.Windows.Forms.Keys.Return, lastKey);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Click_ThenType_TextAppearsInTextBox()
     {
         // This tests the full workflow: click on text box, then type
@@ -153,7 +154,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(testText, inputText);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task MultipleClicks_OnDifferentButtons_EachButtonCountsCorrectly()
     {
         // Arrange
@@ -181,7 +182,7 @@ public class TestHarnessInputTests : IDisposable
         Assert.Equal(3, button2Count);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task KeyCombo_CtrlA_IsDetected()
     {
         // Arrange - First put some text in the box

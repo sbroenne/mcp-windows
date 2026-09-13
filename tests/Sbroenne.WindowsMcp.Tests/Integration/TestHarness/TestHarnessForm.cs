@@ -147,6 +147,9 @@ public sealed class TestHarnessForm : Form
     /// </summary>
     public Point ScrollPanelCenter => GetControlCenter(_scrollPanel);
 
+    /// <summary>Gets whether the scroll target has keyboard focus.</summary>
+    public bool ScrollPanelFocused => _scrollPanel.ContainsFocus;
+
     /// <summary>
     /// Gets the screen coordinates of the drag panel's center.
     /// </summary>

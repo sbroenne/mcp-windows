@@ -73,7 +73,7 @@ public sealed class ElectronSnapshotBenchmarkTests : IDisposable
 
     private async Task ClickAsync(string name, string controlType, CancellationToken cancellationToken)
     {
-        var result = await _automationService.FindAndClickAsync(
+        var result = await _automationService.ObserveAndClickAsync(
             new ElementQuery
             {
                 WindowHandle = _fixture.WindowHandleString,

@@ -31,7 +31,7 @@ public sealed partial class UIAutomationService
     /// </summary>
     private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> FindAndClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
+    internal async Task<UIAutomationResult> FindAndClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         var stopwatch = Stopwatch.StartNew();
@@ -111,7 +111,7 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId, allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
@@ -152,6 +152,7 @@ public sealed partial class UIAutomationService
                     CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
             }
 
+            fallbackClickPoint ??= GetVerifiedCachedClickPoint(element);
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
         }, cancellationToken);
 
@@ -194,123 +195,6 @@ public sealed partial class UIAutomationService
         }, cancellationToken);
     }
 
-    /// <inheritdoc/>
-    public Task<UIAutomationResult> FindAndTypeAsync(
-        ElementQuery query,
-        string text,
-        bool clearFirst,
-        CancellationToken cancellationToken = default) =>
-        FindAndTypeAsync(query, text, clearFirst, "auto", cancellationToken);
-
-    /// <summary>
-    /// Finds a text control and enters text using auto, value, or keyboard input.
-    /// Auto prefers keyboard input for Chromium/Electron so web frameworks receive normal events.
-    /// </summary>
-    public async Task<UIAutomationResult> FindAndTypeAsync(
-        ElementQuery query,
-        string text,
-        bool clearFirst,
-        string inputMode,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
-
-        if (!TryNormalizeInputMode(inputMode, out var normalizedInputMode))
-        {
-            return UIAutomationResult.CreateFailure(
-                "type",
-                UIAutomationErrorType.InvalidParameter,
-                $"Invalid inputMode '{inputMode}'. Valid values: auto, keyboard, value.",
-                CreateDiagnostics(stopwatch, query));
-        }
-
-        // Normalize Windows file paths: convert forward slashes to backslashes
-        // This handles paths like "D:/folder/file.txt" → "D:\folder\file.txt"
-        // Required because Save As dialogs reject forward slashes
-        text = PathNormalizer.NormalizeWindowsPath(text);
-
-        try
-        {
-            var searchQueries = BuildTypeSearchQueries(query);
-            UIAutomationResult? lastResult = null;
-
-            foreach (var searchQuery in searchQueries)
-            {
-                var actionQuery = searchQuery with
-                {
-                    VisibleOnly = searchQuery.VisibleOnly ?? true,
-                    EnabledOnly = searchQuery.EnabledOnly ?? true
-                };
-                var findResult = await FindElementsAsync(actionQuery, cancellationToken);
-                lastResult = findResult;
-
-                if (findResult.Success && findResult.Items is { Length: > 0 })
-                {
-                    var targetElement = findResult.Items[0];
-                    var elementId = targetElement.Id;
-
-                    return await PerformTypeAsync(
-                        elementId,
-                        text,
-                        clearFirst,
-                        normalizedInputMode,
-                        actionQuery.WindowHandle,
-                        stopwatch,
-                        cancellationToken);
-                }
-
-                if (findResult.ErrorType is not null and not UIAutomationErrorType.ElementNotFound)
-                {
-                    return findResult with { Action = "type" };
-                }
-            }
-
-            var errorMessage = lastResult?.ErrorMessage ?? "Element not found.";
-            if (searchQueries.Count > 1 && string.IsNullOrEmpty(lastResult?.ErrorMessage))
-            {
-                errorMessage = "Element not found. Tried default Document/Edit controls. Provide elementId or search criteria (name, controlType, automationId).";
-            }
-
-            return UIAutomationResult.CreateFailure(
-                "type",
-                lastResult?.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                errorMessage,
-                CreateDiagnostics(stopwatch));
-        }
-        catch (COMException ex)
-        {
-            LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "type",
-                COMExceptionHelper.GetErrorType(ex),
-                COMExceptionHelper.GetErrorMessage(ex, "Type"),
-                CreateDiagnostics(stopwatch));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "type",
-                UIAutomationErrorType.InternalError,
-                $"Type failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
-        }
-    }
-
-    /// <summary>
-    /// Types text into a previously-discovered element addressed by its stable element id
-    /// (from ui_find/ui_snapshot), skipping the find step. Useful for reusing a known element
-    /// across multiple actions without re-querying.
-    /// </summary>
-    public Task<UIAutomationResult> TypeIntoElementAsync(
-        string elementId,
-        string text,
-        bool clearFirst,
-        string? windowHandle,
-        CancellationToken cancellationToken = default) =>
-        TypeIntoElementAsync(elementId, text, clearFirst, windowHandle, "auto", cancellationToken);
-
     /// <summary>
     /// Types into a previously discovered element using auto, value, or keyboard input.
     /// </summary>
@@ -334,7 +218,7 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
-        // Normalize Windows file paths for consistency with FindAndTypeAsync.
+        // Preserve path normalization for file-path inputs.
         text = PathNormalizer.NormalizeWindowsPath(text);
 
         try
@@ -368,30 +252,6 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private static List<ElementQuery> BuildTypeSearchQueries(ElementQuery baseQuery)
-    {
-        var queries = new List<ElementQuery>();
-
-        var hasSelector = !string.IsNullOrEmpty(baseQuery.Name) ||
-                          !string.IsNullOrEmpty(baseQuery.NameContains) ||
-                          !string.IsNullOrEmpty(baseQuery.NamePattern) ||
-                          !string.IsNullOrEmpty(baseQuery.AutomationId) ||
-                          !string.IsNullOrEmpty(baseQuery.ClassName) ||
-                          !string.IsNullOrEmpty(baseQuery.ControlType);
-
-        // For plain "type" without selectors, prefer typical text controls first.
-        // Try Document first (modern apps like Win11 Notepad), then Edit (classic apps).
-        if (!hasSelector)
-        {
-            queries.Add(baseQuery with { ControlType = "Document" });
-            queries.Add(baseQuery with { ControlType = "Edit" });
-        }
-
-        queries.Add(baseQuery);
-
-        return queries;
-    }
-
     private async Task<UIAutomationResult> PerformTypeAsync(
         string elementId,
         string text,
@@ -403,9 +263,7 @@ public sealed partial class UIAutomationService
     {
         var staResult = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Success: false, Result: UIAutomationResult.CreateFailure(
@@ -722,46 +580,73 @@ public sealed partial class UIAutomationService
     private static string? ReadEditableValue(UIA.IUIAutomationElement element) =>
         element.TryGetValue() ?? element.GetText();
 
-    /// <inheritdoc/>
-    public async Task<UIAutomationResult> FindAndSelectAsync(ElementQuery query, string value, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
+    internal Task<UIAutomationResult?> ValidateElementTargetAsync(
+        string elementId, string? windowHandle, CancellationToken cancellationToken) =>
+        _staThread.ExecuteAsync<UIAutomationResult?>(() =>
+        {
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            if (element is null)
+            {
+                return UIAutomationResult.CreateFailure("wait", UIAutomationErrorType.ElementStale,
+                    "The observed element is stale. Rediscover it before waiting.");
+            }
+            if (windowHandle is not null &&
+                (!WindowHandleParser.TryParse(windowHandle, out var handle) ||
+                !IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(element), handle)))
+            {
+                return UIAutomationResult.CreateFailure("wait", UIAutomationErrorType.WrongTargetWindow,
+                    "The observed element does not belong to the requested window.");
+            }
+            return null;
+        }, cancellationToken);
 
+    private static Point? GetVerifiedCachedClickPoint(UIA.IUIAutomationElement element)
+    {
+        // Some WinForms TabPage providers have valid cached bounds but empty current bounds.
+        // Use them only after resolving the original live identity and hit-testing that identity.
         try
         {
-            var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
+            var bounds = element.CachedBoundingRectangle;
+            if (bounds.right <= bounds.left || bounds.bottom <= bounds.top)
             {
-                return UIAutomationResult.CreateFailure(
-                    "select",
-                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                    findResult.ErrorMessage ?? "Element not found.",
-                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch));
+                return null;
             }
+            var point = new Point((bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2);
+            var hit = UIA3Automation.Instance.Automation.ElementFromPoint(
+                new UIA.tagPOINT { x = point.X, y = point.Y });
+            for (var current = hit; current is not null; current = current.GetParent())
+            {
+                if (current.IsSameElement(element))
+                {
+                    return point;
+                }
+            }
+        }
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            // Cache-only properties can report E_INVALIDARG as ArgumentException.
+        }
+        return null;
+    }
 
-            var targetElement = findResult.Items[0];
-            var elementId = targetElement.Id;
-
-            return await PerformSelectAsync(elementId, value, query.WindowHandle, stopwatch, cancellationToken);
+    /// <summary>Select an option within the exact previously observed control.</summary>
+    public async Task<UIAutomationResult> SelectElementAsync(
+        string elementId, string value, string? windowHandle, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return await PerformSelectAsync(elementId, value, windowHandle, stopwatch, cancellationToken);
         }
         catch (COMException ex)
         {
-            LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
-            return UIAutomationResult.CreateFailure(
-                "select",
-                COMExceptionHelper.GetErrorType(ex),
-                COMExceptionHelper.GetErrorMessage(ex, "Select"),
-                CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateFailure("select", COMExceptionHelper.GetErrorType(ex),
+                COMExceptionHelper.GetErrorMessage(ex, "Select"), CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
-            return UIAutomationResult.CreateFailure(
-                "select",
-                UIAutomationErrorType.InternalError,
-                $"Select failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateFailure("select", UIAutomationErrorType.InternalError,
+                $"Select failed: {ex.Message}", CreateDiagnostics(stopwatch));
         }
     }
 
@@ -769,9 +654,7 @@ public sealed partial class UIAutomationService
     {
         return await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return UIAutomationResult.CreateFailure(
@@ -1273,70 +1156,6 @@ public sealed partial class UIAutomationService
         }
     }
 
-    /// <summary>
-    /// Finds an element by selectors and double-clicks it.
-    /// </summary>
-    /// <param name="query">The element query.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the double-click.</returns>
-    public async Task<UIAutomationResult> FindAndDoubleClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
-
-        try
-        {
-            var actionQuery = query with
-            {
-                VisibleOnly = query.VisibleOnly ?? true,
-                EnabledOnly = query.EnabledOnly ?? true
-            };
-            var findResult = await FindElementsAsync(actionQuery, cancellationToken);
-            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "double_click",
-                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                    findResult.ErrorMessage ?? "Element not found.",
-                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch, actionQuery));
-            }
-
-            var targetElement = findResult.Items[0];
-
-            // Same cached-bounds fallback as FindAndClickAsync: current bounds can be 0,0,0,0 for
-            // controls like WinForms TabPage children even while they are visible.
-            Point? fallbackClickPoint = null;
-            if (targetElement.Click != null && targetElement.Click.Length >= 2)
-            {
-                var monitorIndex = targetElement.Click.Length >= 3 ? targetElement.Click[2] : 0;
-                var monitorOrigin = _coordinateConverter.GetMonitorOrigin(monitorIndex);
-                fallbackClickPoint = new Point(
-                    targetElement.Click[0] + monitorOrigin.X,
-                    targetElement.Click[1] + monitorOrigin.Y);
-            }
-
-            return await PerformDoubleClickAsync(targetElement.Id, query.WindowHandle, fallbackClickPoint, stopwatch, cancellationToken);
-        }
-        catch (COMException ex)
-        {
-            LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "double_click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
-                COMExceptionHelper.GetErrorMessage(ex, "Double-click"),
-                CreateDiagnostics(stopwatch));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "double_click",
-                UIAutomationErrorType.InternalError,
-                $"Double-click failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
-        }
-    }
-
     private async Task<UIAutomationResult> PerformDoubleClickAsync(
         string elementId,
         string? windowHandle,
@@ -1365,9 +1184,7 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
@@ -1427,7 +1244,7 @@ public sealed partial class UIAutomationService
                 GetElementState(element),
                 GetObservableFingerprint(root));
 
-            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
+            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? GetVerifiedCachedClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
         }, cancellationToken);
 
         if (prepared.Failure != null)
@@ -1678,7 +1495,8 @@ public sealed partial class UIAutomationService
     /// 2. Wait for modal dialog using retry loop (FlaUI pattern)
     /// 3. If dialog appears and filePath provided: type path + Enter (pywinauto pattern)
     /// 4. Handle overwrite confirmation dialogs
-    /// 5. Wait for dialog to close (completion detection)
+    /// 5. Wait for dialog to close
+    /// 6. When a path was supplied, wait for an observable file creation or change before success
     /// </remarks>
     public async Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default)
     {
@@ -1713,12 +1531,20 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            _ = await DeterministicWait.UntilAsync(
+            var foregroundReady = await DeterministicWait.UntilAsync(
                 () => NativeMethods.GetForegroundWindow() == hwnd,
                 TimeSpan.FromMilliseconds(500),
                 TimeSpan.FromMilliseconds(25),
                 cancellationToken: cancellationToken);
+            if (!foregroundReady)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.WrongTargetWindow,
+                    "The target window did not become foreground; no save shortcut was sent.",
+                    CreateDiagnostics(stopwatch));
+            }
 
+            SaveFileObservation? fileBeforeSave = null;
             if (!string.IsNullOrWhiteSpace(filePath))
             {
                 var directory = Path.GetDirectoryName(filePath);
@@ -1730,13 +1556,23 @@ public sealed partial class UIAutomationService
                         $"Save failed: directory '{directory}' does not exist.",
                         CreateDiagnostics(stopwatch));
                 }
+
+                fileBeforeSave = SaveFileObservation.Read(filePath);
             }
 
             // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
-            await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+            var shortcut = await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, 1, hwnd, cancellationToken);
+            if (!shortcut.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.InternalError,
+                    $"Could not send the save shortcut: {shortcut.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
 
             // Step 3: Wait for Save dialog using retry loop (FlaUI Retry.WhileEmpty pattern)
-            var dialog = await WaitForSaveDialogAsync(hwnd, cancellationToken);
+            var dialogObservations = new HashSet<string>();
+            var dialog = await WaitForSaveDialogAsync(hwnd, dialogObservations, cancellationToken);
 
             if (dialog != null)
             {
@@ -1769,7 +1605,23 @@ public sealed partial class UIAutomationService
                 }
             }
 
-            // No dialog appeared = file was saved directly (already had a name)
+            if (!string.IsNullOrWhiteSpace(filePath) &&
+                !await DeterministicWait.UntilAsync(
+                    () => SaveFileObservation.HasChanged(filePath, fileBeforeSave),
+                    SaveDialogCloseTimeout,
+                    SaveDialogPollInterval,
+                    cancellationToken: cancellationToken))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.Timeout,
+                    "No file creation or change was observed at the requested path. " +
+                    (dialog.HasValue
+                        ? "A Save dialog was confirmed and closed. "
+                        : $"No ready Save dialog was observed. Discovery: {string.Join("; ", dialogObservations)}. ") +
+                    "The save shortcut was sent, but its outcome could not be verified.",
+                    CreateDiagnostics(stopwatch));
+            }
+
             return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
@@ -1795,31 +1647,19 @@ public sealed partial class UIAutomationService
     /// </summary>
     private async Task<bool> FocusWindowAsync(nint hwnd, CancellationToken cancellationToken)
     {
-        var activated = _windowActivator is not null &&
+        // Try semantic focus before native strategies that may inject Alt and enter menu mode.
+        var focused = await _staThread.ExecuteAsync(
+            () => Uia.ElementFromHandle(hwnd)?.TrySetFocus() == true,
+            cancellationToken);
+        if (focused && NativeMethods.GetForegroundWindow() == hwnd)
+        {
+            return true;
+        }
+
+        return _windowActivator is not null &&
             await _windowActivator.ActivateWindowAsync(
                 hwnd,
                 cancellationToken: cancellationToken);
-
-        var focused = await _staThread.ExecuteAsync(() =>
-        {
-            var element = Uia.ElementFromHandle(hwnd);
-            if (element == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                element.SetFocus();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }, cancellationToken);
-
-        return activated || focused;
     }
 
     /// <summary>
@@ -1827,12 +1667,13 @@ public sealed partial class UIAutomationService
     /// Returns the dialog element and its name, or null if no dialog appeared.
     /// </summary>
     private async Task<(UIA.IUIAutomationElement element, string name)?> WaitForSaveDialogAsync(
-        nint parentHwnd, CancellationToken cancellationToken)
+        nint parentHwnd, HashSet<string> observations, CancellationToken cancellationToken)
     {
         // Common save dialog title patterns (case-insensitive matching)
         string[] dialogPatterns = ["Save As", "Save as", "Save this file", "Save"];
 
-        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+        // Selection now includes filename-field readiness, using the former discovery and field budgets.
+        var deadline = DateTime.UtcNow + SaveDialogTimeout + SaveDialogTimeout;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -1843,57 +1684,57 @@ public sealed partial class UIAutomationService
             {
                 result = await _staThread.ExecuteAsync(() =>
                 {
-                    // First, check for modal windows of the parent (FlaUI pattern: window.ModalWindows)
-                    var parentElement = Uia.ElementFromHandle(parentHwnd);
-                    if (parentElement != null)
+                    // Owned dialogs can be UIA children without reporting IsModal. Enumerate native
+                    // top-level windows so discovery does not depend on that provider-specific layout.
+                    var handles = new List<nint>();
+                    if (!NativeMethods.EnumWindows((candidate, _) =>
                     {
-                        // Search for modal windows
-                        var windowCondition = Uia.CreatePropertyCondition(
-                            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
-                        var children = parentElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
-
-                        if (children != null)
+                        if (candidate != parentHwnd &&
+                            NativeMethods.IsWindowVisible(candidate) &&
+                            IsSaveDialogWindow(candidate, parentHwnd))
                         {
-                            for (int i = 0; i < children.Length; i++)
-                            {
-                                var child = children.GetElement(i);
-                                var windowPattern = child.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
-                                if (windowPattern != null)
-                                {
-                                    try
-                                    {
-                                        if (windowPattern.CurrentIsModal != 0)
-                                        {
-                                            var name = child.CurrentName ?? "";
-                                            // Check if it matches any dialog pattern
-                                            foreach (var pattern in dialogPatterns)
-                                            {
-                                                if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
-                                                {
-                                                    return (element: child, name: name);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        // Skip this element
-                                    }
-                                }
-                            }
+                            handles.Add(candidate);
                         }
+
+                        return true;
+                    }, nint.Zero))
+                    {
+                        throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
                     }
 
-                    // Fallback: search top-level windows (for system dialogs)
-                    foreach (var pattern in dialogPatterns)
+                    if (handles.Count == 0 && observations.Count < 8)
                     {
-                        var condition = Uia.CreateAndCondition(
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
-                        var dialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, condition);
-                        if (dialog != null)
+                        observations.Add("No visible owned windows");
+                    }
+
+                    foreach (var handle in handles)
+                    {
+                        try
                         {
-                            return (element: dialog, name: pattern);
+                            var dialog = Uia.ElementFromHandle(handle);
+                            var name = dialog?.CurrentName ?? "";
+                            if (dialog == null ||
+                                !dialogPatterns.Any(pattern => name.Contains(pattern, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                continue;
+                            }
+
+                            if (FindSaveDialogEditField(dialog) is not null)
+                            {
+                                return (element: dialog, name: name);
+                            }
+
+                            if (observations.Count < 8)
+                            {
+                                observations.Add($"Window {handle} '{name}': filename field unavailable");
+                            }
+                        }
+                        catch (COMException exception) when (COMExceptionHelper.IsTransientProviderFailure(exception))
+                        {
+                            if (observations.Count < 8)
+                            {
+                                observations.Add($"Window {handle}: provider unavailable (0x{exception.HResult:X8})");
+                            }
                         }
                     }
 
@@ -1983,6 +1824,16 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
+        var dialogHandle = await _staThread.ExecuteAsync(
+            () => ResolveElementWindowHandle(dialog), cancellationToken);
+        if (dialogHandle == nint.Zero)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.WindowNotFound,
+                "The Save dialog has no valid window handle; no filename input was sent.",
+                CreateDiagnostics(stopwatch));
+        }
+
         // Focus the edit field and click it to ensure keyboard input goes here
         int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
         {
@@ -1998,10 +1849,19 @@ public sealed partial class UIAutomationService
 
         if (editFieldCenter is { Length: 2 })
         {
-            await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
+            var focusClick = await _mouseService.ClickAsync(
+                editFieldCenter[0], editFieldCenter[1], ModifierKey.None, dialogHandle,
+                cancellationToken: cancellationToken);
+            if (!focusClick.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.WrongTargetWindow,
+                    $"Could not focus the filename field: {focusClick.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
         }
 
-        _ = await DeterministicWait.UntilAsync(
+        var filenameFocused = await DeterministicWait.UntilAsync(
             async () => await _staThread.ExecuteAsync(
                 () =>
                 {
@@ -2018,6 +1878,13 @@ public sealed partial class UIAutomationService
             TimeSpan.FromMilliseconds(500),
             TimeSpan.FromMilliseconds(25),
             cancellationToken: cancellationToken);
+        if (!filenameFocused)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.WrongTargetWindow,
+                "The filename field did not obtain keyboard focus; no path was typed.",
+                CreateDiagnostics(stopwatch));
+        }
 
         await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
 
@@ -2027,24 +1894,48 @@ public sealed partial class UIAutomationService
         // Select all existing text and type the new path.
         // We use keyboard input rather than Value Pattern because the Windows File Dialog
         // only updates its internal path state from keyboard input, not from UIA Value Pattern.
-        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+        var selectAll = await _keyboardService.PressKeyAsync(
+            "a", ModifierKey.Ctrl, 1, dialogHandle, cancellationToken);
+        if (!selectAll.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.InternalError,
+                $"Could not select the existing filename: {selectAll.Error}",
+                CreateDiagnostics(stopwatch));
+        }
         _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+        var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
+        if (!typed.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.InternalError,
+                $"Could not type the requested filename: {typed.Error}",
+                CreateDiagnostics(stopwatch));
+        }
 
-        _ = await DeterministicWait.UntilAsync(
+        string? observedFilename = null;
+        var filenameObserved = await DeterministicWait.UntilAsync(
             async () => await _staThread.ExecuteAsync(
                 () =>
                 {
-                    var currentValue = editField.TryGetValue();
-                    return currentValue != null &&
-                        (string.Equals(currentValue, normalizedPath, StringComparison.OrdinalIgnoreCase) ||
-                         currentValue.EndsWith(Path.GetFileName(normalizedPath), StringComparison.OrdinalIgnoreCase));
+                    // Dialogs can replace the edit while processing input. Verify the current
+                    // filename control in this same dialog, not the pre-input UIA object.
+                    observedFilename = FindSaveDialogEditField(dialog)?.TryGetValue();
+                    return string.Equals(observedFilename, normalizedPath, StringComparison.OrdinalIgnoreCase);
                 },
                 cancellationToken),
             TimeSpan.FromMilliseconds(750),
             TimeSpan.FromMilliseconds(25),
             transientException: exception => exception is COMException,
             cancellationToken: cancellationToken);
+        if (!filenameObserved)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.Timeout,
+                "The filename field did not contain the requested path; Save was not pressed. " +
+                $"Observed filename: {(observedFilename is null ? "<unavailable>" : observedFilename[..Math.Min(observedFilename.Length, 256)])}",
+                CreateDiagnostics(stopwatch));
+        }
 
         // Click the Save button directly — more reliable than Enter which can interact
         // with autocomplete dropdowns in the Windows file dialog (FlaUI pattern).
@@ -2053,18 +1944,26 @@ public sealed partial class UIAutomationService
         if (!saveClicked)
         {
             // Fallback: press Enter
-            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+            var confirm = await _keyboardService.PressKeyAsync(
+                "Return", ModifierKey.None, 1, dialogHandle, cancellationToken);
+            if (!confirm.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.InternalError,
+                    $"Could not confirm the Save dialog: {confirm.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
         }
 
         // Check for error dialogs (e.g., "Path does not exist")
-        var errorResult = await HandleSaveErrorDialogAsync(cancellationToken);
+        var errorResult = await HandleSaveErrorDialogAsync(dialogHandle, cancellationToken);
         if (errorResult != null)
         {
             return errorResult;
         }
 
         // Handle overwrite confirmation if it appears
-        await HandleOverwriteConfirmationAsync(cancellationToken);
+        await HandleOverwriteConfirmationAsync(dialogHandle, cancellationToken);
 
         return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
     }
@@ -2235,7 +2134,7 @@ public sealed partial class UIAutomationService
     /// Polls for error dialogs for the bounded save-dialog timeout to handle timing variations.
     /// Only checks the FOREGROUND window to avoid false positives from unrelated windows.
     /// </summary>
-    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(CancellationToken cancellationToken)
+    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -2260,10 +2159,9 @@ public sealed partial class UIAutomationService
             {
                 errorInfo = await _staThread.ExecuteAsync(() =>
                 {
-                    // CRITICAL: Only check the FOREGROUND window to avoid false positives
-                    // from other applications (e.g., VS Code chat showing "does not exist" text)
                     var foregroundHwnd = NativeMethods.GetForegroundWindow();
-                    if (foregroundHwnd == IntPtr.Zero)
+                    if (foregroundHwnd == IntPtr.Zero ||
+                        !IsSaveDialogWindow(foregroundHwnd, saveDialogHandle))
                     {
                         return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
                     }
@@ -2331,19 +2229,30 @@ public sealed partial class UIAutomationService
                         cancellationToken);
                 }
 
-                // The operation has already failed; only the dialog teardown is being observed here,
-                // so keep the short budget rather than delaying the error returned to the caller.
-                _ = await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout);
-
-                // Press Escape to close the Save As dialog
-                await _keyboardService.PressKeyAsync("Escape", cancellationToken: cancellationToken);
+                string? cleanupWarning = null;
+                if (await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout))
+                {
+                    var cancelled = await _keyboardService.PressKeyAsync(
+                        "Escape", ModifierKey.None, 1, saveDialogHandle, cancellationToken);
+                    if (!cancelled.Success)
+                    {
+                        cleanupWarning = $"The Save dialog could not be closed safely: {cancelled.Error}";
+                    }
+                }
+                else
+                {
+                    cleanupWarning = "The error dialog remained open; no Escape key was sent.";
+                }
 
                 // Return error to LLM
                 return UIAutomationResult.CreateFailure(
                     "save",
                     UIAutomationErrorType.PathError,
-                    $"Save failed: {errorInfo.errorText}. The directory does not exist. Create the directory first or use an existing path.",
-                    CreateDiagnostics(stopwatch));
+                    $"Save failed: {errorInfo.errorText}",
+                    CreateDiagnostics(stopwatch)) with
+                {
+                    UsageHint = cleanupWarning
+                };
             }
 
             await Task.Delay(100, cancellationToken);
@@ -2356,7 +2265,7 @@ public sealed partial class UIAutomationService
     /// Handles the "Confirm Save As" overwrite confirmation dialog if it appears.
     /// Based on pywinauto pattern: check for Yes/Replace button and click it.
     /// </summary>
-    private async Task HandleOverwriteConfirmationAsync(CancellationToken cancellationToken)
+    private async Task HandleOverwriteConfirmationAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
         // Check for common overwrite confirmation dialogs
         string[] confirmPatterns = ["Confirm Save As", "Replace or Skip Files", "Confirm", "already exists"];
@@ -2377,6 +2286,11 @@ public sealed partial class UIAutomationService
             for (int i = 0; i < windows.Length; i++)
             {
                 var window = windows.GetElement(i);
+                if (!IsSaveDialogWindow(ResolveElementWindowHandle(window), saveDialogHandle))
+                {
+                    continue;
+                }
+
                 var windowName = window.CurrentName ?? "";
 
                 // Check if window matches any confirmation pattern
@@ -2423,6 +2337,27 @@ public sealed partial class UIAutomationService
                 fallbackClickPoint: null,
                 cancellationToken);
         }
+    }
+
+    private static bool IsSaveDialogWindow(nint candidate, nint saveDialogHandle)
+    {
+        if (candidate == nint.Zero || saveDialogHandle == nint.Zero || !NativeMethods.IsWindow(saveDialogHandle))
+        {
+            return false;
+        }
+
+        var current = NativeMethods.GetAncestor(candidate, NativeConstants.GA_ROOT);
+        for (var depth = 0; depth < 64 && current != nint.Zero; depth++)
+        {
+            if (current == saveDialogHandle)
+            {
+                return true;
+            }
+
+            current = NativeMethods.GetWindow(current, NativeConstants.GW_OWNER);
+        }
+
+        return false;
     }
 
     /// <summary>

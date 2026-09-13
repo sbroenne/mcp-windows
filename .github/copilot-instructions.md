@@ -1,5 +1,10 @@
 # Copilot Instructions for mcp-windows
 
+## Code Review
+
+For pull request reviews and re-reviews, use the
+[code-review skill](skills/code-review/SKILL.md) for repository-specific checks and evidence standards.
+
 ## Sister Projects
 
 `mcp-windows` is one of a family of Windows-only MCP-server repos maintained by the same author

@@ -169,57 +169,6 @@ internal static class SnapshotDiffEngine
                     .All(nodes => TreesEqual(nodes.First, nodes.Second)));
     }
 
-    public static bool TryPreserveMatchedIds(
-        IReadOnlyList<UIElementCompactTree> before,
-        IReadOnlyList<UIElementCompactTree> after,
-        out UIElementCompactTree[] result)
-    {
-        ArgumentNullException.ThrowIfNull(before);
-        ArgumentNullException.ThrowIfNull(after);
-
-        var aliases = new List<(string PreviousShortId, string CurrentShortId)>();
-        result = PreserveMatchedIds(before, after, aliases);
-        return ElementIdGenerator.TryTransferAliases(aliases);
-    }
-
-    private static UIElementCompactTree[] PreserveMatchedIds(
-        IReadOnlyList<UIElementCompactTree> before,
-        IReadOnlyList<UIElementCompactTree> after,
-        List<(string PreviousShortId, string CurrentShortId)> aliases)
-    {
-        var beforeGroups = GroupByIdentity(before);
-        var afterGroups = GroupByIdentity(after);
-        var ordinals = new Dictionary<string, int>(StringComparer.Ordinal);
-        var result = new UIElementCompactTree[after.Count];
-
-        for (var index = 0; index < after.Count; index++)
-        {
-            var current = after[index];
-            var identity = Identity(current);
-            var ordinal = ordinals.GetValueOrDefault(identity);
-            ordinals[identity] = ordinal + 1;
-
-            if (beforeGroups.TryGetValue(identity, out var previousMatches) &&
-                afterGroups[identity].Count == previousMatches.Count)
-            {
-                var previous = previousMatches[ordinal];
-                aliases.Add((previous.Id, current.Id));
-                current = current with
-                {
-                    Id = previous.Id,
-                    Children = PreserveMatchedIds(
-                        previous.Children ?? [],
-                        current.Children ?? [],
-                        aliases)
-                };
-            }
-
-            result[index] = current;
-        }
-
-        return result;
-    }
-
     private static void CompareSiblings(
         IReadOnlyList<UIElementCompactTree> before,
         IReadOnlyList<UIElementCompactTree> after,
@@ -342,6 +291,11 @@ internal static class SnapshotDiffEngine
         List<SnapshotChange> changes)
     {
         var updated = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (!string.Equals(before.Id, after.Id, StringComparison.Ordinal))
+        {
+            updated["id"] = after.Id;
+        }
+
         if (!NullableSequenceEqual(before.Click, after.Click))
         {
             updated["click"] = after.Click;

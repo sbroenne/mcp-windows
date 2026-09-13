@@ -19,8 +19,7 @@ public sealed partial class UIAutomationService
             return await _staThread.ExecuteAsync(() =>
             {
                 var element = ElementIdGenerator.ResolveToAutomationElement(
-                    elementId,
-                    allowSelectorFallback: false);
+                    elementId);
                 if (element == null)
                 {
                     return UIAutomationResult.CreateFailure(

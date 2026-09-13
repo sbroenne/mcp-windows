@@ -14,8 +14,8 @@ public sealed class MacroServiceTests : IDisposable
     private readonly MacroService _service;
 
     private const string SampleSteps =
-        "[{\"action\":\"type\",\"automationId\":\"UsernameInput\",\"text\":\"admin\"}," +
-        "{\"action\":\"click\",\"name\":\"Submit\"}]";
+        "[{\"action\":\"find\",\"automationId\":\"UsernameInput\",\"requireUnique\":true}," +
+        "{\"action\":\"type\",\"elementId\":\"$prev\",\"text\":\"admin\"}]";
 
     public MacroServiceTests()
     {
@@ -59,7 +59,7 @@ public sealed class MacroServiceTests : IDisposable
     public async Task Save_OverwritesExisting()
     {
         await _service.SaveAsync("dup", SampleSteps);
-        var second = await _service.SaveAsync("dup", "[{\"action\":\"click\",\"name\":\"OK\"}]");
+        var second = await _service.SaveAsync("dup", "[{\"action\":\"find\",\"name\":\"OK\"}]");
 
         Assert.True(second.Success);
         Assert.Equal(1, second.StepCount);

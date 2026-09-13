@@ -216,6 +216,11 @@ public sealed record BatchStepResult
 /// <summary>Aggregate result of a ui_batch call.</summary>
 public sealed record BatchResult
 {
+    /// <summary>Token of the post-action snapshot baseline.</summary>
+    public string? PostActionSnapshotToken { get; init; }
+
+    /// <summary>Baseline token against which post-action changes were computed.</summary>
+    public string? PostActionBaseSnapshotToken { get; init; }
     /// <summary>True when every executed step succeeded.</summary>
     [JsonPropertyName("success")]
     public required bool Success { get; init; }

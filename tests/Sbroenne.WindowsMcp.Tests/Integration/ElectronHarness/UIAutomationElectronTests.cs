@@ -143,7 +143,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     private async Task NavigateAndWaitForStatusAsync(string destination)
     {
         var expectedStatus = $"Navigated to {destination}";
-        var click = await _automationService.FindAndClickAsync(new ElementQuery
+        var click = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = $"Navigate {destination}",
@@ -310,7 +310,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     public async Task FindAndClick_Button_Succeeds()
     {
         // Act - Click the button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Navigate Home",
@@ -331,7 +331,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         var testText = "test_user_123";
 
         // Act
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -373,7 +373,7 @@ public sealed class UIAutomationElectronTests : IDisposable
     {
         const string testText = "react-style-input";
 
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -576,7 +576,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         // This test simulates a realistic form-filling workflow
 
         // Step 1: Fill username
-        var usernameResult = await _automationService.FindAndTypeAsync(
+        var usernameResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -588,7 +588,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(usernameResult.Success, $"Username type failed: {usernameResult.ErrorMessage}");
 
         // Step 2: Fill email
-        var emailResult = await _automationService.FindAndTypeAsync(
+        var emailResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -600,7 +600,7 @@ public sealed class UIAutomationElectronTests : IDisposable
         Assert.True(emailResult.Success, $"Email type failed: {emailResult.ErrorMessage}");
 
         // Step 3: Click a button (navigate home to verify button click works)
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Navigate Home",

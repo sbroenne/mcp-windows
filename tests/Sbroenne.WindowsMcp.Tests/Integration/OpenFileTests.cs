@@ -166,7 +166,7 @@ public sealed class OpenFileTests : IDisposable
         Assert.True(result.Success, $"Active dialog search failed: {result.ErrorMessage}");
         Assert.NotEmpty(result.Items!);
 
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Scope = "active_dialog",
