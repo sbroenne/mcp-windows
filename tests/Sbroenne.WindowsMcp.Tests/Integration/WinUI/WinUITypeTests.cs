@@ -7,6 +7,8 @@ using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
+using Xunit.Abstractions;
+
 namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 
 /// <summary>
@@ -21,9 +23,11 @@ public sealed class WinUITypeTests : IDisposable
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
     private readonly string _windowHandle;
+    private readonly ITestOutputHelper _output;
 
-    public WinUITypeTests(ModernTestHarnessFixture fixture)
+    public WinUITypeTests(ModernTestHarnessFixture fixture, ITestOutputHelper output)
     {
+        _output = output;
         _fixture = fixture;
         _fixture.BringToFront();
 
@@ -188,6 +192,33 @@ public sealed class WinUITypeTests : IDisposable
         var typed = await keyboard.TypeTextAsync(text, handle);
         Assert.True(typed.Success, typed.Error);
 
+        await AssertEditorTextAsync(text);
+    }
+
+    [Fact]
+    public async Task EditorTextReadback_MatchesSemanticTextEntry()
+    {
+        var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavEditor",
+        });
+        Assert.True(navigate.Success, navigate.ErrorMessage);
+        const string text = "Read-back probe 123";
+        var typed = await _automationService.ObserveAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "EditorTextBox",
+            },
+            text,
+            clearFirst: true);
+        Assert.True(typed.Success, typed.ErrorMessage);
+        await AssertEditorTextAsync(text);
+    }
+
+    private async Task AssertEditorTextAsync(string text)
+    {
         var found = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
@@ -195,7 +226,28 @@ public sealed class WinUITypeTests : IDisposable
         });
         Assert.True(found.Success, found.ErrorMessage);
         var editor = Assert.Single(found.Items!);
-        var read = await _automationService.GetTextAsync(editor.Id, _windowHandle, false);
+        UIAutomationResult? read = null;
+        var matched = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                read = await _automationService.GetTextAsync(editor.Id, _windowHandle, false);
+                _output.WriteLine($"Editor read: {System.Text.Json.JsonSerializer.Serialize(read)}");
+            },
+            condition: () => read is { Success: true }
+                && read.Text?.ReplaceLineEndings("\n") == text.ReplaceLineEndings("\n"));
+        if (!matched)
+        {
+            var counts = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "CharacterCountText",
+            });
+            var focused = await _automationService.GetFocusedElementAsync();
+            _output.WriteLine($"Character count: {System.Text.Json.JsonSerializer.Serialize(counts)}");
+            _output.WriteLine($"Focus after typing: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+        }
+
+        Assert.NotNull(read);
         Assert.True(read.Success, read.ErrorMessage);
         Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
     }
