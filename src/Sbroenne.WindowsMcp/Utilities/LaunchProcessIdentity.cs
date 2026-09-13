@@ -8,17 +8,6 @@ namespace Sbroenne.WindowsMcp.Utilities;
 /// <summary>Process lifetime and executable identity, independent of window titles and PID reuse.</summary>
 internal sealed partial record LaunchProcessIdentity(int ProcessId, DateTime StartTimeUtc, string ExecutablePath)
 {
-    internal static string? ExplicitExecutablePath(string programPath)
-    {
-        // Do not guess ShellExecute's name lookup or resolve Store execution aliases as normal files.
-        return Path.IsPathFullyQualified(programPath) &&
-            string.Equals(Path.GetExtension(programPath), ".exe", StringComparison.OrdinalIgnoreCase) &&
-            File.Exists(programPath) &&
-            (File.GetAttributes(programPath) & FileAttributes.ReparsePoint) == 0
-                ? Path.GetFullPath(programPath)
-                : null;
-    }
-
     internal static LaunchProcessIdentity? TryRead(int processId)
     {
         try
@@ -37,12 +26,14 @@ internal sealed partial record LaunchProcessIdentity(int ProcessId, DateTime Sta
     {
         try
         {
-            // Query the actual image rather than assuming process names uniquely identify executables.
+            // The native image path survives process exit on the retained handle; Win32 path
+            // conversion can fail after exit. Use this same representation for every comparison.
+            const uint ProcessNameNative = 1;
             var buffer = new char[32768];
             var size = (uint)buffer.Length;
             fixed (char* path = buffer)
             {
-                if (!QueryFullProcessImageName(process.SafeHandle, 0, path, ref size))
+                if (!QueryFullProcessImageName(process.SafeHandle, ProcessNameNative, path, ref size))
                 {
                     throw new Win32Exception(Marshal.GetLastPInvokeError());
                 }

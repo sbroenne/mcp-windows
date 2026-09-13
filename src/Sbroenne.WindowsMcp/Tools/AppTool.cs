@@ -162,7 +162,6 @@ public static partial class AppTool
                 }
             }
 
-            var explicitExecutable = waitForWindow ? LaunchProcessIdentity.ExplicitExecutablePath(programPath) : null;
             using var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -174,9 +173,7 @@ public static partial class AppTool
             if (waitForWindow)
             {
                 var windowService = WindowsToolsBase.WindowService;
-                // Windows can no longer supply the image path after a very fast exit. Only an explicit
-                // executable path can supply that identity then; never infer it from a title or basename.
-                var executablePath = LaunchProcessIdentity.TryRead(process)?.ExecutablePath ?? explicitExecutable;
+                var executablePath = LaunchProcessIdentity.TryRead(process)?.ExecutablePath;
                 var timeout = timeoutMs ?? WindowsToolsBase.TimeoutMs;
                 var elapsed = Stopwatch.StartNew();
                 while (true)

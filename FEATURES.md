@@ -165,10 +165,11 @@ Launch applications and get their window handles for subsequent operations.
 | `exitedWithoutWindow` | The launcher exited zero but no window or matching pre-launch instance could be established; the call fails without claiming a handoff. |
 
 A possible handoff is not confirmation that a URL/document was delivered or loaded.
-Executable paths and process creation times establish the existing instance, not window titles
-or executable basenames. If Windows cannot report a fast-exiting process's image path, only
-an explicit full executable path (not a Store execution alias) can supply that identity;
-unresolved names and differently named Store launchers remain unverified.
+Native executable image paths and process creation times establish the existing instance,
+not window titles or executable basenames. The retained process handle identifies even
+an already-exited launcher; bare names still use Windows' own executable lookup.
+If image identity cannot be read, or a Store launcher redirects to a different executable,
+the relationship remains unverified rather than being inferred from a title or requested path.
 Nonzero exits observed during the wait fail even when another instance is open.
 Multiple matching windows are listed without selecting an arbitrary `window`.
 

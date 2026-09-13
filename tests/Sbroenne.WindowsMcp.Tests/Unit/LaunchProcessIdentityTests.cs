@@ -13,32 +13,29 @@ public sealed class LaunchProcessIdentityTests
         Assert.NotNull(identity);
         Assert.Equal(process.Id, identity.ProcessId);
         Assert.Equal(process.StartTime.ToUniversalTime(), identity.StartTimeUtc);
-        Assert.Equal(Environment.ProcessPath, identity.ExecutablePath, ignoreCase: true);
+        Assert.StartsWith("\\Device\\", identity.ExecutablePath, StringComparison.Ordinal);
+        Assert.EndsWith(Environment.ProcessPath![Path.GetPathRoot(Environment.ProcessPath)!.Length..],
+            identity.ExecutablePath, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(identity, LaunchProcessIdentity.TryRead(process.Id));
     }
 
-    [Fact]
-    public async Task FastExit_ExplicitExecutableIdentityDoesNotDependOnLiveImageQuery()
+    [Theory]
+    [InlineData(0)]
+    [InlineData(800)]
+    public async Task RetainedHandle_IdentifiesAlreadyExitedProcessWithoutResolvingLaunchName(int delay)
     {
         var path = Path.Combine(AppContext.BaseDirectory, "Sbroenne.WindowsMcp.Cli.TestFixture.exe");
         using var process = Process.Start(new ProcessStartInfo(path)
         {
-            Arguments = "--exit 0 0",
+            Arguments = $"--exit {delay} 0",
             UseShellExecute = false,
             CreateNoWindow = true,
         })!;
         await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(15));
-        var executable = LaunchProcessIdentity.TryRead(process)?.ExecutablePath ??
-            LaunchProcessIdentity.ExplicitExecutablePath(path);
-        Assert.Equal(path, executable, ignoreCase: true);
-    }
-
-    [Theory]
-    [InlineData("notepad.exe")]
-    [InlineData(".\\fixture.exe")]
-    [InlineData("https://example.invalid")]
-    public void UnresolvedName_IsNotGuessed(string path)
-    {
-        Assert.Null(LaunchProcessIdentity.ExplicitExecutablePath(path));
+        var identity = LaunchProcessIdentity.TryRead(process);
+        Assert.NotNull(identity);
+        Assert.StartsWith("\\Device\\", identity.ExecutablePath, StringComparison.Ordinal);
+        Assert.EndsWith(path[Path.GetPathRoot(path)!.Length..], identity.ExecutablePath, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(process.StartTime.ToUniversalTime(), identity.StartTimeUtc);
     }
 }
