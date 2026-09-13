@@ -44,6 +44,11 @@ public sealed record UIAutomationResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIActionElement? PostActionElement { get; init; }
 
+    /// <summary>Provider read failure after successful dispatch; distinct from snapshot warnings.</summary>
+    [JsonPropertyName("postActionElementWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionElementWarning { get; init; }
+
     /// <summary>
     /// Full element details. Only populated for single-element results or get_element_details.
     /// </summary>

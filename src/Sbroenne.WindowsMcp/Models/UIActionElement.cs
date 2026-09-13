@@ -9,9 +9,9 @@ public sealed record UIActionElement
     [JsonPropertyName("id")]
     public required string Id { get; init; }
 
-    /// <summary>The name at the time of this observation.</summary>
+    /// <summary>The name at the time of this observation, or null when unsupported.</summary>
     [JsonPropertyName("name")]
-    public required string Name { get; init; }
+    public required string? Name { get; init; }
 
     /// <summary>The control type at the time of this observation.</summary>
     [JsonPropertyName("type")]

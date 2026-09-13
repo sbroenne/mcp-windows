@@ -52,6 +52,10 @@ target could not be read afterward, not that the click failed. A name change
 the click. An inert button can also accept a click without doing anything.
 This applies to double-clicks too.
 
+An unsupported pre-action name may be omitted; the original target ID is retained.
+Provider failures while reading after dispatch, including timeouts and access
+errors, produce `postActionElementWarning` without changing dispatch success.
+
 Use `withSnapshot:true` (`--with-snapshot` in the CLI) to inspect the immediate
 window state. For an expected change that takes time, use `ui_wait` with a bounded
 `timeoutMs` (`wincli ui wait --timeout-ms ...`) or compare snapshots. These checks

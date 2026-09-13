@@ -155,7 +155,7 @@ public sealed partial class UIAutomationService
             }
 
             fallbackClickPoint ??= GetVerifiedCachedClickPoint(element);
-            target = ReadActionElement(elementId, element);
+            target = ReadClickTarget(elementId, element);
             targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "target_validation");
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
         }, cancellationToken);
@@ -198,27 +198,43 @@ public sealed partial class UIAutomationService
         Enabled = element.CurrentIsEnabled != 0,
     };
 
+    internal static UIActionElement ReadClickTarget(string id, UIA.IUIAutomationElement element) => new()
+    {
+        Id = id,
+        Name = element.GetName(),
+        Type = element.GetControlTypeName(),
+        // This observation is captured only after the enabled check passed.
+        Enabled = true,
+    };
+
     private static UIAutomationResult CaptureClickResult(
         string action, UIActionElement target, UIA.IUIAutomationElement element,
-        bool unavailable, UIAutomationDiagnostics diagnostics)
-    {
-        UIActionElement? postActionElement = null;
-        if (!unavailable)
-        {
-            try
-            {
-                if (ElementIdGenerator.ResolveToAutomationElement(target.Id) is not null)
-                {
-                    postActionElement = ReadActionElement(target.Id, element);
-                }
-            }
-            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-            {
-                // Dispatch already succeeded. Missing observations must not invite another click.
-            }
-        }
+        bool unavailable, UIAutomationDiagnostics diagnostics) =>
+        CaptureClickResult(
+            action, target,
+            () => !unavailable && ElementIdGenerator.ResolveToAutomationElement(target.Id) is not null
+                ? ReadActionElement(target.Id, element)
+                : null,
+            diagnostics);
 
-        return UIAutomationResult.CreateClickDispatched(action, target, postActionElement, diagnostics);
+    internal static UIAutomationResult CaptureClickResult(
+        string action, UIActionElement target, Func<UIActionElement?> readPostAction,
+        UIAutomationDiagnostics diagnostics)
+    {
+        try
+        {
+            return UIAutomationResult.CreateClickDispatched(action, target, readPostAction(), diagnostics);
+        }
+        catch (Exception ex) when (ex is COMException || COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            // Even a provider timeout or access failure here cannot undo successful dispatch.
+            return UIAutomationResult.CreateClickDispatched(action, target, null, diagnostics) with
+            {
+                PostActionElementWarning = ex is COMException comException
+                    ? COMExceptionHelper.GetErrorMessage(comException, "Post-action element read")
+                    : $"Post-action element read failed: {ex.Message}",
+            };
+        }
     }
 
     /// <summary>
@@ -1265,7 +1281,7 @@ public sealed partial class UIAutomationService
             }
 
             var root = GetRootElementForScroll(element);
-            target = ReadActionElement(elementId, element);
+            target = ReadClickTarget(elementId, element);
             targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "physical_double_click");
             var initial = new ElementActionState(
                 element.GetControlTypeId(),
