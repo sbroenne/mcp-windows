@@ -140,7 +140,7 @@ public sealed class McpArgumentValidationTests(UITestHarnessFixture fixture)
     private static Task<CallToolResult> InvokeRegisteredWaitAsync(Dictionary<string, JsonElement> arguments) =>
         InvokeRegisteredToolAsync("ui_wait", arguments);
 
-    private static async Task<CallToolResult> InvokeRegisteredToolAsync(string name, Dictionary<string, JsonElement> arguments)
+    internal static async Task<CallToolResult> InvokeRegisteredToolAsync(string name, Dictionary<string, JsonElement> arguments)
     {
         var services = new ServiceCollection();
         services.AddMcpServer().WithToolsFromAssembly(typeof(ToolCatalog).Assembly);

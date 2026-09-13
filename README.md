@@ -43,6 +43,25 @@ mouse_control(action='click', x=450, y=300)
 
 Same command works every time. Any machine. Any DPI. Any theme.
 
+For `ui_click` and `wincli ui click`, `success:true` means the action was sent, not
+that saving, publishing, or navigation finished. Responses include
+`actionDispatched:true`, `outcomeVerified:false`, the pre-action `target`, and a
+separately labeled `postActionElement`. `postActionState:"unavailable"` means the
+target could not be read afterward, not that the click failed. A name change
+(Open to Close), self-disable, or disappearing dialog is not a reason to repeat
+the click. An inert button can also accept a click without doing anything.
+This applies to double-clicks too.
+
+An unsupported pre-action name may be omitted; the original target ID is retained.
+Provider failures while reading after dispatch, including timeouts and access
+errors, produce `postActionElementWarning` without changing dispatch success.
+
+Use `withSnapshot:true` (`--with-snapshot` in the CLI) to inspect the immediate
+window state. For an expected change that takes time, use `ui_wait` with a bounded
+`timeoutMs` (`wincli ui wait --timeout-ms ...`) or compare snapshots. These checks
+do not replay the click and do not change its `outcomeVerified` field. A snapshot
+is an observation, not proof of an application-specific outcome.
+
 Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
 For controls that open a native file picker, click the browser control first, then call
 `file_open(..., triggerMode='wait')`. Use `window_management(action='maximize')` when the page's

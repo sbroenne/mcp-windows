@@ -109,6 +109,8 @@ public sealed partial class UIAutomationService
             activationHandle = parsedHandle;
         }
 
+        UIActionElement? target = null;
+        UIAutomationDiagnostics? targetDiagnostics = null;
         var prepared = await _staThread.ExecuteAsync(() =>
         {
             var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
@@ -153,6 +155,8 @@ public sealed partial class UIAutomationService
             }
 
             fallbackClickPoint ??= GetVerifiedCachedClickPoint(element);
+            target = ReadClickTarget(elementId, element);
+            targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "target_validation");
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
         }, cancellationToken);
 
@@ -180,19 +184,57 @@ public sealed partial class UIAutomationService
 
         return await _staThread.ExecuteAsync(() =>
         {
-            var info = outcome.ElementUnavailable
-                ? null
-                : ConvertToElementInfo(prepared.Element!, prepared.Root!, _coordinateConverter);
-            return info is null
-                ? UIAutomationResult.CreateSuccessWithHint(
-                    "click",
-                    "Click succeeded. Element closed or changed its parent window or dialog.",
-                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"))
-                : UIAutomationResult.CreateSuccessCompact(
-                    "click",
-                    [info],
-                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"));
+            return CaptureClickResult(
+                "click", target!, prepared.Element!, outcome.ElementUnavailable,
+                targetDiagnostics! with { DurationMs = stopwatch.ElapsedMilliseconds, ActionPath = outcome.ActionPath });
         }, cancellationToken);
+    }
+
+    private static UIActionElement ReadActionElement(string id, UIA.IUIAutomationElement element) => new()
+    {
+        Id = id,
+        Name = element.CurrentName,
+        Type = UIA3ControlTypeIds.ToName(element.CurrentControlType),
+        Enabled = element.CurrentIsEnabled != 0,
+    };
+
+    internal static UIActionElement ReadClickTarget(string id, UIA.IUIAutomationElement element) => new()
+    {
+        Id = id,
+        Name = element.GetName(),
+        Type = element.GetControlTypeName(),
+        // This observation is captured only after the enabled check passed.
+        Enabled = true,
+    };
+
+    private static UIAutomationResult CaptureClickResult(
+        string action, UIActionElement target, UIA.IUIAutomationElement element,
+        bool unavailable, UIAutomationDiagnostics diagnostics) =>
+        CaptureClickResult(
+            action, target,
+            () => !unavailable && ElementIdGenerator.ResolveToAutomationElement(target.Id) is not null
+                ? ReadActionElement(target.Id, element)
+                : null,
+            diagnostics);
+
+    internal static UIAutomationResult CaptureClickResult(
+        string action, UIActionElement target, Func<UIActionElement?> readPostAction,
+        UIAutomationDiagnostics diagnostics)
+    {
+        try
+        {
+            return UIAutomationResult.CreateClickDispatched(action, target, readPostAction(), diagnostics);
+        }
+        catch (Exception ex) when (ex is COMException || COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            // Even a provider timeout or access failure here cannot undo successful dispatch.
+            return UIAutomationResult.CreateClickDispatched(action, target, null, diagnostics) with
+            {
+                PostActionElementWarning = ex is COMException comException
+                    ? COMExceptionHelper.GetErrorMessage(comException, "Post-action element read")
+                    : $"Post-action element read failed: {ex.Message}",
+            };
+        }
     }
 
     /// <summary>
@@ -1182,6 +1224,8 @@ public sealed partial class UIAutomationService
             activationHandle = parsedElementHandle;
         }
 
+        UIActionElement? target = null;
+        UIAutomationDiagnostics? targetDiagnostics = null;
         var prepared = await _staThread.ExecuteAsync(() =>
         {
             var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
@@ -1237,6 +1281,8 @@ public sealed partial class UIAutomationService
             }
 
             var root = GetRootElementForScroll(element);
+            target = ReadClickTarget(elementId, element);
+            targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "physical_double_click");
             var initial = new ElementActionState(
                 element.GetControlTypeId(),
                 GetToggleStateValue(element),
@@ -1291,34 +1337,9 @@ public sealed partial class UIAutomationService
 
         return await _staThread.ExecuteAsync(() =>
         {
-            // A double-click commonly opens/closes the element's window, so a stale element here is success.
-            UIElementInfo? info;
-            try
-            {
-                info = ConvertToElementInfo(prepared.Element!, GetRootElementForScroll(prepared.Element!), _coordinateConverter);
-            }
-            catch (COMException)
-            {
-                info = null;
-            }
-
-            if (info is null)
-            {
-                return UIAutomationResult.CreateSuccessWithHint(
-                    "double_click",
-                    "Double-click succeeded. Element closed or changed its parent window or dialog.",
-                    CreateDiagnostics(stopwatch));
-            }
-
-            // Unlike a single click, the effect of a double-click frequently lands in a different top-level
-            // window (an opened file or dialog), so an unchanged source tree is a hint, not a failure.
-            return outcome.Observed
-                ? UIAutomationResult.CreateSuccessCompact("double_click", [info], CreateDiagnostics(stopwatch))
-                : UIAutomationResult.CreateSuccessWithHint(
-                    "double_click",
-                    "Double-click was delivered, but no change was observed in this window within the verification window. " +
-                    "If it should have opened something, look for a new window with window_management(action='list').",
-                    CreateDiagnostics(stopwatch));
+            return CaptureClickResult(
+                "double_click", target!, prepared.Element!, outcome.ElementUnavailable,
+                targetDiagnostics! with { DurationMs = stopwatch.ElapsedMilliseconds });
         }, cancellationToken);
     }
 

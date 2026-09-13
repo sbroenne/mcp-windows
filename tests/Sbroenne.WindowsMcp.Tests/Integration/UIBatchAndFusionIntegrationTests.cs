@@ -354,7 +354,7 @@ public sealed class UIBatchAndFusionIntegrationTests
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Double-click batch failed: {ExtractText(result)}");
-        Assert.Equal("double-clicked", batch.Steps[0].Summary);
+        Assert.Equal("double-click dispatched; application outcome not verified", batch.Steps[0].Summary);
 
         // The tool waits for an observable change before returning, which the first mouse-up already causes;
         // poll briefly for the second so the assertion does not race the message pump.
@@ -414,6 +414,8 @@ public sealed class UIBatchAndFusionIntegrationTests
         var text = ExtractText(result);
         var doc = JsonDocument.Parse(text);
         Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), $"Click failed: {text}");
+        Assert.True(doc.RootElement.GetProperty("actionDispatched").GetBoolean());
+        Assert.False(doc.RootElement.GetProperty("outcomeVerified").GetBoolean());
         Assert.Equal("full", doc.RootElement.GetProperty("postActionKind").GetString());
         Assert.True(doc.RootElement.TryGetProperty("postActionTree", out _));
         Assert.False(doc.RootElement.TryGetProperty("postActionChanges", out _));

@@ -140,6 +140,10 @@ checks early/late exits and actual received requests through MCP and CLI, withou
 accounts, or user documents. `scope=window` also includes these tests. Do not run the GUI
 fixture on a shared local desktop.
 
+For click response work, use `scope=click`. This includes owned MCP/CLI response
+regressions, disappearing targets, identity continuity, WinUI clicks, and batch
+snapshot checks. Do not run these desktop tests on a shared local machine.
+
 ```powershell
 # Test specific feature (e.g., after modifying keyboard functionality)
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q
