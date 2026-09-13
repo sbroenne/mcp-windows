@@ -151,4 +151,43 @@ public sealed class WinUITypeTests : IDisposable
         // Assert
         Assert.True(result.Success, $"Type with clear failed: {result.ErrorMessage}");
     }
+
+    [Theory]
+    [InlineData("Project: Aurora")]
+    [InlineData("Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan")]
+    [InlineData("Project: Aurora\nStatus: Draft\nOwner: Taylor")]
+    public async Task KeyboardTyping_PreservesEveryCharacterInModernEditor(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavEditor",
+        });
+        Assert.True(navigate.Success, navigate.ErrorMessage);
+        var focus = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "EditorTextBox",
+        });
+        Assert.True(focus.Success, focus.ErrorMessage);
+
+        using var keyboard = new KeyboardInputService();
+        var handle = nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        var typed = await keyboard.TypeTextAsync(text, handle);
+        Assert.True(typed.Success, typed.Error);
+
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "EditorTextBox",
+        });
+        Assert.True(found.Success, found.ErrorMessage);
+        var editor = Assert.Single(found.Items!);
+        var read = await _automationService.GetTextAsync(editor.Id, _windowHandle, false);
+        Assert.True(read.Success, read.ErrorMessage);
+        Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+    }
 }
