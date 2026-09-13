@@ -53,20 +53,22 @@ credentials in this project.
 
 ## Framework prerequisite
 
-The project pins an inspected public framework revision for reproducible no-model checks.
-The new capture/reporting changes must be available before live runs: `ToolCall.completion_received`
-and `CopilotResult.evidence_complete`. Older versions are rejected before model execution, rather
-than silently accepting missing evidence.
+The project pins published framework commit
+`22745692f1e87e9f4a59d3175bcbcb5ce842d124`, including complete tool evidence,
+configuration-aware reports, recoverable paid summaries, and SDK 1.0.13 support.
+It is published in `sbroenne/pytest-skill-engineering#95`, stacked on SDK upgrade
+`sbroenne/pytest-skill-engineering#94`; publication does not mean either PR is merged.
+Older versions without `ToolCall.completion_received` and `CopilotResult.evidence_complete`
+are rejected before model execution rather than silently accepting missing evidence.
 
-While those framework changes are in a separate worktree, validate and run with:
+For framework development only, an optional local override is:
 
 ```powershell
 uv run --with-editable "$frameworkWorktree" pytest tests\unit -q
 ```
 
-Set `$frameworkWorktree` to your own checkout. Apply the same `--with-editable` option to the live
-command below. Do not commit an absolute local dependency path. Update the pinned revision when
-the framework changes have been published, then validate without the override.
+Set `$frameworkWorktree` to your own checkout. Do not commit an absolute local dependency path.
+Normal commands below use the published pin without an override.
 
 ## Live execution requires a separate decision
 
@@ -99,7 +101,7 @@ times two interfaces. Replace the placeholders with the approved choices:
 ```powershell
 $env:MCP_TEST_DESKTOP_INPUT = '1'
 $env:MCP_USAGE_DISPOSABLE_DESKTOP = '1'
-uv run --with-editable "$frameworkWorktree" pytest tests\live -v `
+uv run pytest tests\live -v `
   --run-usage-evals --usage-model "<approved-model>" `
   --usage-max-runs 6 --usage-timeout <approved-seconds> `
   --junitxml=TestResults\usage-junit.xml `
@@ -147,11 +149,10 @@ influence the other:
 if (-not $env:GITHUB_TOKEN -and $env:GH_TOKEN) {
   $env:GITHUB_TOKEN = $env:GH_TOKEN
 }
-uv run --with-editable "$frameworkWorktree" pytest-skill-engineering-report `
+uv run pytest-skill-engineering-report `
   TestResults\sol-luna.json --html TestResults\sol-luna.html `
   --json TestResults\sol-luna-summary.json `
-  --summary --summary-model copilot/gpt-5.6-sol --summary-attempts 3 `
-  --analysis-prompt "$frameworkWorktree\src\pytest_skill_engineering\prompts\ai_summary.md"
+  --summary --summary-model copilot/gpt-5.6-sol --summary-attempts 3
 ```
 
 4. Compare agreement, disagreement, missed findings, and unsupported claims against the same
@@ -171,12 +172,12 @@ through the process environment, not by copying a user's configuration or creden
 reuse that checkpoint without paying for analysis again:
 
 ```powershell
-uv run --with-editable "$frameworkWorktree" pytest-skill-engineering-report `
+uv run pytest-skill-engineering-report `
   TestResults\sol-luna-summary.json --html TestResults\sol-luna.html
 ```
 
-Do not pass `--summary` when reusing saved analysis. These options require the updated framework
-worktree described above. Review generated recommendations against the actual file checks:
+Do not pass `--summary` when reusing saved analysis. These options are included in the pinned
+framework. Review generated recommendations against the actual file checks:
 pytest pass rates include harness failures, and a single sample does not justify deployment
 rankings. Do not add tool hints to task prompts merely because an automated review suggests them.
 

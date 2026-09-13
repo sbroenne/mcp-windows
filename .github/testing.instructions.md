@@ -18,6 +18,11 @@
 
 ## Test Harnesses
 
+The shared Windows UI workflow runs one job at a time and uses `queue: max` to retain
+up to 100 pending runs instead of replacing an earlier pending validation. Keep
+`cancel-in-progress: false`. Older branches without this setting still need manual
+runner coordination; do not assume they preserve pending work.
+
 ### Fresh CLI/MCP Usage Evaluations
 
 `tests/usage_evals/` is a separate pytest-skill-engineering consumer for learning whether and how

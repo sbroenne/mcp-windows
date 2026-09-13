@@ -70,12 +70,16 @@ public sealed class CliHelpIntegrationTests
     [Fact]
     public async Task HelpText_AsAnOptionValue_IsNotAHelpRequest()
     {
-        var (code, stdout, stderr) = await RunAsync("keyboard", "type", "--text=--help");
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse(["keyboard", "type", "--text=--help"]),
+            output, error, CancellationToken.None);
 
         Assert.Equal(1, code);
-        Assert.Empty(stderr);
-        Assert.Contains("\"success\":false", stdout, StringComparison.Ordinal);
-        Assert.Contains("windowHandle", stdout, StringComparison.Ordinal);
+        Assert.Empty(error.ToString());
+        Assert.Contains("\"success\":false", output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("windowHandle", output.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
