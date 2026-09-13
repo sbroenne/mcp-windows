@@ -17,6 +17,7 @@ public static class WindowsAutomationGuidance
         "ui_snapshot(windowHandle='<handle>') - ORIENT FIRST: compact element tree. REPEATED-CHECK RULE: for before/after or any repeated inspection, you MUST explicitly pass mode='auto' on the first and every later snapshot; never omit mode or choose full. Use full only for one inspection. Use reset then auto to replace an older comparison. parentElementId revisits a known subtree id from an earlier snapshot/find; omit it to inspect the whole window.\n" +
         "ui_find(windowHandle='<handle>', name='...') - discover elements (name, controlType, coordinates)\n" +
         "ui_click(windowHandle='<handle>', elementId='<observed-id>') - click a discovered element. Add doubleClick=true to double-click without coordinates.\n" +
+        "Click success means dispatched, not application outcome verified. target is pre-action; postActionElement is a later observation, or postActionState='unavailable'. Renaming, self-disabling, or disappearing does not justify replay. Use a snapshot or bounded ui_wait for the expected state.\n" +
         "ui_type(windowHandle='<handle>', text='...', elementId='<observed-input-id>') - type into a discovered field\n" +
         "ui_select(windowHandle='<handle>', value='...', elementId='<observed-control-id>') - pick option text in a discovered combo box / list / tab\n" +
         "ui_read(windowHandle='<handle>', elementId='<observed-id>') - read only this element; no whole-window OCR fallback. Omit elementId for intentional whole-window text/OCR.\n" +
@@ -31,7 +32,7 @@ public static class WindowsAutomationGuidance
         "### 2c. BATCH, MACROS & FUSION (Fewer round-trips)\n" +
         "ui_batch(windowHandle='<handle>', steps='[...]', stopOnError=true) - run many steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in ONE call. Use for multi-field forms AND for canvas drawing instead of many separate calls.\n" +
         "ui_macro(action='save', name='...', steps='[...]') then ui_macro(action='run', name='...', windowHandle='<handle>') - persist a ui_batch sequence and replay it later; also action='list'/'get'/'delete'.\n" +
-        "ui_click(windowHandle='<handle>', elementId='<observed-id>', withSnapshot=true) - add withSnapshot=true to ui_click/ui_type/ui_select to verify the result without another call. Use snapshotMode='full' once, 'auto' for repeated checks, or 'reset' to begin a new comparison. Pass snapshotSince for a checked diff.\n\n" +
+        "ui_click(windowHandle='<handle>', elementId='<observed-id>', withSnapshot=true) - add withSnapshot=true to ui_click/ui_type/ui_select to inspect post-action state without another call; this does not verify an application outcome. Use snapshotMode='full' once, 'auto' for repeated checks, or 'reset' to begin a new comparison. Pass snapshotSince for a checked diff.\n\n" +
         "### 2d. CLIPBOARD (Fast bulk text IO)\n" +
         "clipboard(action='get') - read the clipboard text; clipboard(action='set', text='...') - write it; clipboard(action='clear').\n" +
         "Pair with copy/paste hotkeys: focus app, keyboard_control(key='c', modifiers='ctrl'), then clipboard(action='get'); or clipboard(action='set', text='...') then keyboard_control(key='v', modifiers='ctrl').\n\n" +

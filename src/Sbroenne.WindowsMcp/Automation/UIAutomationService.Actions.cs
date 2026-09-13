@@ -109,6 +109,8 @@ public sealed partial class UIAutomationService
             activationHandle = parsedHandle;
         }
 
+        UIActionElement? target = null;
+        UIAutomationDiagnostics? targetDiagnostics = null;
         var prepared = await _staThread.ExecuteAsync(() =>
         {
             var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
@@ -153,6 +155,8 @@ public sealed partial class UIAutomationService
             }
 
             fallbackClickPoint ??= GetVerifiedCachedClickPoint(element);
+            target = ReadActionElement(elementId, element);
+            targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "target_validation");
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
         }, cancellationToken);
 
@@ -180,19 +184,41 @@ public sealed partial class UIAutomationService
 
         return await _staThread.ExecuteAsync(() =>
         {
-            var info = outcome.ElementUnavailable
-                ? null
-                : ConvertToElementInfo(prepared.Element!, prepared.Root!, _coordinateConverter);
-            return info is null
-                ? UIAutomationResult.CreateSuccessWithHint(
-                    "click",
-                    "Click succeeded. Element closed or changed its parent window or dialog.",
-                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"))
-                : UIAutomationResult.CreateSuccessCompact(
-                    "click",
-                    [info],
-                    CreateActionDiagnostics(stopwatch, prepared.Element, outcome.ActionPath ?? "unknown"));
+            return CaptureClickResult(
+                "click", target!, prepared.Element!, outcome.ElementUnavailable,
+                targetDiagnostics! with { DurationMs = stopwatch.ElapsedMilliseconds, ActionPath = outcome.ActionPath });
         }, cancellationToken);
+    }
+
+    private static UIActionElement ReadActionElement(string id, UIA.IUIAutomationElement element) => new()
+    {
+        Id = id,
+        Name = element.CurrentName,
+        Type = UIA3ControlTypeIds.ToName(element.CurrentControlType),
+        Enabled = element.CurrentIsEnabled != 0,
+    };
+
+    private static UIAutomationResult CaptureClickResult(
+        string action, UIActionElement target, UIA.IUIAutomationElement element,
+        bool unavailable, UIAutomationDiagnostics diagnostics)
+    {
+        UIActionElement? postActionElement = null;
+        if (!unavailable)
+        {
+            try
+            {
+                if (ElementIdGenerator.ResolveToAutomationElement(target.Id) is not null)
+                {
+                    postActionElement = ReadActionElement(target.Id, element);
+                }
+            }
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            {
+                // Dispatch already succeeded. Missing observations must not invite another click.
+            }
+        }
+
+        return UIAutomationResult.CreateClickDispatched(action, target, postActionElement, diagnostics);
     }
 
     /// <summary>
@@ -1182,6 +1208,8 @@ public sealed partial class UIAutomationService
             activationHandle = parsedElementHandle;
         }
 
+        UIActionElement? target = null;
+        UIAutomationDiagnostics? targetDiagnostics = null;
         var prepared = await _staThread.ExecuteAsync(() =>
         {
             var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
@@ -1237,6 +1265,8 @@ public sealed partial class UIAutomationService
             }
 
             var root = GetRootElementForScroll(element);
+            target = ReadActionElement(elementId, element);
+            targetDiagnostics = CreateActionDiagnostics(stopwatch, element, "physical_double_click");
             var initial = new ElementActionState(
                 element.GetControlTypeId(),
                 GetToggleStateValue(element),
@@ -1291,34 +1321,9 @@ public sealed partial class UIAutomationService
 
         return await _staThread.ExecuteAsync(() =>
         {
-            // A double-click commonly opens/closes the element's window, so a stale element here is success.
-            UIElementInfo? info;
-            try
-            {
-                info = ConvertToElementInfo(prepared.Element!, GetRootElementForScroll(prepared.Element!), _coordinateConverter);
-            }
-            catch (COMException)
-            {
-                info = null;
-            }
-
-            if (info is null)
-            {
-                return UIAutomationResult.CreateSuccessWithHint(
-                    "double_click",
-                    "Double-click succeeded. Element closed or changed its parent window or dialog.",
-                    CreateDiagnostics(stopwatch));
-            }
-
-            // Unlike a single click, the effect of a double-click frequently lands in a different top-level
-            // window (an opened file or dialog), so an unchanged source tree is a hint, not a failure.
-            return outcome.Observed
-                ? UIAutomationResult.CreateSuccessCompact("double_click", [info], CreateDiagnostics(stopwatch))
-                : UIAutomationResult.CreateSuccessWithHint(
-                    "double_click",
-                    "Double-click was delivered, but no change was observed in this window within the verification window. " +
-                    "If it should have opened something, look for a new window with window_management(action='list').",
-                    CreateDiagnostics(stopwatch));
+            return CaptureClickResult(
+                "double_click", target!, prepared.Element!, outcome.ElementUnavailable,
+                targetDiagnostics! with { DurationMs = stopwatch.ElapsedMilliseconds });
         }, cancellationToken);
     }
 
