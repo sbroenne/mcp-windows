@@ -112,7 +112,7 @@ Assert.Equal("3", readResult.Text);
 ### Desktop-Input Tests Are Opt-In (`MCP_TEST_DESKTOP_INPUT`)
 
 Tests that inject **real** mouse/keyboard input (the `MouseIntegrationTests` and `KeyboardIntegrationTests`
-collections) drive `SendInput` against the live desktop. That input is **global to the active input
+collections, plus `TestHarnessInputTests`) drive `SendInput` against the live desktop. That input is **global to the active input
 desktop** — the test harness window limits *where clicks land*, but it cannot stop the run from
 commandeering the cursor and keyboard focus for the whole session. Running them on a shared or
 interactive machine hijacks your desktop.
