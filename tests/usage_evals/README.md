@@ -54,7 +54,7 @@ credentials in this project.
 ## Framework prerequisite
 
 The project pins published framework commit
-`22745692f1e87e9f4a59d3175bcbcb5ce842d124`, including complete tool evidence,
+`5a533dcd149c3e27f60b0a296a047ba1d3f255ff`, including complete tool evidence,
 configuration-aware reports, recoverable paid summaries, and SDK 1.0.13 support.
 It is published in `sbroenne/pytest-skill-engineering#95`, stacked on SDK upgrade
 `sbroenne/pytest-skill-engineering#94`; publication does not mean either PR is merged.
