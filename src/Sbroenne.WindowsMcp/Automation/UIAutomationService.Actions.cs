@@ -1683,7 +1683,8 @@ public sealed partial class UIAutomationService
         // Common save dialog title patterns (case-insensitive matching)
         string[] dialogPatterns = ["Save As", "Save as", "Save this file", "Save"];
 
-        var deadline = DateTime.UtcNow + SaveDialogTimeout;
+        // Selection now includes filename-field readiness, using the former discovery and field budgets.
+        var deadline = DateTime.UtcNow + SaveDialogTimeout + SaveDialogTimeout;
 
         while (DateTime.UtcNow < deadline)
         {
@@ -1719,7 +1720,8 @@ public sealed partial class UIAutomationService
                                             // Check if it matches any dialog pattern
                                             foreach (var pattern in dialogPatterns)
                                             {
-                                                if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                                if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase) &&
+                                                    FindSaveDialogEditField(child) is not null)
                                                 {
                                                     return (element: child, name: name);
                                                 }
@@ -1745,7 +1747,8 @@ public sealed partial class UIAutomationService
                         for (var index = 0; dialogs is not null && index < dialogs.Length; index++)
                         {
                             var dialog = dialogs.GetElement(index);
-                            if (IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(dialog), parentHwnd))
+                            if (IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(dialog), parentHwnd) &&
+                                FindSaveDialogEditField(dialog) is not null)
                             {
                                 return (element: dialog, name: pattern);
                             }

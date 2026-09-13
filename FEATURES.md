@@ -523,6 +523,7 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 - Works with Office apps, Notepad, and more
 
 Save requires the target window and filename field to have focus before sending input.
+Dialog discovery checks ownership, title, and a recognized filename field; a Save-like title alone is insufficient.
 The filename must be observed before Save is pressed. When a path is supplied, success requires
 observing a new file or a change in its size, creation time, or last-write time after the shortcut.
 An unchanged existing file is not proof of a successful save; if no change is observed, the
