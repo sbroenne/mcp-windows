@@ -266,7 +266,8 @@ public static partial class UIBatchTool
                         ? await service.DoubleClickElementAsync(elementId!, windowHandle, cancellationToken)
                         : await service.ClickElementAsync(elementId!, windowHandle, cancellationToken);
 
-                    return Step(index, action, result.Success, result.Success ? (step.DoubleClick ? "double-clicked" : "clicked") : null,
+                    return Step(index, action, result.Success, result.Success
+                        ? $"{(step.DoubleClick ? "double-click" : "click")} dispatched; application outcome not verified" : null,
                         result.ErrorMessage, elementId ?? FirstElementId(result));
                 }
 

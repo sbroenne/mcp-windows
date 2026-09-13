@@ -17,6 +17,7 @@ on:
           - mouse
           - window
           - ui-automation
+          - click
           - save
           - winui
           - electron
@@ -257,6 +258,7 @@ jobs:
             window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"
             "ui-automation" = "FullyQualifiedName~Integration.UI|FullyQualifiedName~Integration.AnnotatedScreenshot|FullyQualifiedName~Integration.CaptureAnnotated|FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.TestHarnessInput"
             save = "FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.ElectronHarness.ElectronSaveTests"
+            click = "FullyQualifiedName~Integration.UIClick|FullyQualifiedName~Integration.UIAutomationClickClosesWindow|FullyQualifiedName~Integration.CliSnapshotContinuity|FullyQualifiedName~Integration.WinUI.WinUIClick|FullyQualifiedName~Integration.UIBatchAndFusion"
             winui = "FullyQualifiedName~Integration.WinUI"
             electron = "FullyQualifiedName~Integration.ElectronHarness"
             chromium = "FullyQualifiedName~Integration.ChromiumBrowser"

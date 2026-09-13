@@ -19,6 +19,36 @@ public sealed record UIAutomationResult
     [JsonPropertyName("action")]
     public required string Action { get; init; }
 
+    /// <summary>True when a click was sent successfully, not proof of an application outcome.</summary>
+    [JsonPropertyName("actionDispatched")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ActionDispatched { get; init; }
+
+    /// <summary>Clicks do not verify application outcomes, even when a control state changed.</summary>
+    [JsonPropertyName("outcomeVerified")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? OutcomeVerified { get; init; }
+
+    /// <summary>The click target as observed before sending the action.</summary>
+    [JsonPropertyName("target")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIActionElement? Target { get; init; }
+
+    /// <summary>Whether the same target's post-action properties were available or unavailable.</summary>
+    [JsonPropertyName("postActionState")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionState { get; init; }
+
+    /// <summary>An immediate observation after dispatch, not an expected-state check.</summary>
+    [JsonPropertyName("postActionElement")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIActionElement? PostActionElement { get; init; }
+
+    /// <summary>Provider read failure after successful dispatch; distinct from snapshot warnings.</summary>
+    [JsonPropertyName("postActionElementWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionElementWarning { get; init; }
+
     /// <summary>
     /// Full element details. Only populated for single-element results or get_element_details.
     /// </summary>
@@ -267,6 +297,30 @@ public sealed record UIAutomationResult
         };
     }
 
+    /// <summary>Reports click dispatch separately from its unverified application outcome.</summary>
+    public static UIAutomationResult CreateClickDispatched(
+        string action,
+        UIActionElement target,
+        UIActionElement? postActionElement,
+        UIAutomationDiagnostics? diagnostics = null)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            ActionDispatched = true,
+            OutcomeVerified = false,
+            Target = target,
+            PostActionState = postActionElement is null ? "unavailable" : "available",
+            PostActionElement = postActionElement,
+            UsageHint = "Action dispatched; application outcome not verified. " +
+                (postActionElement is null ? "Post-action target unavailable (for example, a closed dialog). " : "") +
+                "Inspect a snapshot or use ui_wait for the expected state; do not replay automatically.",
+            Diagnostics = diagnostics,
+        };
+    }
+
     /// <summary>
     /// Creates a success result with multiple elements.
     /// </summary>
@@ -319,12 +373,6 @@ public sealed record UIAutomationResult
     /// </summary>
     private static string GetActionHint(string action, UIElementInfo[] elements)
     {
-        // For click actions, remind that all UI interactions require tools
-        if (action == "click")
-        {
-            return "Click completed. Continue using ui_click or ui_find for all UI interactions - never skip tool calls.";
-        }
-
         // For find actions, provide element usage guidance
         if (elements.Length == 1)
         {

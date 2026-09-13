@@ -408,7 +408,19 @@ public sealed class SystemResources
               "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" },
               "elementCount": 1
             }
-            // ui_click/ui_type returns single element:
+            // ui_click (including doubleClick) separates dispatch from application outcome:
+            {
+              "success": true,
+              "action": "click",
+              "actionDispatched": true,
+              "outcomeVerified": false,
+              "target": { "id": "<observed-id>", "name": "Open", "type": "Button", "enabled": true },
+              "postActionState": "available",
+              "postActionElement": { "id": "<observed-id>", "name": "Close", "type": "Button", "enabled": true }
+            }
+            // If the target cannot be read afterward, postActionState is "unavailable"
+            // and postActionElement is omitted. This does not turn dispatch into failure.
+            // ui_type returns single element:
             {
               "success": true,
               "el": { "id": "...", "name": "Save", "type": "Button", "ts": "on" },
@@ -424,6 +436,8 @@ public sealed class SystemResources
             ```
 
             **Key fields:**
+            - Click `target` is pre-action; `postActionElement` is an immediate later observation, not proof of saving/publishing/navigation.
+            - `outcomeVerified:false` remains false with an optional snapshot. Inspect it or use bounded `ui_wait`; never replay merely because the target renamed, disabled itself, or disappeared.
             - `id` (element_id) - pass to other ui_* tools
             - `cp` (clickable_point) - fallback coords for mouse_control
             - `fw` (framework_type) - "Electron", "WPF", "WinForms" (affects search strategy)

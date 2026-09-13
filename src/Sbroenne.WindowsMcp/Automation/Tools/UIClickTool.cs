@@ -11,10 +11,10 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [McpServerToolType]
 public static partial class UIClickTool
 {
-    /// <summary>Click or double-click an element discovered by ui_find or ui_snapshot. Rediscover stale IDs; selectors are not accepted. Keywords: click, button, press, toggle, activate, double-click.</summary>
+    /// <summary>Click or double-click an element discovered by ui_find or ui_snapshot. Success means action dispatched, not application outcome verified (saving, publishing, navigation). target preserves pre-action identity/name; postActionElement is a later observation and postActionState says available/unavailable. A renamed, disabled, or missing target does not justify replay. Inspect withSnapshot or use bounded ui_wait to check expected state; neither automatically retries the click. Rediscover stale IDs; selectors are not accepted. Keywords: click, button, press, toggle, activate, double-click.</summary>
     /// <param name="windowHandle">Explicit target window handle.</param>
     /// <param name="elementId">Required opaque ID returned by discovery in this owner.</param>
-    /// <param name="withSnapshot">Attach a post-action snapshot.</param>
+    /// <param name="withSnapshot">Attach a post-action snapshot for inspection, not proof of an expected outcome.</param>
     /// <param name="snapshotMode">full for one verification, auto for repeated checks, reset for a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics.</param>
     /// <param name="doubleClick">Perform a double-click.</param>
