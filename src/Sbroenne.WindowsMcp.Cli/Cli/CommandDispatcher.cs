@@ -481,6 +481,13 @@ internal static class CommandDispatcher
 
     private static string? ValidateUiTargeting(ParsedArgs a)
     {
+        foreach (var option in new[] { "element-id", "id" })
+        {
+            if (a.Has(option) && string.IsNullOrWhiteSpace(a.GetString(option)))
+            {
+                return $"--{option} requires a non-empty element ID value. Omit the ID only for an explicit whole-window read.";
+            }
+        }
         const string Common = "window handle include-diagnostics diagnostics";
         const string Selectors = "name name-contains name-pattern control-type automation-id class-name parent-element-id parent scope require-unique unique enabled-only";
         const string Snapshots = "with-snapshot snapshot snapshot-mode since";

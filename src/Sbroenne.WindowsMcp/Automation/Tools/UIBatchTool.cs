@@ -51,9 +51,12 @@ public static partial class UIBatchTool
     /// step unless expectedProcessName/expectedWindowTitle is set (those verify the foreground window instead).
     /// Selector steps also accept scope="active_dialog", parentElementId, requireUnique,
     /// visibleOnly, and enabledOnly for reliable modal workflows.
-    /// Example steps: [{"action":"type","automationId":"UsernameInput","text":"admin"},
-    /// {"action":"type","automationId":"PasswordInput","text":"secret"},
-    /// {"action":"click","name":"Submit","requireUnique":true},
+    /// Example steps: [{"action":"find","automationId":"UsernameInput","requireUnique":true},
+    /// {"action":"type","elementId":"$prev","text":"admin"},
+    /// {"action":"find","automationId":"PasswordInput","requireUnique":true},
+    /// {"action":"type","elementId":"$prev","text":"secret"},
+    /// {"action":"find","name":"Submit","requireUnique":true},
+    /// {"action":"click","elementId":"$prev"},
     /// {"action":"wait","name":"Saved","mode":"appear"}]
     /// Drawing example: [{"action":"polyline","points":[[100,100],[300,100],[300,250],[100,100]]}]
     /// </remarks>

@@ -35,6 +35,7 @@ public sealed class SearchLimitHarnessFixture : IDisposable
             var scope = new Panel { Name = "SentinelScope", Bounds = new System.Drawing.Rectangle(0, 30, 200, 40) };
             scope.Controls.Add(new Label
             {
+                Name = "SearchLimitSentinel",
                 Text = "Quality sentinel",
                 AccessibleName = "Quality sentinel",
                 AutoSize = true
@@ -135,6 +136,25 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         });
         Assert.False(result.Success);
         Assert.Equal("search_incomplete", result.ErrorType);
+        Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
+    }
+
+    [Fact]
+    public async Task Find_ManagedFilterWithSparseNativeMatches_ChargesUnmatchedProviderNodes()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            NameContains = "Quality sentinel",
+            AutomationId = "SearchLimitSentinel",
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        // A filtered bulk query returns one item only after traversing the entire provider tree.
+        // Incremental enumeration instead reaches its budget before this late native match.
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
         Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
     }
 

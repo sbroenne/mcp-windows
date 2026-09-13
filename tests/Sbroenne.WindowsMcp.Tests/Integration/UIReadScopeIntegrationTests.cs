@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation.Tools;
+using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Tools;
@@ -10,6 +11,24 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Collection("UITestHarness")]
 public sealed class UIReadScopeIntegrationTests(UITestHarnessFixture fixture)
 {
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Cli_ReadWithoutId_RetainsExplicitWholeWindowRead()
+    {
+        fixture.Reset();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var code = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse(["ui", "read", "--window", fixture.TestWindowHandleString]),
+            output, error, CancellationToken.None);
+
+        Assert.Equal(0, code);
+        Assert.Empty(error.ToString());
+        using var json = JsonDocument.Parse(output.ToString());
+        Assert.Contains("Submit", json.RootElement.GetProperty("text").GetString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("invalid-scope-test-id")]

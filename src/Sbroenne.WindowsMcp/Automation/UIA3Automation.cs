@@ -292,6 +292,7 @@ internal static class UIA3PropertyIds
     internal const int ControlType = 30003;
     internal const int LocalizedControlType = 30004;
     internal const int IsEnabled = 30010;
+    internal const int IsControlElement = 30016;
     internal const int IsOffscreen = 30022;
     internal const int BoundingRectangle = 30001;
     internal const int NativeWindowHandle = 30020;

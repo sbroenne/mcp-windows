@@ -162,7 +162,11 @@ public sealed class ElectronSaveTests : IDisposable
         var created = await TestWait.UntilAsync(
             () => File.Exists(testFilePath),
             TimeSpan.FromSeconds(10));
-        Assert.True(created, $"File was not created at: {testFilePath}");
+        var state = created ? null : await _automationService.GetTextAsync(
+            null, _windowHandle, includeChildren: true);
+        Assert.True(created,
+            $"File was not created at: {testFilePath}. Duration={result.Diagnostics?.DurationMs}ms. " +
+            $"Window text: {state?.Text ?? state?.ErrorMessage}");
     }
 
     [Fact]

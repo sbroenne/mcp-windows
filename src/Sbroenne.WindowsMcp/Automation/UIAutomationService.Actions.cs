@@ -1530,11 +1530,18 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
-            _ = await DeterministicWait.UntilAsync(
+            var foregroundReady = await DeterministicWait.UntilAsync(
                 () => NativeMethods.GetForegroundWindow() == hwnd,
                 TimeSpan.FromMilliseconds(500),
                 TimeSpan.FromMilliseconds(25),
                 cancellationToken: cancellationToken);
+            if (!foregroundReady)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.WrongTargetWindow,
+                    "The target window did not become foreground; no save shortcut was sent.",
+                    CreateDiagnostics(stopwatch));
+            }
 
             if (!string.IsNullOrWhiteSpace(filePath))
             {
@@ -1550,7 +1557,14 @@ public sealed partial class UIAutomationService
             }
 
             // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
-            await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+            var shortcut = await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, 1, hwnd, cancellationToken);
+            if (!shortcut.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.InternalError,
+                    $"Could not send the save shortcut: {shortcut.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
 
             // Step 3: Wait for Save dialog using retry loop (FlaUI Retry.WhileEmpty pattern)
             var dialog = await WaitForSaveDialogAsync(hwnd, cancellationToken);
@@ -1586,7 +1600,15 @@ public sealed partial class UIAutomationService
                 }
             }
 
-            // No dialog appeared = file was saved directly (already had a name)
+            if (dialog is null && !string.IsNullOrWhiteSpace(filePath) && !File.Exists(filePath))
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.Timeout,
+                    "No Save dialog was observed and the requested file does not exist. " +
+                    "The save shortcut was sent, but its outcome could not be verified.",
+                    CreateDiagnostics(stopwatch));
+            }
+
             return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
         }
         catch (COMException ex)
@@ -1707,10 +1729,14 @@ public sealed partial class UIAutomationService
                         var condition = Uia.CreateAndCondition(
                             Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
                             Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
-                        var dialog = Uia.RootElement.FindFirst(UIA.TreeScope.TreeScope_Children, condition);
-                        if (dialog != null)
+                        var dialogs = Uia.RootElement.FindAll(UIA.TreeScope.TreeScope_Children, condition);
+                        for (var index = 0; dialogs is not null && index < dialogs.Length; index++)
                         {
-                            return (element: dialog, name: pattern);
+                            var dialog = dialogs.GetElement(index);
+                            if (IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(dialog), parentHwnd))
+                            {
+                                return (element: dialog, name: pattern);
+                            }
                         }
                     }
 
@@ -1800,6 +1826,9 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
+        var dialogHandle = await _staThread.ExecuteAsync(
+            () => ResolveElementWindowHandle(dialog), cancellationToken);
+
         // Focus the edit field and click it to ensure keyboard input goes here
         int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
         {
@@ -1815,10 +1844,19 @@ public sealed partial class UIAutomationService
 
         if (editFieldCenter is { Length: 2 })
         {
-            await _mouseService.ClickAsync(editFieldCenter[0], editFieldCenter[1], cancellationToken: cancellationToken);
+            var focusClick = await _mouseService.ClickAsync(
+                editFieldCenter[0], editFieldCenter[1], ModifierKey.None, dialogHandle,
+                cancellationToken: cancellationToken);
+            if (!focusClick.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.WrongTargetWindow,
+                    $"Could not focus the filename field: {focusClick.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
         }
 
-        _ = await DeterministicWait.UntilAsync(
+        var filenameFocused = await DeterministicWait.UntilAsync(
             async () => await _staThread.ExecuteAsync(
                 () =>
                 {
@@ -1835,6 +1873,13 @@ public sealed partial class UIAutomationService
             TimeSpan.FromMilliseconds(500),
             TimeSpan.FromMilliseconds(25),
             cancellationToken: cancellationToken);
+        if (!filenameFocused)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.WrongTargetWindow,
+                "The filename field did not obtain keyboard focus; no path was typed.",
+                CreateDiagnostics(stopwatch));
+        }
 
         await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
 
@@ -1844,11 +1889,26 @@ public sealed partial class UIAutomationService
         // Select all existing text and type the new path.
         // We use keyboard input rather than Value Pattern because the Windows File Dialog
         // only updates its internal path state from keyboard input, not from UIA Value Pattern.
-        await _keyboardService.PressKeyAsync("a", ModifierKey.Ctrl, cancellationToken: cancellationToken);
+        var selectAll = await _keyboardService.PressKeyAsync(
+            "a", ModifierKey.Ctrl, 1, dialogHandle, cancellationToken);
+        if (!selectAll.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.InternalError,
+                $"Could not select the existing filename: {selectAll.Error}",
+                CreateDiagnostics(stopwatch));
+        }
         _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-        await _keyboardService.TypeTextAsync(normalizedPath, cancellationToken);
+        var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
+        if (!typed.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.InternalError,
+                $"Could not type the requested filename: {typed.Error}",
+                CreateDiagnostics(stopwatch));
+        }
 
-        _ = await DeterministicWait.UntilAsync(
+        var filenameObserved = await DeterministicWait.UntilAsync(
             async () => await _staThread.ExecuteAsync(
                 () =>
                 {
@@ -1862,6 +1922,13 @@ public sealed partial class UIAutomationService
             TimeSpan.FromMilliseconds(25),
             transientException: exception => exception is COMException,
             cancellationToken: cancellationToken);
+        if (!filenameObserved)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.Timeout,
+                "The filename field did not contain the requested path; Save was not pressed.",
+                CreateDiagnostics(stopwatch));
+        }
 
         // Click the Save button directly — more reliable than Enter which can interact
         // with autocomplete dropdowns in the Windows file dialog (FlaUI pattern).
@@ -1870,7 +1937,15 @@ public sealed partial class UIAutomationService
         if (!saveClicked)
         {
             // Fallback: press Enter
-            await _keyboardService.PressKeyAsync("Return", cancellationToken: cancellationToken);
+            var confirm = await _keyboardService.PressKeyAsync(
+                "Return", ModifierKey.None, 1, dialogHandle, cancellationToken);
+            if (!confirm.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "save", UIAutomationErrorType.InternalError,
+                    $"Could not confirm the Save dialog: {confirm.Error}",
+                    CreateDiagnostics(stopwatch));
+            }
         }
 
         // Check for error dialogs (e.g., "Path does not exist")

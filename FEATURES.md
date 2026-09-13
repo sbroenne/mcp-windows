@@ -520,6 +520,11 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 - Handle overwrite confirmation dialogs
 - Works with Office apps, Notepad, and more
 
+Save requires the target window and filename field to have focus before sending input.
+The filename must be observed before Save is pressed. If no dialog appears and a requested
+new file does not exist, the operation reports an unverified outcome rather than success.
+Do not automatically repeat it: the original shortcut may still be processed by the application.
+
 ---
 
 ## 📂 File Open (`file_open`)

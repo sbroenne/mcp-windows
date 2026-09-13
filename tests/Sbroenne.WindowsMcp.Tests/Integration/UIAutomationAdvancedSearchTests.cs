@@ -108,25 +108,40 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     {
         const string DelayedAutomationId = "DelayedSubmitButton";
 
-        var rename = Task.Run(async () =>
-        {
-            await Task.Delay(1850);
-            _fixture.Form!.Invoke(() =>
-                _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
-        });
-
         try
         {
-            var result = await _automationService.FindElementsAsync(new ElementQuery
+            var query = new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = DelayedAutomationId,
-                TimeoutMs = 2000,
-            });
+            };
+            long elapsed = 0;
+            var probes = 0;
+            var result = await UIAutomationService.WaitForFindResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.False(observed.Success);
+                        // Model a provider probe that captured absence before the deadline,
+                        // then completed after it. Publish the control change synchronously.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
+                        elapsed = 2001;
+                    }
 
-            await rename;
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("The deadline has expired; probe without delay."),
+                () => elapsed,
+                CancellationToken.None);
+
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Single(result.Items!);
+            Assert.Equal(2, probes);
         }
         finally
         {

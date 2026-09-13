@@ -208,56 +208,23 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
-        var delay = 50;
-        const int MaxDelay = 500;
-
         // Subscribe before the first probe, so a change that lands between probing and sleeping
         // still wakes us instead of being lost.
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            while (true)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-                if (result.Success)
-                {
-                    return result with { Action = "wait_for" };
-                }
-
-                if (!IsRetryableWaitAbsence(result.ErrorType))
-                {
-                    return result with { Action = "wait_for" };
-                }
-
-                var remainingMs = timeoutMs - stopwatch.ElapsedMilliseconds;
-                if (remainingMs <= 0)
-                {
-                    break;
-                }
-
-                var boundedDelay = (int)Math.Min(delay, remainingMs);
-                await DelayOrUntilStructureChangedAsync(signal, boundedDelay, cancellationToken).ConfigureAwait(false);
-                delay = Math.Min(delay * 2, MaxDelay);
-            }
-
-            stopwatch.Stop();
-
-            return UIAutomationResult.CreateFailure(
-                "wait_for",
-                UIAutomationErrorType.Timeout,
-                $"Element not found within {timeoutMs}ms timeout.",
-                new UIAutomationDiagnostics
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    Query = query,
-                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-                });
+            return await WaitForFindResultAsync(
+                query,
+                timeoutMs,
+                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
+                () => stopwatch.ElapsedMilliseconds,
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            stopwatch.Stop();
             if (signal is not null)
             {
                 LastWaitEventCount = signal.EventCount;

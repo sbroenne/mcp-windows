@@ -11,6 +11,53 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 public sealed partial class UIAutomationService
 {
+    /// <summary>
+    /// Shares the production deadline policy with deterministic clock/probe regressions.
+    /// One probe must start at/after the deadline, even if the preceding probe crossed it.
+    /// </summary>
+    internal static async Task<UIAutomationResult> WaitForFindResultAsync(
+        ElementQuery query,
+        int timeoutMs,
+        Func<Task<UIAutomationResult>> probe,
+        Func<int, CancellationToken, Task> wait,
+        Func<long> elapsedMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        var delay = 50;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var finalProbe = elapsedMilliseconds() >= timeoutMs;
+            var result = await probe().ConfigureAwait(false);
+            if (result.Success || !IsRetryableWaitAbsence(result.ErrorType))
+            {
+                return result with { Action = "wait_for" };
+            }
+
+            if (finalProbe)
+            {
+                var elapsed = elapsedMilliseconds();
+                return UIAutomationResult.CreateFailure(
+                    "wait_for",
+                    UIAutomationErrorType.Timeout,
+                    $"Element not found within {timeoutMs}ms timeout.",
+                    new UIAutomationDiagnostics
+                    {
+                        DurationMs = elapsed,
+                        Query = query,
+                        ElapsedBeforeTimeout = elapsed
+                    });
+            }
+
+            var remaining = timeoutMs - elapsedMilliseconds();
+            if (remaining > 0)
+            {
+                await wait((int)Math.Min(delay, remaining), cancellationToken).ConfigureAwait(false);
+                delay = Math.Min(delay * 2, 500);
+            }
+        }
+    }
+
     /// <inheritdoc/>
     public async Task<UIAutomationResult> FindElementsAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
@@ -186,16 +233,14 @@ public sealed partial class UIAutomationService
                     : query.MaxDepth.Value;
 
                 // Routes to the cheapest correct strategy and applies off-screen filtering.
-                // Resets counters so it can be re-run for the content-view -> control-view fallback.
+                // Managed scan passes share one node budget, including fallback passes.
                 // - No advanced criteria: single FindAllBuildCache (fastest).
-                // - Advanced criteria without ExactDepth: cached bulk fetch + in-process filter.
-                //   This avoids the per-node COM storm of the raw TreeWalker, which is the dominant
-                //   cost for Chromium/Electron where nameContains/namePattern is the recommended path.
+                // - Managed criteria: single-node raw navigation with element-only caches.
+                //   Counting nonmatching raw nodes bounds work before provider materialization.
                 // - ExactDepth requires depth-aware traversal, so keep the TreeWalker.
                 void RunScan(UIA.IUIAutomationCondition scanCondition)
                 {
                     elementInfos.Clear();
-                    elementsScanned = 0;
                     matchCount = 0;
                     scanLimitReached = false;
 
@@ -207,7 +252,8 @@ public sealed partial class UIAutomationService
                     {
                         scanLimitReached = FindElementsWithCachedFilter(
                             rootElement, scanCondition, query, elementInfos, ref elementsScanned,
-                            ref matchCount, maxResults, cancellationToken);
+                            ref matchCount, maxResults, query.MaxDepth ?? int.MaxValue,
+                            visibleOnly, regionFilter, cancellationToken);
                     }
                     else
                     {
@@ -241,7 +287,7 @@ public sealed partial class UIAutomationService
                 // Guardrail: the content view can hide nodes some flows target (custom ARIA roles,
                 // decorative-but-interactive widgets). Fall back to the full control view when the
                 // content-view scan comes up empty so discoverability never regresses.
-                if (useContentView && elementInfos.Count == 0)
+                if (useContentView && elementInfos.Count == 0 && !scanLimitReached)
                 {
                     usedContentView = false;
                     RunScan(condition);
@@ -253,21 +299,32 @@ public sealed partial class UIAutomationService
                 string? windowTitle = rootElement.GetName();
 
                 // AUTO-RECOVERY: If exact name match failed, automatically try partial match
-                if (elementInfos.Count == 0 && !string.IsNullOrEmpty(query.Name) && string.IsNullOrEmpty(query.NameContains))
+                if (!scanLimitReached && elementInfos.Count == 0 &&
+                    !string.IsNullOrEmpty(query.Name) && string.IsNullOrEmpty(query.NameContains))
                 {
                     // Reset and retry with nameContains instead of exact name
                     var relaxedQuery = query with { Name = null, NameContains = query.Name };
                     var relaxedCondition = BuildCondition(relaxedQuery);
 
                     elementInfos.Clear();
-                    elementsScanned = 0;
                     matchCount = 0;
 
                     // Relaxation scans the control view for maximum recall.
                     usedContentView = false;
-                    scanLimitReached = FindElementsWithCachedFilter(
-                        rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned,
-                        ref matchCount, maxResults, cancellationToken);
+                    if (query.ExactDepth.HasValue)
+                    {
+                        FindElementsWithTreeWalker(
+                            rootElement, rootElement, relaxedCondition, relaxedQuery, effectiveMaxDepth, 0,
+                            elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren,
+                            ref scanLimitReached, cancellationToken);
+                    }
+                    else
+                    {
+                        scanLimitReached = FindElementsWithCachedFilter(
+                            rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned,
+                            ref matchCount, maxResults, query.MaxDepth ?? int.MaxValue,
+                            visibleOnly, regionFilter, cancellationToken);
+                    }
 
                     if (visibleOnly && elementInfos.Count > 0)
                     {
@@ -290,7 +347,8 @@ public sealed partial class UIAutomationService
                     return UIAutomationResult.CreateFailure(
                         "find",
                         UIAutomationErrorType.SearchIncomplete,
-                        $"Search incomplete: checked {elementsScanned} candidates and reached the {MaxElementsToScan}-element scan limit. " +
+                        $"Search incomplete: checked {elementsScanned} candidates within the {MaxElementsToScan}-element scan budget. " +
+                        "The scan limit was reached or the provider changed before enumeration completed. " +
                         "Remaining candidates were not checked.",
                         CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
                 }
@@ -445,11 +503,8 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
-    /// Advanced-criteria finding using a single FindAllBuildCache pass plus in-process filtering.
-    /// Pushes Name(exact)/AutomationId/ControlType down as native conditions, then filters
-    /// nameContains/namePattern/className against cached properties. This avoids the per-node
-    /// cross-process COM round-trips of the raw TreeWalker, which is the dominant cost for
-    /// Chromium/Electron content where nameContains/namePattern is the recommended query path.
+    /// Managed filtering over bounded, single-element cached navigation. Do not replace this
+    /// with bulk retrieval: limiting an array after fetching it does not bound provider work.
     /// </summary>
     private bool FindElementsWithCachedFilter(
         UIA.IUIAutomationElement rootElement,
@@ -459,58 +514,68 @@ public sealed partial class UIAutomationService
         ref int elementsScanned,
         ref int matchCount,
         int maxResults,
+        int maxDepth,
+        bool visibleOnly,
+        BoundingRect? regionFilter,
         CancellationToken cancellationToken)
     {
+        var scanned = 0;
+        var matches = matchCount;
         try
         {
-            // Single COM call fetches every element matching the native condition with all
-            // properties cached; substring/regex/className are then evaluated in-process.
             var cacheRequest = Uia.CreateElementCacheRequest(UIA.TreeScope.TreeScope_Element);
-            var elements = rootElement.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, condition, cacheRequest);
-            if (elements == null)
-            {
-                return false;
-            }
-
-            // Bound in-process work with the same budget the tree path uses.
-            var count = Math.Min(elements.Length, MaxElementsToScan);
-            var i = 0;
-            for (; i < count && results.Count < maxResults; i++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                elementsScanned++;
-
-                var element = elements.GetElement(i);
-                if (element == null)
+            cacheRequest.AddProperty(UIA3PropertyIds.IsControlElement);
+            cacheRequest.TreeFilter = Uia.TrueCondition;
+            var walker = Uia.Automation.RawViewWalker;
+            var outcome = BoundedSearchTraversal.Walk(
+                rootElement,
+                element => walker.GetFirstChildElementBuildCache(element, cacheRequest),
+                element => walker.GetNextSiblingElementBuildCache(element, cacheRequest),
+                element => element.GetCachedPropertyValue(UIA3PropertyIds.IsControlElement) is true,
+                (element, _) =>
                 {
-                    continue;
-                }
+                    scanned++;
+                    if (!MatchesCondition(element, condition) || !MatchesAdvancedCriteriaCached(element, query))
+                    {
+                        return false;
+                    }
 
-                if (!MatchesAdvancedCriteriaCached(element, query))
-                {
-                    continue;
-                }
+                    var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, fromCachedElement: true);
+                    if (info is null || (visibleOnly && info.IsOffscreen) ||
+                        (query.EnabledOnly == true && !info.IsEnabled) ||
+                        (regionFilter is not null && !IntersectsRegion(info.BoundingRect, regionFilter)))
+                    {
+                        return false;
+                    }
 
-                matchCount++;
-                if (matchCount < query.FoundIndex)
-                {
-                    continue;
-                }
+                    matches++;
+                    if (matches < query.FoundIndex)
+                    {
+                        return false;
+                    }
 
-                var children = query.IncludeChildren ? GetChildren(element, rootElement) : null;
-                var elementInfo = ConvertToElementInfo(element, rootElement, _coordinateConverter, children, fromCachedElement: true);
-                if (elementInfo != null)
-                {
-                    results.Add(elementInfo);
-                }
-            }
+                    if (query.IncludeChildren)
+                    {
+                        info = info with { Children = GetChildren(element, rootElement) };
+                    }
 
-            return i == MaxElementsToScan && i < elements.Length;
+                    results.Add(info);
+                    return results.Count >= maxResults;
+                },
+                Math.Max(0, MaxElementsToScan - elementsScanned),
+                Math.Max(1, maxDepth),
+                cancellationToken);
+            return outcome.LimitReached;
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
-            // Element tree changed during search - return whatever was collected.
-            return false;
+            // A provider failure leaves unvisited nodes; never turn partial evidence into absence.
+            return true;
+        }
+        finally
+        {
+            elementsScanned += scanned;
+            matchCount = matches;
         }
     }
 

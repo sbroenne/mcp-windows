@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -115,6 +116,34 @@ public sealed class SaveTests : IDisposable
         Assert.True(saved, $"Expected file to exist with harness content at: {testFilePath}");
         Assert.NotEmpty(content);
         Assert.Contains("Test file created at", content);
+    }
+
+    [Fact]
+    public async Task Save_MissingDialogAndFile_DoesNotReportSuccess()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Save without a handler" };
+            target.Show();
+            return target.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"not-saved-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+
+            Assert.False(result.Success);
+            Assert.Equal(Models.UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Contains("could not be verified", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => target?.Dispose());
+        }
     }
 
     [Fact]

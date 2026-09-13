@@ -8,6 +8,26 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class TargetedActionValidationTests
 {
     [Theory]
+    [InlineData("--element-id")]
+    [InlineData("--element-id=")]
+    [InlineData("--element-id= \t ")]
+    [InlineData("--id")]
+    [InlineData("--id=")]
+    [InlineData("--id= \t ")]
+    public async Task CliReadRejectsPresentEmptyIdBeforeDispatch(string option)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var result = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse(["ui", "read", "--window", "12345", option]),
+            output, error, CancellationToken.None);
+
+        Assert.Equal(2, result);
+        Assert.Empty(output.ToString());
+        Assert.Contains("non-empty", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("click")]
     [InlineData("type")]
     [InlineData("select")]

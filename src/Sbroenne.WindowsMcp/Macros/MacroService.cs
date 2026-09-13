@@ -46,13 +46,21 @@ public sealed class MacroService
     {
         foreach (var step in steps)
         {
+            if (step is null)
+            {
+                return "Every macro step must be an object; null steps are not valid.";
+            }
+            if (IsDiscoveryStep(step) && step.ElementId is not null)
+            {
+                return "Discovery and appear/disappear macro waits accept selectors, not elementId.";
+            }
             if ((step.ElementId is not null && step.ElementId != "$prev") || step.ParentElementId is not null)
             {
                 return "Macros cannot persist action IDs. Discover fresh targets on each replay and use elementId='$prev'.";
             }
             var action = step.Action?.Trim().ToLowerInvariant();
             if (action is "click" or "type" or "select" ||
-                (action == "wait" && string.Equals(step.Mode, "state", StringComparison.OrdinalIgnoreCase)))
+                (action == "wait" && string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase)))
             {
                 if (step.ElementId != "$prev" || step.Name is not null || step.NameContains is not null ||
                     step.NamePattern is not null || step.ControlType is not null ||
@@ -63,6 +71,13 @@ public sealed class MacroService
             }
         }
         return null;
+    }
+
+    private static bool IsDiscoveryStep(BatchStep step)
+    {
+        var action = step.Action?.Trim().ToLowerInvariant();
+        return action == "find" || (action == "wait" &&
+            !string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -106,6 +121,16 @@ public sealed class MacroService
         try
         {
             using var document = JsonDocument.Parse(stepsJson);
+            for (var index = 0; index < parsed.Length; index++)
+            {
+                if (IsDiscoveryStep(parsed[index]) &&
+                    document.RootElement[index].EnumerateObject().Any(property =>
+                        property.Name.Equals("elementId", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return MacroResult.Failure("save",
+                        "Discovery and appear/disappear macro waits accept selectors, not elementId (including null).");
+                }
+            }
             stepsElement = document.RootElement.Clone();
         }
         catch (JsonException ex)
