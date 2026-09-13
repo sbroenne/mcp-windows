@@ -195,7 +195,11 @@ public sealed class SaveTests : IDisposable
         try
         {
             var result = await _automationService.SaveAsync(_windowHandle, path);
-            Assert.True(result.Success, result.ErrorMessage);
+            var failureState = result.Success ? null : await _automationService.GetTextAsync(
+                null, _windowHandle, includeChildren: true);
+            Assert.True(result.Success,
+                $"{result.ErrorMessage}. Window text: {failureState?.Text ?? failureState?.ErrorMessage}. " +
+                $"Files in the owned output directory: {string.Join(", ", Directory.GetFiles(_testOutputDir))}");
             Assert.True(File.Exists(path));
 
             var foreignWindow = WindowHandleParser.Format(unrelatedHandle);

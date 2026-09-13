@@ -548,6 +548,14 @@ public sealed partial class UIAutomationService
     {
         try
         {
+            // Validate the candidate's own snapshot, not a provider-normalized ancestor.
+            // This also ensures the returned cached properties satisfy the exact selectors.
+            if (!MatchesNativeSearchProperties(query, element.GetCachedName(),
+                element.GetCachedAutomationId(), element.CachedControlType))
+            {
+                return false;
+            }
+
             if (!string.IsNullOrEmpty(query.NameContains))
             {
                 var name = element.GetCachedName();
@@ -600,16 +608,24 @@ public sealed partial class UIAutomationService
         }
     }
 
-    /// <summary>
-    /// Manually evaluates if an element matches a condition.
-    /// </summary>
+    internal static bool MatchesNativeSearchProperties(
+        ElementQuery query, string? name, string? automationId, int controlType)
+    {
+        var requestedType = string.IsNullOrEmpty(query.ControlType) ? 0 : GetControlTypeId(query.ControlType);
+        return (string.IsNullOrEmpty(query.Name) ||
+                string.Equals(name, query.Name, StringComparison.OrdinalIgnoreCase)) &&
+            (string.IsNullOrEmpty(query.AutomationId) ||
+                string.Equals(automationId, query.AutomationId, StringComparison.Ordinal)) &&
+            (requestedType <= 0 || controlType == requestedType);
+    }
+
+    /// <summary>Tests only the candidate itself, never a provider-normalized ancestor.</summary>
     private static bool MatchesCondition(UIA.IUIAutomationElement element, UIA.IUIAutomationCondition condition)
     {
-        // For UIA3 COM, we can use FindFirst on the element itself to check if it matches
         try
         {
             var result = element.FindFirst(UIA.TreeScope.TreeScope_Element, condition);
-            return result != null;
+            return result != null && element.IsSameElement(result);
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {

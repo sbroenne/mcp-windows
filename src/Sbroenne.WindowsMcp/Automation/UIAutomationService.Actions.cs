@@ -1614,6 +1614,9 @@ public sealed partial class UIAutomationService
                 return UIAutomationResult.CreateFailure(
                     "save", UIAutomationErrorType.Timeout,
                     "No file creation or change was observed at the requested path. " +
+                    (dialog.HasValue
+                        ? "A Save dialog was confirmed and closed. "
+                        : "No Save dialog was observed. ") +
                     "The save shortcut was sent, but its outcome could not be verified.",
                     CreateDiagnostics(stopwatch));
             }
