@@ -46,7 +46,7 @@ wincli <group> [<action>] [--option value] [--flag]
 
 | Group | Purpose |
 | --- | --- |
-| `app` | Launch an application and return its window handle |
+| `app` | Observe application launch; return a handle when one eligible window is identified |
 | `window` | Manage windows (find, list, activate, move, close, …) |
 | `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `read-table`, `wait`, `batch`) |
 | `keyboard` | Send keystrokes (`type`, `press`, `sequence`, …) |
@@ -57,6 +57,14 @@ wincli <group> [<action>] [--option value] [--flag]
 | `file-save` | Save the active document (handles the Save As dialog) |
 | `file-open` | Open an existing file (handles the Open dialog) |
 | `service` | Start, inspect, or gracefully stop the CLI-only daemon |
+
+`wincli app` reports `launchStatus`: `started` (no observed window or `--no-wait`),
+`windowObserved` (a visible process-owned window), `possibleHandoff` (clean exit with
+a matching pre-existing instance), or `exitedWithoutWindow` (failure to establish either).
+A possible handoff does not prove delivery or loaded content. Multiple matching windows
+are listed in `windows` without selecting `window`; inspect the intended target before
+using its handle. No status guarantees focus, input readiness, or URL/document readiness.
+Observed nonzero exits fail even when another instance is open.
 
 ## Typical workflow
 

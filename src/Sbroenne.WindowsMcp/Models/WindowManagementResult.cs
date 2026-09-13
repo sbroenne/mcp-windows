@@ -66,6 +66,14 @@ public sealed record WindowManagementResult
     public string? Message { get; init; }
 
     /// <summary>
+    /// Gets the app launch observation: started, windowObserved, possibleHandoff, or exitedWithoutWindow.
+    /// A window or possible handoff does not verify requested content or input readiness.
+    /// </summary>
+    [JsonPropertyName("launchStatus")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LaunchStatus { get; init; }
+
+    /// <summary>
     /// Creates a successful result for a list operation.
     /// </summary>
     /// <param name="windows">The list of windows.</param>

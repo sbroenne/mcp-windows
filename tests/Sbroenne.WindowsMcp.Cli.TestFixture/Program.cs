@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace Sbroenne.WindowsMcp.Cli.TestFixture;
@@ -8,6 +9,38 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args is ["--handoff-primary", var untitledDirectory, var untitledCount, "--untitled"])
+        {
+            return RunReceiver(untitledDirectory, int.Parse(untitledCount, CultureInfo.InvariantCulture), untitled: true);
+        }
+
+        if (args is ["--handoff-primary", var directory, var count])
+        {
+            return RunReceiver(directory, int.Parse(count, CultureInfo.InvariantCulture));
+        }
+
+        if (args is ["--handoff-secondary", var target, var delay, var exitCode])
+        {
+            Thread.Sleep(int.Parse(delay, CultureInfo.InvariantCulture));
+            WriteArguments(Path.Combine(target, "request.json"), ["owned local request"]);
+            var deadline = Stopwatch.StartNew();
+            while (!File.Exists(Path.Combine(target, "receipt.json")))
+            {
+                if (deadline.Elapsed > TimeSpan.FromSeconds(10))
+                {
+                    return 9;
+                }
+                Thread.Sleep(20);
+            }
+            return int.Parse(exitCode, CultureInfo.InvariantCulture);
+        }
+
+        if (args is ["--exit", var exitDelay, var code])
+        {
+            Thread.Sleep(int.Parse(exitDelay, CultureInfo.InvariantCulture));
+            return int.Parse(code, CultureInfo.InvariantCulture);
+        }
+
         // The persistent CLI owner must not rely on a later client's environment.
         const string RecordPrefix = "--record-arguments=";
         if (args.Length > 0 && args[^1].StartsWith(RecordPrefix, StringComparison.Ordinal))
@@ -40,6 +73,57 @@ internal static class Program
         };
         Application.Run(window);
         return 0;
+    }
+
+    private static int RunReceiver(string directory, int count, bool untitled = false)
+    {
+        var windows = Enumerable.Range(0, count).Select(_ => new InertWindow
+        {
+            Text = untitled ? "" : "Owned receiver - unrelated document title",
+            ShowInTaskbar = true,
+            Location = new Point(100, 100),
+        }).ToArray();
+        using var timer = new System.Windows.Forms.Timer { Interval = 25 };
+        var lifetime = Stopwatch.StartNew();
+        var received = false;
+        timer.Tick += (_, _) =>
+        {
+            var request = Path.Combine(directory, "request.json");
+            if (!received && File.Exists(request))
+            {
+                var arguments = JsonSerializer.Deserialize<string[]>(File.ReadAllText(request))!;
+                WriteArguments(Path.Combine(directory, "receipt.json"), arguments);
+                received = true;
+            }
+            if (lifetime.Elapsed > TimeSpan.FromMinutes(2))
+            {
+                windows[0].Close();
+            }
+        };
+        windows[0].Shown += (_, _) =>
+        {
+            foreach (var window in windows.Skip(1))
+            {
+                window.Show();
+            }
+            Console.WriteLine(JsonSerializer.Serialize(windows.Select(w => w.Handle.ToInt64().ToString(CultureInfo.InvariantCulture))));
+            Console.Out.Flush();
+            WriteArguments(Path.Combine(directory, "owner.json"),
+                [Environment.ProcessId.ToString(CultureInfo.InvariantCulture)]);
+            timer.Start();
+        };
+        try
+        {
+            Application.Run(windows[0]);
+            return 0;
+        }
+        finally
+        {
+            foreach (var window in windows)
+            {
+                window.Dispose();
+            }
+        }
     }
 
     private static void WriteArguments(string path, string[] arguments)

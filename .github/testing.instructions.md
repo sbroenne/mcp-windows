@@ -135,6 +135,11 @@ For Save-dialog work on the dedicated desktop runner, dispatch the Windows UI
 Integration Tests workflow with `scope=save`. This runs both WinForms and Electron
 Save tests. Pull requests still require the full desktop suite before merge.
 
+For application-launch handoff work, use `scope=app-launch`. The owned receiver fixture
+checks early/late exits and actual received requests through MCP and CLI, without browsers,
+accounts, or user documents. `scope=window` also includes these tests. Do not run the GUI
+fixture on a shared local desktop.
+
 For click response work, use `scope=click`. This includes owned MCP/CLI response
 regressions, disappearing targets, identity continuity, WinUI clicks, and batch
 snapshot checks. Do not run these desktop tests on a shared local machine.

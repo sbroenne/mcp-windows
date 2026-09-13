@@ -153,6 +153,33 @@ Launch applications and get their window handles for subsequent operations.
 - Returns window handle for use with other tools
 - Configurable startup parameters
 
+### Launch observations (MCP and CLI)
+
+`app` and `wincli app` report `launchStatus` separately from requested content:
+
+| Status | Meaning |
+|--------|---------|
+| `started` | The process started; no window was observed within the wait, or waiting was disabled. |
+| `windowObserved` | A visible window belongs to the launched process. |
+| `possibleHandoff` | The launcher exited zero and a pre-launch instance of the same executable still has visible windows. |
+| `exitedWithoutWindow` | The launcher exited zero but no window or matching pre-launch instance could be established; the call fails without claiming a handoff. |
+
+A possible handoff is not confirmation that a URL/document was delivered or loaded.
+Native executable image paths and process creation times establish the existing instance,
+not window titles or executable basenames. The retained process handle identifies even
+an already-exited launcher; bare names still use Windows' own executable lookup.
+Launch observations include visible untitled windows; ordinary window listings retain
+their existing filtering, while explicit handle operations can inspect those windows.
+If image identity cannot be read, or a Store launcher redirects to a different executable,
+the relationship remains unverified rather than being inferred from a title or requested path.
+Nonzero exits observed during the wait fail even when another instance is open.
+Multiple matching windows are listed without selecting an arbitrary `window`.
+
+No launch status guarantees foreground focus, input readiness, or requested content.
+Inspect the intended window with `ui_read` / `ui_wait` before acting; activate it explicitly
+with `window_management` when needed. A running process without a window can still exit later;
+`started` is an observation, not a guarantee of future success.
+
 ### Example
 
 ```

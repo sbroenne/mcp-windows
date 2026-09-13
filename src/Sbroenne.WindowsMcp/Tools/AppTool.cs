@@ -16,33 +16,29 @@ namespace Sbroenne.WindowsMcp.Tools;
 public static partial class AppTool
 {
     /// <summary>
-    /// How long to wait to detect if a process is a stub (exits quickly).
-    /// </summary>
-    private const int StubDetectionDelayMs = 300;
-
-    /// <summary>
     /// Launch Windows applications by semantic app name or executable path. Prefer this tool over powershell, shell,
     /// terminal, or command-line process launchers whenever the user asks to open, start, or launch an app.
     /// Use this to start programs like notepad.exe, calc.exe, msedge.exe, chrome.exe, winword.exe, excel.exe, etc.
-    /// Returns structured launch status plus a window handle for use with window_management, keyboard_control, and other tools.
+    /// Returns structured launch status and, when uniquely identified, a window handle for subsequent tools.
     /// Keywords: launch, open, start, run, app, application, program, executable, exe, open app,
     /// start program, launch application, run program, notepad, calculator, browser, edge, chrome.
     /// </summary>
     /// <remarks>
-    /// This tool is safer and more reliable than shell commands for app launch because it focuses the window,
-    /// waits for the first usable window, handles UWP/Store app stubs such as Calculator, and returns normalized
+    /// This tool observes the launched process and its visible windows and returns normalized
     /// process/window metadata. Do not use powershell or shell commands to launch apps unless this tool fails or
     /// the task explicitly requires shell execution.
     ///
     /// Examples: app(programPath='notepad.exe'), app(programPath='calc.exe'), app(programPath='msedge.exe', arguments='https://example.com').
-    /// After launch, the window is focused and ready for input. Use the returned handle for subsequent operations.
+    /// A returned window is observed, not guaranteed focused or ready for input. Verify the intended
+    /// page/document with ui_read or ui_wait before acting. Activate the window explicitly if needed.
     /// Launch a browser with a URL, then use ui_find/ui_click/ui_type with the returned handle to automate page content.
     /// Edge (msedge.exe) and Chrome (chrome.exe) page content is fully automatable: links, buttons, and form fields
     /// surface as ARIA/visible-text UIA names. Browser chrome (address bar, tabs) is best-effort — use keyboard shortcuts.
     ///
-    /// NOTE: Some apps (e.g., calc.exe, UWP/Store apps) launch as a stub that exits immediately and spawns a separate
-    /// process. If the launch appears to fail, use window_management(action='find', title='Calculator') to locate
-    /// the window by title instead.
+    /// NOTE: A clean exit with a surviving pre-launch instance of the same executable returns possibleHandoff.
+    /// Delivery and requested content are not verified. Multiple matching windows return no selected handle.
+    /// Store launchers that redirect to a different executable cannot be associated by title; use
+    /// window_management to inspect the intended application when no matching window can be verified.
     /// NOTE: Chromium browsers (Edge, Chrome) also use a stub/session model — if you need an authenticated page,
     /// check window_management(action='find') for an existing signed-in window before calling app().
     /// </remarks>
@@ -148,8 +144,27 @@ public static partial class AppTool
                 startInfo.WorkingDirectory = workingDirectory;
             }
 
-            var launchTime = DateTime.UtcNow;
-            var process = Process.Start(startInfo);
+            var baseline = new Dictionary<int, LaunchProcessIdentity>();
+            if (waitForWindow)
+            {
+                var before = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!before.Success)
+                {
+                    return before;
+                }
+                foreach (var pid in (before.Windows ?? []).Select(w => w.ProcessId).Distinct())
+                {
+                    var identity = LaunchProcessIdentity.TryRead(pid);
+                    if (identity is not null)
+                    {
+                        baseline.Add(pid, identity);
+                    }
+                }
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            using var process = Process.Start(startInfo);
             if (process is null)
             {
                 return WindowManagementResult.CreateFailure(
@@ -157,117 +172,55 @@ public static partial class AppTool
                     $"Failed to start process: '{programPath}'");
             }
 
-            // Extract the program name for window title matching (used if process is a stub)
-            var programName = Path.GetFileNameWithoutExtension(programPath) ?? programPath;
-
-            // If we should wait for the window to appear
             if (waitForWindow)
             {
                 var windowService = WindowsToolsBase.WindowService;
+                var executablePath = LaunchProcessIdentity.TryRead(process)?.ExecutablePath;
                 var timeout = timeoutMs ?? WindowsToolsBase.TimeoutMs;
-                var deadline = DateTime.UtcNow.AddMilliseconds(timeout);
-
-                // Observe early process/window state to detect UWP launcher stubs.
-                _ = await DeterministicWait.UntilAsync(
-                    () =>
-                    {
-                        process.Refresh();
-                        return process.HasExited || process.MainWindowHandle != IntPtr.Zero;
-                    },
-                    TimeSpan.FromMilliseconds(StubDetectionDelayMs),
-                    TimeSpan.FromMilliseconds(20),
-                    cancellationToken: cancellationToken);
-                process.Refresh();
-
-                // Check early if this is a stub pattern (process exited quickly with success)
-                if (process.HasExited)
+                var elapsed = Stopwatch.StartNew();
+                while (true)
                 {
-                    var exitedQuickly = (DateTime.UtcNow - launchTime).TotalMilliseconds < (StubDetectionDelayMs * 2);
-                    var exitedSuccessfully = process.ExitCode == 0;
-
-                    if (exitedQuickly && exitedSuccessfully)
-                    {
-                        // This is likely a stub that launched another process (e.g., UWP app)
-                        // Try to find a window by program name in the title
-                        var stubWindow = await FindWindowByTitleAsync(windowService, programName, deadline, cancellationToken);
-                        if (stubWindow != null)
-                        {
-                            return WindowManagementResult.CreateWindowSuccess(
-                                stubWindow,
-                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                        }
-                    }
-
-                    return WindowManagementResult.CreateFailure(
-                        WindowManagementErrorCode.SystemError,
-                        $"Process '{programPath}' exited unexpectedly with code {process.ExitCode}");
-                }
-
-                // Wait for the process to have a main window
-                while (!process.HasExited && DateTime.UtcNow < deadline)
-                {
-                    await Task.Delay(100, cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     process.Refresh();
-
-                    // First try MainWindowHandle (works for most apps)
-                    if (process.MainWindowHandle != IntPtr.Zero)
+                    if (process.HasExited)
                     {
-                        var windowInfo = await windowService.GetWindowInfoAsync(process.MainWindowHandle, cancellationToken);
-                        if (windowInfo != null)
-                        {
-                            return WindowManagementResult.CreateWindowSuccess(
-                                windowInfo,
-                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                        }
+                        return await ObserveExitAsync(process, programPath, executablePath, baseline, cancellationToken);
                     }
 
-                    // Fallback: Search for any visible window owned by this process
-                    var listResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
-                    if (listResult.Success && listResult.Windows != null)
+                    var listResult = await windowService.ListLaunchWindowsAsync(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    // Enumeration is asynchronous: an exit during it must win over stale window evidence.
+                    process.Refresh();
+                    if (process.HasExited)
                     {
-                        var processWindow = listResult.Windows.FirstOrDefault(w =>
-                            w.ProcessId == process.Id ||
-                            string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                        if (processWindow != null)
-                        {
-                            return WindowManagementResult.CreateWindowSuccess(
-                                processWindow,
-                                $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
-                        }
+                        return await ObserveExitAsync(process, programPath, executablePath, baseline, cancellationToken);
                     }
-                }
-
-                if (process.HasExited)
-                {
-                    return WindowManagementResult.CreateFailure(
-                        WindowManagementErrorCode.SystemError,
-                        $"Process '{programPath}' exited unexpectedly with code {process.ExitCode}");
-                }
-
-                // Timeout waiting for window - make one final attempt
-                var finalListResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
-                if (finalListResult.Success && finalListResult.Windows != null)
-                {
-                    var processWindow = finalListResult.Windows.FirstOrDefault(w =>
-                        w.ProcessId == process.Id ||
-                        string.Equals(w.ProcessName, process.ProcessName, StringComparison.OrdinalIgnoreCase));
-
-                    if (processWindow != null)
+                    if (!listResult.Success)
                     {
-                        return WindowManagementResult.CreateWindowSuccess(
-                            processWindow,
-                            $"Launched '{programPath}'. Window is focused and ready. Use this handle for all subsequent operations.");
+                        return listResult;
                     }
+                    var windows = (listResult.Windows ?? []).Where(w => w.ProcessId == process.Id).ToArray();
+                    if (windows.Length > 0)
+                    {
+                        return ObservedWindows(windows, "windowObserved",
+                            $"Launched '{programPath}' (PID: {process.Id}); visible window observed. Focus, input readiness, and requested content are not verified.");
+                    }
+                    var remaining = timeout - elapsed.ElapsedMilliseconds;
+                    if (remaining <= 0)
+                    {
+                        return WindowManagementResult.CreateSuccess(
+                            $"Launched '{programPath}' (PID: {process.Id}), but no window was observed within timeout. Request delivery and content are not verified. Use window_management to inspect the application.")
+                            with
+                        { LaunchStatus = "started" };
+                    }
+                    await Task.Delay((int)Math.Min(100, remaining), cancellationToken);
                 }
-
-                return WindowManagementResult.CreateSuccess(
-                    $"Launched '{programPath}' (PID: {process.Id}), but window did not appear within timeout. Use window_management(action='find') to locate the window.");
             }
 
-            // Not waiting for window - just return success
             return WindowManagementResult.CreateSuccess(
-                $"Launched '{programPath}' successfully (PID: {process.Id})");
+                $"Started '{programPath}' (PID: {process.Id}); window and exit status were not observed.")
+                with
+            { LaunchStatus = "started" };
         }
         catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 2) // ERROR_FILE_NOT_FOUND
         {
@@ -320,41 +273,61 @@ public static partial class AppTool
         return string.IsNullOrWhiteSpace(arguments) ? a11yFlag : $"{a11yFlag} {arguments}";
     }
 
-    /// <summary>
-    /// Finds a window by searching for the program name in window titles.
-    /// This handles cases where the launched process is a stub that redirects to another app
-    /// (e.g., UWP apps like Calculator where calc.exe is a stub for the Store app).
-    /// </summary>
-    private static async Task<WindowInfoCompact?> FindWindowByTitleAsync(
-        Window.WindowService windowService,
-        string programName,
-        DateTime deadline,
+    private static async Task<WindowManagementResult> ObserveExitAsync(
+        Process process,
+        string programPath,
+        string? executablePath,
+        Dictionary<int, LaunchProcessIdentity> baseline,
         CancellationToken cancellationToken)
     {
-        while (DateTime.UtcNow < deadline)
+        if (process.ExitCode != 0)
         {
-            var listResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
-            if (listResult.Success && listResult.Windows != null)
-            {
-                // Search for window where title contains the program name
-                // e.g., "calc" matches "Calculator", "notepad" matches "Notepad"
-                var matchingWindow = listResult.Windows.FirstOrDefault(w =>
-                    w.Title?.Contains(programName, StringComparison.OrdinalIgnoreCase) == true);
-
-                if (matchingWindow != null)
-                {
-                    // Focus the window before returning (Handle is stored as decimal string)
-                    if (nint.TryParse(matchingWindow.Handle, out var hwnd))
-                    {
-                        await windowService.ActivateWindowAsync(hwnd, cancellationToken);
-                    }
-                    return matchingWindow;
-                }
-            }
-
-            await Task.Delay(100, cancellationToken);
+            return WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.SystemError,
+                $"Process '{programPath}' exited with code {process.ExitCode}");
         }
 
-        return null;
+        var current = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!current.Success)
+        {
+            return current;
+        }
+        var matchingProcesses = new HashSet<int>();
+        foreach (var pid in (current.Windows ?? []).Select(w => w.ProcessId).Distinct())
+        {
+            if (executablePath is not null &&
+                baseline.TryGetValue(pid, out var before) &&
+                string.Equals(before.ExecutablePath, executablePath, StringComparison.OrdinalIgnoreCase) &&
+                LaunchProcessIdentity.TryRead(pid) == before)
+            {
+                matchingProcesses.Add(pid);
+            }
+        }
+        var candidates = (current.Windows ?? []).Where(w => matchingProcesses.Contains(w.ProcessId)).ToArray();
+        if (candidates.Length > 0)
+        {
+            return ObservedWindows(candidates, "possibleHandoff",
+                $"Process '{programPath}' exited with code 0; a pre-existing instance of the same executable remains. Possible request handoff; delivery, requested content, focus, and input readiness are not verified.");
+        }
+
+        return WindowManagementResult.CreateFailure(
+            WindowManagementErrorCode.SystemError,
+            $"Process '{programPath}' exited with code 0 without an observed window or a verified matching pre-launch instance. Request handoff is not verified; inspect the intended application with window_management before retrying. Redirected Store launchers may use a different executable.")
+            with
+        { LaunchStatus = "exitedWithoutWindow" };
+    }
+
+    private static WindowManagementResult ObservedWindows(WindowInfoCompact[] windows, string status, string message)
+    {
+        return new WindowManagementResult
+        {
+            Success = true,
+            LaunchStatus = status,
+            Window = windows.Length == 1 ? windows[0] : null,
+            Windows = windows.Length > 1 ? windows : null,
+            Count = windows.Length,
+            Message = windows.Length > 1 ? message + " Multiple windows match; no target window was selected." : message,
+        };
     }
 }

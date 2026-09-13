@@ -16,6 +16,7 @@ on:
           - keyboard
           - mouse
           - window
+          - app-launch
           - ui-automation
           - click
           - save
@@ -256,6 +257,7 @@ jobs:
             keyboard = "FullyQualifiedName~Integration.Keyboard"
             mouse = "FullyQualifiedName~Integration.Mouse|FullyQualifiedName~Integration.DpiAwareness|FullyQualifiedName~Integration.ModifierKey|FullyQualifiedName~Integration.MultiMonitor"
             window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"
+            "app-launch" = "FullyQualifiedName~Integration.AppLaunchHandoff"
             "ui-automation" = "FullyQualifiedName~Integration.UI|FullyQualifiedName~Integration.AnnotatedScreenshot|FullyQualifiedName~Integration.CaptureAnnotated|FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.TestHarnessInput"
             save = "FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.ElectronHarness.ElectronSaveTests"
             click = "FullyQualifiedName~Integration.UIClick|FullyQualifiedName~Integration.UIAutomationClickClosesWindow|FullyQualifiedName~Integration.CliSnapshotContinuity|FullyQualifiedName~Integration.WinUI.WinUIClick|FullyQualifiedName~Integration.UIBatchAndFusion"
