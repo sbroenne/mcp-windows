@@ -115,6 +115,7 @@ public sealed class WindowEnumerator
             }
 
             NativeMethods.EnumWindows(EnumCallback, IntPtr.Zero);
+            cancellationToken.ThrowIfCancellationRequested();
 
             return (IReadOnlyList<WindowInfo>)windows;
         }, cancellationToken);

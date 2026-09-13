@@ -148,6 +148,7 @@ public static partial class AppTool
             if (waitForWindow)
             {
                 var before = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
                 if (!before.Success)
                 {
                     return before;
@@ -162,6 +163,7 @@ public static partial class AppTool
                 }
             }
 
+            cancellationToken.ThrowIfCancellationRequested();
             using var process = Process.Start(startInfo);
             if (process is null)
             {
@@ -186,6 +188,7 @@ public static partial class AppTool
                     }
 
                     var listResult = await windowService.ListLaunchWindowsAsync(cancellationToken);
+                    cancellationToken.ThrowIfCancellationRequested();
                     // Enumeration is asynchronous: an exit during it must win over stale window evidence.
                     process.Refresh();
                     if (process.HasExited)
@@ -285,6 +288,7 @@ public static partial class AppTool
         }
 
         var current = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (!current.Success)
         {
             return current;

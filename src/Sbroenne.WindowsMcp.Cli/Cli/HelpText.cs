@@ -79,7 +79,9 @@ internal static class HelpText
             Restart invalidates prior element IDs and snapshot tokens, not target applications.
 
         app --path <exe> [--args <a>|--arguments <a>] [--working-dir <d>] [--no-wait] [--timeout-ms <n>]
-            Launch an application and return its window handle.
+            Observe launchStatus: started, windowObserved, possibleHandoff, or exitedWithoutWindow.
+            A window handle is optional; multiple windows are listed without selecting a target.
+            Handoff delivery, loaded content, focus, and input readiness are not verified.
             For child arguments beginning with --, use --args="--new-window target"
             (or --arguments="--new-window target"). Separate --args "--new-window target"
             and missing values are usage errors; they never launch the application.
