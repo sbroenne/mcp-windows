@@ -40,6 +40,9 @@ public sealed class WindowEnumerator
         return EnumerateWindowsCoreAsync(filter, null, useRegex, includeAllDesktops, cancellationToken);
     }
 
+    internal Task<IReadOnlyList<WindowInfo>> EnumerateLaunchWindowsAsync(CancellationToken cancellationToken) =>
+        EnumerateWindowsCoreAsync(null, null, false, true, cancellationToken, includeUntitled: true);
+
     /// <summary>
     /// Core enumeration with separate title and processName filters.
     /// </summary>
@@ -48,7 +51,8 @@ public sealed class WindowEnumerator
         string? processNameFilter,
         bool useRegex,
         bool includeAllDesktops,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool includeUntitled = false)
     {
         return Task.Run(() =>
         {
@@ -73,7 +77,7 @@ public sealed class WindowEnumerator
                     return false;
                 }
 
-                var info = GetWindowInfoCore(hwnd, includeAllDesktops);
+                var info = GetWindowInfoCore(hwnd, includeAllDesktops, includeUntitled);
 
                 if (info is null)
                 {
@@ -119,7 +123,7 @@ public sealed class WindowEnumerator
     /// <inheritdoc/>
     public Task<WindowInfo?> GetWindowInfoAsync(nint handle, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() => GetWindowInfoCore(handle, includeAllDesktops: true), cancellationToken);
+        return Task.Run(() => GetWindowInfoCore(handle, includeAllDesktops: true, includeUntitled: true), cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -132,7 +136,7 @@ public sealed class WindowEnumerator
         return EnumerateWindowsCoreAsync(title, processName, useRegex, includeAllDesktops: false, cancellationToken);
     }
 
-    private WindowInfo? GetWindowInfoCore(nint hwnd, bool includeAllDesktops)
+    private WindowInfo? GetWindowInfoCore(nint hwnd, bool includeAllDesktops, bool includeUntitled = false)
     {
         // Check if window is visible
         if (!NativeMethods.IsWindowVisible(hwnd))
@@ -151,7 +155,7 @@ public sealed class WindowEnumerator
         string title = GetWindowTitle(hwnd);
 
         // Skip windows with empty titles (typically system/framework windows)
-        if (string.IsNullOrEmpty(title))
+        if (!includeUntitled && string.IsNullOrEmpty(title))
         {
             return null;
         }
@@ -160,7 +164,7 @@ public sealed class WindowEnumerator
         string className = GetClassName(hwnd);
 
         // Skip known system windows that shouldn't be enumerated
-        if (ShouldSkipWindow(hwnd, className, title))
+        if (ShouldSkipWindow(hwnd, className, title, includeUntitled))
         {
             return null;
         }
@@ -393,7 +397,7 @@ public sealed class WindowEnumerator
         return result == 0 && cloaked != 0;
     }
 
-    private static bool ShouldSkipWindow(nint hwnd, string className, string title)
+    private static bool ShouldSkipWindow(nint hwnd, string className, string title, bool includeUntitled)
     {
         // Skip known system window classes
         string[] skipClasses =
@@ -413,7 +417,7 @@ public sealed class WindowEnumerator
         }
 
         // Skip windows that are clearly not user windows
-        if (className.StartsWith("HwndWrapper[", StringComparison.OrdinalIgnoreCase))
+        if (!includeUntitled && className.StartsWith("HwndWrapper[", StringComparison.OrdinalIgnoreCase))
         {
             // WPF wrapper windows - only skip if no meaningful title
             if (string.IsNullOrWhiteSpace(title))

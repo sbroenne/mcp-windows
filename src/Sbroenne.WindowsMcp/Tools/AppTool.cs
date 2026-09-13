@@ -147,7 +147,7 @@ public static partial class AppTool
             var baseline = new Dictionary<int, LaunchProcessIdentity>();
             if (waitForWindow)
             {
-                var before = await WindowsToolsBase.WindowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+                var before = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
                 if (!before.Success)
                 {
                     return before;
@@ -185,7 +185,7 @@ public static partial class AppTool
                         return await ObserveExitAsync(process, programPath, executablePath, baseline, cancellationToken);
                     }
 
-                    var listResult = await windowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+                    var listResult = await windowService.ListLaunchWindowsAsync(cancellationToken);
                     // Enumeration is asynchronous: an exit during it must win over stale window evidence.
                     process.Refresh();
                     if (process.HasExited)
@@ -284,7 +284,7 @@ public static partial class AppTool
                 $"Process '{programPath}' exited with code {process.ExitCode}");
         }
 
-        var current = await WindowsToolsBase.WindowService.ListWindowsAsync(includeAllDesktops: true, cancellationToken: cancellationToken);
+        var current = await WindowsToolsBase.WindowService.ListLaunchWindowsAsync(cancellationToken);
         if (!current.Success)
         {
             return current;

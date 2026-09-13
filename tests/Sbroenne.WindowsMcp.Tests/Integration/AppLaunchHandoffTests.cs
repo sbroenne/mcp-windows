@@ -25,11 +25,11 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
         }
     }
 
-    public static TheoryData<bool, int, int, int> HandoffCases
+    public static TheoryData<bool, int, int, int, bool> HandoffCases
     {
         get
         {
-            var cases = new TheoryData<bool, int, int, int>();
+            var cases = new TheoryData<bool, int, int, int, bool>();
             foreach (var cli in new[] { false, true })
             {
                 foreach (var delay in new[] { 0, 800 })
@@ -38,7 +38,8 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
                     {
                         foreach (var windows in new[] { 1, 2 })
                         {
-                            cases.Add(cli, delay, code, windows);
+                            cases.Add(cli, delay, code, windows, false);
+                            cases.Add(cli, delay, code, windows, true);
                         }
                     }
                 }
@@ -49,14 +50,31 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
 
     [Theory]
     [MemberData(nameof(HandoffCases))]
-    public async Task ExistingReceiver_ExitStatusAndAmbiguityArePreserved(bool cli, int delay, int code, int windowCount)
+    public async Task ExistingReceiver_ExitStatusAndAmbiguityArePreserved(bool cli, int delay, int code, int windowCount, bool untitled)
     {
         var directory = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, $"handoff-{Guid.NewGuid():N}")).FullName;
-        using var receiver = Start(FixturePath, ["--handoff-primary", directory, windowCount.ToString(CultureInfo.InvariantCulture)]);
+        var receiverArguments = new List<string> { "--handoff-primary", directory, windowCount.ToString(CultureInfo.InvariantCulture) };
+        if (untitled)
+        {
+            receiverArguments.Add("--untitled");
+        }
+        using var receiver = Start(FixturePath, receiverArguments);
         try
         {
             var handles = JsonSerializer.Deserialize<string[]>((await receiver.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)))!)!;
             Assert.Equal(windowCount, handles.Length);
+            if (untitled)
+            {
+                var listed = await WindowsToolsBase.WindowService.ListWindowsAsync(includeAllDesktops: true);
+                Assert.True(listed.Success);
+                Assert.DoesNotContain(listed.Windows!, w => handles.Contains(w.Handle, StringComparer.Ordinal));
+                foreach (var handle in handles)
+                {
+                    var targeted = await WindowsToolsBase.WindowService.GetWindowInfoAsync(nint.Parse(handle, CultureInfo.InvariantCulture));
+                    Assert.NotNull(targeted);
+                    Assert.Equal("", targeted.Title);
+                }
+            }
 
             var (success, json) = await LaunchAsync(cli, FixturePath, $"--handoff-secondary \"{directory}\" {delay} {code}");
             using var result = JsonDocument.Parse(json);
@@ -174,9 +192,11 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task NewWindow_IsOwnedByLaunchedProcessNotExistingInstance(bool cli)
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public async Task NewWindow_IsOwnedByLaunchedProcessNotExistingInstance(bool cli, bool untitled)
     {
         var root = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, $"handoff-{Guid.NewGuid():N}")).FullName;
         var first = Directory.CreateDirectory(Path.Combine(root, "first")).FullName;
@@ -185,7 +205,8 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
         try
         {
             Assert.NotNull(await existing.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)));
-            var (success, json) = await LaunchAsync(cli, FixturePath, $"--handoff-primary \"{second}\" 1");
+            var arguments = $"--handoff-primary \"{second}\" 1" + (untitled ? " --untitled" : "");
+            var (success, json) = await LaunchAsync(cli, FixturePath, arguments);
             Assert.True(success, json);
             using var result = JsonDocument.Parse(json);
             Assert.Equal("windowObserved", result.RootElement.GetProperty("launchStatus").GetString());

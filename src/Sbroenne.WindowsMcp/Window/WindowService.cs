@@ -75,16 +75,30 @@ public sealed class WindowService
     }
 
     /// <inheritdoc/>
-    public async Task<WindowManagementResult> ListWindowsAsync(
+    public Task<WindowManagementResult> ListWindowsAsync(
         string? filter = null,
         bool useRegex = false,
         bool includeAllDesktops = false,
         CancellationToken cancellationToken = default)
     {
+        return ListWindowsCoreAsync(filter, useRegex, includeAllDesktops, includeUntitled: false, cancellationToken);
+    }
+
+    internal Task<WindowManagementResult> ListLaunchWindowsAsync(CancellationToken cancellationToken) =>
+        ListWindowsCoreAsync(null, false, true, includeUntitled: true, cancellationToken);
+
+    private async Task<WindowManagementResult> ListWindowsCoreAsync(
+        string? filter,
+        bool useRegex,
+        bool includeAllDesktops,
+        bool includeUntitled,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            var windows = await _enumerator.EnumerateWindowsAsync(
-                filter, useRegex, includeAllDesktops, cancellationToken);
+            var windows = includeUntitled
+                ? await _enumerator.EnumerateLaunchWindowsAsync(cancellationToken)
+                : await _enumerator.EnumerateWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

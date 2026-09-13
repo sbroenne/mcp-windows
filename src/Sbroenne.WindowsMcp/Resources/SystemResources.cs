@@ -123,7 +123,7 @@ public sealed class SystemResources
 
             | Tool | Purpose |
             |------|---------|
-            | `app` | Launch applications (notepad.exe, chrome.exe, winword.exe). Returns window handle. |
+            | `app` | Observe application launch. Returns a window handle only when one eligible window is identified. |
             | `window_management` | Find, activate, close, move existing windows. Get window handles. |
             | `screenshot_control` | Capture screenshots with element discovery (annotate=true). |
             | `ui_click` | Click buttons, checkboxes, menu items, links. |
@@ -136,14 +136,22 @@ public sealed class SystemResources
 
             ## The Standard Workflow: Launch App, Then Interact
 
-            1. **Launch the application** with `app` - returns a window handle
+            1. **Launch the application** with `app` - inspect `launchStatus` and any returned `window` or `windows`
             2. **Discover controls** with `ui_snapshot` or `ui_find`
             3. **Use the handle and returned element ID** for targeted actions
 
+            `started` may have no window. `windowObserved` reports a visible process-owned window.
+            `possibleHandoff` reports a clean launcher exit with a matching pre-existing instance,
+            not confirmed request delivery or loaded content. Multiple windows are listed without a
+            selected `window`; inspect and choose the intended target. `exitedWithoutWindow` fails
+            when no matching window/instance can be established. None guarantees focus or readiness.
+
             ```
             app(programPath="notepad.exe")
-            → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
+            → Example: { "success": true, "launchStatus": "windowObserved",
+                         "window": { "handle": "123456", "title": "Untitled - Notepad", ... } }
 
+            # Only after a window is identified; verify the intended content before acting
             ui_find(windowHandle="123456", nameContains="Save")
             → Choose the intended control's returned id
             ui_click(windowHandle="123456", elementId="<save-id>")

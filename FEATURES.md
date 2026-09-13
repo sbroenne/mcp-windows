@@ -168,6 +168,8 @@ A possible handoff is not confirmation that a URL/document was delivered or load
 Native executable image paths and process creation times establish the existing instance,
 not window titles or executable basenames. The retained process handle identifies even
 an already-exited launcher; bare names still use Windows' own executable lookup.
+Launch observations include visible untitled windows; ordinary window listings retain
+their existing filtering, while explicit handle operations can inspect those windows.
 If image identity cannot be read, or a Store launcher redirects to a different executable,
 the relationship remains unverified rather than being inferred from a title or requested path.
 Nonzero exits observed during the wait fail even when another instance is open.

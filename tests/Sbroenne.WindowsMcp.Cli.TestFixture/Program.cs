@@ -9,6 +9,11 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        if (args is ["--handoff-primary", var untitledDirectory, var untitledCount, "--untitled"])
+        {
+            return RunReceiver(untitledDirectory, int.Parse(untitledCount, CultureInfo.InvariantCulture), untitled: true);
+        }
+
         if (args is ["--handoff-primary", var directory, var count])
         {
             return RunReceiver(directory, int.Parse(count, CultureInfo.InvariantCulture));
@@ -70,11 +75,11 @@ internal static class Program
         return 0;
     }
 
-    private static int RunReceiver(string directory, int count)
+    private static int RunReceiver(string directory, int count, bool untitled = false)
     {
         var windows = Enumerable.Range(0, count).Select(_ => new InertWindow
         {
-            Text = "Owned receiver - unrelated document title",
+            Text = untitled ? "" : "Owned receiver - unrelated document title",
             ShowInTaskbar = true,
             Location = new Point(100, 100),
         }).ToArray();
