@@ -10,9 +10,20 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 [Collection("WindowManagement")]
 [Trait("Category", "RequiresDesktop")]
-public sealed class AppLaunchHandoffTests
+public sealed class AppLaunchHandoffTests : IAsyncLifetime
 {
     private static string FixturePath => Path.Combine(AppContext.BaseDirectory, "Sbroenne.WindowsMcp.Cli.TestFixture.exe");
+    private McpClient? _client;
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        if (_client is not null)
+        {
+            await _client.DisposeAsync();
+        }
+    }
 
     public static TheoryData<bool, int, int, int> HandoffCases
     {
@@ -180,6 +191,13 @@ public sealed class AppLaunchHandoffTests
             Assert.Equal("windowObserved", result.RootElement.GetProperty("launchStatus").GetString());
             var pid = result.RootElement.GetProperty("window").GetProperty("pid").GetInt32();
             Assert.NotEqual(existing.Id, pid);
+            var ownerFile = Path.Combine(second, "owner.json");
+            Assert.True(await TestWait.UntilAsync(() => File.Exists(ownerFile), TimeSpan.FromSeconds(10)));
+            var owner = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(ownerFile));
+            Assert.NotNull(owner);
+            Assert.Equal(int.Parse(Assert.Single(owner), CultureInfo.InvariantCulture), pid);
+            using var observedProcess = Process.GetProcessById(pid);
+            Assert.False(observedProcess.HasExited);
             Assert.Contains("not verified", result.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
         }
         finally
@@ -203,7 +221,7 @@ public sealed class AppLaunchHandoffTests
         }
     }
 
-    private static async Task<(bool Success, string Json)> LaunchAsync(bool cli, string path, string arguments, string? workingDirectory = null)
+    private async Task<(bool Success, string Json)> LaunchAsync(bool cli, string path, string arguments, string? workingDirectory = null)
     {
         if (cli)
         {
@@ -223,8 +241,9 @@ public sealed class AppLaunchHandoffTests
             Name = "owned-launch-test",
         });
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await using var client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
-        var response = await client.CallToolAsync("app", new Dictionary<string, object?>
+        // Keep the server alive until fixture cleanup: disposing stdio transport terminates its child tree.
+        _client = await McpClient.CreateAsync(transport, cancellationToken: timeout.Token);
+        var response = await _client.CallToolAsync("app", new Dictionary<string, object?>
         {
             ["programPath"] = path,
             ["arguments"] = arguments,
