@@ -80,17 +80,20 @@ public sealed class CliIntegrationTests
             ?? throw new InvalidOperationException($"Could not start {executable}.");
         var stdout = process.StandardOutput.ReadToEndAsync();
         var stderr = process.StandardError.ReadToEndAsync();
-        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         try
         {
-            await process.WaitForExitAsync(timeout.Token);
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45));
+            await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(10));
+            return (process.ExitCode, await stdout, await stderr);
         }
-        catch (OperationCanceledException)
+        finally
         {
-            process.Kill();
-            throw new TimeoutException($"CLI process {process.Id} did not exit within 60 seconds.");
+            if (!process.HasExited)
+            {
+                process.Kill();
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
         }
-        return (process.ExitCode, await stdout, await stderr);
     }
 
     [Fact]
@@ -195,19 +198,26 @@ public sealed class CliIntegrationTests
     }
 
     [Fact]
-    public async Task Cli_UiSnapshot_SeparateProcessesDoNotShareRememberedViews()
+    public async Task Cli_UiSnapshot_SeparateProcessesRequireExplicitBaseline()
     {
-        var first = await RunSeparateProcessAsync(
-            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
-        var second = await RunSeparateProcessAsync(
-            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+        try
+        {
+            var first = await RunSeparateProcessAsync(
+                "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+            var second = await RunSeparateProcessAsync(
+                "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
 
-        using var firstDocument = JsonDocument.Parse(first.Stdout);
-        using var secondDocument = JsonDocument.Parse(second.Stdout);
-        Assert.Equal(0, first.Code);
-        Assert.Equal("full", firstDocument.RootElement.GetProperty("kind").GetString());
-        Assert.Equal(0, second.Code);
-        Assert.Equal("full", secondDocument.RootElement.GetProperty("kind").GetString());
+            using var firstDocument = JsonDocument.Parse(first.Stdout);
+            using var secondDocument = JsonDocument.Parse(second.Stdout);
+            Assert.Equal(0, first.Code);
+            Assert.Equal("full", firstDocument.RootElement.GetProperty("kind").GetString());
+            Assert.Equal(0, second.Code);
+            Assert.Equal("full", secondDocument.RootElement.GetProperty("kind").GetString());
+        }
+        finally
+        {
+            await RunSeparateProcessAsync("service", "stop");
+        }
     }
 
     [Fact]
