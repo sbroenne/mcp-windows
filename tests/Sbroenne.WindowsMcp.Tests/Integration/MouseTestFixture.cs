@@ -191,10 +191,10 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     {
         if (_form == null || _form.IsDisposed)
         {
-            return;
+            throw new InvalidOperationException("Test harness form is not available.");
         }
 
-        await TestWait.RetryUntilAsync(
+        var ready = await TestWait.RetryUntilAsync(
             attempt: () =>
             {
                 AllowSetForegroundWindow(ASFW_ANY);
@@ -210,6 +210,13 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
             condition: () => GetForegroundWindow() == TestWindowHandle,
             timeout: TimeSpan.FromMilliseconds(maxRetries * delayMs),
             pollInterval: TimeSpan.FromMilliseconds(delayMs));
+
+        if (!ready)
+        {
+            throw new TimeoutException(
+                $"Test harness window {TestWindowHandle} did not become foreground; " +
+                $"actual foreground window is {GetForegroundWindow()}.");
+        }
     }
 
     /// <summary>

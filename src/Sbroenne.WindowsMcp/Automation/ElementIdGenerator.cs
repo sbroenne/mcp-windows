@@ -1,755 +1,289 @@
-using System.Collections.Concurrent;
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
 
-/// <summary>
-/// Generates and resolves unique element IDs for UI Automation elements.
-/// Uses short IDs (1, 2, 3...) externally, mapped to full IDs internally.
-/// Full format: "window:{hwnd}|runtime:{id}|path:{treePath}"
-/// Thread-safe caching is built-in to minimize duplicate ID generation.
-/// </summary>
+/// <summary>Owns bounded, immutable references to observed UI Automation elements.</summary>
 [SupportedOSPlatform("windows")]
 public static class ElementIdGenerator
 {
     internal const int MaxRetainedIds = 4096;
 
-    // Thread-safe cache for mapping short IDs to full IDs
-    private static readonly ConcurrentDictionary<string, string> s_shortToFull = new();
-    private static readonly ConcurrentDictionary<string, string> s_fullToShort = new();
-    private static readonly ConcurrentDictionary<string, long> s_shortVersions = new();
-    private static readonly Queue<(string ShortId, string FullId, long Version)> s_registrationOrder = new();
-    private static readonly Lock s_registrationLock = new();
+    private static readonly Lock s_lock = new();
+    private static readonly Dictionary<string, Registration> s_registrations = new(StringComparer.Ordinal);
+    private static readonly Dictionary<Identity, string> s_ids = [];
+    private static readonly Queue<string> s_order = new();
+    private static string s_generation = NewGeneration();
     private static long s_counter;
-    private static long s_registrationVersion;
 
-    internal static int RetainedIdCount => s_shortToFull.Count;
-
-    /// <summary>
-    /// Generates a unique ID for a UI Automation element.
-    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
-    /// </summary>
-    /// <param name="element">The automation element.</param>
-    /// <param name="rootElement">The root element (window) for path calculation.</param>
-    /// <returns>A short element ID string.</returns>
-    public static string GenerateId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    internal static int RetainedIdCount
     {
-        var fullId = GenerateFullId(element, rootElement);
-        return RegisterFullId(fullId);
+        get { lock (s_lock) { return s_registrations.Count; } }
     }
 
-    /// <summary>
-    /// Generates a unique ID for a UI Automation element optimized for token usage.
-    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
-    /// </summary>
-    /// <param name="element">The automation element.</param>
-    /// <param name="rootElement">The root element (window) for path calculation.</param>
-    /// <returns>A short element ID string optimized for LLM token usage.</returns>
-    public static string GenerateFastId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
+    /// <summary>Registers a live element using its current runtime identity.</summary>
+    public static string GenerateId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement) =>
+        Generate(element, rootElement, cached: false);
+
+    /// <summary>Registers a live element using cached identity properties when available.</summary>
+    public static string GenerateFastId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement) =>
+        Generate(element, rootElement, cached: true);
+
+    /// <summary>Registers a live element when no property cache was requested.</summary>
+    public static string GenerateFastIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement) =>
+        Generate(element, rootElement, cached: false);
+
+    private static string Generate(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, bool cached)
     {
         ArgumentNullException.ThrowIfNull(element);
         ArgumentNullException.ThrowIfNull(rootElement);
+        try
+        {
+            nint handle;
+            try
+            {
+                handle = cached ? rootElement.GetCachedNativeWindowHandle() : rootElement.GetNativeWindowHandle();
+            }
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            {
+                handle = rootElement.GetNativeWindowHandle();
+            }
+            if (handle == nint.Zero)
+            {
+                handle = GetTopLevelWindowHandle(element);
+            }
+            else
+            {
+                handle = NativeMethods.GetAncestor(handle, NativeConstants.GA_ROOT);
+            }
 
-        var fullId = GenerateFastFullId(element, rootElement);
-        return RegisterFullId(fullId);
+            int[]? runtimeId;
+            int providerProcessId;
+            try
+            {
+                runtimeId = cached
+                    ? (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId)
+                    : element.GetRuntimeId();
+                providerProcessId = cached
+                    ? (int)element.GetCachedPropertyValue(UIA3PropertyIds.ProcessId)
+                    : element.CurrentProcessId;
+            }
+            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+            {
+                runtimeId = element.GetRuntimeId();
+                providerProcessId = element.CurrentProcessId;
+            }
+
+            var runtime = runtimeId is { Length: > 0 } ? string.Join(".", runtimeId) : "0";
+            return Register($"window:{handle}|runtime:{runtime}|path:observed", element, providerProcessId);
+        }
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            // A disappearing element can still be displayed, but its reference cannot resolve.
+            return Register("window:0|runtime:0|path:stale", null);
+        }
     }
 
-    /// <summary>
-    /// Generates a unique ID for an element using only cached properties.
-    /// Returns a short ID (e.g., "1", "2") that maps to the full internal ID.
-    /// </summary>
-    /// <param name="element">The automation element.</param>
-    /// <param name="rootElement">The root element (window) for path calculation.</param>
-    /// <returns>A short element ID string.</returns>
-    public static string GenerateFastIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
-    {
-        ArgumentNullException.ThrowIfNull(element);
-        ArgumentNullException.ThrowIfNull(rootElement);
-
-        var fullId = GenerateFastFullIdFromCurrent(element, rootElement);
-        return RegisterFullId(fullId);
-    }
-
-    /// <summary>
-    /// Resolves a short element ID to the actual UI Automation element.
-    /// </summary>
-    /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
-    /// <returns>The UI Automation element, or null if resolution fails.</returns>
-    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId) =>
-        ResolveToAutomationElement(elementId, allowSelectorFallback: true);
-
-    /// <summary>
-    /// Resolves a short element ID to the actual UI Automation element.
-    /// </summary>
-    /// <param name="elementId">The short element ID (e.g., "1", "2").</param>
-    /// <param name="allowSelectorFallback">
-    /// Whether resolution may fall back to positional tree paths or an exact name/control-type search.
-    /// State-changing actions should pass <see langword="false"/>.
-    /// </param>
-    /// <returns>The UI Automation element, or null if resolution fails.</returns>
-    public static UIA.IUIAutomationElement? ResolveToAutomationElement(
-        string elementId,
-        bool allowSelectorFallback)
+    /// <summary>Resolves only a reference issued by this owner, never a name or a tree position.</summary>
+    public static UIA.IUIAutomationElement? ResolveToAutomationElement(string elementId)
     {
         ArgumentNullException.ThrowIfNull(elementId);
-
-        // Try to resolve short ID to full ID
-        var fullId = ResolveFullId(elementId) ?? elementId;
-
-        var parts = ParseElementId(fullId);
-        if (parts == null)
+        Registration? registration;
+        lock (s_lock)
         {
+            s_registrations.TryGetValue(elementId, out registration);
+        }
+
+        if (registration is null)
+        {
+            return null;
+        }
+
+        var identity = registration.Identity;
+        if (identity.ProcessStartTicks <= 0 || identity.ProviderStartTicks <= 0 || identity.RuntimeId == "0" ||
+            GetProcessLifetime(identity.WindowHandle) != (identity.ProcessId, identity.ProcessStartTicks) ||
+            GetProcessLifetime(identity.ProviderProcessId) != (identity.ProviderProcessId, identity.ProviderStartTicks))
+        {
+            Retire(elementId);
             return null;
         }
 
         try
         {
-            UIA.IUIAutomationElement? element = null;
-
-            // Try to find by runtime ID first (most reliable)
-            if (!string.IsNullOrEmpty(parts.RuntimeId) && parts.RuntimeId != "0")
+            // Keep the original provider object: searching for a reused runtime ID can retarget.
+            var element = registration.Element;
+            if (element is not null &&
+                element.CurrentProcessId == identity.ProviderProcessId &&
+                string.Equals(string.Join(".", element.GetRuntimeId() ?? []), identity.RuntimeId, StringComparison.Ordinal) &&
+                GetTopLevelWindowHandle(element) == identity.WindowHandle)
             {
-                var runtimeId = parts.RuntimeId.Split('.').Select(int.Parse).ToArray();
-                element = FindByRuntimeId(parts.WindowHandle, runtimeId);
+                return element;
             }
-
-            // A tree path is positional and may now identify a replacement control.
-            // Strict state-changing resolution must fail closed without a stable runtime identity.
-            if (element == null &&
-                allowSelectorFallback &&
-                !string.IsNullOrEmpty(parts.TreePath) &&
-                parts.TreePath != "stale")
-            {
-                element = FindByTreePath(parts.WindowHandle, parts.TreePath);
-            }
-
-            // Last-resort: Locator-style re-resolution by name + control type. Chromium/Electron churn
-            // runtime IDs and tree indices on re-render, so re-find the element by its stable semantic
-            // selector when both the runtime ID and tree path have gone stale.
-            if (allowSelectorFallback && element == null && !string.IsNullOrEmpty(parts.Name))
-            {
-                element = FindBySelector(parts.WindowHandle, parts.ControlType, parts.Name!);
-            }
-
-            return element;
         }
         catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
-            return null;
+            // The original provider no longer exposes this observation.
         }
-        catch (FormatException)
-        {
-            return null;
-        }
-        catch (OverflowException)
-        {
-            return null;
-        }
+
+        Retire(elementId);
+        return null;
     }
 
     private static nint GetTopLevelWindowHandle(UIA.IUIAutomationElement element)
     {
         var current = element;
-        nint topLevelHandle = IntPtr.Zero;
-        var desktopRoot = UIA3Automation.Instance.RootElement;
-
-        while (current != null)
+        var desktop = UIA3Automation.Instance.RootElement;
+        while (current is not null && !current.IsSameElement(desktop))
         {
-            try
+            var currentHandle = current.GetNativeWindowHandle();
+            if (currentHandle != nint.Zero)
             {
-                if (current.IsSameElement(desktopRoot))
-                {
-                    break;
-                }
-
-                var hwnd = current.GetNativeWindowHandle();
-                if (hwnd != 0)
-                {
-                    topLevelHandle = hwnd;
-                }
-
-                current = current.GetParent();
+                return NativeMethods.GetAncestor(currentHandle, NativeConstants.GA_ROOT);
             }
-            catch
-            {
-                break;
-            }
+
+            current = current.GetParent();
         }
 
-        return topLevelHandle;
+        return nint.Zero;
     }
 
-    /// <summary>
-    /// Generates the full internal ID for an element (not for external use).
-    /// </summary>
-    private static string GenerateFullId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
-    {
-        ArgumentNullException.ThrowIfNull(element);
-        ArgumentNullException.ThrowIfNull(rootElement);
+    internal static string RegisterFullId(string fullId) => Register(fullId, null);
 
-        try
-        {
-            var windowHandle = rootElement.GetNativeWindowHandle();
-            if (windowHandle == 0)
-            {
-                windowHandle = GetTopLevelWindowHandle(element);
-            }
-
-            // Get runtime ID
-            var runtimeId = element.GetRuntimeId();
-            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
-                ? string.Join(".", runtimeId)
-                : "0";
-
-            // Calculate tree path from root
-            var treePath = CalculateTreePath(element, rootElement);
-
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:{treePath}{BuildSelectorSegment(element, cached: false)}";
-        }
-        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return "window:0|runtime:0|path:stale";
-        }
-    }
-
-    /// <summary>
-    /// Generates the fast full ID (cached properties, no tree path).
-    /// </summary>
-    private static string GenerateFastFullId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
-    {
-        try
-        {
-            nint windowHandle;
-            try
-            {
-                windowHandle = rootElement.GetCachedNativeWindowHandle();
-            }
-            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-            {
-                windowHandle = rootElement.GetNativeWindowHandle();
-            }
-
-            if (windowHandle == 0)
-            {
-                windowHandle = GetTopLevelWindowHandle(element);
-            }
-
-            // Get runtime ID - try cached first
-            int[]? runtimeId = null;
-            try
-            {
-                runtimeId = (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId);
-            }
-            catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-            {
-                // Fall back to current if not cached
-                runtimeId = element.GetRuntimeId();
-            }
-
-            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
-                ? string.Join(".", runtimeId)
-                : "0";
-
-            // Simplified format - no tree path (expensive to calculate)
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:cached{BuildSelectorSegment(element, cached: true)}";
-        }
-        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return "window:0|runtime:0|path:error";
-        }
-    }
-
-    /// <summary>
-    /// Generates the fast full ID from current properties.
-    /// </summary>
-    private static string GenerateFastFullIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement)
-    {
-        try
-        {
-            var windowHandle = rootElement.GetNativeWindowHandle();
-            if (windowHandle == 0)
-            {
-                windowHandle = GetTopLevelWindowHandle(element);
-            }
-
-            // Get runtime ID
-            var runtimeId = element.GetRuntimeId();
-            var runtimeIdStr = runtimeId != null && runtimeId.Length > 0
-                ? string.Join(".", runtimeId)
-                : "0";
-
-            // Simplified format - no tree path
-            return $"window:{windowHandle}|runtime:{runtimeIdStr}|path:fast{BuildSelectorSegment(element, cached: false)}";
-        }
-        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return "window:0|runtime:0|path:error";
-        }
-    }
-
-    private static string CalculateTreePath(UIA.IUIAutomationElement element, UIA.IUIAutomationElement root)
-    {
-        var path = new Stack<int>();
-        var current = element;
-        var uia = UIA3Automation.Instance;
-
-        while (current != null)
-        {
-            // Check if we reached root
-            if (current.IsSameElement(root))
-            {
-                break;
-            }
-
-            // Find parent
-            var parent = current.GetParent();
-            if (parent == null)
-            {
-                break;
-            }
-
-            // Find index among siblings
-            var siblings = parent.FindAll(UIA.TreeScope.TreeScope_Children, uia.TrueCondition);
-            var index = 0;
-            if (siblings != null)
-            {
-                for (var i = 0; i < siblings.Length; i++)
-                {
-                    var sibling = siblings.GetElement(i);
-                    if (sibling != null && sibling.IsSameElement(current))
-                    {
-                        path.Push(index);
-                        break;
-                    }
-
-                    index++;
-                }
-            }
-
-            current = parent;
-        }
-
-        return path.Count > 0 ? string.Join(".", path) : "0";
-    }
-
-    /// <summary>
-    /// Builds the optional selector segment ("|sel:{controlType}~{name}") used as a Locator-style
-    /// re-resolution fallback. Returns an empty string when the element has no usable name.
-    /// </summary>
-    private static string BuildSelectorSegment(UIA.IUIAutomationElement element, bool cached)
-    {
-        try
-        {
-            var name = cached ? element.GetCachedName() : element.GetName();
-            if (string.IsNullOrWhiteSpace(name))
-            {
-                return string.Empty;
-            }
-
-            var controlType = cached ? element.GetCachedControlTypeName() : element.GetControlTypeName();
-
-            // '|' and '~' are our delimiters and newlines break the single-line id; strip them.
-            // Cap length to keep ids compact — the name only needs to be specific enough to re-find.
-            var sanitizedName = name
-                .Replace('|', ' ')
-                .Replace('~', ' ')
-                .Replace('\r', ' ')
-                .Replace('\n', ' ')
-                .Trim();
-            if (sanitizedName.Length > 120)
-            {
-                sanitizedName = sanitizedName[..120];
-            }
-
-            var sanitizedType = (controlType ?? string.Empty).Replace('|', ' ').Replace('~', ' ').Trim();
-
-            return $"|sel:{sanitizedType}~{sanitizedName}";
-        }
-        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return string.Empty;
-        }
-    }
-
-    private static ElementIdParts? ParseElementId(string elementId)
-    {
-        var parts = elementId.Split('|');
-        if (parts.Length < 3)
-        {
-            return null;
-        }
-
-        string? windowPart = null;
-        string? runtimePart = null;
-        string? pathPart = null;
-        string? controlType = null;
-        string? name = null;
-
-        foreach (var part in parts)
-        {
-            if (part.StartsWith("window:", StringComparison.Ordinal))
-            {
-                windowPart = part["window:".Length..];
-            }
-            else if (part.StartsWith("runtime:", StringComparison.Ordinal))
-            {
-                runtimePart = part["runtime:".Length..];
-            }
-            else if (part.StartsWith("path:", StringComparison.Ordinal))
-            {
-                pathPart = part["path:".Length..];
-            }
-            else if (part.StartsWith("sel:", StringComparison.Ordinal))
-            {
-                var sel = part["sel:".Length..];
-                var tilde = sel.IndexOf('~');
-                if (tilde >= 0)
-                {
-                    controlType = sel[..tilde];
-                    name = sel[(tilde + 1)..];
-                }
-                else
-                {
-                    name = sel;
-                }
-            }
-        }
-
-        // Require the original three segments so malformed ids (e.g., "window:0|runtime:0")
-        // still fail closed.
-        if (windowPart == null || runtimePart == null || pathPart == null)
-        {
-            return null;
-        }
-
-        if (!nint.TryParse(windowPart, out var windowHandle))
-        {
-            return null;
-        }
-
-        return new ElementIdParts(windowHandle, runtimePart, pathPart, controlType, name);
-    }
-
-    private static UIA.IUIAutomationElement? FindByRuntimeId(nint windowHandle, int[] runtimeId)
-    {
-        try
-        {
-            var uia = UIA3Automation.Instance;
-            var root = windowHandle != 0
-                ? uia.ElementFromHandle(windowHandle)
-                : uia.RootElement;
-
-            if (root == null)
-            {
-                return null;
-            }
-
-            // First check if the root element itself matches the runtime ID
-            var rootRuntimeId = root.GetRuntimeId();
-            if (rootRuntimeId != null && rootRuntimeId.SequenceEqual(runtimeId))
-            {
-                return root;
-            }
-
-            // Search descendants for the runtime ID
-            var condition = uia.CreatePropertyCondition(UIA3PropertyIds.RuntimeId, runtimeId);
-            return root.FindFirst(UIA.TreeScope.TreeScope_Descendants, condition);
-        }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return null;
-        }
-    }
-
-    private static UIA.IUIAutomationElement? FindByTreePath(nint windowHandle, string treePath)
-    {
-        try
-        {
-            var uia = UIA3Automation.Instance;
-            var root = windowHandle != 0
-                ? uia.ElementFromHandle(windowHandle)
-                : uia.RootElement;
-
-            if (root == null)
-            {
-                return null;
-            }
-
-            var indices = treePath.Split('.').Select(int.Parse).ToArray();
-            var current = root;
-
-            foreach (var index in indices)
-            {
-                var children = current.FindAll(UIA.TreeScope.TreeScope_Children, uia.TrueCondition);
-                if (children == null || index < 0 || index >= children.Length)
-                {
-                    return null;
-                }
-
-                current = children.GetElement(index);
-                if (current == null)
-                {
-                    return null;
-                }
-            }
-
-            return current;
-        }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return null;
-        }
-        catch (FormatException)
-        {
-            return null;
-        }
-        catch (OverflowException)
-        {
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// Locator-style fallback: re-finds an element by exact name, preferring a control-type match and
-    /// an on-screen element. Used only when runtime-id and tree-path resolution have both failed.
-    /// </summary>
-    private static UIA.IUIAutomationElement? FindBySelector(nint windowHandle, string? controlType, string name)
-    {
-        try
-        {
-            var uia = UIA3Automation.Instance;
-            var root = windowHandle != 0
-                ? uia.ElementFromHandle(windowHandle)
-                : uia.RootElement;
-
-            if (root == null)
-            {
-                return null;
-            }
-
-            var condition = uia.CreatePropertyCondition(UIA3PropertyIds.Name, name);
-            var candidates = root.FindAll(UIA.TreeScope.TreeScope_Descendants, condition);
-            if (candidates == null || candidates.Length == 0)
-            {
-                return null;
-            }
-
-            UIA.IUIAutomationElement? typeMatch = null;
-            UIA.IUIAutomationElement? firstAny = null;
-
-            for (var i = 0; i < candidates.Length; i++)
-            {
-                var candidate = candidates.GetElement(i);
-                if (candidate == null)
-                {
-                    continue;
-                }
-
-                firstAny ??= candidate;
-
-                if (string.IsNullOrEmpty(controlType) ||
-                    string.Equals(candidate.GetControlTypeName(), controlType, StringComparison.OrdinalIgnoreCase))
-                {
-                    // Prefer an on-screen element of the right type; keep searching for a visible one.
-                    try
-                    {
-                        if (candidate.CurrentIsOffscreen == 0)
-                        {
-                            return candidate;
-                        }
-                    }
-                    catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-                    {
-                        return candidate;
-                    }
-
-                    typeMatch ??= candidate;
-                }
-            }
-
-            return typeMatch ?? firstAny;
-        }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return null;
-        }
-    }
-
-    private sealed record ElementIdParts(nint WindowHandle, string RuntimeId, string TreePath, string? ControlType, string? Name);
-
-    /// <summary>
-    /// Registers a full element ID and returns a short ID.
-    /// If the full ID is already registered, returns the existing short ID.
-    /// Thread-safe with automatic deduplication.
-    /// </summary>
-    internal static string RegisterFullId(string fullId)
+    private static string Register(string fullId, UIA.IUIAutomationElement? element, int providerProcessId = 0)
     {
         ArgumentNullException.ThrowIfNull(fullId);
-
-        lock (s_registrationLock)
+        var segments = fullId.Split('|');
+        var window = segments.FirstOrDefault(part => part.StartsWith("window:", StringComparison.Ordinal));
+        var runtime = segments.FirstOrDefault(part => part.StartsWith("runtime:", StringComparison.Ordinal));
+        _ = nint.TryParse(window?["window:".Length..], out var handle);
+        var (processId, startTicks) = GetProcessLifetime(handle);
+        var provider = providerProcessId == processId
+            ? (ProcessId: processId, StartTicks: startTicks)
+            : GetProcessLifetime(providerProcessId);
+        var identity = new Identity(handle, processId, startTicks, provider.ProcessId, provider.StartTicks, runtime?["runtime:".Length..] ?? "0");
+        lock (s_lock)
         {
-            if (s_fullToShort.TryGetValue(fullId, out var existingShortId))
+            if (identity.RuntimeId != "0" && s_ids.TryGetValue(identity, out var existing))
             {
-                return existingShortId;
+                return existing;
             }
 
-            var shortId = Interlocked.Increment(ref s_counter).ToString();
-            var version = Interlocked.Increment(ref s_registrationVersion);
-            s_fullToShort[fullId] = shortId;
-            s_shortToFull[shortId] = fullId;
-            s_shortVersions[shortId] = version;
-            s_registrationOrder.Enqueue((shortId, fullId, version));
+            var id = $"{s_generation}.{(++s_counter).ToString("x", CultureInfo.InvariantCulture)}";
+            s_registrations.Add(id, new Registration(identity, fullId, element, Environment.CurrentManagedThreadId));
+            s_ids[identity] = id;
+            s_order.Enqueue(id);
+            while (s_order.Count > MaxRetainedIds)
+            {
+                Retire(s_order.Dequeue());
+            }
 
-            TrimRegistrations();
-
-            return shortId;
+            return id;
         }
     }
 
-    private static void TrimRegistrations()
+    private static (int ProcessId, long StartTicks) GetProcessLifetime(nint handle)
     {
-        while (s_registrationOrder.Count > MaxRetainedIds)
+        if (handle == nint.Zero || NativeMethods.GetWindowThreadProcessId(handle, out var nativeId) == 0)
         {
-            var expired = s_registrationOrder.Dequeue();
-            if (s_shortVersions.TryGetValue(expired.ShortId, out var currentVersion) &&
-                currentVersion == expired.Version &&
-                s_shortToFull.TryGetValue(expired.ShortId, out var mappedFullId) &&
-                string.Equals(mappedFullId, expired.FullId, StringComparison.Ordinal))
+            return default;
+        }
+
+        return GetProcessLifetime(checked((int)nativeId));
+    }
+
+    private static (int ProcessId, long StartTicks) GetProcessLifetime(int processId)
+    {
+        if (processId <= 0)
+        {
+            return default;
+        }
+
+        try
+        {
+            using var process = Process.GetProcessById(processId);
+            return (process.Id, process.StartTime.ToUniversalTime().Ticks);
+        }
+        catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return default;
+        }
+    }
+
+    private static void Retire(string id)
+    {
+        lock (s_lock)
+        {
+            if (s_registrations.Remove(id, out var registration) &&
+                s_ids.TryGetValue(registration.Identity, out var current) && current == id)
             {
-                _ = s_shortToFull.TryRemove(expired.ShortId, out _);
-                _ = s_shortVersions.TryRemove(expired.ShortId, out _);
-                RemoveReverseMappingIfCurrent(expired.FullId, expired.ShortId);
+                s_ids.Remove(registration.Identity);
             }
         }
     }
 
-    private static void RemoveReverseMappingIfCurrent(string fullId, string shortId)
+    internal static string? ResolveFullId(string elementId)
     {
-        if (s_fullToShort.TryGetValue(fullId, out var mappedShortId) &&
-            string.Equals(mappedShortId, shortId, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(elementId);
+        lock (s_lock)
         {
-            _ = s_fullToShort.TryRemove(fullId, out _);
+            return s_registrations.TryGetValue(elementId, out var registration) ? registration.FullId : null;
         }
     }
 
-    /// <summary>
-    /// Resolves a short ID to the full element ID.
-    /// </summary>
-    internal static string? ResolveFullId(string shortId)
-    {
-        ArgumentNullException.ThrowIfNull(shortId);
-
-        return s_shortToFull.TryGetValue(shortId, out var fullId) ? fullId : null;
-    }
-
-    /// <summary>
-    /// Transfers newly generated registrations to client-visible IDs from a previous snapshot.
-    /// The operation is all-or-nothing so callers can safely fall back to a full response.
-    /// </summary>
-    internal static bool TryTransferAliases(
-        IReadOnlyList<(string PreviousShortId, string CurrentShortId)> aliases)
-    {
-        ArgumentNullException.ThrowIfNull(aliases);
-
-        lock (s_registrationLock)
-        {
-            if (aliases.Any(alias =>
-                    !s_shortToFull.ContainsKey(alias.PreviousShortId) ||
-                    !s_shortToFull.ContainsKey(alias.CurrentShortId)))
-            {
-                return false;
-            }
-
-            var transfers = aliases
-                .Where(alias => !string.Equals(
-                    alias.PreviousShortId,
-                    alias.CurrentShortId,
-                    StringComparison.Ordinal))
-                .Distinct()
-                .ToArray();
-            if (transfers.Select(alias => alias.PreviousShortId).Distinct(StringComparer.Ordinal).Count() != transfers.Length ||
-                transfers.Select(alias => alias.CurrentShortId).Distinct(StringComparer.Ordinal).Count() != transfers.Length)
-            {
-                return false;
-            }
-
-            var previousIds = aliases
-                .Select(alias => alias.PreviousShortId)
-                .ToHashSet(StringComparer.Ordinal);
-
-            if (transfers.Any(alias =>
-                    previousIds.Contains(alias.CurrentShortId) ||
-                    !s_shortToFull.ContainsKey(alias.PreviousShortId) ||
-                    !s_shortToFull.ContainsKey(alias.CurrentShortId)))
-            {
-                return false;
-            }
-
-            foreach (var (previousShortId, currentShortId) in transfers)
-            {
-                var previousFullId = s_shortToFull[previousShortId];
-                var currentFullId = s_shortToFull[currentShortId];
-                if (string.Equals(previousFullId, currentFullId, StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                RemoveReverseMappingIfCurrent(previousFullId, previousShortId);
-                s_shortToFull[previousShortId] = currentFullId;
-                var version = Interlocked.Increment(ref s_registrationVersion);
-                s_shortVersions[previousShortId] = version;
-                s_registrationOrder.Enqueue((previousShortId, currentFullId, version));
-            }
-
-            TrimRegistrations();
-            return true;
-        }
-    }
-
-    /// <summary>
-    /// Resolves a window handle from a short or full element ID without requiring callers to know the
-    /// internal ID format. This is used for activation safety checks before sending raw mouse input.
-    /// </summary>
+    /// <summary>Returns the recorded window for an issued reference, never for a raw internal ID.</summary>
     public static bool TryResolveWindowHandle(string elementId, out nint windowHandle)
     {
-        windowHandle = IntPtr.Zero;
+        windowHandle = nint.Zero;
         if (string.IsNullOrWhiteSpace(elementId))
         {
             return false;
         }
 
-        var fullId = ResolveFullId(elementId) ?? elementId;
-
-        const string prefix = "window:";
-        var startIndex = fullId.IndexOf(prefix, StringComparison.Ordinal);
-        if (startIndex < 0)
+        lock (s_lock)
         {
-            return false;
+            if (s_registrations.TryGetValue(elementId, out var registration))
+            {
+                windowHandle = registration.Identity.WindowHandle;
+            }
         }
 
-        startIndex += prefix.Length;
-        var endIndex = fullId.IndexOf('|', startIndex);
-        if (endIndex < 0)
-        {
-            endIndex = fullId.Length;
-        }
-
-        var windowValue = fullId.Substring(startIndex, endIndex - startIndex).Trim();
-        return nint.TryParse(windowValue, out windowHandle) && windowHandle != IntPtr.Zero;
+        return windowHandle != nint.Zero;
     }
 
     internal static void Clear()
     {
-        lock (s_registrationLock)
+        lock (s_lock)
         {
-            s_shortToFull.Clear();
-            s_fullToShort.Clear();
-            s_shortVersions.Clear();
-            s_registrationOrder.Clear();
-            Interlocked.Exchange(ref s_counter, 0);
-            Interlocked.Exchange(ref s_registrationVersion, 0);
+            s_registrations.Clear();
+            s_ids.Clear();
+            s_order.Clear();
+            s_generation = NewGeneration();
+            s_counter = 0;
         }
     }
+
+    internal static void RetireCurrentThread()
+    {
+        lock (s_lock)
+        {
+            foreach (var id in s_registrations
+                         .Where(pair => pair.Value.ThreadId == Environment.CurrentManagedThreadId)
+                         .Select(pair => pair.Key).ToArray())
+            {
+                Retire(id);
+            }
+        }
+    }
+
+    private static string NewGeneration() =>
+        "e" + Convert.ToBase64String(Guid.NewGuid().ToByteArray()).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private sealed record Registration(Identity Identity, string FullId, UIA.IUIAutomationElement? Element, int ThreadId);
+    private readonly record struct Identity(
+        nint WindowHandle, int ProcessId, long ProcessStartTicks,
+        int ProviderProcessId, long ProviderStartTicks, string RuntimeId);
 }

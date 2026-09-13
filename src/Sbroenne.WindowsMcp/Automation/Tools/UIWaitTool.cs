@@ -80,6 +80,13 @@ public static partial class UIWaitTool
 
             if (normalizedMode == "state")
             {
+                if (name is not null || nameContains is not null || namePattern is not null ||
+                    controlType is not null || automationId is not null || className is not null ||
+                    parentElementId is not null || requireUnique || enabledOnly is not null ||
+                    (scope is not null && scope != "window"))
+                {
+                    return WindowsToolsBase.FailResult("State waits accept elementId and desiredState, not selectors.");
+                }
                 if (string.IsNullOrWhiteSpace(elementId))
                 {
                     return WindowsToolsBase.FailResult(
@@ -92,6 +99,11 @@ public static partial class UIWaitTool
                         "mode='state' requires desiredState. Valid values: enabled, disabled, on, off, indeterminate, visible, offscreen.");
                 }
 
+                var targetError = await automationService.ValidateElementTargetAsync(elementId, windowHandle, cancellationToken);
+                if (targetError is not null)
+                {
+                    return WindowsToolsBase.ToCallToolResult(targetError, includeDiagnostics);
+                }
                 var stateResult = await automationService.WaitForElementStateAsync(elementId, desiredState, timeoutMs, cancellationToken);
                 return WindowsToolsBase.ToCallToolResult(stateResult, includeDiagnostics);
             }
@@ -100,6 +112,11 @@ public static partial class UIWaitTool
             {
                 return WindowsToolsBase.FailResult(
                     $"Invalid mode '{mode}'. Valid values: appear, disappear, state.");
+            }
+
+            if (elementId is not null || desiredState is not null)
+            {
+                return WindowsToolsBase.FailResult("Appear/disappear waits accept selectors, not elementId or desiredState.");
             }
 
             var hasSelector = !string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) ||
@@ -132,29 +149,10 @@ public static partial class UIWaitTool
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
 
-    /// <summary>Compatibility overload for callers using the original wait signature.</summary>
-    public static Task<CallToolResult> ExecuteAsync(
-        string? windowHandle,
-        string? mode,
-        string? elementId,
-        string? desiredState,
-        string? name,
-        string? nameContains,
-        string? namePattern,
-        string? controlType,
-        string? automationId,
-        string? className,
-        int timeoutMs,
-        bool includeDiagnostics,
-        CancellationToken cancellationToken) =>
-        ExecuteAsync(
-            windowHandle, mode, elementId, desiredState, name, nameContains, namePattern,
-            controlType, automationId, className, null, "window", false, null, timeoutMs,
-            includeDiagnostics, cancellationToken);
 }

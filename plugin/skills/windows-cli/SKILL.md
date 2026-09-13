@@ -9,25 +9,26 @@ source: "plugin"
 ## Context
 
 `wincli` is the command-line twin of the Windows MCP server. Every command calls the exact same
-underlying tool, so behavior and JSON output are identical to the MCP tools - only the entry point
-differs. Prefer `wincli` when you already have a shell: one small command vocabulary costs far fewer
-tokens than loading every MCP tool schema, and each call is stateless (window handles are OS-global,
-so there is no server session to keep alive).
+underlying tool through a persistent user-owned CLI daemon. Prefer `wincli` when
+you already have a shell: one small command vocabulary costs far fewer tokens than loading every
+MCP tool schema. IDs from CLI discovery can be reused across commands against that daemon.
+MCP instances have separate owners; never transfer their IDs to the CLI.
 
 ## Discovery (do this first)
 
 - `wincli --help` - the command map and a common workflow.
 - `wincli tools` - every command with its options.
 - `wincli tools --json` - machine-readable tool manifest (names, descriptions, JSON input schemas);
-  the same surface the MCP server exposes via `tools/list`. Parse this to construct calls precisely.
-- `wincli guidance` - the full semantic-automation guide (same text the MCP host receives).
+  the same surface the MCP server exposes via `tools/list`, **not a CLI flag schema**. Use `tools`
+  for kebab-case CLI spellings.
+- `wincli guidance` - CLI lifetime limitations followed by the shared semantic-automation guide.
 
 ## Preferred workflow
 
 1. `wincli window find --title <part>` (or `wincli app --path <exe>`) to get a **window handle**.
 2. `wincli ui snapshot --window <handle>` to see the accessible element tree.
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
-4. `wincli ui read-table --window <handle> --automation-id <grid>` to pull a grid/table/details-list into structured rows + headers in one call.
+4. `wincli ui read-table --window <handle> --element-id <grid-id>` to pull an observed grid/table into structured rows + headers.
    For a web page, add `--format article` to `wincli ui read` to get clean main-content text (nav/breadcrumb chrome and inline link URLs stripped, headings/lists as markdown).
 5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
    Use `wincli file-open --window <handle> --path <file>` for Open flows.
@@ -38,16 +39,36 @@ so there is no server session to keep alive).
 ## Patterns
 
 ### Semantic-first automation
-- Target elements by `--name`, `--name-contains`, `--control-type`, or `--automation-id`, not coordinates.
+- Discover elements with `ui find` using `--name`, `--control-type`, or `--automation-id`.
+  Pass the returned `--element-id` to click/type/select/read/read-table; action selectors are rejected.
+  Omit the ID only for an intentional whole-window `ui read --window <h>`.
 - Add `--with-snapshot` to `ui click`/`ui type`/`ui select` to get the updated tree back in the same
   call (perceive + act fused - avoids a second round trip).
 - Use `ui batch --window <h> --steps '<json>'` to run an ordered sequence
-  (e.g. `[{"action":"type","automationId":"UsernameInput","text":"me"},{"action":"click","name":"Submit"}]`)
+  (e.g. `[{"action":"find","automationId":"UsernameInput","requireUnique":true},{"action":"type","elementId":"$prev","text":"me"}]`)
   in a single invocation.
 
 ### Waiting
 - Use `ui wait --window <h> --name <x>` (or `--mode disappear`) instead of sleeping, so automation
   stays fast and deterministic after dialogs, navigation, or tab switches.
+- Use `ui wait --mode state --element-id <id> --desired-state enabled`, or a batch discovery then
+  `{"action":"wait","mode":"state","elementId":"$prev","desiredState":"enabled"}`,
+  `$prev` must refer to one unambiguous immediately preceding result.
+
+### Element-ID lifetime
+- Reuse CLI IDs while their observed controls and daemon owner remain alive.
+- Replacement, eviction, or daemon restart invalidates old IDs. Rediscover; stale IDs never retarget by name.
+- Discovery supports `--parent-element-id` and `--near-element` from the same owner.
+- Saved macros discover controls afresh and consume same-run `$prev`, never persisted literal IDs.
+- CLI `ui snapshot --mode auto` returns a full baseline without `--since <snapshotToken>`.
+  Supply that token for checked diffs; interleaved callers may safely receive a full snapshot.
+
+### Application arguments
+- `--args` and `--arguments` are aliases. For child arguments beginning with `--`, use equals:
+  `wincli app --path C:\Tools\local-app.exe --args="--new-window target"`.
+- Separate `--args "--new-window target"` is deliberately rejected, even when quoted as one value.
+  Missing values are also usage errors (exit `2`); no application launches. The equals form preserves
+  the complete argument string. Ordinary values work as `--args "local document.txt"`.
 
 ### Macros (record & replay)
 - Save a proven `ui batch` sequence once: `wincli macro save --name login --steps '<json>'`.
@@ -62,8 +83,10 @@ so there is no server session to keep alive).
 - `0` success, `1` tool error (inspect the JSON `error` field), `2` usage error (bad arguments).
 
 ### Output
-- stdout is the tool's JSON payload - parse it directly. Diagnostic detail is available on any
-  command via `--include-diagnostics`.
+- stdout is the tool's JSON payload - parse it directly. Use `--include-diagnostics` (alias
+  `--diagnostics`) on `ui` operations, `macro run`, `file-open`, or `file-save` for available
+  diagnostic detail. Their command aliases have the same support; other command groups reject
+  these flags. Diagnostics are not a global option.
 
 ## Anti-patterns
 

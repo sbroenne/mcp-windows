@@ -129,7 +129,7 @@ public sealed class SystemResources
             | `ui_click` | Click buttons, checkboxes, menu items, links. |
             | `ui_type` | Type text into input fields. |
             | `ui_find` | Find elements, get details, inspect properties. |
-            | `ui_read` | Read text from elements (with OCR fallback). |
+            | `ui_read` | Read element text; explicit window reads can use OCR fallback. |
             | `file_save` | 💾 Save files to disk (handles Save As dialogs automatically!). |
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
             | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
@@ -137,13 +137,16 @@ public sealed class SystemResources
             ## The Standard Workflow: Launch App, Then Interact
 
             1. **Launch the application** with `app` - returns a window handle
-            2. **Use the handle** for all subsequent operations
+            2. **Discover controls** with `ui_snapshot` or `ui_find`
+            3. **Use the handle and returned element ID** for targeted actions
 
             ```
             app(programPath="notepad.exe")
             → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
 
-            ui_click(windowHandle="123456", nameContains="Save")
+            ui_find(windowHandle="123456", nameContains="Save")
+            → Choose the intended control's returned id
+            ui_click(windowHandle="123456", elementId="<save-id>")
             screenshot_control(target="window", windowHandle="123456")
             ```
 
@@ -157,10 +160,12 @@ public sealed class SystemResources
             → Get the handle from the result
             ```
 
-            ### 2. Interact with Elements
+            ### 2. Discover, Then Interact with Elements
             ```
-            ui_click(windowHandle="<handle>", nameContains="Save")
-            ui_type(windowHandle="<handle>", controlType="Edit", text="Hello")
+            ui_snapshot(windowHandle="<handle>")
+            → Choose IDs from the returned tree
+            ui_click(windowHandle="<handle>", elementId="<save-id>")
+            ui_type(windowHandle="<handle>", elementId="<input-id>", text="Hello")
             ```
 
             ### 3. If You Don't Know the Element Name → Discover First
@@ -171,7 +176,8 @@ public sealed class SystemResources
 
             ### 4. For Toggles → Click handles state
             ```
-            ui_click(windowHandle="<handle>", nameContains="Dark Mode", controlType="CheckBox")
+            ui_find(windowHandle="<handle>", nameContains="Dark Mode", controlType="CheckBox")
+            ui_click(windowHandle="<handle>", elementId="<checkbox-id>")
             ```
             The result includes toggle state after clicking.
 
@@ -191,22 +197,23 @@ public sealed class SystemResources
 
             | Goal | Primary Tool | Fallback |
             |------|-------------|----------|
-            | Click button/checkbox | ui_click(windowHandle=..., nameContains=...) | mouse_control(windowHandle=...) |
-            | Type in text field | ui_type(windowHandle=..., text=...) | ✅ Works on elevated windows! |
+            | Click button/checkbox | ui_click(windowHandle=..., elementId=...) | Explicit coordinate action only if no semantic action was dispatched |
+            | Type in text field | ui_type(windowHandle=..., elementId=..., text=...) | Rediscover if the ID is stale |
             | Save a file | file_save(windowHandle=..., filePath=...) | ⚠️ keyboard_control CANNOT handle Save As dialogs! |
-            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | ⚠️ Fails on elevated windows - use ui_type |
+            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | Requires a matching permission level |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
-            | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
+            | Read text from element | ui_read(windowHandle=..., elementId=...) | Rediscover; element reads never widen to window OCR |
             | Wait for new window | window_management(action='wait_for', title='...') | - |
             | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
             | Find visible elements | screenshot_control with annotate=true | ui_find(windowHandle=...) |
 
             ## ⚠️ Elevated Windows (GitHub Actions, Admin processes)
 
-            On elevated processes, `keyboard_control` fails. Use these alternatives:
-            - **Type text**: `ui_type(windowHandle=..., text="Hello")` ← works!
-            - **Notepad specifically**: `ui_type(windowHandle=..., controlType="Document", text="Hello")`
-            - **Click buttons**: `ui_click(windowHandle=..., nameContains="Button")` ← works!
+            Match the target application's permission level. Windows can deny both UI Automation
+            and physical input when the target is more privileged.
+            - **Type text**: discover the input, then `ui_type(windowHandle=..., elementId="<input-id>", text="Hello")`.
+            - **Notepad**: discover its Edit or Document control, then use its returned ID.
+            - **Click buttons**: discover the button, then `ui_click(windowHandle=..., elementId="<button-id>")`.
 
             ## Key Principles
 
@@ -216,9 +223,13 @@ public sealed class SystemResources
             4. **Use window_management(wait_for) for dialogs** - wait for new windows to appear
             5. **Use file_save for saving** - handles Save As dialogs automatically (⚠️ NOT keyboard_control!)
 
-            ## When to Use `ui_find` (Optional)
+            ## When to Use `ui_find`
 
-            All ui_* tools support direct search, so `ui_find` is rarely needed. Use it when:
+            Targeted actions require IDs. Discover with `ui_snapshot` or `ui_find`; selectors
+            belong to discovery and appear/disappear waits, not click/type/select/read actions.
+            IDs belong to the CLI daemon or MCP process that returned them. Rediscover after
+            a restart or a stale-reference error; never silently substitute a same-name control.
+            Use `ui_find` when:
 
             - **Getting clickable_point** for mouse fallback: `ui_find` returns coordinates
             - **Multiple matches** - see all matching elements, pick the right one
@@ -226,7 +237,9 @@ public sealed class SystemResources
 
             ## Fallback Strategy
 
-            If ui_click doesn't work (custom controls, games, etc.):
+            For controls without a semantic action (custom controls, games, etc.), use explicit
+            coordinates only when no earlier action was dispatched. Never replay an action with
+            an unknown outcome:
 
             ```
             window_management(action="find", title="MyApp")

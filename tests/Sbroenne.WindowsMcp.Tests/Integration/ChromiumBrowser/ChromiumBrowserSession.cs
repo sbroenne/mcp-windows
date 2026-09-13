@@ -693,7 +693,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     private static bool TryDismissKnownPopup(UIAutomationService automationService, string windowHandle)
     {
-        var gotItResult = automationService.FindAndClickAsync(new ElementQuery
+        var gotItResult = automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = windowHandle,
             Name = "Got it",
@@ -722,7 +722,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
             foreach (var buttonName in popupSignal.DismissButtons)
             {
-                var clickResult = automationService.FindAndClickAsync(new ElementQuery
+                var clickResult = automationService.ObserveAndClickAsync(new ElementQuery
                 {
                     WindowHandle = windowHandle,
                     Name = buttonName,

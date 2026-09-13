@@ -12,6 +12,58 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public class ElementIdGeneratorTests
 {
     [Fact]
+    public async Task DisposingAutomationThreadRetiresItsObservedReferences()
+    {
+        string id;
+        using (var thread = new UIAutomationThread())
+        {
+            id = await thread.ExecuteAsync(() =>
+                ElementIdGenerator.RegisterFullId("window:1|runtime:101|path:cached"));
+            Assert.NotNull(ElementIdGenerator.ResolveFullId(id));
+        }
+
+        Assert.Null(ElementIdGenerator.ResolveFullId(id));
+        var rediscovered = ElementIdGenerator.RegisterFullId("window:1|runtime:101|path:cached");
+        Assert.NotEqual(id, rediscovered);
+    }
+
+    [Fact]
+    public void IssuedReferenceCannotBeMistakenForACommandLineOption()
+    {
+        var id = ElementIdGenerator.RegisterFullId("window:1|runtime:91|path:cached");
+        Assert.StartsWith("e", id, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Clear_DoesNotAllowOldIdsToResolveToNewControls()
+    {
+        var oldId = ElementIdGenerator.RegisterFullId("window:1|runtime:7|path:cached");
+        ElementIdGenerator.Clear();
+        var newId = ElementIdGenerator.RegisterFullId("window:1|runtime:8|path:cached");
+
+        Assert.NotEqual(oldId, newId);
+        Assert.Null(ElementIdGenerator.ResolveFullId(oldId));
+    }
+
+    [Fact]
+    public void RegisterFullId_RenameAndPathChangesKeepSameObservedIdentity()
+    {
+        ElementIdGenerator.Clear();
+        var before = ElementIdGenerator.RegisterFullId("window:1|runtime:7|path:0|sel:Button~Save");
+        var after = ElementIdGenerator.RegisterFullId("window:1|runtime:7|path:cached|sel:Button~Saved");
+
+        Assert.Equal(before, after);
+        Assert.Equal(1, ElementIdGenerator.RetainedIdCount);
+    }
+
+    [Fact]
+    public void TryResolveWindowHandle_DoesNotAcceptUnregisteredInternalIdentity()
+    {
+        Assert.False(ElementIdGenerator.TryResolveWindowHandle(
+            "window:12345|runtime:7|path:cached", out _));
+    }
+
+    [Fact]
     public void RegisterFullId_WhenCapacityExceeded_EvictsOldestId()
     {
         ElementIdGenerator.Clear();

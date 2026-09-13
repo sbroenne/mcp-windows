@@ -10,6 +10,7 @@ public sealed class CliHelpIntegrationTests
     [InlineData("app", "--path")]
     [InlineData("keyboard", "--modifiers")]
     [InlineData("file-save", "--path")]
+    [InlineData("service", "start|status|stop")]
     public async Task Help_DoesNotRequireActionArguments(string command, string expectedOption)
     {
         var (code, stdout, stderr) = await RunAsync(command, "--help");
@@ -69,7 +70,7 @@ public sealed class CliHelpIntegrationTests
     [Fact]
     public async Task HelpText_AsAnOptionValue_IsNotAHelpRequest()
     {
-        var (code, stdout, stderr) = await RunAsync("ui", "type", "--text=--help");
+        var (code, stdout, stderr) = await RunAsync("keyboard", "type", "--text=--help");
 
         Assert.Equal(1, code);
         Assert.Empty(stderr);
@@ -95,6 +96,20 @@ public sealed class CliHelpIntegrationTests
         Assert.Equal(0, code);
         Assert.Contains("keyboard press --window <h> --key A --modifiers Ctrl", stdout, StringComparison.Ordinal);
         Assert.DoesNotContain("mouse <action>", stdout, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Help_UsesRequestWritersWhenDispatchedInProcess()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse(["file-save", "--window", "0", "--help"]),
+            output, error, CancellationToken.None);
+
+        Assert.Equal(0, code);
+        Assert.Empty(error.ToString());
+        Assert.StartsWith("file-save ", output.ToString(), StringComparison.Ordinal);
     }
 
     private static async Task<(int Code, string Stdout, string Stderr)> RunAsync(params string[] args)

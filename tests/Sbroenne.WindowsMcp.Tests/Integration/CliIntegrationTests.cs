@@ -3,6 +3,8 @@ using System.Diagnostics;
 using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
+using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -29,26 +31,27 @@ public sealed class CliIntegrationTests
 
     private static readonly JsonSerializerOptions ParseOptions = new() { PropertyNameCaseInsensitive = true };
 
+    private async Task<string> DiscoverIdAsync(string? name, string? automationId)
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = name,
+            AutomationId = automationId,
+            RequireUnique = true
+        });
+        Assert.True(result.Success, result.ErrorMessage);
+        return Assert.Single(result.Items!).Id;
+    }
+
     /// <summary>Runs a CLI command in-process, capturing stdout, stderr, and the exit code.</summary>
     private static async Task<(int Code, string Stdout, string Stderr)> RunAsync(params string[] args)
     {
-        var originalOut = Console.Out;
-        var originalErr = Console.Error;
         using var outWriter = new StringWriter();
         using var errWriter = new StringWriter();
-        Console.SetOut(outWriter);
-        Console.SetError(errWriter);
-        try
-        {
-            var parsed = ParsedArgs.Parse(args);
-            var code = await CommandDispatcher.DispatchAsync(parsed, CancellationToken.None);
-            return (code, outWriter.ToString(), errWriter.ToString());
-        }
-        finally
-        {
-            Console.SetOut(originalOut);
-            Console.SetError(originalErr);
-        }
+        var parsed = ParsedArgs.Parse(args);
+        var code = await CommandDispatcher.DispatchAsync(parsed, outWriter, errWriter, CancellationToken.None);
+        return (code, outWriter.ToString(), errWriter.ToString());
     }
 
     private static bool SuccessOf(string json)
@@ -57,7 +60,7 @@ public sealed class CliIntegrationTests
         return doc.RootElement.TryGetProperty("success", out var s) && s.GetBoolean();
     }
 
-    private static async Task<(int Code, string Stdout, string Stderr)> RunSeparateProcessAsync(
+    internal static async Task<(int Code, string Stdout, string Stderr)> RunSeparateProcessAsync(
         params string[] args)
     {
         var executable = Path.ChangeExtension(typeof(CommandDispatcher).Assembly.Location, ".exe");
@@ -75,10 +78,22 @@ public sealed class CliIntegrationTests
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Could not start {executable}.");
-        var stdout = await process.StandardOutput.ReadToEndAsync();
-        var stderr = await process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
-        return (process.ExitCode, stdout, stderr);
+        var stdout = process.StandardOutput.ReadToEndAsync();
+        var stderr = process.StandardError.ReadToEndAsync();
+        try
+        {
+            await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45));
+            await Task.WhenAll(stdout, stderr).WaitAsync(TimeSpan.FromSeconds(10));
+            return (process.ExitCode, await stdout, await stderr);
+        }
+        finally
+        {
+            if (!process.HasExited)
+            {
+                process.Kill();
+                await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            }
+        }
     }
 
     [Fact]
@@ -94,7 +109,7 @@ public sealed class CliIntegrationTests
     public async Task Cli_UiClick_OnHarnessButton_Succeeds()
     {
         var (code, stdout, _) = await RunAsync(
-            "ui", "click", "--window", _windowHandle, "--name", "Submit", "--control-type", "Button");
+            "ui", "click", "--window", _windowHandle, "--element-id", await DiscoverIdAsync("Submit", null));
 
         Assert.Equal(0, code);
         Assert.True(SuccessOf(stdout), stdout);
@@ -105,7 +120,7 @@ public sealed class CliIntegrationTests
     {
         var (code, stdout, _) = await RunAsync(
             "ui", "type", "--window", _windowHandle,
-            "--automation-id", "UsernameInput", "--control-type", "Edit",
+            "--element-id", await DiscoverIdAsync(null, "UsernameInput"),
             "--text", "cli-user", "--clear-first");
 
         Assert.Equal(0, code);
@@ -115,7 +130,7 @@ public sealed class CliIntegrationTests
     [Fact]
     public async Task Cli_UiClick_MissingWindow_ReturnsToolError()
     {
-        var (code, stdout, _) = await RunAsync("ui", "click", "--name", "Submit");
+        var (code, stdout, _) = await RunAsync("ui", "click", "--element-id", "unknown");
 
         Assert.Equal(1, code);
         Assert.False(SuccessOf(stdout), stdout);
@@ -154,8 +169,10 @@ public sealed class CliIntegrationTests
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "batch-cli", clearFirst = true },
-            new { action = "click", name = "Submit", controlType = "Button" },
+            new { action = "find", automationId = "UsernameInput", controlType = "Edit", requireUnique = true },
+            new { action = "type", elementId = "$prev", text = "batch-cli", clearFirst = true },
+            new { action = "find", name = "Submit", controlType = "Button", requireUnique = true },
+            new { action = "click", elementId = "$prev" },
         });
 
         var (code, stdout, _) = await RunAsync("ui", "batch", "--window", _windowHandle, "--steps", steps);
@@ -181,19 +198,26 @@ public sealed class CliIntegrationTests
     }
 
     [Fact]
-    public async Task Cli_UiSnapshot_SeparateProcessesDoNotShareRememberedViews()
+    public async Task Cli_UiSnapshot_SeparateProcessesRequireExplicitBaseline()
     {
-        var first = await RunSeparateProcessAsync(
-            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
-        var second = await RunSeparateProcessAsync(
-            "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+        try
+        {
+            var first = await RunSeparateProcessAsync(
+                "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
+            var second = await RunSeparateProcessAsync(
+                "ui", "snapshot", "--window", _windowHandle, "--mode", "auto");
 
-        using var firstDocument = JsonDocument.Parse(first.Stdout);
-        using var secondDocument = JsonDocument.Parse(second.Stdout);
-        Assert.Equal(0, first.Code);
-        Assert.Equal("full", firstDocument.RootElement.GetProperty("kind").GetString());
-        Assert.Equal(0, second.Code);
-        Assert.Equal("full", secondDocument.RootElement.GetProperty("kind").GetString());
+            using var firstDocument = JsonDocument.Parse(first.Stdout);
+            using var secondDocument = JsonDocument.Parse(second.Stdout);
+            Assert.Equal(0, first.Code);
+            Assert.Equal("full", firstDocument.RootElement.GetProperty("kind").GetString());
+            Assert.Equal(0, second.Code);
+            Assert.Equal("full", secondDocument.RootElement.GetProperty("kind").GetString());
+        }
+        finally
+        {
+            await RunSeparateProcessAsync("service", "stop");
+        }
     }
 
     [Fact]
@@ -221,19 +245,19 @@ public sealed class CliIntegrationTests
     public async Task Cli_UiReadTable_MatchesMcpServerOutputExactly()
     {
         // Ensure the Data Grid tab is realized so the grid exposes its rows.
-        await RunAsync("ui", "click", "--window", _windowHandle, "--name", "Data Grid", "--control-type", "TabItem");
+        await RunAsync("ui", "click", "--window", _windowHandle, "--element-id", await DiscoverIdAsync("Data Grid", null));
         await Task.Delay(150);
 
+        var gridId = await DiscoverIdAsync(null, "ProductsDataGrid");
         var direct = await UIReadTableTool.ExecuteAsync(
-            _windowHandle, name: null, nameContains: null, namePattern: null,
-            controlType: null, automationId: "ProductsDataGrid", className: null, elementId: null,
-            foundIndex: 1, maxRows: 200, maxColumns: 50, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, gridId,
+            maxRows: 200, maxColumns: 50, includeDiagnostics: false, CancellationToken.None);
         var directText = direct.Content
             .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
             .Single().Text;
 
         var (code, stdout, _) = await RunAsync(
-            "ui", "read-table", "--window", _windowHandle, "--automation-id", "ProductsDataGrid");
+            "ui", "read-table", "--window", _windowHandle, "--element-id", gridId);
 
         Assert.Equal(0, code);
         Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
@@ -354,7 +378,7 @@ public sealed class CliIntegrationTests
     public async Task Cli_Macro_SaveListGetDelete_RoundTrips()
     {
         var name = "cli-macro-" + Guid.NewGuid().ToString("N");
-        const string steps = "[{\"action\":\"click\",\"name\":\"Submit\"}]";
+        const string steps = "[{\"action\":\"find\",\"name\":\"Submit\",\"requireUnique\":true},{\"action\":\"click\",\"elementId\":\"$prev\"}]";
         try
         {
             var (saveCode, saveOut, _) = await RunAsync("macro", "save", "--name", name, "--steps", steps);
@@ -370,7 +394,7 @@ public sealed class CliIntegrationTests
             using (var doc = JsonDocument.Parse(getOut))
             {
                 Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), getOut);
-                Assert.Equal(1, doc.RootElement.GetProperty("stepCount").GetInt32());
+                Assert.Equal(2, doc.RootElement.GetProperty("stepCount").GetInt32());
                 Assert.Equal(JsonValueKind.Array, doc.RootElement.GetProperty("steps").ValueKind);
             }
 
@@ -392,7 +416,7 @@ public sealed class CliIntegrationTests
         // Both entry points must produce identical output for a run against a nonexistent macro.
         var direct = await Sbroenne.WindowsMcp.Macros.Tools.UIMacroTool.ExecuteAsync(
             Sbroenne.WindowsMcp.Models.MacroAction.Run, name, steps: null, windowHandle: _windowHandle,
-            stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
         var directText = direct.Content
             .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
             .Single().Text;

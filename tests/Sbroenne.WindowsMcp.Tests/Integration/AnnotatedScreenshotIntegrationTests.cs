@@ -285,10 +285,9 @@ public sealed class AnnotatedScreenshotIntegrationTests : IDisposable
             Assert.False(
                 string.IsNullOrEmpty(element.Id),
                 $"Element {element.Index} should have a valid Id");
-            // Element IDs are now short numeric identifiers (e.g., "1", "2", "744")
             Assert.True(
-                int.TryParse(element.Id, out _),
-                $"Element ID '{element.Id}' should be a numeric string");
+                ElementIdGenerator.TryResolveWindowHandle(element.Id, out _),
+                $"Element ID '{element.Id}' should belong to this owner");
         }
     }
 

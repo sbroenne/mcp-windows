@@ -72,7 +72,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var initialClickCount = _fixture.Form?.SubmitClickCount ?? 0;
 
         // Act - Click via UI Automation on the Submit button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -90,7 +90,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     [Fact]
     public async Task FindAndClick_Button_PrefersSemanticInvoke()
     {
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",
@@ -128,7 +128,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
             // Element discovery can take long enough for another desktop window to gain focus.
             // Re-establish foreground immediately before exercising the physical fallback.
             _fixture.BringToFront();
-            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            var result = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = "PhysicalFallbackTarget",
@@ -158,7 +158,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         });
         Assert.Single(target.Items!);
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "InertTarget",
@@ -199,7 +199,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     public async Task FindAndClick_TabControl_SwitchesTab()
     {
         // Act - Click on the List View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -221,14 +221,14 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     public async Task FindAndClick_CheckBox_TogglesState()
     {
         // Ensure we're on the Form Controls tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",
             ControlType = "TabItem",
         });
         // Find and click a checkbox to toggle it
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NotificationsCheckbox",
@@ -252,7 +252,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var initialCount = _fixture.Form?.SubmitClickCount ?? 0;
 
         // Act - Click specifically on Submit button by name and type
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -298,8 +298,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var pathBasedElementId = await _staThread.ExecuteAsync(() =>
         {
             var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+                elementId);
             Assert.NotNull(element);
             var root = UIA3Automation.Instance.ElementFromHandle(
                 nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture));
@@ -330,7 +329,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
 
         _fixture.Form!.Invoke(_fixture.Form.ReplaceSubmitButtonForTesting);
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             ParentElementId = oldParentId,

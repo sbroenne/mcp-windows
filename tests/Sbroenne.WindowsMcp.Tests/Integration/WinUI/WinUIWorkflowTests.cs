@@ -69,7 +69,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         foreach (var (navItem, expectedControl) in navigationItems)
         {
             // Navigate
-            var navResult = await _automationService.FindAndClickAsync(new ElementQuery
+            var navResult = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = navItem,
@@ -97,7 +97,7 @@ public sealed class WinUIWorkflowTests : IDisposable
     public async Task Workflow_FillForm_AllValuesSet()
     {
         // Navigate to Form Controls
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -105,7 +105,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         await Task.Delay(200);
 
         // 1. Type username
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -117,7 +117,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         await Task.Delay(50);
 
         // 2. Toggle a checkbox
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "EnableNotificationsCheckbox",
@@ -125,7 +125,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         await Task.Delay(50);
 
         // 3. Click submit
-        var submitResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var submitResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",
@@ -151,7 +151,7 @@ public sealed class WinUIWorkflowTests : IDisposable
     public async Task Workflow_EditorTyping_Succeeds()
     {
         // Navigate to Editor
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
@@ -159,7 +159,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         await Task.Delay(200);
 
         // Type text (with clear first to ensure clean state)
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -188,7 +188,7 @@ public sealed class WinUIWorkflowTests : IDisposable
     public async Task Workflow_CommandBar_ToolbarActionsWork()
     {
         // Click the New button
-        var newResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var newResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NewButton",
@@ -207,7 +207,7 @@ public sealed class WinUIWorkflowTests : IDisposable
         Assert.NotEmpty(findResult.Items!);
 
         // Click Save button
-        var saveResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var saveResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SaveButton",
@@ -222,7 +222,7 @@ public sealed class WinUIWorkflowTests : IDisposable
     public async Task Workflow_SliderExists_OnFormControlsPage()
     {
         // Navigate to Form Controls
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",

@@ -38,10 +38,11 @@ public sealed class WindowsAutomationPrompts
                 "\n" +
                 "Step 2 - Interact with elements (using handle from step 1):\n" +
                 "• Find: ui_find(windowHandle='<handle>', nameContains='...') — discover elements\n" +
-                "• Click: ui_click(windowHandle='<handle>', nameContains='...') — click buttons, tabs, checkboxes\n" +
-                "• Type: ui_type(windowHandle='<handle>', controlType='Edit', text='...') — enter text\n" +
-                "• Read: ui_read(windowHandle='<handle>', nameContains='...') — get text content\n" +
-                "• Read table: ui_read_table(windowHandle='<handle>', automationId='...') — extract a grid/table/details-list into structured rows + headers in one call\n" +
+                "• Discover: ui_find(windowHandle='<handle>', nameContains='...', requireUnique=true) — obtain an observed ID\n" +
+                "• Click: ui_click(windowHandle='<handle>', elementId='<observed-id>') — click buttons, tabs, checkboxes\n" +
+                "• Type: ui_type(windowHandle='<handle>', elementId='<observed-id>', text='...') — enter text\n" +
+                "• Read: ui_read(windowHandle='<handle>', elementId='<observed-id>') — get only this element's text\n" +
+                "• Read table: ui_read_table(windowHandle='<handle>', elementId='<observed-grid-id>') — extract structured rows + headers\n" +
 
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "• Open: file_open(windowHandle='<handle>', filePath='...') — opens an existing file, handles Open dialogs automatically\n" +
@@ -73,7 +74,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "First find the window handle, then use ui_click directly. " +
+                "First find the window handle, discover the target with ui_find, then use ui_click with its returned ID. " +
                 "Use mouse_control only as fallback when ui_click fails."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
@@ -85,7 +86,7 @@ public sealed class WindowsAutomationPrompts
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
                 "Step 2: Click the element (using handle from step 1):\n" +
-                "• ui_click(windowHandle='<handle>', automationId=... OR nameContains=...)\n" +
+                "• ui_click(windowHandle='<handle>', elementId='<ID returned by ui_find>')\n" +
                 "• For checkboxes: ui_click also handles toggle state automatically.\n" +
                 "\n" +
                 "If click fails, use mouse_control(action='click', windowHandle='<handle>', x=..., y=...) with element's clickablePoint.")
@@ -112,7 +113,7 @@ public sealed class WindowsAutomationPrompts
         return
         [
             new(ChatRole.System,
-                "First find the window handle, then use ui_type. Only use keyboard_control as fallback."),
+                "First find the window handle and discover the input ID, then use ui_type. Only use keyboard_control as fallback."),
             new(ChatRole.User,
                 $"Window: {windowTitle}\n" +
                 $"Field: {fieldDescription}\n" +
@@ -125,7 +126,7 @@ public sealed class WindowsAutomationPrompts
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
                 "Step 2: Type into the field (using handle from step 1):\n" +
-                $"ui_type(windowHandle='<handle>', controlType='Edit', automationId=... OR nameContains=..., text='{text}', clearFirst={clearFirst.ToString().ToLowerInvariant()})\n" +
+                $"ui_type(windowHandle='<handle>', elementId='<ID returned by ui_find>', text='{text}', clearFirst={clearFirst.ToString().ToLowerInvariant()})\n" +
                 "\n" +
                 "If UIA typing fails: Activate window first, then use keyboard_control(action='type', text='...').")
         ];
@@ -154,7 +155,7 @@ public sealed class WindowsAutomationPrompts
                 "2) screenshot_control(target='window', windowHandle='<handle>') — see numbered elements; keep default image omission for token efficiency.\n" +
                 "3) ui_find(windowHandle='<handle>', nameContains='...', sortByProminence=true) — discover elements.\n" +
                 "4) Prefer nameContains and namePattern for ARIA labels; automationId may be absent in Electron or browser content.\n" +
-                "5) ui_click(windowHandle='<handle>', nameContains='...') — click the element.\n" +
+                "5) ui_click(windowHandle='<handle>', elementId='<observed-id>') — click the element.\n" +
                 "6) For text input, use ui_type with the element.\n" +
                 "7) Real browser pages are best-effort today: start with page content before browser chrome.")
         ];
@@ -192,7 +193,7 @@ public sealed class WindowsAutomationPrompts
                     ? $"   • app(programPath='{browser}') — only if no existing window found\n"
                     : $"   • app(programPath='{browser}', arguments='{url}') — only if no existing window found\n") +
                 "2) Use ui_find(windowHandle='<handle>', nameContains='...', controlType='Button'/'Hyperlink'/'Edit'/'Document', sortByProminence=true).\n" +
-                "3) Prefer nameContains or namePattern for page text and ARIA labels, then use ui_click or ui_type.\n" +
+                "3) Discover using nameContains or namePattern for page text and ARIA labels, then pass the returned ID to ui_click or ui_type.\n" +
                 "4) For browser chrome, prefer keyboard_control: Ctrl+L address bar, Ctrl+R refresh, Ctrl+Tab next tab.\n" +
                 "5) If names are unclear, use screenshot_control(target='window', windowHandle='<handle>') first; keep the default image omission for token efficiency.")
         ];
@@ -220,7 +221,7 @@ public sealed class WindowsAutomationPrompts
                 "Verification options (choose the most deterministic):\n" +
                 "1) window_management(action='list', filter='...') — verify a closed window/dialog is absent.\n" +
                 "2) ui_find(windowHandle='<handle>', nameContains='...') — verify element exists (has built-in timeout).\n" +
-                "3) ui_read(windowHandle='<handle>', nameContains='...') — check text content changed.\n" +
+                "3) ui_read(windowHandle='<handle>', elementId='<observed-id>') — check text content changed.\n" +
                 "5) screenshot_control(target='window', windowHandle='<handle>', annotate=true) — visual element discovery.\n" +
                 "6) ui_read(windowHandle='<handle>') — for custom-rendered text (uses OCR fallback).")
         ];
@@ -256,7 +257,7 @@ public sealed class WindowsAutomationPrompts
                 $"window_management(action='find', title='{windowTitle}')\n" +
                 "\n" +
                 "Step 2: Click the toggle (using handle from step 1):\n" +
-                "ui_click(windowHandle='<handle>', controlType='CheckBox' or 'RadioButton', automationId=... OR nameContains=...)\n" +
+                "ui_click(windowHandle='<handle>', elementId='<observed checkbox/radio ID from ui_find>')\n" +
                 "\n" +
                 "The response includes the current toggle state after clicking.\n" +
                 "Verify with ui_find to confirm the element state changed.")
@@ -300,8 +301,9 @@ public sealed class WindowsAutomationPrompts
                 "1) keyboard_control(action='press', key='s', modifiers='ctrl') — trigger Ctrl+S\n" +
                 "2) window_management(action='find', title='Save As') — discover Save As dialog\n" +
                 "3) Use modal window handle with ui_type, ui_click:\n" +
-                "   - ui_type(windowHandle='<modal_handle>', controlType='Edit', text='<filename>')\n" +
-                "   - ui_click(windowHandle='<modal_handle>', nameContains='Save')\n" +
+                "   - Discover the Edit input and Save button with ui_find on the modal window.\n" +
+                "   - ui_type(windowHandle='<modal_handle>', elementId='<input-id>', text='<filename>')\n" +
+                "   - ui_click(windowHandle='<modal_handle>', elementId='<save-button-id>')\n" +
                 "\n" +
                 "IMPORTANT: Do NOT use keyboard_control for typing file paths! " +
                 "Use ui_type with the modal window handle to directly interact with the filename field.")

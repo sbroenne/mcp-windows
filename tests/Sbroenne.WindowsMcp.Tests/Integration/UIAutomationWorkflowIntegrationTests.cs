@@ -75,7 +75,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
         await Task.Delay(200);
 
         // Step 1: Type text using automationId to target specific textbox
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -90,7 +90,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
         await Task.Delay(100);
 
         // Step 2: Click the Submit button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -109,7 +109,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
     {
         // Arrange - Type some text
         var testText = "Read this back";
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -154,7 +154,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
         Assert.True(waitResult.Success);
 
         // Act - Click it
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -180,7 +180,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
         Assert.True(tabFindResult.Success);
 
         // Act - Click to navigate to Form Controls tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",
@@ -190,7 +190,7 @@ public sealed class UIAutomationWorkflowIntegrationTests : IDisposable
         await Task.Delay(100);
 
         // Find and click a checkbox on that tab
-        var checkboxResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var checkboxResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             ControlType = "CheckBox",

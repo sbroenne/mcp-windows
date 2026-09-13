@@ -98,11 +98,19 @@ public readonly struct FrameworkStrategy
 /// </summary>
 public sealed partial class UIAutomationService
 {
+    private static bool ReferenceMatchesWindow(string elementId, string? windowHandle) =>
+        string.IsNullOrWhiteSpace(windowHandle) ||
+        (WindowHandleParser.TryParse(windowHandle, out var requested) &&
+         ElementIdGenerator.TryResolveWindowHandle(elementId, out var recorded) &&
+         IsRequestedWindowHandleCompatible(recorded, requested));
+
     private static UIA.IUIAutomationElement? GetRootElement(string? windowHandle)
     {
-        if (WindowHandleParser.TryParse(windowHandle, out var parsedHandle) && parsedHandle != IntPtr.Zero)
+        if (windowHandle is not null)
         {
-            return Uia.Automation.ElementFromHandle(parsedHandle);
+            return WindowHandleParser.TryParse(windowHandle, out var parsedHandle) && parsedHandle != IntPtr.Zero
+                ? Uia.Automation.ElementFromHandle(parsedHandle)
+                : null;
         }
 
         var foregroundWindow = GetForegroundWindowHandle();
@@ -121,19 +129,9 @@ public sealed partial class UIAutomationService
             return null;
         }
 
-        // Try to extract window handle from element ID
-        // Format: "window:{hwnd}|runtime:{id}|path:{treePath}"
-        if (elementId.StartsWith("window:", StringComparison.Ordinal))
+        if (ElementIdGenerator.TryResolveWindowHandle(elementId, out var handle))
         {
-            var endIdx = elementId.IndexOf('|');
-            if (endIdx > 7)
-            {
-                var hwndStr = elementId.Substring(7, endIdx - 7);
-                if (WindowHandleParser.TryParse(hwndStr, out var hwnd) && hwnd != IntPtr.Zero)
-                {
-                    return Uia.Automation.ElementFromHandle(hwnd);
-                }
-            }
+            return Uia.Automation.ElementFromHandle(handle);
         }
 
         return null;

@@ -70,7 +70,7 @@ public sealed class UIReadToolIntegrationTests : IDisposable
         var testText = "Test value for GetText";
 
         // First type the text using automationId to target specific textbox
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -135,7 +135,7 @@ public sealed class UIReadToolIntegrationTests : IDisposable
     {
         // Arrange - Set text in the text box
         var testText = "Multi read test";
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,

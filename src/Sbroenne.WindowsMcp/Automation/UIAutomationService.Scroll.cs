@@ -22,8 +22,7 @@ public sealed partial class UIAutomationService
             {
                 element = await _staThread.ExecuteAsync(() =>
                     ElementIdGenerator.ResolveToAutomationElement(
-                        elementId,
-                        allowSelectorFallback: false), cancellationToken);
+                        elementId), cancellationToken);
 
                 if (element == null)
                 {
@@ -49,8 +48,7 @@ public sealed partial class UIAutomationService
 
                 element = await _staThread.ExecuteAsync(() =>
                     ElementIdGenerator.ResolveToAutomationElement(
-                        foundElement.ElementId,
-                        allowSelectorFallback: false), cancellationToken);
+                        foundElement.ElementId), cancellationToken);
             }
             else
             {

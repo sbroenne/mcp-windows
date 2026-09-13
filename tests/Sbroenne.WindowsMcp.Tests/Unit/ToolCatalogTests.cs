@@ -10,6 +10,17 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class ToolCatalogTests
 {
     [Fact]
+    public void FindDescription_UsesObservedIdsAndVisitedNodeBudget()
+    {
+        var find = Assert.Single(ToolCatalog.GetTools(), tool => tool.Name == "ui_find");
+
+        Assert.Contains("elementId", find.Description, StringComparison.Ordinal);
+        Assert.Contains("2000 visited UIA nodes", find.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("pass its name/automationId/controlType", find.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("2000 candidates", find.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetTools_ReturnsAllToolsWithMetadata()
     {
         var tools = ToolCatalog.GetTools();
@@ -49,7 +60,7 @@ public sealed class ToolCatalogTests
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_click"]));
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_batch"]));
         Assert.Contains("scope", ParameterNames(tools["ui_find"]));
-        Assert.Contains("requireUnique", ParameterNames(tools["ui_click"]));
+        Assert.Contains("elementId", ParameterNames(tools["ui_click"]));
         Assert.Contains("inputMode", ParameterNames(tools["ui_type"]));
         Assert.Contains("triggerMode", ParameterNames(tools["file_open"]));
     }

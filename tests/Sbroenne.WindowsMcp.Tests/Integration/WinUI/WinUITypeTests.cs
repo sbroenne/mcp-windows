@@ -56,7 +56,7 @@ public sealed class WinUITypeTests : IDisposable
     public async Task FindAndType_InUsernameTextBox_Succeeds()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -65,7 +65,7 @@ public sealed class WinUITypeTests : IDisposable
 
         // Act - Type text into the username field
         var testText = "TestUser123";
-        var result = await _automationService.FindAndTypeAsync(
+        var result = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -82,7 +82,7 @@ public sealed class WinUITypeTests : IDisposable
     public async Task FindAndType_InEditorTextBox_Succeeds()
     {
         // Navigate to Editor page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
@@ -91,7 +91,7 @@ public sealed class WinUITypeTests : IDisposable
 
         // Act - Type some text with multiple words
         var testText = "Hello world this is a test of the editor";
-        var result = await _automationService.FindAndTypeAsync(
+        var result = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -120,7 +120,7 @@ public sealed class WinUITypeTests : IDisposable
     public async Task FindAndType_ClearAndReplace_WorksCorrectly()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -128,7 +128,7 @@ public sealed class WinUITypeTests : IDisposable
         await Task.Delay(200);
 
         // Type initial text
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -139,7 +139,7 @@ public sealed class WinUITypeTests : IDisposable
         await Task.Delay(100);
 
         // Type with clear option to replace
-        var result = await _automationService.FindAndTypeAsync(
+        var result = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,

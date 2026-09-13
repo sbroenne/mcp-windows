@@ -108,30 +108,89 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     {
         const string DelayedAutomationId = "DelayedSubmitButton";
 
-        var rename = Task.Run(async () =>
-        {
-            await Task.Delay(1850);
-            _fixture.Form!.Invoke(() =>
-                _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
-        });
-
         try
         {
-            var result = await _automationService.FindElementsAsync(new ElementQuery
+            var query = new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = DelayedAutomationId,
-                TimeoutMs = 2000,
-            });
+            };
+            long elapsed = 0;
+            var probes = 0;
+            var result = await UIAutomationService.WaitForFindResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.False(observed.Success);
+                        // Model a provider probe that captured absence before the deadline,
+                        // then completed after it. Publish the control change synchronously.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
+                        elapsed = 2001;
+                    }
 
-            await rename;
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("The deadline has expired; probe without delay."),
+                () => elapsed,
+                CancellationToken.None);
+
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Single(result.Items!);
+            Assert.Equal(2, probes);
         }
         finally
         {
             _fixture.Form!.Invoke(() =>
                 _fixture.Form.SetSubmitButtonAutomationIdForTesting("SubmitButton"));
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Disappear_FinalProbeObservesVisibilityChangeWithoutStructureSignal()
+    {
+        var query = new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            VisibleOnly = true
+        };
+        long elapsed = 0;
+        var probes = 0;
+        try
+        {
+            var result = await UIAutomationService.WaitForDisappearResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.True(observed.Success, observed.ErrorMessage);
+                        // No event signal is wired to this wait. Visibility must be re-probed
+                        // even when the first provider call used the entire deadline.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+                        elapsed = 2001;
+                    }
+
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("No sleep is allowed after the deadline."),
+                () => elapsed,
+                CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(2, probes);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
         }
     }
 
@@ -185,7 +244,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     [Fact]
     public async Task Select_RequireUnique_PropagatesAmbiguity()
     {
-        var result = await _automationService.FindAndSelectAsync(
+        var result = await _automationService.ObserveAndSelectAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -312,7 +371,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     public async Task Find_RequireUnique_RedactsTextFieldValuesFromDiagnostics()
     {
         const string SensitiveValue = "private-field-value";
-        var typed = await _automationService.FindAndTypeAsync(
+        var typed = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
