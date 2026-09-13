@@ -229,6 +229,7 @@ public sealed class WinUITypeTests : IDisposable
             condition: () => focused is { Success: true, Items.Length: 1 }
                 && focused.Items[0].Id == targetEditor.Id);
         Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
+        _output.WriteLine($"Focus before keyboard calls: {System.Text.Json.JsonSerializer.Serialize(focused)}");
 
         return nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
     }
@@ -257,6 +258,8 @@ public sealed class WinUITypeTests : IDisposable
 
     private async Task AssertEditorTextAsync(string text)
     {
+        var focusAfterInput = await _automationService.GetFocusedElementAsync();
+        _output.WriteLine($"Focus after input: {System.Text.Json.JsonSerializer.Serialize(focusAfterInput)}");
         var found = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
