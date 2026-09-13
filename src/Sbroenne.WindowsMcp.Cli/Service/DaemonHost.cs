@@ -142,7 +142,7 @@ internal sealed class DaemonHost : IDisposable
                 using var clientIdentity = WindowsIdentity.GetCurrent();
                 sameElevation = new WindowsPrincipal(clientIdentity).IsInRole(WindowsBuiltInRole.Administrator) == elevated;
             });
-            if (!sameElevation)
+            if (await RejectElevationMismatchAsync(pipe, sameElevation, requestCts.Token))
             {
                 return;
             }
@@ -228,6 +228,20 @@ internal sealed class DaemonHost : IDisposable
         {
             // Never log request payloads or desktop text. Disconnect cancels, it does not replay.
         }
+    }
+
+    internal static async Task<bool> RejectElevationMismatchAsync(
+        Stream pipe, bool sameElevation, CancellationToken cancellationToken)
+    {
+        if (sameElevation)
+        {
+            return false;
+        }
+
+        await DaemonProtocol.WriteAsync(pipe,
+            new DaemonResponse(ExitCodes.ToolError, "", "CLI service elevation mismatch; no operation was dispatched."),
+            cancellationToken);
+        return true;
     }
 
     private async Task HandleControlAsync(Stream pipe, DaemonRequest request, CancellationToken token)

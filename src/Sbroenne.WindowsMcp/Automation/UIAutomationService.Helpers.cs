@@ -106,9 +106,11 @@ public sealed partial class UIAutomationService
 
     private static UIA.IUIAutomationElement? GetRootElement(string? windowHandle)
     {
-        if (WindowHandleParser.TryParse(windowHandle, out var parsedHandle) && parsedHandle != IntPtr.Zero)
+        if (windowHandle is not null)
         {
-            return Uia.Automation.ElementFromHandle(parsedHandle);
+            return WindowHandleParser.TryParse(windowHandle, out var parsedHandle) && parsedHandle != IntPtr.Zero
+                ? Uia.Automation.ElementFromHandle(parsedHandle)
+                : null;
         }
 
         var foregroundWindow = GetForegroundWindowHandle();

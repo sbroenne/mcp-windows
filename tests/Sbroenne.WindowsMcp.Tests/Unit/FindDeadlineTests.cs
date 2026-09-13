@@ -124,4 +124,52 @@ public sealed class FindDeadlineTests
 
     private static UIAutomationResult Missing() =>
         UIAutomationResult.CreateFailure("find", UIAutomationErrorType.ElementNotFound, "Not present.");
+
+    [Fact]
+    public async Task Disappearance_FinalProbeObservesChangeWithoutEvent()
+    {
+        long elapsed = 0;
+        var probes = 0;
+        var result = await UIAutomationService.WaitForDisappearResultAsync(
+            new ElementQuery(), 125,
+            () =>
+            {
+                probes++;
+                return Task.FromResult(elapsed < 125
+                    ? new UIAutomationResult
+                    {
+                        Success = true,
+                        Action = "find",
+                        Items = [new() { Id = "observed", Type = "Button", Click = [0, 0, 0], Enabled = true }]
+                    }
+                    : Missing());
+            },
+            (delay, _) =>
+            {
+                elapsed += delay;
+                return Task.CompletedTask;
+            },
+            () => elapsed,
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal("wait_for_disappear", result.Action);
+        Assert.Equal(125, elapsed);
+        Assert.Equal(3, probes);
+    }
+
+    [Fact]
+    public async Task Disappearance_IncompleteSearchDoesNotBecomeSuccessAtDeadline()
+    {
+        var result = await UIAutomationService.WaitForDisappearResultAsync(
+            new ElementQuery(), 125,
+            () => Task.FromResult(UIAutomationResult.CreateFailure(
+                "find", UIAutomationErrorType.SearchIncomplete, "Unknown remaining elements.")),
+            (_, _) => throw new InvalidOperationException("Incomplete search must not be retried."),
+            () => 125,
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
+    }
 }

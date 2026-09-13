@@ -16,6 +16,25 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Trait("Category", "Integration")]
 public sealed class UIBatchAndFusionIntegrationTests
 {
+    [Theory]
+    [InlineData("""{"action":"unknown"}""")]
+    [InlineData("""{"action":"type","elementId":"$prev"}""")]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_InvalidLaterStep_DoesNotClickEarlierTarget(string invalidStep)
+    {
+        var id = await DiscoverIdAsync("Submit", null);
+        var before = _fixture.Form!.SubmitClickCount;
+        var steps = $$"""[{"action":"click","elementId":"{{id}}"},{{invalidStep}}]""";
+
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, false, false, "full", false, CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(before, _fixture.Form.SubmitClickCount);
+        using var payload = JsonDocument.Parse(ExtractText(result));
+        Assert.False(payload.RootElement.TryGetProperty("stepsRun", out _));
+    }
+
     private static readonly string[] SnapshotKinds = ["full", "diff"];
     private readonly UITestHarnessFixture _fixture;
     private readonly string _windowHandle;

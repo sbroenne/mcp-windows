@@ -51,6 +51,7 @@ internal static class HelpText
         CLI STATE
           CLI invocations share a persistent daemon and its observed IDs.
           A stale ID fails safely. Discover again after control replacement or daemon restart.
+          Unknown options are rejected before invoking tools for every command group.
 
         GROUPS
           service      Manage the persistent CLI daemon (start, status, stop).

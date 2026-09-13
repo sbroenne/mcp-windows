@@ -267,6 +267,8 @@ Read text from elements using UI Automation or OCR.
 
 - Extract text from any UI element
 - Automatic whole-window OCR fallback only for explicit window reads
+  with empty UIA text or a provider/extraction failure. Invalid targets and
+  access failures remain errors; malformed window handles never select the foreground window.
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
 - Element-ID failures return errors, not unrelated window text.

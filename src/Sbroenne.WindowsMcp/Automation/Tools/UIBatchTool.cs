@@ -32,6 +32,8 @@ public static partial class UIBatchTool
     /// </summary>
     /// <remarks>
     /// Steps run top to bottom. By default the batch stops at the first failing step (stopOnError=true).
+    /// Every step's action, required fields, and action-specific arguments are validated before any step executes.
+    /// Runtime failures (such as a stale ID) still obey stopOnError; validation failures never run earlier steps.
     /// Each step is a JSON object with an "action" plus the fields that action needs:
     /// - find:     selectors (name/controlType/automationId/...). Resolves an element; its id is exposed to the next step as "$prev".
     /// - click:    required elementId, optional doubleClick.

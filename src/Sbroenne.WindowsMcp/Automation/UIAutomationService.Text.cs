@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -24,6 +25,21 @@ public sealed partial class UIAutomationService
     public async Task<UIAutomationResult> GetTextAsync(string? elementId, string? windowHandle, bool includeChildren, TextExtractionMode mode, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+
+        if (windowHandle is not null &&
+            (!WindowHandleParser.TryParse(windowHandle, out var hwnd) || hwnd == nint.Zero))
+        {
+            return UIAutomationResult.CreateFailure(
+                "get_text", UIAutomationErrorType.InvalidParameter,
+                "windowHandle must be a nonzero decimal window handle.", CreateDiagnostics(stopwatch));
+        }
+
+        if (elementId is not null && string.IsNullOrWhiteSpace(elementId))
+        {
+            return UIAutomationResult.CreateFailure(
+                "get_text", UIAutomationErrorType.InvalidParameter,
+                "elementId must not be empty. Omit it only for a whole-window read.", CreateDiagnostics(stopwatch));
+        }
 
         try
         {
@@ -58,7 +74,7 @@ public sealed partial class UIAutomationService
                         return UIAutomationResult.CreateFailure(
                             "get_text",
                             UIAutomationErrorType.WindowNotFound,
-                            "No foreground window found.",
+                            windowHandle is null ? "No foreground window found." : "The requested window was not found.",
                             CreateDiagnostics(stopwatch));
                     }
                 }

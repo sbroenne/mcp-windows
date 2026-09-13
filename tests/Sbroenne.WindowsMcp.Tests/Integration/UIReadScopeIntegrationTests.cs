@@ -52,6 +52,26 @@ public sealed class UIReadScopeIntegrationTests(UITestHarnessFixture fixture)
     }
 
     [Theory]
+    [InlineData("not-a-hwnd")]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData(" 123 ")]
+    [InlineData("0x123")]
+    public async Task Read_MalformedWindow_IsRejectedByToolAndService(string window)
+    {
+        var result = await UIReadTool.ExecuteAsync(
+            window, null, true, null, null, false, CancellationToken.None);
+        using var json = Payload(result);
+        Assert.True(result.IsError);
+        Assert.False(json.RootElement.TryGetProperty("text", out _));
+
+        var serviceResult = await WindowsToolsBase.UIAutomationService.GetTextAsync(null, window, true);
+        Assert.False(serviceResult.Success);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter, serviceResult.ErrorType);
+        Assert.Null(serviceResult.Text);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Read_ExplicitWindowOrObservedElement_RetainsText(bool elementRead)

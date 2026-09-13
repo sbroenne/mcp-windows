@@ -54,6 +54,11 @@ public static partial class UIReadTool
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
+        if (!WindowHandleParser.TryParse(windowHandle, out var hwnd) || hwnd == nint.Zero)
+        {
+            return WindowsToolsBase.FailResult("windowHandle must be a nonzero decimal window handle.");
+        }
+
         if (elementId is not null && string.IsNullOrWhiteSpace(elementId))
         {
             return WindowsToolsBase.FailResult("elementId must not be empty. Omit it only for an explicit whole-window read.");
@@ -69,19 +74,7 @@ public static partial class UIReadTool
         {
             var automationService = WindowsToolsBase.UIAutomationService;
             var result = await automationService.GetTextAsync(elementId, windowHandle, includeChildren, mode, cancellationToken);
-            if (!result.Success)
-            {
-                return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
-            }
-
-            if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
-            {
-                return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
-            }
-
-            // Article mode is a UIA-only, structure-aware extraction; OCR (which returns raw pixels
-            // as flat text) cannot honor it, so skip the OCR fallback and return the UIA result.
-            if (mode == TextExtractionMode.Article || elementId is not null)
+            if (!ShouldTryWindowOcr(result, elementId, mode))
             {
                 return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
             }
@@ -89,14 +82,20 @@ public static partial class UIReadTool
             // Fallback: try OCR on the window region
             try
             {
-                if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
+                if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd) ||
+                    NativeMethods.IsIconic(hwnd))
                 {
-                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.WindowNotFound,
+                        "The requested window is unavailable for whole-window OCR."), includeDiagnostics);
                 }
 
-                if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+                if (!NativeMethods.GetWindowRect(hwnd, out var rect) ||
+                    rect.Right <= rect.Left || rect.Bottom <= rect.Top)
                 {
-                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.InvalidRegion,
+                        "The requested window has no capturable region."), includeDiagnostics);
                 }
 
                 var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
@@ -117,10 +116,25 @@ public static partial class UIReadTool
                     };
                     return WindowsToolsBase.ToCallToolResult(ocrSuccessResult, includeDiagnostics);
                 }
+
+                if (!ocrResult.Success)
+                {
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.InternalError,
+                        $"Whole-window OCR failed: {ocrResult.ErrorMessage}") with
+                    {
+                        UsageHint = result.ErrorMessage
+                    }, includeDiagnostics);
+                }
             }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                // OCR fallback failed - ignore and return original result
+                return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                    actionName, UIAutomationErrorType.InternalError,
+                    $"Whole-window OCR failed: {ex.Message}") with
+                {
+                    UsageHint = result.ErrorMessage
+                }, includeDiagnostics);
             }
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
@@ -129,6 +143,19 @@ public static partial class UIReadTool
         {
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
+    }
+
+    internal static bool ShouldTryWindowOcr(UIAutomationResult result, string? elementId, TextExtractionMode mode)
+    {
+        if (elementId is not null || mode != TextExtractionMode.Raw)
+        {
+            return false;
+        }
+
+        return result.Success
+            ? string.IsNullOrWhiteSpace(result.Text)
+            : result.ErrorType is UIAutomationErrorType.InternalError or UIAutomationErrorType.PatternNotSupported
+                or UIAutomationErrorType.NoTextFound or UIAutomationErrorType.Timeout;
     }
 
     private static bool TryParseTextExtractionMode(string? format, out TextExtractionMode mode)

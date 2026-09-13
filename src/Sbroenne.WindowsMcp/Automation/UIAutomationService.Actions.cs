@@ -1495,7 +1495,8 @@ public sealed partial class UIAutomationService
     /// 2. Wait for modal dialog using retry loop (FlaUI pattern)
     /// 3. If dialog appears and filePath provided: type path + Enter (pywinauto pattern)
     /// 4. Handle overwrite confirmation dialogs
-    /// 5. Wait for dialog to close (completion detection)
+    /// 5. Wait for dialog to close
+    /// 6. When a path was supplied, wait for the requested file before reporting success
     /// </remarks>
     public async Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default)
     {
@@ -1600,11 +1601,16 @@ public sealed partial class UIAutomationService
                 }
             }
 
-            if (dialog is null && !string.IsNullOrWhiteSpace(filePath) && !File.Exists(filePath))
+            if (!string.IsNullOrWhiteSpace(filePath) &&
+                !await DeterministicWait.UntilAsync(
+                    () => File.Exists(filePath),
+                    SaveDialogCloseTimeout,
+                    SaveDialogPollInterval,
+                    cancellationToken: cancellationToken))
             {
                 return UIAutomationResult.CreateFailure(
                     "save", UIAutomationErrorType.Timeout,
-                    "No Save dialog was observed and the requested file does not exist. " +
+                    "The requested file does not exist after waiting for the save. " +
                     "The save shortcut was sent, but its outcome could not be verified.",
                     CreateDiagnostics(stopwatch));
             }

@@ -6,6 +6,46 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class MacroReplayValidationTests : IDisposable
 {
+    [Theory]
+    [MemberData(nameof(BatchPreflightTests.InvalidSteps), MemberType = typeof(BatchPreflightTests))]
+    public async Task Save_IncompleteOrUnsupportedStep_FailsBeforePersistence(string invalidStep)
+    {
+        var steps = $"[{invalidStep}]";
+        var result = await new MacroService(_directory).SaveAsync("invalid", steps);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.False(Directory.Exists(_directory));
+    }
+
+    [Theory]
+    [InlineData("""[{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"key","key":"enter"},{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"read"},{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"snapshot"},{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"wait","mode":"disappear","name":"Submit"},{"action":"read","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"mouse","mouseAction":"get_position"},{"action":"read","elementId":"$prev"}]""")]
+    public async Task Save_PreviousReferenceWithoutImmediateProducer_Fails(string steps)
+    {
+        var result = await new MacroService(_directory).SaveAsync("invalid", steps);
+
+        Assert.False(result.Success);
+        Assert.Contains("preceding", result.Error, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(_directory));
+    }
+
+    [Theory]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"read","elementId":"$prev"},{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"wait","mode":"appear","name":"Submit"},{"action":"click","elementId":"$prev"},{"action":"read","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"wait","mode":"state","elementId":"$prev","desiredState":"enabled"},{"action":"click","elementId":"$prev"}]""")]
+    [InlineData("""[{"action":"find","name":"Submit"},{"action":"click","elementId":" $PREV "}]""")]
+    public async Task Save_PreviousReferenceChains_PreserveRuntimeSemantics(string steps)
+    {
+        var result = await new MacroService(_directory).SaveAsync("valid", steps);
+
+        Assert.True(result.Success, result.Error);
+    }
+
     private readonly string _directory = Path.Combine(
         AppContext.BaseDirectory, "macro-review-tests", Guid.NewGuid().ToString("N"));
 

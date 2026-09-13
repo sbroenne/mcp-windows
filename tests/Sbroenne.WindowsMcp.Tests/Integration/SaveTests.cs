@@ -93,6 +93,7 @@ public sealed class SaveTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
+        Assert.True(File.Exists(testFilePath), "Save must observe the requested file before reporting success.");
 
         // Wait for the harness to finish writing the file. Waiting on the content rather than on
         // File.Exists also rules out observing a file that exists but has not been flushed yet.
@@ -155,6 +156,48 @@ public sealed class SaveTests : IDisposable
         // Assert
         Assert.False(result.Success);
         Assert.Contains("Invalid window handle", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Save_AcceptedDialogWithoutFile_DoesNotReportSuccess()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        string? acceptedPath = null;
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Save without writing", KeyPreview = true };
+            target.KeyDown += (_, e) =>
+            {
+                if (e.Control && e.KeyCode == System.Windows.Forms.Keys.S)
+                {
+                    e.SuppressKeyPress = true;
+                    using var dialog = new System.Windows.Forms.SaveFileDialog();
+                    if (dialog.ShowDialog(target) == System.Windows.Forms.DialogResult.OK)
+                    {
+                        acceptedPath = dialog.FileName;
+                    }
+                }
+            };
+            target.Show();
+            return target.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"accepted-not-saved-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+
+            Assert.Equal(path, (string?)fixtureForm.Invoke(() => acceptedPath));
+            Assert.False(result.Success);
+            Assert.Equal(Models.UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Contains("could not be verified", result.ErrorMessage, StringComparison.Ordinal);
+            Assert.False(File.Exists(path));
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => target?.Dispose());
+        }
     }
 
     [Fact]

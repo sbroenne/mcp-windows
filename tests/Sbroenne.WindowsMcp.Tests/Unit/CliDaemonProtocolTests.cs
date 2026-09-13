@@ -96,4 +96,46 @@ public sealed class CliDaemonProtocolTests
     }
 
     private static CancellationToken TestContextToken => CancellationToken.None;
+
+    [Fact]
+    public async Task ElevationMismatch_SendsDefiniteRejectionBeforeDispatch()
+    {
+        await using var stream = new MemoryStream();
+        var rejected = await DaemonHost.RejectElevationMismatchAsync(stream, sameElevation: false, CancellationToken.None);
+        Assert.True(rejected);
+        stream.Position = 0;
+        var response = await DaemonProtocol.ReadAsync<DaemonResponse>(stream, CancellationToken.None);
+        Assert.Equal(1, response.ExitCode);
+        Assert.Empty(response.Output);
+        Assert.Contains("elevation", response.Error, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("no operation was dispatched", response.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown", response.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task MatchingElevation_DoesNotWriteSpuriousResponse()
+    {
+        await using var stream = new MemoryStream();
+        Assert.False(await DaemonHost.RejectElevationMismatchAsync(stream, sameElevation: true, CancellationToken.None));
+        Assert.Equal(0, stream.Length);
+    }
+
+    [Fact]
+    public async Task ElevationRejection_ReachesClientAsDefiniteFailure()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await DaemonClient.StopAsync(timeout.Token);
+        await using var server = new NamedPipeServerStream(DaemonIdentity.PipeName, PipeDirection.InOut,
+            1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        var accept = server.WaitForConnectionAsync(timeout.Token);
+        var responseTask = DaemonClient.SendAsync(
+            new DaemonRequest("execute", ["ui", "click"], Environment.CurrentDirectory),
+            TimeSpan.FromSeconds(3), timeout.Token);
+        await accept;
+        await DaemonProtocol.ReadAsync<DaemonRequest>(server, timeout.Token);
+        Assert.True(await DaemonHost.RejectElevationMismatchAsync(server, sameElevation: false, timeout.Token));
+        var response = await responseTask;
+        Assert.Equal(1, response.ExitCode);
+        Assert.Contains("no operation was dispatched", response.Error, StringComparison.Ordinal);
+    }
 }

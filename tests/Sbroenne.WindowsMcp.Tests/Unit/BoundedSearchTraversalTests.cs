@@ -97,6 +97,20 @@ public sealed class BoundedSearchTraversalTests
     }
 
     [Fact]
+    public void RootOnlyDepth_IsProvablyCompleteWithoutRemainingBudgetOrNavigation()
+    {
+        var outcome = BoundedSearchTraversal.Walk(
+            new Node(-1),
+            _ => throw new InvalidOperationException("Root-only scope must not fetch descendants."),
+            _ => throw new InvalidOperationException("Root-only scope must not fetch siblings."),
+            _ => true, (_, _) => false,
+            maxNodes: 0, maxDepth: 0, CancellationToken.None);
+
+        Assert.False(outcome.LimitReached);
+        Assert.Equal(0, outcome.NodesVisited);
+    }
+
+    [Fact]
     public void Cancellation_IsCheckedBeforeAnyProviderFetch()
     {
         using var cancellation = new CancellationTokenSource();
@@ -121,7 +135,7 @@ public sealed class BoundedSearchTraversalTests
     }
 
     [Fact]
-    public void ManagedSearch_UsesSingleNodeNavigation_NotBulkProviderFetch()
+    public void AllSearchRoutes_UseSingleNodeNavigation_NotBulkProviderFetch()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
         while (current is not null && !File.Exists(Path.Combine(current.FullName, "Sbroenne.WindowsMcp.sln")))
@@ -132,6 +146,9 @@ public sealed class BoundedSearchTraversalTests
         Assert.NotNull(current);
         var source = File.ReadAllText(Path.Combine(current.FullName,
             "src", "Sbroenne.WindowsMcp", "Automation", "UIAutomationService.Find.cs"));
+        Assert.DoesNotContain("FindElementsWithFindAll", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".FindAllBuildCache(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindElementsWithTreeWalker", source, StringComparison.Ordinal);
         var start = source.IndexOf("private bool FindElementsWithCachedFilter(", StringComparison.Ordinal);
         var end = source.IndexOf("private static bool MatchesAdvancedCriteriaCached(", start, StringComparison.Ordinal);
         var managedPath = source[start..end];
@@ -141,6 +158,39 @@ public sealed class BoundedSearchTraversalTests
         Assert.Contains("BoundedSearchTraversal.Walk", managedPath, StringComparison.Ordinal);
         Assert.Contains("GetFirstChildElementBuildCache", managedPath, StringComparison.Ordinal);
         Assert.Contains("GetNextSiblingElementBuildCache", managedPath, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BudgetBoundary_WithUnvisitedDescendants_DoesNotClaimComplete()
+    {
+        var root = new Node(-1);
+        var fetched = 0;
+        var outcome = BoundedSearchTraversal.Walk(
+            root,
+            node =>
+            {
+                fetched++;
+                Assert.True(fetched <= 2000);
+                return new Node(node.Index + 1);
+            },
+            _ => null, _ => true, (_, _) => false,
+            2000, 3000, CancellationToken.None);
+
+        Assert.Equal(2000, fetched);
+        Assert.True(outcome.LimitReached);
+    }
+
+    [Fact]
+    public void ExhaustedSmallTree_IsProvablyCompleteBeforeBudget()
+    {
+        var root = new Node(-1);
+        var outcome = BoundedSearchTraversal.Walk(
+            root, node => node == root ? new Node(0) : null,
+            _ => null, _ => true, (_, _) => false,
+            2000, 20, CancellationToken.None);
+
+        Assert.Equal(1, outcome.NodesVisited);
+        Assert.False(outcome.LimitReached);
     }
 
     private sealed record Node(int Index, bool IsControl = true);

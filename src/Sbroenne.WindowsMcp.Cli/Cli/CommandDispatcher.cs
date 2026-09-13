@@ -20,6 +20,11 @@ internal static class CommandDispatcher
 
     public static async Task<int> DispatchAsync(ParsedArgs args, CancellationToken ct)
     {
+        var optionError = ValidateNonUiOptions(args);
+        if (optionError is not null)
+        {
+            return Emit.Usage(optionError);
+        }
         switch (args.Group)
         {
             case "app":
@@ -55,6 +60,34 @@ internal static class CommandDispatcher
             default:
                 return Emit.Usage($"unknown command '{args.Group}'.");
         }
+    }
+
+    internal static string? ValidateNonUiOptions(ParsedArgs args)
+    {
+        const string WindowOptions = "window handle";
+        const string Diagnostics = "include-diagnostics diagnostics";
+        var options = args.Group switch
+        {
+            "app" => "path program program-path args arguments working-dir cwd working-directory no-wait wait-for-window timeout-ms timeout",
+            "window" or "window-management" => $"{WindowOptions} title process process-name filter regex include-all-desktops all-desktops x y width height timeout-ms timeout target monitor-index monitor state exclude-title discard-changes",
+            "keyboard" => $"{WindowOptions} text key modifiers repeat sequence inter-key-delay-ms delay-ms delay clear-first clear",
+            "mouse" => $"{WindowOptions} target x y end-x endx end-y endy direction amount modifiers button monitor-index monitor expected-window-title expected-title expected-process-name expected-process points",
+            "screenshot" => $"{WindowOptions} action no-annotate annotate target monitor-index monitor region-x region-y region-width region-height include-cursor cursor image-format format quality output-mode output-path out include-image",
+            "file-save" or "filesave" or "save" => $"{WindowOptions} path file-path file {Diagnostics}",
+            "file-open" or "fileopen" or "open" => $"{WindowOptions} path file-path file {Diagnostics} trigger-mode trigger timeout-ms timeout",
+            "process" or "proc" => "name pid sort-by sort limit force",
+            "clipboard" or "clip" => "text",
+            "macro" or "ui-macro" => $"{WindowOptions} steps steps-file name continue-on-error no-stop-on-error stop-on-error with-snapshot snapshot snapshot-mode {Diagnostics} since",
+            _ => null,
+        };
+        if (options is null)
+        {
+            return null;
+        }
+
+        var allowed = options.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unknown = args.OptionNames.FirstOrDefault(option => !allowed.Contains(option));
+        return unknown is null ? null : $"Unknown --{unknown} option for {args.Group}. See wincli tools for supported options.";
     }
 
     private static string? Window(ParsedArgs a) => a.GetString("window", "handle");

@@ -239,66 +239,21 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
-        var delay = 50;
-        const int MaxDelay = 500;
-
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            while (stopwatch.ElapsedMilliseconds < timeoutMs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-                if (!result.Success)
-                {
-                    if (IsSatisfiedDisappearAbsence(result.ErrorType))
-                    {
-                        stopwatch.Stop();
-                        return UIAutomationResult.CreateSuccess(
-                            "wait_for_disappear",
-                            new UIAutomationDiagnostics
-                            {
-                                DurationMs = stopwatch.ElapsedMilliseconds,
-                                Query = query
-                            });
-                    }
-
-                    return result with { Action = "wait_for_disappear" };
-                }
-
-                if ((result.Items?.Length ?? 0) == 0)
-                {
-                    stopwatch.Stop();
-                    return UIAutomationResult.CreateSuccess(
-                        "wait_for_disappear",
-                        new UIAutomationDiagnostics
-                        {
-                            DurationMs = stopwatch.ElapsedMilliseconds,
-                            Query = query
-                        });
-                }
-
-                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
-                delay = Math.Min(delay * 2, MaxDelay);
-            }
-
-            stopwatch.Stop();
-
-            return UIAutomationResult.CreateFailure(
-                "wait_for_disappear",
-                UIAutomationErrorType.Timeout,
-                $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
-                new UIAutomationDiagnostics
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    Query = query,
-                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-                });
+            return await WaitForDisappearResultAsync(
+                query,
+                timeoutMs,
+                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
+                () => stopwatch.ElapsedMilliseconds,
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            stopwatch.Stop();
             if (signal is not null)
             {
                 LastWaitEventCount = signal.EventCount;

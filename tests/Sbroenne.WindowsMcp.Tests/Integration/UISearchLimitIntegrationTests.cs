@@ -40,10 +40,10 @@ public sealed class SearchLimitHarnessFixture : IDisposable
                 AccessibleName = "Quality sentinel",
                 AutoSize = true
             });
-            panel.Controls.Add(scope);
             panel.ResumeLayout();
             form.Controls.Add(panel);
             panel.BringToFront();
+            form.Controls.Add(scope);
         });
     }
 
@@ -51,6 +51,7 @@ public sealed class SearchLimitHarnessFixture : IDisposable
 }
 
 [Collection("SearchLimitHarness")]
+[Trait("Category", "RequiresDesktop")]
 public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixture)
 {
     [Fact]
@@ -92,7 +93,8 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         var parent = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = fixture.WindowHandle,
-            AutomationId = "SentinelScope"
+            AutomationId = "SentinelScope",
+            MaxDepth = 1,
         });
         Assert.True(parent.Success, parent.ErrorMessage);
         var id = Assert.Single(parent.Items!).Id;
@@ -153,6 +155,107 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
 
         // A filtered bulk query returns one item only after traversing the entire provider tree.
         // Incremental enumeration instead reaches its budget before this late native match.
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
+        Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
+    }
+
+    [Fact]
+    public async Task Find_NativeOnlySparseMatch_IsBoundedBeforeProviderMaterialization()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            AutomationId = "SearchLimitSentinel",
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
+        Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
+    }
+
+    [Fact]
+    public async Task Find_ExplicitFoundIndex_SatisfiesRequestedPageBeforeScanBudget()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            ControlType = "Text",
+            FoundIndex = 2,
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.Equal(2, result.Items!.Length);
+        Assert.InRange(result.Diagnostics!.ElementsScanned!.Value, 3, 1999);
+    }
+
+    [Fact]
+    public async Task Find_ExplicitFoundIndexBeyondBudget_DoesNotClaimAbsence()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            ControlType = "Text",
+            FoundIndex = 2001,
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
+        Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
+    }
+
+    [Fact]
+    public async Task Find_FulfilledDefaultResultLimit_ReturnsSuccessfulBoundedPage()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            ControlType = "Text",
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        Assert.True(result.Success, result.ErrorMessage);
+        Assert.Equal(100, result.Items!.Length);
+        Assert.InRange(result.Diagnostics!.ElementsScanned!.Value, 100, 1999);
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_TwoMatchesProveAmbiguityBeforeBudget()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            ControlType = "Text",
+            RequireUnique = true,
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.InRange(result.Diagnostics!.ElementsScanned!.Value, 2, 1999);
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_OneEarlyMatchStillNeedsCompleteTraversal()
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            NameContains = "Quality early match",
+            ControlType = "Text",
+            RequireUnique = true,
+            ContentViewOnly = false,
+            VisibleOnly = false,
+        });
+
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
         Assert.Equal(2000, result.Diagnostics?.ElementsScanned);

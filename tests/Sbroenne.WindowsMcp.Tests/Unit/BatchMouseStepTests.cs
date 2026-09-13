@@ -26,6 +26,14 @@ public sealed class BatchMouseStepTests
     private static BatchResult ParseBatch(CallToolResult result) =>
         JsonSerializer.Deserialize<BatchResult>(ExtractText(result), ParseOptions)!;
 
+    private static string PreflightError(CallToolResult result)
+    {
+        Assert.True(result.IsError);
+        using var payload = JsonDocument.Parse(ExtractText(result));
+        Assert.False(payload.RootElement.TryGetProperty("stepsRun", out _));
+        return payload.RootElement.GetProperty("error").GetString()!;
+    }
+
     private static Task<CallToolResult> RunBatchAsync(string steps) =>
         UIBatchTool.ExecuteAsync("12345", steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
@@ -83,13 +91,7 @@ public sealed class BatchMouseStepTests
     {
         var result = await RunBatchAsync("""[{"action":"mouse","x":10,"y":10}]""");
 
-        var batch = ParseBatch(result);
-        Assert.False(batch.Success);
-        Assert.True(result.IsError);
-
-        var step = Assert.Single(batch.Steps);
-        Assert.False(step.Success);
-        Assert.Contains("requires 'mouseAction'", step.Error, StringComparison.Ordinal);
+        Assert.Contains("requires 'mouseAction'", PreflightError(result), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -97,10 +99,9 @@ public sealed class BatchMouseStepTests
     {
         var result = await RunBatchAsync("""[{"action":"mouse","mouseAction":"wiggle","x":10,"y":10}]""");
 
-        var step = Assert.Single(ParseBatch(result).Steps);
-        Assert.False(step.Success);
-        Assert.Contains("invalid mouseAction 'wiggle'", step.Error, StringComparison.Ordinal);
-        Assert.Contains("polyline", step.Error, StringComparison.Ordinal);
+        var error = PreflightError(result);
+        Assert.Contains("invalid mouseAction 'wiggle'", error, StringComparison.Ordinal);
+        Assert.Contains("polyline", error, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -108,9 +109,7 @@ public sealed class BatchMouseStepTests
     {
         var result = await RunBatchAsync("""[{"action":"teleport"}]""");
 
-        var step = Assert.Single(ParseBatch(result).Steps);
-        Assert.False(step.Success);
-        Assert.Contains("mouse, polyline", step.Error, StringComparison.Ordinal);
+        Assert.Contains("mouse, polyline", PreflightError(result), StringComparison.Ordinal);
     }
 
     [Theory]
@@ -122,7 +121,8 @@ public sealed class BatchMouseStepTests
     {
         // A recognized action gets past parsing and fails later (invalid window handle), never with
         // "invalid mouseAction" - that is what distinguishes accepted spellings from rejected ones.
-        var result = await RunBatchAsync($$"""[{"action":"mouse","mouseAction":"{{mouseAction}}","x":10,"y":10}]""");
+        var points = mouseAction == "polyline" ? ""","points":[[10,10],[20,20]]""" : "";
+        var result = await RunBatchAsync($$"""[{"action":"mouse","mouseAction":"{{mouseAction}}","x":10,"y":10{{points}}}]""");
 
         var step = Assert.Single(ParseBatch(result).Steps);
         Assert.DoesNotContain("invalid mouseAction", step.Error ?? "", StringComparison.Ordinal);

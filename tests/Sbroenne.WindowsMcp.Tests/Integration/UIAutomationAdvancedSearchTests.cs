@@ -151,6 +151,50 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Disappear_FinalProbeObservesVisibilityChangeWithoutStructureSignal()
+    {
+        var query = new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            VisibleOnly = true
+        };
+        long elapsed = 0;
+        var probes = 0;
+        try
+        {
+            var result = await UIAutomationService.WaitForDisappearResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.True(observed.Success, observed.ErrorMessage);
+                        // No event signal is wired to this wait. Visibility must be re-probed
+                        // even when the first provider call used the entire deadline.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+                        elapsed = 2001;
+                    }
+
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("No sleep is allowed after the deadline."),
+                () => elapsed,
+                CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(2, probes);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+        }
+    }
+
+    [Fact]
     public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
     {
         var result = await _automationService.WaitForElementAsync(
