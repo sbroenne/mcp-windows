@@ -7,6 +7,44 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class CliDaemonProtocolTests
 {
+    [Theory]
+    [InlineData("args", "--new-window")]
+    [InlineData("arguments", "--new-window")]
+    [InlineData("args", null)]
+    [InlineData("arguments", null)]
+    public void InvalidOperationArguments_ProduceDefiniteUsageRejection(string option, string? value)
+    {
+        var arguments = new List<string> { "app", "--path", "nonexistent-review-test.exe", $"--{option}" };
+        if (value is not null)
+        {
+            arguments.Add(value);
+        }
+
+        var accepted = DaemonHost.TryParseOperationArguments([.. arguments], out var parsed, out var rejection);
+
+        Assert.False(accepted);
+        Assert.Null(parsed);
+        Assert.NotNull(rejection);
+        Assert.Equal(2, rejection.ExitCode);
+        Assert.Empty(rejection.Output);
+        Assert.Contains($"--{option}=", rejection.Error, StringComparison.Ordinal);
+        Assert.Contains("no operation was dispatched", rejection.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown", rejection.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ValidOperationArguments_RetainExactChildArgumentValue()
+    {
+        const string childArguments = "--new-window \"local target\"";
+        var accepted = DaemonHost.TryParseOperationArguments(
+            ["app", "--path", "example.exe", $"--args={childArguments}"], out var parsed, out var rejection);
+
+        Assert.True(accepted);
+        Assert.Null(rejection);
+        Assert.NotNull(parsed);
+        Assert.Equal(childArguments, parsed.GetString("args"));
+    }
+
     [Fact]
     public async Task Frame_RoundTripsExactArgumentTokensAndCallerDirectory()
     {

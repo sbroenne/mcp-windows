@@ -4,6 +4,32 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class CliCommandValidationTests
 {
+    [Fact]
+    public void Help_DiagnosticsAreExplicitlyCommandScoped()
+    {
+        Assert.DoesNotContain("add --include-diagnostics to any command", HelpText.Tools, StringComparison.Ordinal);
+        Assert.Contains("Diagnostics (not global)", HelpText.Tools, StringComparison.Ordinal);
+        Assert.Contains("--diagnostics", HelpText.Tools, StringComparison.Ordinal);
+        Assert.Contains("file-open", HelpText.Tools, StringComparison.Ordinal);
+        Assert.Contains("file-save", HelpText.Tools, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("include-diagnostics")]
+    [InlineData("diagnostics")]
+    public void DiagnosticsAliases_AreAcceptedOnlyBySupportingNonUiGroups(string option)
+    {
+        foreach (var group in new[] { "macro", "ui-macro", "file-open", "fileopen", "open", "file-save", "filesave", "save" })
+        {
+            Assert.Null(CommandDispatcher.ValidateNonUiOptions(ParsedArgs.Parse([group, "run", $"--{option}"])));
+        }
+        foreach (var group in new[] { "app", "window", "window-management", "keyboard", "mouse", "screenshot", "clipboard", "clip", "process", "proc" })
+        {
+            var error = CommandDispatcher.ValidateNonUiOptions(ParsedArgs.Parse([group, $"--{option}"]));
+            Assert.Contains($"--{option}", error, StringComparison.Ordinal);
+        }
+    }
+
     [Theory]
     [InlineData("app", null)]
     [InlineData("window", "close")]

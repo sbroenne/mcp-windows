@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -169,12 +170,17 @@ internal sealed class DaemonHost : IDisposable
                 return;
             }
 
+            if (!TryParseOperationArguments(request.Arguments, out var parsed, out var rejection))
+            {
+                await DaemonProtocol.WriteAsync(pipe, rejection, requestCts.Token);
+                return;
+            }
+
             requestCts.CancelAfter(DaemonClient.RequestTimeout);
             using var disconnectCts = CancellationTokenSource.CreateLinkedTokenSource(requestCts.Token);
             var disconnected = WatchDisconnectAsync(pipe, requestCts, disconnectCts.Token);
             try
             {
-                var parsed = ParsedArgs.Parse(request.Arguments);
                 var wait = parsed.Group == "ui" && parsed.Action == "wait";
                 var acquired = false;
                 string[]? priorKeys = null;
@@ -227,6 +233,26 @@ internal sealed class DaemonHost : IDisposable
         catch (Exception ex) when (ex is IOException or OperationCanceledException or JsonException or ArgumentException)
         {
             // Never log request payloads or desktop text. Disconnect cancels, it does not replay.
+        }
+    }
+
+    internal static bool TryParseOperationArguments(
+        string[] arguments,
+        [NotNullWhen(true)] out ParsedArgs? parsed,
+        [NotNullWhen(false)] out DaemonResponse? rejection)
+    {
+        try
+        {
+            parsed = ParsedArgs.Parse(arguments);
+            rejection = null;
+            return true;
+        }
+        catch (ArgumentException ex)
+        {
+            parsed = null;
+            rejection = new DaemonResponse(ExitCodes.UsageError, "",
+                $"Invalid command arguments; no operation was dispatched. {ex.Message}");
+            return false;
         }
     }
 

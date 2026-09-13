@@ -84,8 +84,10 @@ wincli macro run --name login --window 12345
 
 ## Output & exit codes
 
-- **stdout** — the tool's JSON payload (parse it directly). Add `--include-diagnostics` to any
-  command for timing/diagnostic detail.
+- **stdout** — the tool's JSON payload (parse it directly). On `ui` operations, `macro run`,
+  `file-open`, and `file-save`, use `--include-diagnostics` (alias `--diagnostics`) for available
+  diagnostic detail. Command aliases have the same support. These flags are **not global**;
+  other command groups reject them.
 - **exit code** — `0` success, `1` tool error (see the JSON `error` field), `2` usage error.
 - **stderr** — usage errors and actionable guidance; invalid CLI arguments do not invoke the tool.
 

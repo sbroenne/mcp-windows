@@ -83,8 +83,10 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 - `0` success, `1` tool error (inspect the JSON `error` field), `2` usage error (bad arguments).
 
 ### Output
-- stdout is the tool's JSON payload - parse it directly. Diagnostic detail is available on any
-  command via `--include-diagnostics`.
+- stdout is the tool's JSON payload - parse it directly. Use `--include-diagnostics` (alias
+  `--diagnostics`) on `ui` operations, `macro run`, `file-open`, or `file-save` for available
+  diagnostic detail. Their command aliases have the same support; other command groups reject
+  these flags. Diagnostics are not a global option.
 
 ## Anti-patterns
 

@@ -37,11 +37,20 @@ public sealed class CliSnapshotContinuityTests(UITestHarnessFixture fixture, ITe
             Assert.Equal(1, staleClick.Code);
             using var staleReadJson = JsonDocument.Parse(staleRead.Stdout);
             using var staleClickJson = JsonDocument.Parse(staleClick.Stdout);
-            Assert.Equal(UIAutomationErrorType.ElementStale,
+            // Reads report unresolved IDs as not found; clicks explicitly classify stale targets.
+            // Both must fail closed rather than retargeting the same-label replacement.
+            Assert.Equal(UIAutomationErrorType.ElementNotFound,
                 staleReadJson.RootElement.GetProperty("errorType").GetString());
+            Assert.False(staleReadJson.RootElement.TryGetProperty("text", out _));
             Assert.Equal(UIAutomationErrorType.ElementStale,
                 staleClickJson.RootElement.GetProperty("errorType").GetString());
             Assert.Equal(1, ReadClickCount(form));
+
+            var replacementRead = await RunTargetedAsync("read", replacement);
+            Assert.True(replacementRead.Code == 0, replacementRead.Stderr + replacementRead.Stdout);
+            using var replacementReadJson = JsonDocument.Parse(replacementRead.Stdout);
+            Assert.Contains("Submit", replacementReadJson.RootElement.GetProperty("text").GetString(),
+                StringComparison.Ordinal);
 
             var replacementClick = await RunTargetedAsync("click", replacement);
             Assert.True(replacementClick.Code == 0, replacementClick.Stderr + replacementClick.Stdout);

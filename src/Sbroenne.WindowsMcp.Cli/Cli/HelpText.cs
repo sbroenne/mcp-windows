@@ -162,7 +162,9 @@ internal static class HelpText
             Persist a ui_batch steps array under a name, then replay it later against any window.
             Replay uses the identical batch engine, so a macro run == the equivalent ui batch call.
 
-        Global: add --include-diagnostics to any command for timing/diagnostic details.
+        Diagnostics (not global): --include-diagnostics (alias --diagnostics) is supported by
+            ui operations, macro run, file-open, and file-save for available diagnostic details.
+            Their command aliases have the same support. Other command groups reject these flags.
         Machine-readable: run 'wincli tools --json' for the full tool manifest (names + JSON schemas).
         This is the MCP schema, not a CLI flag schema; use the kebab-case options above.
 

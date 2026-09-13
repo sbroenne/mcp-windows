@@ -146,7 +146,12 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         var readResult = await harness.AutomationService.GetTextAsync(focusMessage.Id, session.WindowHandleString, includeChildren: false);
 
         Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
-        Assert.Equal(FocusedButtonMessage, readResult.Text);
+        var diagnostic = readResult.Text == FocusedButtonMessage
+            ? string.Empty
+            : await harness.DescribeObservedElementAsync(focusMessage.Id);
+        Assert.True(readResult.Text == FocusedButtonMessage,
+            $"Expected '{FocusedButtonMessage}', read '{readResult.Text}'. " +
+            $"Discovery name='{focusMessage.Name}', window={session.WindowHandleString}. {diagnostic}");
     }
 
     [SkippableTheory]

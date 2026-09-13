@@ -119,8 +119,10 @@ public sealed class SaveTests : IDisposable
         Assert.Contains("Test file created at", content);
     }
 
-    [Fact]
-    public async Task Save_MissingDialogAndFile_DoesNotReportSuccess()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Save_MissingDialogAndFileChange_DoesNotReportSuccess(bool existingFile)
     {
         var fixtureForm = _fixture.Form!;
         System.Windows.Forms.Form? target = null;
@@ -134,12 +136,21 @@ public sealed class SaveTests : IDisposable
 
         try
         {
+            if (existingFile)
+            {
+                await File.WriteAllTextAsync(path, "Unchanged existing file");
+            }
+
             var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
 
             Assert.False(result.Success);
             Assert.Equal(Models.UIAutomationErrorType.Timeout, result.ErrorType);
             Assert.Contains("could not be verified", result.ErrorMessage, StringComparison.Ordinal);
-            Assert.False(File.Exists(path));
+            Assert.Equal(existingFile, File.Exists(path));
+            if (existingFile)
+            {
+                Assert.Equal("Unchanged existing file", await File.ReadAllTextAsync(path));
+            }
         }
         finally
         {
@@ -156,6 +167,54 @@ public sealed class SaveTests : IDisposable
         // Assert
         Assert.False(result.Success);
         Assert.Contains("Invalid window handle", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Save_DoesNotConfirmAnUnrelatedWindow()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? unrelated = null;
+        var unrelatedHandle = (nint)fixtureForm.Invoke(() =>
+        {
+            unrelated = new System.Windows.Forms.Form { Text = "Confirm Save As" };
+            var status = new System.Windows.Forms.Label
+            {
+                Name = "ForeignConfirmStatus",
+                Text = "Untouched",
+                AutoSize = true
+            };
+            var confirm = new System.Windows.Forms.Button { Text = "Yes", Top = 40 };
+            confirm.Click += (_, _) => status.Text = "Confirmed";
+            unrelated.Controls.Add(status);
+            unrelated.Controls.Add(confirm);
+            unrelated.Show(fixtureForm);
+            return unrelated.Handle;
+        });
+        var path = Path.Combine(_testOutputDir, $"owned-save-{Guid.NewGuid():N}.txt");
+
+        try
+        {
+            var result = await _automationService.SaveAsync(_windowHandle, path);
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.True(File.Exists(path));
+
+            var foreignWindow = WindowHandleParser.Format(unrelatedHandle);
+            var found = await _automationService.FindElementsAsync(new Models.ElementQuery
+            {
+                WindowHandle = foreignWindow,
+                AutomationId = "ForeignConfirmStatus",
+                RequireUnique = true
+            });
+            Assert.True(found.Success, found.ErrorMessage);
+            var read = await _automationService.GetTextAsync(
+                Assert.Single(found.Items!).Id, foreignWindow, includeChildren: false);
+            Assert.True(read.Success, read.ErrorMessage);
+            Assert.Equal("Untouched", read.Text);
+        }
+        finally
+        {
+            fixtureForm.Invoke(() => unrelated?.Dispose());
+        }
     }
 
     [Fact]

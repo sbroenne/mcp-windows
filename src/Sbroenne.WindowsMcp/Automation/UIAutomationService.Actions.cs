@@ -1496,7 +1496,7 @@ public sealed partial class UIAutomationService
     /// 3. If dialog appears and filePath provided: type path + Enter (pywinauto pattern)
     /// 4. Handle overwrite confirmation dialogs
     /// 5. Wait for dialog to close
-    /// 6. When a path was supplied, wait for the requested file before reporting success
+    /// 6. When a path was supplied, wait for an observable file creation or change before success
     /// </remarks>
     public async Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default)
     {
@@ -1544,6 +1544,7 @@ public sealed partial class UIAutomationService
                     CreateDiagnostics(stopwatch));
             }
 
+            SaveFileObservation? fileBeforeSave = null;
             if (!string.IsNullOrWhiteSpace(filePath))
             {
                 var directory = Path.GetDirectoryName(filePath);
@@ -1555,6 +1556,8 @@ public sealed partial class UIAutomationService
                         $"Save failed: directory '{directory}' does not exist.",
                         CreateDiagnostics(stopwatch));
                 }
+
+                fileBeforeSave = SaveFileObservation.Read(filePath);
             }
 
             // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
@@ -1603,14 +1606,14 @@ public sealed partial class UIAutomationService
 
             if (!string.IsNullOrWhiteSpace(filePath) &&
                 !await DeterministicWait.UntilAsync(
-                    () => File.Exists(filePath),
+                    () => SaveFileObservation.HasChanged(filePath, fileBeforeSave),
                     SaveDialogCloseTimeout,
                     SaveDialogPollInterval,
                     cancellationToken: cancellationToken))
             {
                 return UIAutomationResult.CreateFailure(
                     "save", UIAutomationErrorType.Timeout,
-                    "The requested file does not exist after waiting for the save. " +
+                    "No file creation or change was observed at the requested path. " +
                     "The save shortcut was sent, but its outcome could not be verified.",
                     CreateDiagnostics(stopwatch));
             }
@@ -1834,6 +1837,13 @@ public sealed partial class UIAutomationService
 
         var dialogHandle = await _staThread.ExecuteAsync(
             () => ResolveElementWindowHandle(dialog), cancellationToken);
+        if (dialogHandle == nint.Zero)
+        {
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.WindowNotFound,
+                "The Save dialog has no valid window handle; no filename input was sent.",
+                CreateDiagnostics(stopwatch));
+        }
 
         // Focus the edit field and click it to ensure keyboard input goes here
         int[]? editFieldCenter = await _staThread.ExecuteAsync<int[]?>(() =>
@@ -1955,14 +1965,14 @@ public sealed partial class UIAutomationService
         }
 
         // Check for error dialogs (e.g., "Path does not exist")
-        var errorResult = await HandleSaveErrorDialogAsync(cancellationToken);
+        var errorResult = await HandleSaveErrorDialogAsync(dialogHandle, cancellationToken);
         if (errorResult != null)
         {
             return errorResult;
         }
 
         // Handle overwrite confirmation if it appears
-        await HandleOverwriteConfirmationAsync(cancellationToken);
+        await HandleOverwriteConfirmationAsync(dialogHandle, cancellationToken);
 
         return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
     }
@@ -2133,7 +2143,7 @@ public sealed partial class UIAutomationService
     /// Polls for error dialogs for the bounded save-dialog timeout to handle timing variations.
     /// Only checks the FOREGROUND window to avoid false positives from unrelated windows.
     /// </summary>
-    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(CancellationToken cancellationToken)
+    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -2158,10 +2168,9 @@ public sealed partial class UIAutomationService
             {
                 errorInfo = await _staThread.ExecuteAsync(() =>
                 {
-                    // CRITICAL: Only check the FOREGROUND window to avoid false positives
-                    // from other applications (e.g., VS Code chat showing "does not exist" text)
                     var foregroundHwnd = NativeMethods.GetForegroundWindow();
-                    if (foregroundHwnd == IntPtr.Zero)
+                    if (foregroundHwnd == IntPtr.Zero ||
+                        !IsSaveDialogWindow(foregroundHwnd, saveDialogHandle))
                     {
                         return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
                     }
@@ -2229,19 +2238,30 @@ public sealed partial class UIAutomationService
                         cancellationToken);
                 }
 
-                // The operation has already failed; only the dialog teardown is being observed here,
-                // so keep the short budget rather than delaying the error returned to the caller.
-                _ = await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout);
-
-                // Press Escape to close the Save As dialog
-                await _keyboardService.PressKeyAsync("Escape", cancellationToken: cancellationToken);
+                string? cleanupWarning = null;
+                if (await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout))
+                {
+                    var cancelled = await _keyboardService.PressKeyAsync(
+                        "Escape", ModifierKey.None, 1, saveDialogHandle, cancellationToken);
+                    if (!cancelled.Success)
+                    {
+                        cleanupWarning = $"The Save dialog could not be closed safely: {cancelled.Error}";
+                    }
+                }
+                else
+                {
+                    cleanupWarning = "The error dialog remained open; no Escape key was sent.";
+                }
 
                 // Return error to LLM
                 return UIAutomationResult.CreateFailure(
                     "save",
                     UIAutomationErrorType.PathError,
-                    $"Save failed: {errorInfo.errorText}. The directory does not exist. Create the directory first or use an existing path.",
-                    CreateDiagnostics(stopwatch));
+                    $"Save failed: {errorInfo.errorText}",
+                    CreateDiagnostics(stopwatch)) with
+                {
+                    UsageHint = cleanupWarning
+                };
             }
 
             await Task.Delay(100, cancellationToken);
@@ -2254,7 +2274,7 @@ public sealed partial class UIAutomationService
     /// Handles the "Confirm Save As" overwrite confirmation dialog if it appears.
     /// Based on pywinauto pattern: check for Yes/Replace button and click it.
     /// </summary>
-    private async Task HandleOverwriteConfirmationAsync(CancellationToken cancellationToken)
+    private async Task HandleOverwriteConfirmationAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
         // Check for common overwrite confirmation dialogs
         string[] confirmPatterns = ["Confirm Save As", "Replace or Skip Files", "Confirm", "already exists"];
@@ -2275,6 +2295,11 @@ public sealed partial class UIAutomationService
             for (int i = 0; i < windows.Length; i++)
             {
                 var window = windows.GetElement(i);
+                if (!IsSaveDialogWindow(ResolveElementWindowHandle(window), saveDialogHandle))
+                {
+                    continue;
+                }
+
                 var windowName = window.CurrentName ?? "";
 
                 // Check if window matches any confirmation pattern
@@ -2321,6 +2346,27 @@ public sealed partial class UIAutomationService
                 fallbackClickPoint: null,
                 cancellationToken);
         }
+    }
+
+    private static bool IsSaveDialogWindow(nint candidate, nint saveDialogHandle)
+    {
+        if (candidate == nint.Zero || saveDialogHandle == nint.Zero || !NativeMethods.IsWindow(saveDialogHandle))
+        {
+            return false;
+        }
+
+        var current = NativeMethods.GetAncestor(candidate, NativeConstants.GA_ROOT);
+        for (var depth = 0; depth < 64 && current != nint.Zero; depth++)
+        {
+            if (current == saveDialogHandle)
+            {
+                return true;
+            }
+
+            current = NativeMethods.GetWindow(current, NativeConstants.GW_OWNER);
+        }
+
+        return false;
     }
 
     /// <summary>

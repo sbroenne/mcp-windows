@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Sbroenne.WindowsMcp.Cli;
+using Sbroenne.WindowsMcp.Cli.Service;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -8,6 +9,41 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Trait("Category", "Integration")]
 public sealed class CliDaemonLifecycleTests
 {
+    [Theory]
+    [InlineData("args")]
+    [InlineData("arguments")]
+    public async Task MalformedRawRequest_ReturnsUsageAndKeepsOwnerResponsive(string option)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+        try
+        {
+            var started = await RunAsync("service", "start");
+            Assert.True(started.Code == 0, started.Error + started.Output);
+            var before = await DaemonClient.StatusAsync(timeout.Token);
+            using var beforeStatus = JsonDocument.Parse(before.Output);
+            var request = new DaemonRequest("execute",
+                ["app", "--path", "nonexistent-review-test.exe", $"--{option}", "--new-window"],
+                Environment.CurrentDirectory);
+
+            var response = await DaemonClient.SendAsync(request, TimeSpan.FromSeconds(5), timeout.Token);
+
+            Assert.Equal(2, response.ExitCode);
+            Assert.Empty(response.Output);
+            Assert.Contains($"--{option}=", response.Error, StringComparison.Ordinal);
+            Assert.Contains("no operation was dispatched", response.Error, StringComparison.Ordinal);
+            Assert.DoesNotContain("unknown", response.Error, StringComparison.OrdinalIgnoreCase);
+            var after = await DaemonClient.StatusAsync(timeout.Token);
+            using var afterStatus = JsonDocument.Parse(after.Output);
+            Assert.Equal(beforeStatus.RootElement.GetProperty("generation").GetString(),
+                afterStatus.RootElement.GetProperty("generation").GetString());
+        }
+        finally
+        {
+            using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            await DaemonClient.StopAsync(cleanup.Token);
+        }
+    }
+
     [Fact]
     public async Task ConcurrentStart_Status_Stop_Restart_UseOnePersistentOwner()
     {
