@@ -454,7 +454,8 @@ public sealed record UIAutomationResult
 
         UIAutomationErrorType.SearchIncomplete =>
             "Search stopped at its scan limit; the target may still exist. Narrow the search with exact name, " +
-            "automationId, controlType or className, or parentElementId within the same MCP session. " +
+            "automationId, controlType or className, or parentElementId within the same MCP session or CLI daemon. " +
+            "MCP sessions and the CLI daemon are separate owners; their element IDs are not interchangeable. " +
             "A longer timeout does not increase the scan limit.",
 
         UIAutomationErrorType.MultipleMatches =>

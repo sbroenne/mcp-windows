@@ -22,10 +22,10 @@ internal sealed class StrictArgumentTool(McpServerTool inner) : McpServerTool
         ArgumentNullException.ThrowIfNull(request);
         if (request.Params?.Arguments is { } arguments)
         {
-            var stateWait = ProtocolTool.Name == "ui_wait" &&
-                arguments.TryGetValue("mode", out var mode) &&
-                mode.ValueKind == JsonValueKind.String &&
-                string.Equals(mode.GetString()?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
+            var modeText = arguments.TryGetValue("mode", out var mode) && mode.ValueKind == JsonValueKind.String
+                ? mode.GetString()?.Trim().ToLowerInvariant() : null;
+            var stateWait = ProtocolTool.Name == "ui_wait" && modeText == "state";
+            var discoveryWait = ProtocolTool.Name == "ui_wait" && modeText is null or "" or "appear" or "disappear";
             foreach (var name in arguments.Keys)
             {
                 if (!_argumentNames.Contains(name))
@@ -51,6 +51,29 @@ internal sealed class StrictArgumentTool(McpServerTool inner) : McpServerTool
                         {
                             Text = $"State waits do not accept selector argument '{name}', including null/default values. "
                                 + "Use only elementId and desiredState to identify the target condition.",
+                        }],
+                    });
+                }
+                if (ProtocolTool.Name == "ui_read" && name == "elementId" &&
+                    (arguments[name].ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(arguments[name].GetString())))
+                {
+                    return ValueTask.FromResult(new CallToolResult
+                    {
+                        IsError = true,
+                        Content = [new TextContentBlock
+                        {
+                            Text = "A supplied elementId must be a non-empty ID. Omit elementId only for an explicit whole-window read.",
+                        }],
+                    });
+                }
+                if (discoveryWait && name is "elementId" or "desiredState")
+                {
+                    return ValueTask.FromResult(new CallToolResult
+                    {
+                        IsError = true,
+                        Content = [new TextContentBlock
+                        {
+                            Text = $"Appear/disappear waits do not accept '{name}', including null. Use selectors instead.",
                         }],
                     });
                 }

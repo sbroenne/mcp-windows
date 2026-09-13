@@ -102,39 +102,10 @@ public static partial class UIBatchTool
         try
         {
             using var document = JsonDocument.Parse(steps);
-            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            var validationError = BatchStepValidation.Validate(document.RootElement);
+            if (validationError is not null)
             {
-                foreach (var rawStep in document.RootElement.EnumerateArray())
-                {
-                    if (rawStep.ValueKind != JsonValueKind.Object)
-                    {
-                        return WindowsToolsBase.FailResult("Every batch step must be an object.");
-                    }
-                    var action = rawStep.EnumerateObject().FirstOrDefault(p =>
-                        p.Name.Equals("action", StringComparison.OrdinalIgnoreCase)).Value;
-                    var mode = rawStep.EnumerateObject().FirstOrDefault(p =>
-                        p.Name.Equals("mode", StringComparison.OrdinalIgnoreCase)).Value;
-                    var actionText = action.ValueKind == JsonValueKind.String ? action.GetString()?.Trim().ToLowerInvariant() : null;
-                    var stateWait = actionText == "wait" && mode.ValueKind == JsonValueKind.String &&
-                        string.Equals(mode.GetString()?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
-                    if ((actionText == "find" || (actionText == "wait" && !stateWait)) &&
-                        rawStep.EnumerateObject().Any(p => p.Name.Equals("elementId", StringComparison.OrdinalIgnoreCase)))
-                    {
-                        return WindowsToolsBase.FailResult("Discovery and appear/disappear waits accept selectors, not elementId.");
-                    }
-                    if (actionText is "click" or "type" or "select" or "read" || stateWait)
-                    {
-                        foreach (var property in rawStep.EnumerateObject())
-                        {
-                            if (property.Name.ToLowerInvariant() is "name" or "namecontains" or "namepattern" or
-                                "controltype" or "automationid" or "classname" or "foundindex" or "scope" or
-                                "parentelementid" or "requireunique" or "visibleonly" or "enabledonly")
-                            {
-                                return WindowsToolsBase.FailResult("Targeted steps do not accept selectors, including null/default values. Discover first and use elementId.");
-                            }
-                        }
-                    }
-                }
+                return WindowsToolsBase.FailResult(validationError);
             }
             parsedSteps = JsonSerializer.Deserialize<BatchStep[]>(steps, StepParseOptions);
         }
@@ -260,7 +231,7 @@ public static partial class UIBatchTool
         var action = (step.Action ?? "").Trim().ToLowerInvariant();
         var service = WindowsToolsBase.UIAutomationService;
         var elementId = ResolveElementId(step.ElementId, lastElementId);
-        var isStateWait = action == "wait" && string.Equals(step.Mode, "state", StringComparison.OrdinalIgnoreCase);
+        var isStateWait = action == "wait" && string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
         var targeted = action is "click" or "type" or "select" || isStateWait;
         var hasSelectors = step.Name is not null || step.NameContains is not null || step.NamePattern is not null ||
             step.ControlType is not null || step.AutomationId is not null || step.ClassName is not null ||
@@ -281,9 +252,7 @@ public static partial class UIBatchTool
             case "find":
                 {
                     var result = await service.FindElementsAsync(BuildQuery(step, windowHandle), cancellationToken);
-                    var firstId = result.Items is { Length: 1 } ? result.Items[0].Id
-                        : result.Elements is { Length: 1 } ? result.Elements[0].ElementId
-                        : null;
+                    var firstId = UniqueElementId(result);
                     return Step(index, action, result.Success,
                         result.Success ? $"found {result.ElementCount ?? result.Items?.Length ?? 0} element(s)" : null,
                         result.ErrorMessage, firstId);
@@ -369,7 +338,7 @@ public static partial class UIBatchTool
                         ? await service.WaitForElementAsync(query, timeout, cancellationToken)
                         : await service.WaitForElementDisappearAsync(query, timeout, cancellationToken);
                     return Step(index, action, waitResult.Success, waitResult.Success ? $"{mode} satisfied" : null,
-                        waitResult.ErrorMessage, mode == "appear" ? FirstElementId(waitResult) : null);
+                        waitResult.ErrorMessage, mode == "appear" ? UniqueElementId(waitResult) : null);
                 }
 
             case "read":
@@ -597,6 +566,11 @@ public static partial class UIBatchTool
     private static string? FirstElementId(UIAutomationResult result) =>
         result.Items is { Length: > 0 } ? result.Items[0].Id
         : result.Elements is { Length: > 0 } ? result.Elements[0].ElementId
+        : null;
+
+    private static string? UniqueElementId(UIAutomationResult result) =>
+        result.Items is { Length: 1 } ? result.Items[0].Id
+        : result.Elements is { Length: 1 } ? result.Elements[0].ElementId
         : null;
 
     private static ModifierKey ParseModifiers(string? value)

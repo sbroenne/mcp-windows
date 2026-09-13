@@ -7,6 +7,20 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class TargetedActionValidationTests
 {
+    [Fact]
+    public async Task CliClick_IdAliasIsNotSupportedByCurrentDispatcher()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var result = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse(["ui", "click", "--window", "12345", "--id", "observed-id"]),
+            output, error, CancellationToken.None);
+
+        Assert.Equal(2, result);
+        Assert.Empty(output.ToString());
+        Assert.Contains("Unknown or removed --id", error.ToString(), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("--element-id")]
     [InlineData("--element-id=")]

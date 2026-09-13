@@ -14,18 +14,19 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIFindTool
 {
     /// <summary>
-    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element names, types, and coordinates for use with ui_click/ui_type/mouse_control.
+    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns observed IDs for elementId targeting with ui_click/ui_type, plus names, types, and coordinates.
+    /// Each bounded scan has a budget of 2000 visited UIA nodes, including nonmatching nodes.
     /// Keywords: find, locate, search element, discover, inspect, look for, get element, query UI,
     /// element by name, control, accessibility tree, where is.
     /// </summary>
     /// <remarks>
     /// Finds UI elements by name, type, ID, or other criteria. Returns each element's name, automationId, controlType, and click coordinates.
-    /// To act on a result, pass its name/automationId/controlType to ui_click or ui_type (add foundIndex to disambiguate), or its coordinates to mouse_control.
+    /// To act on a result, pass its returned id as elementId to ui_click or ui_type. Selectors and foundIndex are discovery-only; use them here to disambiguate before acting.
+    /// Use coordinates with mouse_control only as a fallback.
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
     /// REQUIRED: windowHandle (from window_management tool).
     /// For Electron/Chromium, visible text and ARIA labels usually show up here as element names.
-    /// Substring/regex and depth-aware searches are bounded to 2000 candidates. If candidates remain
-    /// at that limit, search_incomplete means absence or uniqueness could not be established.
+    /// If unvisited nodes remain at the scan limit, search_incomplete means absence or uniqueness could not be established.
     /// Narrow with exact name, automationId, controlType, className or a known parentElementId;
     /// increasing timeoutMs does not increase this limit.
     /// </remarks>

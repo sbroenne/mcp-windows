@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Sbroenne.WindowsMcp.Macros;
+using Sbroenne.WindowsMcp.Models;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
@@ -62,10 +63,13 @@ public sealed class MacroReplayValidationTests : IDisposable
     [InlineData("wait", null)]
     [InlineData("wait", "appear")]
     [InlineData("wait", "disappear")]
-    public void ValidateReplayReferences_DiscoveryWithPreviousId_ReturnsValidationError(string action, string? mode)
+    public void SharedRawValidation_DiscoveryWithPreviousId_ReturnsValidationError(string action, string? mode)
     {
-        var error = MacroService.ValidateReplayReferences(
-            [new() { Action = action, Mode = mode, Name = "Submit", ElementId = "$prev" }]);
+        var steps = JsonSerializer.SerializeToElement(new[]
+        {
+            new { action, mode, name = "Submit", elementId = "$prev" },
+        });
+        var error = BatchStepValidation.Validate(steps);
 
         Assert.Contains("elementId", error, StringComparison.Ordinal);
     }

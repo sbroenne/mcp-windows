@@ -20,7 +20,7 @@ public sealed class UIReadScopeIntegrationTests(UITestHarnessFixture fixture)
         using var error = new StringWriter();
 
         var code = await CommandDispatcher.DispatchAsync(
-            ParsedArgs.Parse(["ui", "read", "--window", fixture.TestWindowHandleString]),
+            ParsedArgs.Parse(["ui", "read", "--window", fixture.TestWindowHandleString, "--include-children"]),
             output, error, CancellationToken.None);
 
         Assert.Equal(0, code);

@@ -13,6 +13,63 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 public sealed class McpArgumentValidationTests(UITestHarnessFixture fixture)
 {
     [Theory]
+    [InlineData("null")]
+    [InlineData("\"\"")]
+    [InlineData("\" \\t \"")]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task RegisteredRead_RejectsPresentEmptyIdWithoutWidening(string valueJson)
+    {
+        fixture.Reset();
+        var arguments = new Dictionary<string, JsonElement>
+        {
+            ["windowHandle"] = JsonSerializer.SerializeToElement(fixture.TestWindowHandleString),
+            ["includeChildren"] = JsonSerializer.SerializeToElement(true),
+        };
+        var valid = await InvokeRegisteredToolAsync("ui_read", arguments);
+        Assert.False(valid.IsError);
+        Assert.Contains("Submit", Assert.IsType<TextContentBlock>(Assert.Single(valid.Content)).Text, StringComparison.Ordinal);
+
+        arguments["elementId"] = JsonSerializer.Deserialize<JsonElement>(valueJson);
+        var rejected = await InvokeRegisteredToolAsync("ui_read", arguments);
+        Assert.True(rejected.IsError);
+        var error = Assert.IsType<TextContentBlock>(Assert.Single(rejected.Content)).Text;
+        Assert.Contains("elementId", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("Submit", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null, "elementId")]
+    [InlineData(null, "desiredState")]
+    [InlineData("appear", "elementId")]
+    [InlineData("appear", "desiredState")]
+    [InlineData("disappear", "elementId")]
+    [InlineData("disappear", "desiredState")]
+    [InlineData(" APPEAR ", "elementId")]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task RegisteredDiscoveryWait_RejectsExplicitNullStateArguments(string? mode, string property)
+    {
+        fixture.Reset();
+        var arguments = new Dictionary<string, JsonElement>
+        {
+            ["windowHandle"] = JsonSerializer.SerializeToElement(fixture.TestWindowHandleString),
+            ["name"] = JsonSerializer.SerializeToElement(
+                mode == "disappear" ? $"Absent-{Guid.NewGuid():N}" : "Submit"),
+            ["timeoutMs"] = JsonSerializer.SerializeToElement(500),
+        };
+        if (mode is not null)
+        {
+            arguments["mode"] = JsonSerializer.SerializeToElement(mode);
+        }
+        var valid = await InvokeRegisteredWaitAsync(arguments);
+        Assert.False(valid.IsError);
+
+        arguments[property] = JsonSerializer.SerializeToElement<string?>(null);
+        var rejected = await InvokeRegisteredWaitAsync(arguments);
+        Assert.True(rejected.IsError);
+        Assert.Contains(property, Assert.IsType<TextContentBlock>(Assert.Single(rejected.Content)).Text, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("name", "null")]
     [InlineData("nameContains", "null")]
     [InlineData("namePattern", "null")]
@@ -80,18 +137,21 @@ public sealed class McpArgumentValidationTests(UITestHarnessFixture fixture)
         Assert.False(result.IsError);
     }
 
-    private static async Task<CallToolResult> InvokeRegisteredWaitAsync(Dictionary<string, JsonElement> arguments)
+    private static Task<CallToolResult> InvokeRegisteredWaitAsync(Dictionary<string, JsonElement> arguments) =>
+        InvokeRegisteredToolAsync("ui_wait", arguments);
+
+    private static async Task<CallToolResult> InvokeRegisteredToolAsync(string name, Dictionary<string, JsonElement> arguments)
     {
         var services = new ServiceCollection();
         services.AddMcpServer().WithToolsFromAssembly(typeof(ToolCatalog).Assembly);
         ToolFilter.Apply(services, include: null, exclude: null);
         using var provider = services.BuildServiceProvider();
-        var tool = Assert.Single(provider.GetServices<McpServerTool>(), t => t.ProtocolTool.Name == "ui_wait");
+        var tool = Assert.Single(provider.GetServices<McpServerTool>(), t => t.ProtocolTool.Name == name);
         await using var server = McpServer.Create(
             new StreamServerTransport(Stream.Null, Stream.Null),
             new McpServerOptions { ServerInfo = new() { Name = "wait-validation-test", Version = "1.0.0" } },
             serviceProvider: provider);
-        var parameters = new CallToolRequestParams { Name = "ui_wait", Arguments = arguments };
+        var parameters = new CallToolRequestParams { Name = name, Arguments = arguments };
         var request = new RequestContext<CallToolRequestParams>(
             server, new JsonRpcRequest { Id = new RequestId(1), Method = "tools/call" }, parameters);
 

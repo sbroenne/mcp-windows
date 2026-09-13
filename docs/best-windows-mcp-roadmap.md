@@ -88,7 +88,7 @@ Three moats:
 ### 5. Dual entry point: MCP + CLI + Skills
 The desktop is shared, but discovered element references and snapshot baselines need a
 persistent owner. CLI calls use one background daemon; MCP keeps its own in-process state.
-Discover a control, then pass its returned ID to `wincli ui click --window 123 --id <id>`.
+Discover a control, then pass its returned ID to `wincli ui click --window 123 --element-id <id>`.
 Clicks are not idempotent: never automatically replay an action after losing its response.
 
 **Shipped (Phase 3):** `wincli` — a twin command-line entry point in `Sbroenne.WindowsMcp.Cli`.

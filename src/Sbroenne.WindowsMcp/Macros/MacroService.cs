@@ -50,10 +50,6 @@ public sealed class MacroService
             {
                 return "Every macro step must be an object; null steps are not valid.";
             }
-            if (IsDiscoveryStep(step) && step.ElementId is not null)
-            {
-                return "Discovery and appear/disappear macro waits accept selectors, not elementId.";
-            }
             if ((step.ElementId is not null && step.ElementId != "$prev") || step.ParentElementId is not null)
             {
                 return "Macros cannot persist action IDs. Discover fresh targets on each replay and use elementId='$prev'.";
@@ -62,22 +58,13 @@ public sealed class MacroService
             if (action is "click" or "type" or "select" ||
                 (action == "wait" && string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase)))
             {
-                if (step.ElementId != "$prev" || step.Name is not null || step.NameContains is not null ||
-                    step.NamePattern is not null || step.ControlType is not null ||
-                    step.AutomationId is not null || step.ClassName is not null)
+                if (step.ElementId != "$prev")
                 {
-                    return "Targeted macro actions require a fresh discovery step and elementId='$prev', not selectors.";
+                    return "Targeted macro actions require a fresh discovery step and elementId='$prev'.";
                 }
             }
         }
         return null;
-    }
-
-    private static bool IsDiscoveryStep(BatchStep step)
-    {
-        var action = step.Action?.Trim().ToLowerInvariant();
-        return action == "find" || (action == "wait" &&
-            !string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -97,9 +84,17 @@ public sealed class MacroService
         }
 
         BatchStep[]? parsed;
+        JsonElement stepsElement;
         try
         {
-            parsed = JsonSerializer.Deserialize<BatchStep[]>(stepsJson, StepParseOptions);
+            using var document = JsonDocument.Parse(stepsJson);
+            var validationError = BatchStepValidation.Validate(document.RootElement);
+            if (validationError is not null)
+            {
+                return MacroResult.Failure("save", validationError);
+            }
+            parsed = document.RootElement.Deserialize<BatchStep[]>(StepParseOptions);
+            stepsElement = document.RootElement.Clone();
         }
         catch (JsonException ex)
         {
@@ -115,27 +110,6 @@ public sealed class MacroService
         if (referenceError is not null)
         {
             return MacroResult.Failure("save", referenceError);
-        }
-
-        JsonElement stepsElement;
-        try
-        {
-            using var document = JsonDocument.Parse(stepsJson);
-            for (var index = 0; index < parsed.Length; index++)
-            {
-                if (IsDiscoveryStep(parsed[index]) &&
-                    document.RootElement[index].EnumerateObject().Any(property =>
-                        property.Name.Equals("elementId", StringComparison.OrdinalIgnoreCase)))
-                {
-                    return MacroResult.Failure("save",
-                        "Discovery and appear/disappear macro waits accept selectors, not elementId (including null).");
-                }
-            }
-            stepsElement = document.RootElement.Clone();
-        }
-        catch (JsonException ex)
-        {
-            return MacroResult.Failure("save", $"steps is not valid JSON: {ex.Message}.");
         }
 
         var definition = new MacroDefinition

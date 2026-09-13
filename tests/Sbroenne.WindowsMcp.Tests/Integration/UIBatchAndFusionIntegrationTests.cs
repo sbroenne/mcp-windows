@@ -40,6 +40,57 @@ public sealed class UIBatchAndFusionIntegrationTests
         DesktopInputTests.SkipUnlessEnabled();
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_AmbiguousAppearWait_CannotSupplyPreviousTarget()
+    {
+        var steps = """
+            [{"action":"wait","mode":"appear","controlType":"Button","timeoutMs":1000},
+             {"action":"read","elementId":"$prev"}]
+            """;
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.Equal(2, batch.StepsRun);
+        Assert.True(batch.Steps[0].Success);
+        Assert.Null(batch.Steps[0].ElementId);
+        Assert.False(batch.Steps[1].Success);
+        Assert.Contains("unambiguous", batch.Steps[1].Error, StringComparison.Ordinal);
+        Assert.Null(batch.Steps[1].Text);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_UniqueAppearWait_SuppliesPreviousTarget()
+    {
+        var steps = """
+            [{"action":"wait","mode":"appear","automationId":"SubmitButton","timeoutMs":1000},
+             {"action":"read","elementId":"$prev"}]
+            """;
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.True(batch.Success, ExtractText(result));
+        Assert.NotNull(batch.Steps[0].ElementId);
+        Assert.Equal(batch.Steps[0].ElementId, batch.Steps[1].ElementId);
+        Assert.Contains("Submit", batch.Steps[1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_ReadWithoutId_PreservesWholeWindowScope()
+    {
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, """[{"action":"read","includeChildren":true}]""",
+            true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.True(batch.Success, ExtractText(result));
+        Assert.Contains("Submit", Assert.Single(batch.Steps).Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Batch_FillFormAndSubmit_AllStepsSucceed()
     {
         var steps = JsonSerializer.Serialize(new object[]
