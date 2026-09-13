@@ -21,7 +21,8 @@ public sealed class MacroService
     private static readonly JsonSerializerOptions StepParseOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
     };
 
     private readonly string _rootDirectory;
@@ -40,6 +41,29 @@ public sealed class MacroService
 
     /// <summary>The directory macros are stored in.</summary>
     public string RootDirectory => _rootDirectory;
+
+    internal static string? ValidateReplayReferences(BatchStep[] steps)
+    {
+        foreach (var step in steps)
+        {
+            if ((step.ElementId is not null && step.ElementId != "$prev") || step.ParentElementId is not null)
+            {
+                return "Macros cannot persist action IDs. Discover fresh targets on each replay and use elementId='$prev'.";
+            }
+            var action = step.Action?.Trim().ToLowerInvariant();
+            if (action is "click" or "type" or "select" ||
+                (action == "wait" && string.Equals(step.Mode, "state", StringComparison.OrdinalIgnoreCase)))
+            {
+                if (step.ElementId != "$prev" || step.Name is not null || step.NameContains is not null ||
+                    step.NamePattern is not null || step.ControlType is not null ||
+                    step.AutomationId is not null || step.ClassName is not null)
+                {
+                    return "Targeted macro actions require a fresh discovery step and elementId='$prev', not selectors.";
+                }
+            }
+        }
+        return null;
+    }
 
     /// <summary>
     /// Saves (or overwrites) a macro named <paramref name="name"/> from a ui_batch steps array.
@@ -70,6 +94,12 @@ public sealed class MacroService
         if (parsed is null || parsed.Length == 0)
         {
             return MacroResult.Failure("save", "steps must be a non-empty JSON array of step objects.");
+        }
+
+        var referenceError = ValidateReplayReferences(parsed);
+        if (referenceError is not null)
+        {
+            return MacroResult.Failure("save", referenceError);
         }
 
         JsonElement stepsElement;

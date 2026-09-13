@@ -27,7 +27,7 @@ public sealed class BatchMouseStepTests
         JsonSerializer.Deserialize<BatchResult>(ExtractText(result), ParseOptions)!;
 
     private static Task<CallToolResult> RunBatchAsync(string steps) =>
-        UIBatchTool.ExecuteAsync("12345", steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+        UIBatchTool.ExecuteAsync("12345", steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
     [Fact]
     public void BatchStep_MouseStep_DeserializesCoordinatesAndButton()

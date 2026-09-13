@@ -112,7 +112,7 @@ public sealed class WinUIWaitTests : IDisposable
     public async Task Focus_TextBox_SetsFocus()
     {
         // Navigate to Form Controls page where text boxes exist
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -132,8 +132,7 @@ public sealed class WinUIWaitTests : IDisposable
         var textBoxId = findResult.Items![0].Id;
         Assert.NotNull(textBoxId);
 
-        // Element IDs are now short numeric identifiers
-        Assert.True(int.TryParse(textBoxId, out _), $"Element ID format unexpected: {textBoxId}");
+        Assert.True(Sbroenne.WindowsMcp.Automation.ElementIdGenerator.TryResolveWindowHandle(textBoxId, out _));
 
         // Act - try to focus using the element ID
         var focusResult = await _automationService.FocusElementAsync(textBoxId);

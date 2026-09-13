@@ -76,11 +76,16 @@ dotnet build tests\Sbroenne.WindowsMcp.ModernHarness -c Debug -p:Platform=x64
 
 ```csharp
 // ✅ Correct: Use MCP tools to verify state
-var readResult = await _automationService.ReadElementAsync(new ElementQuery
+var found = await _automationService.FindElementsAsync(new ElementQuery
 {
     WindowHandle = _windowHandle,
     AutomationId = "ButtonClicksDisplay",
+    RequireUnique = true,
 });
+Assert.True(found.Success);
+var target = Assert.Single(found.Items!);
+var readResult = await _automationService.GetTextAsync(
+    target.Id, _windowHandle, includeChildren: false);
 Assert.Equal("3", readResult.Text);
 
 // ❌ Wrong: Direct property access (not available for out-of-process apps)

@@ -18,7 +18,8 @@ public static partial class UIBatchTool
     private static readonly JsonSerializerOptions StepParseOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
     };
 
     /// <summary>
@@ -33,17 +34,18 @@ public static partial class UIBatchTool
     /// Steps run top to bottom. By default the batch stops at the first failing step (stopOnError=true).
     /// Each step is a JSON object with an "action" plus the fields that action needs:
     /// - find:     selectors (name/controlType/automationId/...). Resolves an element; its id is exposed to the next step as "$prev".
-    /// - click:    selectors OR elementId, optional doubleClick.
-    /// - type:     selectors OR elementId, plus text; optional clearFirst and inputMode (auto/keyboard/value).
-    /// - select:   selectors, plus value (visible option text).
+    /// - click:    required elementId, optional doubleClick.
+    /// - type:     required elementId, plus text; optional clearFirst and inputMode (auto/keyboard/value).
+    /// - select:   required selection-control elementId, plus value (visible option text).
     /// - wait:     mode (appear/disappear/state), selectors or elementId+desiredState, optional timeoutMs.
-    /// - read:     selectors or elementId (or neither, to read the whole window), optional includeChildren.
+    /// - read:     elementId (omit only for an explicit whole-window read), optional includeChildren.
     /// - snapshot: capture the window element tree (optional maxDepth).
     /// - key:      key (e.g. enter, tab, f5) with optional modifiers (ctrl,shift,alt,win) and repeat.
     /// - mouse:    mouseAction (move/click/double_click/right_click/middle_click/drag/polyline/scroll) plus x,y
     ///             (and endX,endY for drag), optional button, modifiers, direction, amount.
     /// - polyline: points [[x1,y1],[x2,y2],...] drawn as ONE continuous stroke, optional button.
-    /// Reference the previous step's resolved element by setting a step's elementId to "$prev".
+    /// Reference the immediately preceding step's single resolved element with elementId="$prev".
+    /// Ambiguous find results cannot supply $prev. Action selectors and unknown fields are rejected.
     /// Mouse coordinates are window-relative by default; set target ('primary_screen'/'secondary_screen') or
     /// monitorIndex on a step for screen-relative coordinates. The target window is activated before each mouse
     /// step unless expectedProcessName/expectedWindowTitle is set (those verify the foreground window instead).
@@ -62,6 +64,7 @@ public static partial class UIBatchTool
     /// <param name="snapshotMode">Post-batch snapshot mode when withSnapshot=true: full for one verification (default), auto for repeated checks of the same window, or reset when this batch starts a new comparison.</param>
     /// <param name="includeDiagnostics">Reserved for parity; batch responses are already compact. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="snapshotSince">Previous snapshot token for a checked post-action diff.</param>
     /// <returns>A call result whose JSON payload lists per-step outcomes. <c>IsError</c> is true unless every executed step succeeded.</returns>
     [McpServerTool(Name = "ui_batch", Title = "Run UI Automation Steps", Destructive = true, OpenWorld = false)]
     public static async partial Task<CallToolResult> ExecuteAsync(
@@ -71,7 +74,8 @@ public static partial class UIBatchTool
         [DefaultValue(false)] bool withSnapshot,
         [DefaultValue("full")] string snapshotMode,
         [DefaultValue(false)] bool includeDiagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [DefaultValue(null)] string? snapshotSince = null)
     {
         if (string.IsNullOrWhiteSpace(windowHandle))
         {
@@ -82,7 +86,7 @@ public static partial class UIBatchTool
         if (string.IsNullOrWhiteSpace(steps))
         {
             return WindowsToolsBase.FailResult(
-                "steps is required: a JSON array of step objects, e.g. [{\"action\":\"click\",\"name\":\"Submit\"}].");
+                "steps is required: a JSON array, e.g. [{\"action\":\"find\",\"name\":\"Submit\",\"requireUnique\":true},{\"action\":\"click\",\"elementId\":\"$prev\"}].");
         }
 
         if (!SnapshotStateService.TryParseMode(snapshotMode, out var parsedSnapshotMode))
@@ -94,6 +98,41 @@ public static partial class UIBatchTool
         BatchStep[]? parsedSteps;
         try
         {
+            using var document = JsonDocument.Parse(steps);
+            if (document.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var rawStep in document.RootElement.EnumerateArray())
+                {
+                    if (rawStep.ValueKind != JsonValueKind.Object)
+                    {
+                        return WindowsToolsBase.FailResult("Every batch step must be an object.");
+                    }
+                    var action = rawStep.EnumerateObject().FirstOrDefault(p =>
+                        p.Name.Equals("action", StringComparison.OrdinalIgnoreCase)).Value;
+                    var mode = rawStep.EnumerateObject().FirstOrDefault(p =>
+                        p.Name.Equals("mode", StringComparison.OrdinalIgnoreCase)).Value;
+                    var actionText = action.ValueKind == JsonValueKind.String ? action.GetString()?.Trim().ToLowerInvariant() : null;
+                    var stateWait = actionText == "wait" && mode.ValueKind == JsonValueKind.String &&
+                        string.Equals(mode.GetString()?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
+                    if ((actionText == "find" || (actionText == "wait" && !stateWait)) &&
+                        rawStep.EnumerateObject().Any(p => p.Name.Equals("elementId", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return WindowsToolsBase.FailResult("Discovery and appear/disappear waits accept selectors, not elementId.");
+                    }
+                    if (actionText is "click" or "type" or "select" or "read" || stateWait)
+                    {
+                        foreach (var property in rawStep.EnumerateObject())
+                        {
+                            if (property.Name.ToLowerInvariant() is "name" or "namecontains" or "namepattern" or
+                                "controltype" or "automationid" or "classname" or "foundindex" or "scope" or
+                                "parentelementid" or "requireunique" or "visibleonly" or "enabledonly")
+                            {
+                                return WindowsToolsBase.FailResult("Targeted steps do not accept selectors, including null/default values. Discover first and use elementId.");
+                            }
+                        }
+                    }
+                }
+            }
             parsedSteps = JsonSerializer.Deserialize<BatchStep[]>(steps, StepParseOptions);
         }
         catch (JsonException ex)
@@ -140,15 +179,16 @@ public static partial class UIBatchTool
             if (stepResult.Success)
             {
                 succeeded++;
-                if (!string.IsNullOrWhiteSpace(stepResult.ElementId))
-                {
-                    lastElementId = stepResult.ElementId;
-                }
+                lastElementId = stepResult.ElementId;
             }
-            else if (stopOnError)
+            else
             {
-                stopped = i < parsedSteps.Length - 1;
-                break;
+                lastElementId = null;
+                if (stopOnError)
+                {
+                    stopped = i < parsedSteps.Length - 1;
+                    break;
+                }
             }
         }
 
@@ -164,7 +204,9 @@ public static partial class UIBatchTool
                     maxDepth: 5,
                     controlTypeFilter: null,
                     parsedSnapshotMode,
-                    cancellationToken);
+                    includeDiagnostics: false,
+                    cancellationToken,
+                    snapshotSince);
                 if (snapshot.Success)
                 {
                     postSnapshot = snapshot;
@@ -192,6 +234,8 @@ public static partial class UIBatchTool
             PostActionKind = postSnapshot?.Kind,
             PostActionTree = postSnapshot?.Tree,
             PostActionChanges = postSnapshot?.Changes,
+            PostActionSnapshotToken = postSnapshot?.SnapshotToken,
+            PostActionBaseSnapshotToken = postSnapshot?.BaseSnapshotToken,
             PostActionWarning = postSnapshotWarning
         };
 
@@ -203,23 +247,6 @@ public static partial class UIBatchTool
         };
     }
 
-    /// <summary>Calls the snapshot-aware overload with a complete post-batch snapshot.</summary>
-    public static Task<CallToolResult> ExecuteAsync(
-        string windowHandle,
-        string steps,
-        bool stopOnError,
-        bool withSnapshot,
-        bool includeDiagnostics,
-        CancellationToken cancellationToken) =>
-        ExecuteAsync(
-            windowHandle,
-            steps,
-            stopOnError,
-            withSnapshot,
-            "full",
-            includeDiagnostics,
-            cancellationToken);
-
     private static async Task<BatchStepResult> ExecuteStepAsync(
         int index,
         BatchStep step,
@@ -230,14 +257,29 @@ public static partial class UIBatchTool
         var action = (step.Action ?? "").Trim().ToLowerInvariant();
         var service = WindowsToolsBase.UIAutomationService;
         var elementId = ResolveElementId(step.ElementId, lastElementId);
+        var isStateWait = action == "wait" && string.Equals(step.Mode, "state", StringComparison.OrdinalIgnoreCase);
+        var targeted = action is "click" or "type" or "select" || isStateWait;
+        var hasSelectors = step.Name is not null || step.NameContains is not null || step.NamePattern is not null ||
+            step.ControlType is not null || step.AutomationId is not null || step.ClassName is not null ||
+            step.ParentElementId is not null || step.RequireUnique || step.EnabledOnly is not null ||
+            step.VisibleOnly is not null || step.FoundIndex != 1 ||
+            (step.Scope is not null && step.Scope != "window");
+        if ((targeted || action == "read") && hasSelectors)
+        {
+            return Step(index, action, false, null, "Targeted steps do not accept selectors. Add a find step and use elementId='$prev'.");
+        }
+        if ((targeted || step.ElementId is not null) && string.IsNullOrWhiteSpace(elementId))
+        {
+            return Step(index, action, false, null, "elementId is required; $prev must refer to one unambiguous immediately preceding result.");
+        }
 
         switch (action)
         {
             case "find":
                 {
                     var result = await service.FindElementsAsync(BuildQuery(step, windowHandle), cancellationToken);
-                    var firstId = result.Items is { Length: > 0 } ? result.Items[0].Id
-                        : result.Elements is { Length: > 0 } ? result.Elements[0].ElementId
+                    var firstId = result.Items is { Length: 1 } ? result.Items[0].Id
+                        : result.Elements is { Length: 1 } ? result.Elements[0].ElementId
                         : null;
                     return Step(index, action, result.Success,
                         result.Success ? $"found {result.ElementCount ?? result.Items?.Length ?? 0} element(s)" : null,
@@ -246,20 +288,9 @@ public static partial class UIBatchTool
 
             case "click":
                 {
-                    UIAutomationResult result;
-                    if (!string.IsNullOrWhiteSpace(elementId))
-                    {
-                        result = step.DoubleClick
-                            ? await service.DoubleClickElementAsync(elementId, windowHandle, cancellationToken)
-                            : await service.ClickElementAsync(elementId, windowHandle, cancellationToken);
-                    }
-                    else
-                    {
-                        var query = BuildQuery(step, windowHandle);
-                        result = step.DoubleClick
-                            ? await service.FindAndDoubleClickAsync(query, cancellationToken)
-                            : await service.FindAndClickAsync(query, cancellationToken);
-                    }
+                    var result = step.DoubleClick
+                        ? await service.DoubleClickElementAsync(elementId!, windowHandle, cancellationToken)
+                        : await service.ClickElementAsync(elementId!, windowHandle, cancellationToken);
 
                     return Step(index, action, result.Success, result.Success ? (step.DoubleClick ? "double-clicked" : "clicked") : null,
                         result.ErrorMessage, elementId ?? FirstElementId(result));
@@ -272,18 +303,11 @@ public static partial class UIBatchTool
                         return Step(index, action, false, null, "type step requires 'text'.");
                     }
 
-                    var result = !string.IsNullOrWhiteSpace(elementId)
-                        ? await service.TypeIntoElementAsync(
-                            elementId,
+                    var result = await service.TypeIntoElementAsync(
+                            elementId!,
                             step.Text,
                             step.ClearFirst,
                             windowHandle,
-                            step.InputMode ?? "auto",
-                            cancellationToken)
-                        : await service.FindAndTypeAsync(
-                            BuildQuery(step, windowHandle),
-                            step.Text,
-                            step.ClearFirst,
                             step.InputMode ?? "auto",
                             cancellationToken);
                     return Step(index, action, result.Success, result.Success ? "typed" : null,
@@ -297,9 +321,9 @@ public static partial class UIBatchTool
                         return Step(index, action, false, null, "select step requires 'value'.");
                     }
 
-                    var result = await service.FindAndSelectAsync(BuildQuery(step, windowHandle), step.Value, cancellationToken);
+                    var result = await service.SelectElementAsync(elementId!, step.Value, windowHandle, cancellationToken);
                     return Step(index, action, result.Success, result.Success ? $"selected '{step.Value}'" : null,
-                        result.ErrorMessage, FirstElementId(result));
+                        result.ErrorMessage, elementId);
                 }
 
             case "wait":
@@ -317,6 +341,11 @@ public static partial class UIBatchTool
                             return Step(index, action, false, null, "wait mode=state requires desiredState.");
                         }
 
+                        var targetError = await service.ValidateElementTargetAsync(elementId, windowHandle, cancellationToken);
+                        if (targetError is not null)
+                        {
+                            return Step(index, action, false, null, targetError.ErrorMessage);
+                        }
                         var stateResult = await service.WaitForElementStateAsync(elementId, step.DesiredState, timeout, cancellationToken);
                         return Step(index, action, stateResult.Success, stateResult.Success ? $"state '{step.DesiredState}' reached" : null,
                             stateResult.ErrorMessage, elementId);
@@ -325,6 +354,11 @@ public static partial class UIBatchTool
                     if (mode is not ("appear" or "disappear"))
                     {
                         return Step(index, action, false, null, $"invalid wait mode '{step.Mode}'. Use appear, disappear, or state.");
+                    }
+
+                    if (step.ElementId is not null || step.DesiredState is not null || !hasSelectors)
+                    {
+                        return Step(index, action, false, null, "Appear/disappear waits require selectors and reject elementId/desiredState.");
                     }
 
                     var query = BuildQuery(step, windowHandle);

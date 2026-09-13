@@ -49,11 +49,13 @@ public sealed class ChromiumSnapshotBenchmarkTests
         using var state = new SnapshotStateService();
         var key = SnapshotRequestKey.Create(session.WindowHandleString, null, 5, "Edit");
 
-        var focusPage = await harness.AutomationService.FindAndClickAsync(
+        var focusPage = await harness.AutomationService.ObserveAndClickAsync(
             new ElementQuery
             {
                 WindowHandle = session.WindowHandleString,
                 Name = "Code",
+                ControlType = "Button",
+                RequireUnique = true,
                 TimeoutMs = 10000
             },
             CancellationToken.None);
@@ -72,7 +74,7 @@ public sealed class ChromiumSnapshotBenchmarkTests
             CancellationToken.None);
         Assert.Equal("full", baseline.Kind);
 
-        var type = await harness.AutomationService.FindAndTypeAsync(
+        var type = await harness.AutomationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = session.WindowHandleString,
@@ -149,7 +151,7 @@ public sealed class ChromiumSnapshotBenchmarkTests
         var ready = false;
         for (var attempt = 1; attempt <= 2 && !ready; attempt++)
         {
-            var typeResult = await harness.AutomationService.FindAndTypeAsync(
+            var typeResult = await harness.AutomationService.ObserveAndTypeAsync(
                 new ElementQuery
                 {
                     WindowHandle = session.WindowHandleString,

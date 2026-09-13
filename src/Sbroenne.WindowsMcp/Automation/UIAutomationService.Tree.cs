@@ -21,6 +21,13 @@ public sealed partial class UIAutomationService
                 UIA.IUIAutomationElement? rootElement;
                 if (!string.IsNullOrEmpty(parentElementId))
                 {
+                    if (!ReferenceMatchesWindow(parentElementId, windowHandle))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "get_tree", UIAutomationErrorType.InvalidParameter,
+                            "The parent reference does not belong to the requested window. Rediscover within that window.");
+                    }
+
                     rootElement = ElementIdGenerator.ResolveToAutomationElement(parentElementId);
                     if (rootElement == null)
                     {

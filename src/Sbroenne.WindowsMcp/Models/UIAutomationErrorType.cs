@@ -8,6 +8,9 @@ public static class UIAutomationErrorType
     /// <summary>No element matching the query was found.</summary>
     public const string ElementNotFound = "element_not_found";
 
+    /// <summary>The search budget was exhausted before all candidates could be checked.</summary>
+    public const string SearchIncomplete = "search_incomplete";
+
     /// <summary>The wait_for operation exceeded its timeout.</summary>
     public const string Timeout = "timeout";
 

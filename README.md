@@ -21,16 +21,20 @@ Windows MCP Server asks Windows directly: "What buttons exist in this window?" W
 window_management(action='find', title='Notepad') → handle='123456'
 
 # 2. Click elements by name
-ui_click(windowHandle='123456', nameContains='Save')
+ui_find(windowHandle='123456', nameContains='Save', requireUnique=true)
+ui_click(windowHandle='123456', elementId='<returned-id>')
 
 # 3. Type into fields
-ui_type(windowHandle='123456', controlType='Edit', text='Hello World')
+ui_find(windowHandle='123456', controlType='Edit', requireUnique=true)
+ui_type(windowHandle='123456', elementId='<returned-id>', text='Hello World')
 
 # Browser/React field: force normal focus and keyboard events when needed
-ui_type(windowHandle='123456', name='Title', text='New title', inputMode='keyboard')
+ui_find(windowHandle='123456', name='Title', requireUnique=true)
+ui_type(windowHandle='123456', elementId='<returned-id>', text='New title', inputMode='keyboard')
 
 # Modal with duplicate labels: scope the action and require one match
-ui_click(windowHandle='123456', name='Save', scope='active_dialog', requireUnique=true)
+ui_find(windowHandle='123456', name='Save', scope='active_dialog', requireUnique=true)
+ui_click(windowHandle='123456', elementId='<returned-id>')
 
 # 4. Fallback for games/canvas — screenshot + mouse
 screenshot_control(target='window', windowHandle='123456') → element coordinates
@@ -97,12 +101,12 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 |------|---------|
 | `ui_snapshot` | Capture a compact element tree; `mode=auto` returns smaller updates after the first view |
 | `ui_find` | Discover elements in a window (with timeout/retry) |
-| `ui_click` | Click buttons, checkboxes, menu items by name |
-| `ui_type` | Type into text fields |
-| `ui_select` | Pick a value in a combo box, list, or tab |
-| `ui_read` | Read text from elements (with OCR fallback) |
-| `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
-| `ui_wait` | Wait for an element to appear, disappear, or reach a state |
+| `ui_click` | Click buttons, checkboxes, menu items by observed ID |
+| `ui_type` | Type into a text field by observed ID |
+| `ui_select` | Pick an option value in a combo box, list, or tab identified by observed ID |
+| `ui_read` | Read observed element text, or explicit whole-window text with OCR fallback |
+| `ui_read_table` | Extract a grid/table/list-view identified by observed ID into structured rows + headers |
+| `ui_wait` | Discover appearance/disappearance by selector, or wait for an observed ID to reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
 | `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog |
@@ -117,13 +121,24 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 
 Full reference: [FEATURES.md](FEATURES.md)
 
+Discover controls with `ui_find` or `ui_snapshot`, then use the returned opaque `elementId` for
+click/double-click, type, select, element read, table read, and state waits. Selectors are accepted
+only for discovery and appear/disappear waits, not targeted actions. For `ui_select`, `value`
+identifies the option text; the control still requires an ID. A whole-window `ui_read` requires
+an explicit window and no element ID. Removed targeting arguments are rejected, not ignored.
+IDs belong to their observing MCP instance or CLI daemon: rediscover after replacement, eviction,
+or owner restart, and never transfer IDs between owners. Batch `$prev` requires an unambiguous
+preceding result; saved macros discover fresh controls instead of storing IDs.
+
 Use the default `mode=full` for one inspection. For repeated views of the same window or a known
-subtree through the long-running MCP server, use `mode=auto` from the first view; `full` is not
+subtree, use `mode=auto` from the first view; `full` is not
 remembered.
 The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
 space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start a new comparison,
-and use `parentElementId` only to revisit a subtree returned by an earlier snapshot or find. Separate
-`wincli` commands do not share remembered views.
+and use `parentElementId` only to revisit a subtree returned by an earlier snapshot or find.
+Separate `wincli` commands share the CLI daemon's bounded latest-baseline cache. Pass the previous
+`snapshotToken` with `--since` to request a CLI diff; a missing or mismatched token returns a full
+baseline. For post-action snapshots, combine `--with-snapshot --snapshot-mode auto --since <token>`.
 [The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
 byte/token savings in Electron, Word, and Excel. A Playwright-style semantic view improved realistic
 Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of 20
@@ -143,16 +158,21 @@ byte-for-byte identical to the MCP tools (verified by a parity test).
 
 `wincli` is the **token-efficient path for coding agents**: instead of loading every MCP tool schema
 into context, an agent with shell access discovers the whole surface through `--help` / `tools` /
-`guidance` and issues one command per action. Because window handles are OS-global, each call is
-stateless — there is no server session to keep alive.
+`guidance` and issues one command per action. Commands automatically start or connect to a
+persistent, user-owned CLI daemon, which retains observed IDs across invocations. This daemon is
+separate from every MCP server instance; their IDs and snapshot baselines are not interchangeable.
 
 ```powershell
 wincli window find --title Notepad           # -> window handle
-wincli ui snapshot --window 12345 --mode full  # complete accessible element tree
-wincli ui click --window 12345 --name Submit --with-snapshot
+wincli ui snapshot --window 12345 --mode auto # -> tree with IDs + snapshotToken
+wincli ui find --window 12345 --name Submit --control-type Button
+wincli ui click --window 12345 --element-id "<returned-id>" --with-snapshot
+wincli ui snapshot --window 12345 --mode auto --since "<previous-snapshotToken>"
 wincli clipboard set --text "hello"          # write the clipboard
 wincli macro run --name login --window 12345 # replay a saved workflow
-wincli guidance                              # full automation guide
+wincli guidance                             # full automation guide
+wincli service status                       # inspect the CLI daemon
+wincli service stop                         # stop before rebuilding or upgrading
 ```
 
 Exit codes: `0` success, `1` tool error, `2` usage error. See the

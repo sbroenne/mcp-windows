@@ -209,6 +209,7 @@ public sealed class UIA3Automation : IDisposable
         request.AddProperty(UIA3PropertyIds.ClassName);
         request.AddProperty(UIA3PropertyIds.NativeWindowHandle);
         request.AddProperty(UIA3PropertyIds.RuntimeId);
+        request.AddProperty(UIA3PropertyIds.ProcessId);
 
         // Add pattern availability properties - O(1) check for what actions are possible
         // This allows LLM to know element capabilities without expensive GetCurrentPattern calls

@@ -49,7 +49,7 @@ public sealed class ToolCatalogTests
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_click"]));
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_batch"]));
         Assert.Contains("scope", ParameterNames(tools["ui_find"]));
-        Assert.Contains("requireUnique", ParameterNames(tools["ui_click"]));
+        Assert.Contains("elementId", ParameterNames(tools["ui_click"]));
         Assert.Contains("inputMode", ParameterNames(tools["ui_type"]));
         Assert.Contains("triggerMode", ParameterNames(tools["file_open"]));
     }

@@ -57,14 +57,17 @@ public sealed class UIMacroIntegrationTests : IDisposable
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "macro-user", clearFirst = true },
-            new { action = "type", automationId = "PasswordInput", controlType = "Edit", text = "macro-pass", clearFirst = true },
-            new { action = "click", name = "Submit", controlType = "Button" },
+            new { action = "find", automationId = "UsernameInput", controlType = "Edit", requireUnique = true },
+            new { action = "type", elementId = "$prev", text = "macro-user", clearFirst = true },
+            new { action = "find", automationId = "PasswordInput", controlType = "Edit", requireUnique = true },
+            new { action = "type", elementId = "$prev", text = "macro-pass", clearFirst = true },
+            new { action = "find", name = "Submit", controlType = "Button", requireUnique = true },
+            new { action = "click", elementId = "$prev" },
         });
 
         var save = await _service.SaveAsync("login-flow", steps);
         Assert.True(save.Success);
-        Assert.Equal(3, save.StepCount);
+        Assert.Equal(6, save.StepCount);
 
         // Load the persisted steps and replay them through the batch engine, exactly as the
         // ui_macro 'run' action does internally.
@@ -72,12 +75,12 @@ public sealed class UIMacroIntegrationTests : IDisposable
         Assert.NotNull(stepsJson);
 
         var result = await Sbroenne.WindowsMcp.Automation.Tools.UIBatchTool.ExecuteAsync(
-            _windowHandle, stepsJson!, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, stepsJson!, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = JsonSerializer.Deserialize<BatchResult>(ExtractText(result), ParseOptions)!;
         Assert.True(batch.Success, $"Macro replay failed: {ExtractText(result)}");
-        Assert.Equal(3, batch.StepsRun);
-        Assert.Equal(3, batch.StepsSucceeded);
+        Assert.Equal(6, batch.StepsRun);
+        Assert.Equal(6, batch.StepsSucceeded);
     }
 
     [Fact]
@@ -85,7 +88,7 @@ public sealed class UIMacroIntegrationTests : IDisposable
     {
         var result = await UIMacroTool.ExecuteAsync(
             MacroAction.Run, "does-not-exist", steps: null, windowHandle: _windowHandle,
-            stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Contains("does not exist", ExtractText(result), StringComparison.Ordinal);

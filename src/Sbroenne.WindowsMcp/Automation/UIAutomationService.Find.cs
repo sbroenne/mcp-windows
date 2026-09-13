@@ -58,9 +58,15 @@ public sealed partial class UIAutomationService
                 UIA.IUIAutomationElement? rootElement;
                 if (!string.IsNullOrEmpty(query.ParentElementId))
                 {
+                    if (!ReferenceMatchesWindow(query.ParentElementId, query.WindowHandle))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "find", UIAutomationErrorType.InvalidParameter,
+                            "The parent reference does not belong to the requested window. Rediscover within that window.");
+                    }
+
                     rootElement = ElementIdGenerator.ResolveToAutomationElement(
-                        query.ParentElementId,
-                        allowSelectorFallback: false);
+                        query.ParentElementId);
                     if (rootElement == null)
                     {
                         return UIAutomationResult.CreateFailure(
@@ -125,6 +131,13 @@ public sealed partial class UIAutomationService
                 BoundingRect? referencePoint = null;
                 if (!string.IsNullOrEmpty(query.NearElement))
                 {
+                    if (!ReferenceMatchesWindow(query.NearElement, query.WindowHandle))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "find", UIAutomationErrorType.InvalidParameter,
+                            "The proximity reference does not belong to the requested window. Rediscover within that window.");
+                    }
+
                     var refElement = ElementIdGenerator.ResolveToAutomationElement(query.NearElement);
                     if (refElement == null)
                     {
@@ -149,6 +162,7 @@ public sealed partial class UIAutomationService
                 var elementInfos = new List<UIElementInfo>();
                 var elementsScanned = 0;
                 var matchCount = 0;
+                var scanLimitReached = false;
                 var maxResults = query.FoundIndex > 1 ? query.FoundIndex : 100;
 
                 // Detect framework and get optimal search strategy
@@ -183,6 +197,7 @@ public sealed partial class UIAutomationService
                     elementInfos.Clear();
                     elementsScanned = 0;
                     matchCount = 0;
+                    scanLimitReached = false;
 
                     if (!hasAdvancedCriteria)
                     {
@@ -190,11 +205,16 @@ public sealed partial class UIAutomationService
                     }
                     else if (!query.ExactDepth.HasValue)
                     {
-                        FindElementsWithCachedFilter(rootElement, scanCondition, query, elementInfos, ref elementsScanned, ref matchCount, maxResults);
+                        scanLimitReached = FindElementsWithCachedFilter(
+                            rootElement, scanCondition, query, elementInfos, ref elementsScanned,
+                            ref matchCount, maxResults, cancellationToken);
                     }
                     else
                     {
-                        FindElementsWithTreeWalker(rootElement, rootElement, scanCondition, query, effectiveMaxDepth, 0, elementInfos, ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren);
+                        FindElementsWithTreeWalker(
+                            rootElement, rootElement, scanCondition, query, effectiveMaxDepth, 0, elementInfos,
+                            ref elementsScanned, ref matchCount, maxResults, query.IncludeChildren,
+                            ref scanLimitReached, cancellationToken);
                     }
 
                     // Exclude off-screen elements when visibility filtering is in effect.
@@ -245,7 +265,9 @@ public sealed partial class UIAutomationService
 
                     // Relaxation scans the control view for maximum recall.
                     usedContentView = false;
-                    FindElementsWithCachedFilter(rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned, ref matchCount, maxResults);
+                    scanLimitReached = FindElementsWithCachedFilter(
+                        rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned,
+                        ref matchCount, maxResults, cancellationToken);
 
                     if (visibleOnly && elementInfos.Count > 0)
                     {
@@ -261,6 +283,16 @@ public sealed partial class UIAutomationService
                     {
                         LogSearchPerformance(_logger, "find (auto-relaxed to partial match)", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
                     }
+                }
+
+                if (scanLimitReached)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "find",
+                        UIAutomationErrorType.SearchIncomplete,
+                        $"Search incomplete: checked {elementsScanned} candidates and reached the {MaxElementsToScan}-element scan limit. " +
+                        "Remaining candidates were not checked.",
+                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
                 }
 
                 if (elementInfos.Count == 0)
@@ -419,14 +451,15 @@ public sealed partial class UIAutomationService
     /// cross-process COM round-trips of the raw TreeWalker, which is the dominant cost for
     /// Chromium/Electron content where nameContains/namePattern is the recommended query path.
     /// </summary>
-    private void FindElementsWithCachedFilter(
+    private bool FindElementsWithCachedFilter(
         UIA.IUIAutomationElement rootElement,
         UIA.IUIAutomationCondition condition,
         ElementQuery query,
         List<UIElementInfo> results,
         ref int elementsScanned,
         ref int matchCount,
-        int maxResults)
+        int maxResults,
+        CancellationToken cancellationToken)
     {
         try
         {
@@ -436,13 +469,15 @@ public sealed partial class UIAutomationService
             var elements = rootElement.FindAllBuildCache(UIA.TreeScope.TreeScope_Descendants, condition, cacheRequest);
             if (elements == null)
             {
-                return;
+                return false;
             }
 
             // Bound in-process work with the same budget the tree path uses.
             var count = Math.Min(elements.Length, MaxElementsToScan);
-            for (var i = 0; i < count && results.Count < maxResults; i++)
+            var i = 0;
+            for (; i < count && results.Count < maxResults; i++)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 elementsScanned++;
 
                 var element = elements.GetElement(i);
@@ -469,10 +504,13 @@ public sealed partial class UIAutomationService
                     results.Add(elementInfo);
                 }
             }
+
+            return i == MaxElementsToScan && i < elements.Length;
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
             // Element tree changed during search - return whatever was collected.
+            return false;
         }
     }
 
@@ -549,10 +587,19 @@ public sealed partial class UIAutomationService
         ref int elementsScanned,
         ref int matchCount,
         int maxResults,
-        bool includeChildren)
+        bool includeChildren,
+        ref bool scanLimitReached,
+        CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         if (currentDepth > maxDepth || results.Count >= maxResults)
         {
+            return;
+        }
+
+        if (elementsScanned >= MaxElementsToScan)
+        {
+            scanLimitReached = true;
             return;
         }
 
@@ -590,9 +637,12 @@ public sealed partial class UIAutomationService
             }
 
             var child = current.GetFirstChild();
-            while (child != null && results.Count < maxResults)
+            while (child != null && results.Count < maxResults && !scanLimitReached)
             {
-                FindElementsWithTreeWalker(child, rootElement, condition, query, maxDepth, currentDepth + 1, results, ref elementsScanned, ref matchCount, maxResults, includeChildren);
+                FindElementsWithTreeWalker(
+                    child, rootElement, condition, query, maxDepth, currentDepth + 1, results,
+                    ref elementsScanned, ref matchCount, maxResults, includeChildren,
+                    ref scanLimitReached, cancellationToken);
                 child = child.GetNextSibling();
             }
         }

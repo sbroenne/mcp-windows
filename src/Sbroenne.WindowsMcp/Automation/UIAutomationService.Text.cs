@@ -42,6 +42,13 @@ public sealed partial class UIAutomationService
                             $"Element with ID '{elementId}' not found.",
                             CreateDiagnostics(stopwatch));
                     }
+                    if (!string.IsNullOrWhiteSpace(windowHandle) &&
+                        (!nint.TryParse(windowHandle, out var requestedHandle) || requestedHandle == nint.Zero ||
+                        !IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(targetElement), requestedHandle)))
+                    {
+                        return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.WrongTargetWindow,
+                            "The resolved element does not belong to the requested window.");
+                    }
                 }
                 else
                 {

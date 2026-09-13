@@ -185,7 +185,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     [Fact]
     public async Task Select_RequireUnique_PropagatesAmbiguity()
     {
-        var result = await _automationService.FindAndSelectAsync(
+        var result = await _automationService.ObserveAndSelectAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -312,7 +312,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     public async Task Find_RequireUnique_RedactsTextFieldValuesFromDiagnostics()
     {
         const string SensitiveValue = "private-field-value";
-        var typed = await _automationService.FindAndTypeAsync(
+        var typed = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,

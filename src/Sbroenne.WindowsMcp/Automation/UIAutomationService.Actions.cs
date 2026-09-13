@@ -31,7 +31,7 @@ public sealed partial class UIAutomationService
     /// </summary>
     private static readonly TimeSpan SaveDialogPollInterval = TimeSpan.FromMilliseconds(100);
     /// <inheritdoc/>
-    public async Task<UIAutomationResult> FindAndClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
+    internal async Task<UIAutomationResult> FindAndClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
         var stopwatch = Stopwatch.StartNew();
@@ -111,7 +111,7 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(elementId, allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
@@ -152,6 +152,7 @@ public sealed partial class UIAutomationService
                     CreateActionDiagnostics(stopwatch, element, "target_validation")), Element: (UIA.IUIAutomationElement?)null, Root: (UIA.IUIAutomationElement?)null);
             }
 
+            fallbackClickPoint ??= GetVerifiedCachedClickPoint(element);
             return (Failure: (UIAutomationResult?)null, Element: element, Root: GetRootElementForScroll(element));
         }, cancellationToken);
 
@@ -194,123 +195,6 @@ public sealed partial class UIAutomationService
         }, cancellationToken);
     }
 
-    /// <inheritdoc/>
-    public Task<UIAutomationResult> FindAndTypeAsync(
-        ElementQuery query,
-        string text,
-        bool clearFirst,
-        CancellationToken cancellationToken = default) =>
-        FindAndTypeAsync(query, text, clearFirst, "auto", cancellationToken);
-
-    /// <summary>
-    /// Finds a text control and enters text using auto, value, or keyboard input.
-    /// Auto prefers keyboard input for Chromium/Electron so web frameworks receive normal events.
-    /// </summary>
-    public async Task<UIAutomationResult> FindAndTypeAsync(
-        ElementQuery query,
-        string text,
-        bool clearFirst,
-        string inputMode,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
-
-        if (!TryNormalizeInputMode(inputMode, out var normalizedInputMode))
-        {
-            return UIAutomationResult.CreateFailure(
-                "type",
-                UIAutomationErrorType.InvalidParameter,
-                $"Invalid inputMode '{inputMode}'. Valid values: auto, keyboard, value.",
-                CreateDiagnostics(stopwatch, query));
-        }
-
-        // Normalize Windows file paths: convert forward slashes to backslashes
-        // This handles paths like "D:/folder/file.txt" → "D:\folder\file.txt"
-        // Required because Save As dialogs reject forward slashes
-        text = PathNormalizer.NormalizeWindowsPath(text);
-
-        try
-        {
-            var searchQueries = BuildTypeSearchQueries(query);
-            UIAutomationResult? lastResult = null;
-
-            foreach (var searchQuery in searchQueries)
-            {
-                var actionQuery = searchQuery with
-                {
-                    VisibleOnly = searchQuery.VisibleOnly ?? true,
-                    EnabledOnly = searchQuery.EnabledOnly ?? true
-                };
-                var findResult = await FindElementsAsync(actionQuery, cancellationToken);
-                lastResult = findResult;
-
-                if (findResult.Success && findResult.Items is { Length: > 0 })
-                {
-                    var targetElement = findResult.Items[0];
-                    var elementId = targetElement.Id;
-
-                    return await PerformTypeAsync(
-                        elementId,
-                        text,
-                        clearFirst,
-                        normalizedInputMode,
-                        actionQuery.WindowHandle,
-                        stopwatch,
-                        cancellationToken);
-                }
-
-                if (findResult.ErrorType is not null and not UIAutomationErrorType.ElementNotFound)
-                {
-                    return findResult with { Action = "type" };
-                }
-            }
-
-            var errorMessage = lastResult?.ErrorMessage ?? "Element not found.";
-            if (searchQueries.Count > 1 && string.IsNullOrEmpty(lastResult?.ErrorMessage))
-            {
-                errorMessage = "Element not found. Tried default Document/Edit controls. Provide elementId or search criteria (name, controlType, automationId).";
-            }
-
-            return UIAutomationResult.CreateFailure(
-                "type",
-                lastResult?.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                errorMessage,
-                CreateDiagnostics(stopwatch));
-        }
-        catch (COMException ex)
-        {
-            LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "type",
-                COMExceptionHelper.GetErrorType(ex),
-                COMExceptionHelper.GetErrorMessage(ex, "Type"),
-                CreateDiagnostics(stopwatch));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogFindAndTypeError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "type",
-                UIAutomationErrorType.InternalError,
-                $"Type failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
-        }
-    }
-
-    /// <summary>
-    /// Types text into a previously-discovered element addressed by its stable element id
-    /// (from ui_find/ui_snapshot), skipping the find step. Useful for reusing a known element
-    /// across multiple actions without re-querying.
-    /// </summary>
-    public Task<UIAutomationResult> TypeIntoElementAsync(
-        string elementId,
-        string text,
-        bool clearFirst,
-        string? windowHandle,
-        CancellationToken cancellationToken = default) =>
-        TypeIntoElementAsync(elementId, text, clearFirst, windowHandle, "auto", cancellationToken);
-
     /// <summary>
     /// Types into a previously discovered element using auto, value, or keyboard input.
     /// </summary>
@@ -334,7 +218,7 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
-        // Normalize Windows file paths for consistency with FindAndTypeAsync.
+        // Preserve path normalization for file-path inputs.
         text = PathNormalizer.NormalizeWindowsPath(text);
 
         try
@@ -368,30 +252,6 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private static List<ElementQuery> BuildTypeSearchQueries(ElementQuery baseQuery)
-    {
-        var queries = new List<ElementQuery>();
-
-        var hasSelector = !string.IsNullOrEmpty(baseQuery.Name) ||
-                          !string.IsNullOrEmpty(baseQuery.NameContains) ||
-                          !string.IsNullOrEmpty(baseQuery.NamePattern) ||
-                          !string.IsNullOrEmpty(baseQuery.AutomationId) ||
-                          !string.IsNullOrEmpty(baseQuery.ClassName) ||
-                          !string.IsNullOrEmpty(baseQuery.ControlType);
-
-        // For plain "type" without selectors, prefer typical text controls first.
-        // Try Document first (modern apps like Win11 Notepad), then Edit (classic apps).
-        if (!hasSelector)
-        {
-            queries.Add(baseQuery with { ControlType = "Document" });
-            queries.Add(baseQuery with { ControlType = "Edit" });
-        }
-
-        queries.Add(baseQuery);
-
-        return queries;
-    }
-
     private async Task<UIAutomationResult> PerformTypeAsync(
         string elementId,
         string text,
@@ -403,9 +263,7 @@ public sealed partial class UIAutomationService
     {
         var staResult = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Success: false, Result: UIAutomationResult.CreateFailure(
@@ -722,46 +580,73 @@ public sealed partial class UIAutomationService
     private static string? ReadEditableValue(UIA.IUIAutomationElement element) =>
         element.TryGetValue() ?? element.GetText();
 
-    /// <inheritdoc/>
-    public async Task<UIAutomationResult> FindAndSelectAsync(ElementQuery query, string value, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
+    internal Task<UIAutomationResult?> ValidateElementTargetAsync(
+        string elementId, string? windowHandle, CancellationToken cancellationToken) =>
+        _staThread.ExecuteAsync<UIAutomationResult?>(() =>
+        {
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            if (element is null)
+            {
+                return UIAutomationResult.CreateFailure("wait", UIAutomationErrorType.ElementStale,
+                    "The observed element is stale. Rediscover it before waiting.");
+            }
+            if (windowHandle is not null &&
+                (!WindowHandleParser.TryParse(windowHandle, out var handle) ||
+                !IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(element), handle)))
+            {
+                return UIAutomationResult.CreateFailure("wait", UIAutomationErrorType.WrongTargetWindow,
+                    "The observed element does not belong to the requested window.");
+            }
+            return null;
+        }, cancellationToken);
 
+    private static Point? GetVerifiedCachedClickPoint(UIA.IUIAutomationElement element)
+    {
+        // Some WinForms TabPage providers have valid cached bounds but empty current bounds.
+        // Use them only after resolving the original live identity and hit-testing that identity.
         try
         {
-            var findResult = await FindElementsAsync(query, cancellationToken);
-            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
+            var bounds = element.CachedBoundingRectangle;
+            if (bounds.right <= bounds.left || bounds.bottom <= bounds.top)
             {
-                return UIAutomationResult.CreateFailure(
-                    "select",
-                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                    findResult.ErrorMessage ?? "Element not found.",
-                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch));
+                return null;
             }
+            var point = new Point((bounds.left + bounds.right) / 2, (bounds.top + bounds.bottom) / 2);
+            var hit = UIA3Automation.Instance.Automation.ElementFromPoint(
+                new UIA.tagPOINT { x = point.X, y = point.Y });
+            for (var current = hit; current is not null; current = current.GetParent())
+            {
+                if (current.IsSameElement(element))
+                {
+                    return point;
+                }
+            }
+        }
+        catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
+        {
+            // Cache-only properties can report E_INVALIDARG as ArgumentException.
+        }
+        return null;
+    }
 
-            var targetElement = findResult.Items[0];
-            var elementId = targetElement.Id;
-
-            return await PerformSelectAsync(elementId, value, query.WindowHandle, stopwatch, cancellationToken);
+    /// <summary>Select an option within the exact previously observed control.</summary>
+    public async Task<UIAutomationResult> SelectElementAsync(
+        string elementId, string value, string? windowHandle, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            return await PerformSelectAsync(elementId, value, windowHandle, stopwatch, cancellationToken);
         }
         catch (COMException ex)
         {
-            LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
-            return UIAutomationResult.CreateFailure(
-                "select",
-                COMExceptionHelper.GetErrorType(ex),
-                COMExceptionHelper.GetErrorMessage(ex, "Select"),
-                CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateFailure("select", COMExceptionHelper.GetErrorType(ex),
+                COMExceptionHelper.GetErrorMessage(ex, "Select"), CreateDiagnostics(stopwatch));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            LogFindAndSelectError(_logger, query.Name ?? query.AutomationId ?? "unknown", value, ex);
-            return UIAutomationResult.CreateFailure(
-                "select",
-                UIAutomationErrorType.InternalError,
-                $"Select failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
+            return UIAutomationResult.CreateFailure("select", UIAutomationErrorType.InternalError,
+                $"Select failed: {ex.Message}", CreateDiagnostics(stopwatch));
         }
     }
 
@@ -769,9 +654,7 @@ public sealed partial class UIAutomationService
     {
         return await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return UIAutomationResult.CreateFailure(
@@ -1273,70 +1156,6 @@ public sealed partial class UIAutomationService
         }
     }
 
-    /// <summary>
-    /// Finds an element by selectors and double-clicks it.
-    /// </summary>
-    /// <param name="query">The element query.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The result of the double-click.</returns>
-    public async Task<UIAutomationResult> FindAndDoubleClickAsync(ElementQuery query, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        var stopwatch = Stopwatch.StartNew();
-
-        try
-        {
-            var actionQuery = query with
-            {
-                VisibleOnly = query.VisibleOnly ?? true,
-                EnabledOnly = query.EnabledOnly ?? true
-            };
-            var findResult = await FindElementsAsync(actionQuery, cancellationToken);
-            if (!findResult.Success || findResult.Items == null || findResult.Items.Length == 0)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "double_click",
-                    findResult.ErrorType ?? UIAutomationErrorType.ElementNotFound,
-                    findResult.ErrorMessage ?? "Element not found.",
-                    findResult.Diagnostics ?? CreateDiagnostics(stopwatch, actionQuery));
-            }
-
-            var targetElement = findResult.Items[0];
-
-            // Same cached-bounds fallback as FindAndClickAsync: current bounds can be 0,0,0,0 for
-            // controls like WinForms TabPage children even while they are visible.
-            Point? fallbackClickPoint = null;
-            if (targetElement.Click != null && targetElement.Click.Length >= 2)
-            {
-                var monitorIndex = targetElement.Click.Length >= 3 ? targetElement.Click[2] : 0;
-                var monitorOrigin = _coordinateConverter.GetMonitorOrigin(monitorIndex);
-                fallbackClickPoint = new Point(
-                    targetElement.Click[0] + monitorOrigin.X,
-                    targetElement.Click[1] + monitorOrigin.Y);
-            }
-
-            return await PerformDoubleClickAsync(targetElement.Id, query.WindowHandle, fallbackClickPoint, stopwatch, cancellationToken);
-        }
-        catch (COMException ex)
-        {
-            LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "double_click",
-                COMExceptionHelper.IsElementStale(ex) ? UIAutomationErrorType.ElementStale : UIAutomationErrorType.InternalError,
-                COMExceptionHelper.GetErrorMessage(ex, "Double-click"),
-                CreateDiagnostics(stopwatch));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogFindAndClickError(_logger, query.Name ?? query.AutomationId ?? "unknown", ex);
-            return UIAutomationResult.CreateFailure(
-                "double_click",
-                UIAutomationErrorType.InternalError,
-                $"Double-click failed: {ex.Message}",
-                CreateDiagnostics(stopwatch));
-        }
-    }
-
     private async Task<UIAutomationResult> PerformDoubleClickAsync(
         string elementId,
         string? windowHandle,
@@ -1365,9 +1184,7 @@ public sealed partial class UIAutomationService
 
         var prepared = await _staThread.ExecuteAsync(() =>
         {
-            var element = ElementIdGenerator.ResolveToAutomationElement(
-                elementId,
-                allowSelectorFallback: false);
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
             if (element == null)
             {
                 return (Failure: UIAutomationResult.CreateFailure(
@@ -1427,7 +1244,7 @@ public sealed partial class UIAutomationService
                 GetElementState(element),
                 GetObservableFingerprint(root));
 
-            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
+            return (Failure: (UIAutomationResult?)null, Element: element, Root: root, Point: GetPhysicalClickPoint(element) ?? GetVerifiedCachedClickPoint(element) ?? fallbackClickPoint, WindowHandle: elementWindowHandle, Initial: initial);
         }, cancellationToken);
 
         if (prepared.Failure != null)

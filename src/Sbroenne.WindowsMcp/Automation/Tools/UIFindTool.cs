@@ -24,6 +24,10 @@ public static partial class UIFindTool
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
     /// REQUIRED: windowHandle (from window_management tool).
     /// For Electron/Chromium, visible text and ARIA labels usually show up here as element names.
+    /// Substring/regex and depth-aware searches are bounded to 2000 candidates. If candidates remain
+    /// at that limit, search_incomplete means absence or uniqueness could not be established.
+    /// Narrow with exact name, automationId, controlType, className or a known parentElementId;
+    /// increasing timeoutMs does not increase this limit.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive). For Electron apps and Chromium browsers, this is often the visible label or ARIA label.</param>

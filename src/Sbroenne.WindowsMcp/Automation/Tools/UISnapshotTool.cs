@@ -20,7 +20,7 @@ public static partial class UISnapshotTool
     /// Orient primitive: capture a compact element tree ("snapshot") of a window without guessing
     /// selectors first. Returns a hierarchy of elements (id, name, type, click coordinates, enabled)
     /// so you can see what's on screen, then act with ui_click/ui_type/ui_select using an element's
-    /// name/automationId (or its returned id).
+    /// returned id.
     /// Keywords: snapshot, element tree, structure, overview, inspect window, list elements,
     /// what's on screen, accessibility tree, orient, discover UI, dump window.
     /// </summary>
@@ -33,8 +33,9 @@ public static partial class UISnapshotTool
     /// not remembered. This running server returns only useful changes when that is smaller. Automatic complete
     /// responses omit proven layout-only Chromium/Electron wrappers while retaining named and actionable
     /// controls. Use reset when starting a new comparison: it forgets and replaces the remembered view.
-    /// No saved-view id is required.
-    /// Separate wincli invocations start fresh and therefore safely return a complete simplified view.
+    /// MCP remembers the last automatic view in its own process. CLI commands share a persistent
+    /// daemon: pass the previous snapshotToken as since to request a diff. Only the latest view is
+    /// retained; missing or mismatched tokens return a complete simplified view, not an unsafe diff.
     /// To drill into a large window, pass parentElementId (from a prior snapshot/find) to scope the scan,
     /// or controlTypeFilter to retain matching controls and the ancestors needed to reach them.
     /// </remarks>
@@ -45,6 +46,7 @@ public static partial class UISnapshotTool
     /// <param name="mode">REQUIRED for before/after or other repeated checks: explicitly use auto on BOTH the first and later snapshots of the same window or subtree. Never omit mode or use full for repeated checks. Use reset first only when replacing an older comparison, then auto. Use full only for a one-time complete inspection (default); full is not remembered.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, elements scanned, detected framework) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="since">Previous snapshotToken for this window and capture settings. Required for CLI diffs; a missing or mismatched token returns a full snapshot. No sessions or histories are created.</param>
     /// <returns>A call result containing a text content block with the JSON payload of the element tree. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "ui_snapshot", Title = "Snapshot UI Tree", Destructive = false, ReadOnly = true, OpenWorld = false)]
     public static async partial Task<CallToolResult> ExecuteAsync(
@@ -54,7 +56,8 @@ public static partial class UISnapshotTool
         [DefaultValue(null)] string? controlTypeFilter,
         [DefaultValue("full")] string mode,
         [DefaultValue(false)] bool includeDiagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [DefaultValue(null)] string? since = null)
     {
         const string actionName = "snapshot";
 
@@ -79,7 +82,8 @@ public static partial class UISnapshotTool
                 controlTypeFilter,
                 parsedMode,
                 includeDiagnostics,
-                cancellationToken);
+                cancellationToken,
+                since);
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
@@ -89,20 +93,4 @@ public static partial class UISnapshotTool
         }
     }
 
-    /// <summary>Calls <see cref="ExecuteAsync(string?, string?, int, string?, string, bool, CancellationToken)"/> in full mode.</summary>
-    public static Task<CallToolResult> ExecuteAsync(
-        string? windowHandle,
-        string? parentElementId,
-        int maxDepth,
-        string? controlTypeFilter,
-        bool includeDiagnostics,
-        CancellationToken cancellationToken) =>
-        ExecuteAsync(
-            windowHandle,
-            parentElementId,
-            maxDepth,
-            controlTypeFilter,
-            "full",
-            includeDiagnostics,
-            cancellationToken);
 }

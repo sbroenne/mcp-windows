@@ -5,6 +5,19 @@ namespace Sbroenne.WindowsMcp.Cli;
 /// <summary>Static help, version, and command-reference text for the CLI.</summary>
 internal static class HelpText
 {
+    public const string ElementIdLifetime = """
+        CLI ELEMENT-ID LIFETIME
+        IDs identify observations in the persistent CLI daemon, not OS handles.
+        Reuse IDs from ui find/ui snapshot in later CLI invocations while that owner remains alive.
+        Restart, eviction, or replacement makes an ID stale: rediscover, never repair it by name.
+        MCP owners and the CLI daemon do not share IDs. Treat IDs as opaque strings.
+        Targeted click/type/select/read-table and state waits require --element-id.
+        Selectors belong only to discovery and appear/disappear waits.
+        ui read --window <handle> without --element-id explicitly reads the whole window.
+        Batch $prev requires an unambiguous preceding result. Saved macros must discover
+        fresh targets on replay, then use elementId="$prev", never persisted IDs.
+        """;
+
     public static string Version
     {
         get
@@ -33,9 +46,14 @@ internal static class HelpText
         COMMON WORKFLOW
           1. wincli window find --title Notepad          -> get a window handle
           2. wincli ui snapshot --window <handle>        -> see the element tree
-          3. wincli ui click --window <handle> --name OK --with-snapshot
+          3. wincli ui click --window <handle> --element-id <observed-id> --with-snapshot
+
+        CLI STATE
+          CLI invocations share a persistent daemon and its observed IDs.
+          A stale ID fails safely. Discover again after control replacement or daemon restart.
 
         GROUPS
+          service      Manage the persistent CLI daemon (start, status, stop).
           app          Launch an application.
           window       Manage windows (find, list, activate, move, close, ...).
           ui           UI automation (snapshot, find, click, type, select, read, read-table, wait, batch).
@@ -55,8 +73,15 @@ internal static class HelpText
         wincli command reference
         ========================
 
-        app --path <exe> [--args <a>] [--working-dir <d>] [--no-wait] [--timeout-ms <n>]
+        service start|status|stop
+            Start, inspect, or stop the user-owned CLI daemon. Normal commands auto-start it.
+            Restart invalidates prior element IDs and snapshot tokens, not target applications.
+
+        app --path <exe> [--args <a>|--arguments <a>] [--working-dir <d>] [--no-wait] [--timeout-ms <n>]
             Launch an application and return its window handle.
+            For child arguments beginning with --, use --args="--new-window target"
+            (or --arguments="--new-window target"). Separate --args "--new-window target"
+            and missing values are usage errors; they never launch the application.
 
         window <action> [options]
             actions: list, find, activate, get_foreground, minimize, maximize, restore, close,
@@ -66,33 +91,33 @@ internal static class HelpText
                      --x --y --width --height --timeout-ms --target --monitor-index
                      --state --exclude-title --discard-changes
 
-        ui snapshot --window <h> [--parent <id>] [--max-depth <n>] [--control-type <t>]
-                    [--mode full|auto|reset]
+        ui snapshot --window <h> [--max-depth <n>] [--control-type <t>]
+                    [--mode full|auto|reset] [--since <snapshot-token>]
             Use full for one complete inspection (default). For repeated checks of the same window
-            or --parent subtree, use auto from the first check; full is not remembered. Use reset,
-            then auto, to begin a new comparison. --parent revisits an earlier snapshot/find id.
-            Separate wincli calls start fresh, so auto safely returns a complete simplified view.
+            use auto from the first check; full is not remembered. Use reset,
+            then auto, to begin a new comparison within a persistent MCP connection.
+            CLI auto without --since returns a full baseline. Pass the returned token with --since
+            for a later diff; a missing/mismatched baseline safely returns a full view.
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
-                     [--sort-by-prominence] [--in-region x,y,w,h] [--near-element <id>]
+                     [--sort-by-prominence] [--in-region x,y,w,h]
                      [--visible-only] [--enabled-only] [--content-view-only]
-                     [--scope window|active_dialog] [--parent <id>] [--require-unique]
+                     [--scope window|active_dialog] [--require-unique]
                      [--timeout-ms <n>]
-        ui click    --window <h> [selectors|--element-id <id>] [--found-index <n>]
-                     [--scope window|active_dialog] [--parent <id>] [--require-unique]
+        ui click    --window <h> --element-id <id>
                      [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
-        ui type     --window <h> --text <s> [selectors|--element-id <id>] [--clear-first]
-                     [--input-mode auto|keyboard|value] [--scope window|active_dialog]
-                     [--parent <id>] [--require-unique] [--with-snapshot]
+        ui type     --window <h> --text <s> --element-id <id> [--clear-first]
+                     [--input-mode auto|keyboard|value] [--with-snapshot]
                      [--snapshot-mode full|auto|reset]
-        ui select   --window <h> --value <s> [selectors] [--with-snapshot] [--snapshot-mode full|auto|reset]
-        ui read     --window <h> [selectors|--element-id <id>] [--include-children] [--language <c>] [--format raw|article]
-        ui read-table --window <h> [selectors|--element-id <id>] [--max-rows <n>] [--max-columns <n>]
-        ui wait     [--window <h>] [--mode appear|disappear|...] [--element-id <id>]
-                     [--desired-state <s>] [selectors] [--timeout-ms <n>]
+        ui select   --window <h> --value <s> --element-id <control-id> [--with-snapshot] [--snapshot-mode full|auto|reset]
+        ui read     --window <h> [--element-id <id>] [--include-children] [--language <c>] [--format raw|article]
+        ui read-table --window <h> --element-id <grid-id> [--max-rows <n>] [--max-columns <n>]
+        ui wait     [--window <h>] [--mode appear|disappear] [selectors] [--timeout-ms <n>]
+        ui wait     --mode state --element-id <id> --desired-state <state> [--timeout-ms <n>]
         ui batch    --window <h> --steps '<json>' | --steps-file <path>
                      [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]
             For --with-snapshot, use full once, auto for repeated checks, or reset to begin a new comparison.
+            Add --since <token> for checked post-action diffs on click/type/select/batch/macro.
             selectors: --name --name-contains --name-pattern --control-type --automation-id --class-name
 
         keyboard <action> --window <h> [options]
@@ -138,5 +163,7 @@ internal static class HelpText
 
         Global: add --include-diagnostics to any command for timing/diagnostic details.
         Machine-readable: run 'wincli tools --json' for the full tool manifest (names + JSON schemas).
-        """;
+        This is the MCP schema, not a CLI flag schema; use the kebab-case options above.
+
+        """ + ElementIdLifetime;
 }
