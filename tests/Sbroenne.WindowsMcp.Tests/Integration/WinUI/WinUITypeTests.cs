@@ -163,6 +163,51 @@ public sealed class WinUITypeTests : IDisposable
     public async Task KeyboardTyping_PreservesEveryCharacterInModernEditor(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        var typed = await keyboard.TypeTextAsync(text, handle);
+        Assert.True(typed.Success, typed.Error);
+
+        await AssertEditorTextAsync(text);
+    }
+
+    [Fact]
+    public async Task KeyboardTyping_IndividuallySentCharactersArePreserved()
+    {
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        const string text = "Project: Aurora";
+        foreach (var character in text)
+        {
+            var typed = await keyboard.TypeTextAsync(character.ToString(), handle);
+            Assert.True(typed.Success, typed.Error);
+        }
+
+        await AssertEditorTextAsync(text);
+    }
+
+    [Fact]
+    public async Task KeyboardPress_VirtualKeysAreDeliveredToEditor()
+    {
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        foreach (var key in new[] { "a", "b", "c" })
+        {
+            var pressed = await keyboard.PressKeyAsync(key, ModifierKey.None, 1, handle);
+            Assert.True(pressed.Success, pressed.Error);
+        }
+
+        await AssertEditorTextAsync("abc");
+    }
+
+    private async Task<nint> FocusEditorAsync()
+    {
         var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
@@ -185,14 +230,7 @@ public sealed class WinUITypeTests : IDisposable
                 && focused.Items[0].Id == targetEditor.Id);
         Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
 
-        using var keyboard = new KeyboardInputService();
-        var handle = nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
-        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
-        Assert.True(select.Success, select.Error);
-        var typed = await keyboard.TypeTextAsync(text, handle);
-        Assert.True(typed.Success, typed.Error);
-
-        await AssertEditorTextAsync(text);
+        return nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
     }
 
     [Fact]
