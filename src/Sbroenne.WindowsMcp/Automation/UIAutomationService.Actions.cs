@@ -1571,7 +1571,8 @@ public sealed partial class UIAutomationService
             }
 
             // Step 3: Wait for Save dialog using retry loop (FlaUI Retry.WhileEmpty pattern)
-            var dialog = await WaitForSaveDialogAsync(hwnd, cancellationToken);
+            var dialogObservations = new HashSet<string>();
+            var dialog = await WaitForSaveDialogAsync(hwnd, dialogObservations, cancellationToken);
 
             if (dialog != null)
             {
@@ -1616,7 +1617,7 @@ public sealed partial class UIAutomationService
                     "No file creation or change was observed at the requested path. " +
                     (dialog.HasValue
                         ? "A Save dialog was confirmed and closed. "
-                        : "No Save dialog was observed. ") +
+                        : $"No ready Save dialog was observed. Discovery: {string.Join("; ", dialogObservations)}. ") +
                     "The save shortcut was sent, but its outcome could not be verified.",
                     CreateDiagnostics(stopwatch));
             }
@@ -1678,7 +1679,7 @@ public sealed partial class UIAutomationService
     /// Returns the dialog element and its name, or null if no dialog appeared.
     /// </summary>
     private async Task<(UIA.IUIAutomationElement element, string name)?> WaitForSaveDialogAsync(
-        nint parentHwnd, CancellationToken cancellationToken)
+        nint parentHwnd, HashSet<string> observations, CancellationToken cancellationToken)
     {
         // Common save dialog title patterns (case-insensitive matching)
         string[] dialogPatterns = ["Save As", "Save as", "Save this file", "Save"];
@@ -1695,62 +1696,56 @@ public sealed partial class UIAutomationService
             {
                 result = await _staThread.ExecuteAsync(() =>
                 {
-                    // First, check for modal windows of the parent (FlaUI pattern: window.ModalWindows)
-                    var parentElement = Uia.ElementFromHandle(parentHwnd);
-                    if (parentElement != null)
+                    // Owned dialogs can be UIA children without reporting IsModal. Enumerate native
+                    // top-level windows so discovery does not depend on that provider-specific layout.
+                    var handles = new List<nint>();
+                    if (!NativeMethods.EnumWindows((candidate, _) =>
                     {
-                        // Search for modal windows
-                        var windowCondition = Uia.CreatePropertyCondition(
-                            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
-                        var children = parentElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
-
-                        if (children != null)
+                        if (candidate != parentHwnd &&
+                            NativeMethods.IsWindowVisible(candidate) &&
+                            IsSaveDialogWindow(candidate, parentHwnd))
                         {
-                            for (int i = 0; i < children.Length; i++)
-                            {
-                                var child = children.GetElement(i);
-                                var windowPattern = child.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
-                                if (windowPattern != null)
-                                {
-                                    try
-                                    {
-                                        if (windowPattern.CurrentIsModal != 0)
-                                        {
-                                            var name = child.CurrentName ?? "";
-                                            // Check if it matches any dialog pattern
-                                            foreach (var pattern in dialogPatterns)
-                                            {
-                                                if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase) &&
-                                                    FindSaveDialogEditField(child) is not null)
-                                                {
-                                                    return (element: child, name: name);
-                                                }
-                                            }
-                                        }
-                                    }
-                                    catch
-                                    {
-                                        // Skip this element
-                                    }
-                                }
-                            }
+                            handles.Add(candidate);
                         }
+
+                        return true;
+                    }, nint.Zero))
+                    {
+                        throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
                     }
 
-                    // Fallback: search top-level windows (for system dialogs)
-                    foreach (var pattern in dialogPatterns)
+                    if (handles.Count == 0 && observations.Count < 8)
                     {
-                        var condition = Uia.CreateAndCondition(
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window),
-                            Uia.CreatePropertyCondition(UIA3PropertyIds.Name, pattern));
-                        var dialogs = Uia.RootElement.FindAll(UIA.TreeScope.TreeScope_Children, condition);
-                        for (var index = 0; dialogs is not null && index < dialogs.Length; index++)
+                        observations.Add("No visible owned windows");
+                    }
+
+                    foreach (var handle in handles)
+                    {
+                        try
                         {
-                            var dialog = dialogs.GetElement(index);
-                            if (IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(dialog), parentHwnd) &&
-                                FindSaveDialogEditField(dialog) is not null)
+                            var dialog = Uia.ElementFromHandle(handle);
+                            var name = dialog?.CurrentName ?? "";
+                            if (dialog == null ||
+                                !dialogPatterns.Any(pattern => name.Contains(pattern, StringComparison.OrdinalIgnoreCase)))
                             {
-                                return (element: dialog, name: pattern);
+                                continue;
+                            }
+
+                            if (FindSaveDialogEditField(dialog) is not null)
+                            {
+                                return (element: dialog, name: name);
+                            }
+
+                            if (observations.Count < 8)
+                            {
+                                observations.Add($"Window {handle} '{name}': filename field unavailable");
+                            }
+                        }
+                        catch (COMException exception) when (COMExceptionHelper.IsTransientProviderFailure(exception))
+                        {
+                            if (observations.Count < 8)
+                            {
+                                observations.Add($"Window {handle}: provider unavailable (0x{exception.HResult:X8})");
                             }
                         }
                     }

@@ -703,6 +703,7 @@ public sealed class UITestHarnessForm : Form
     /// </summary>
     public void Reset()
     {
+        LastKeyDownForTesting = "None";
         SubmitClickCount = 0;
         SubmitMouseInputCount = 0;
         SemanticControlMouseInputCount = 0;
@@ -811,11 +812,14 @@ public sealed class UITestHarnessForm : Form
         return base.ProcessCmdKey(ref msg, keyData);
     }
 
+    public string LastKeyDownForTesting { get; private set; } = "None";
+
     /// <summary>
     /// Handles Ctrl+S to show Save As dialog (like a real application).
     /// </summary>
     private void OnFormKeyDown(object? sender, KeyEventArgs e)
     {
+        LastKeyDownForTesting = $"{e.KeyData}; active control: {ActiveControl?.Name}";
         if (e.Control && e.KeyCode == Keys.S)
         {
             e.SuppressKeyPress = true; // Prevent the beep

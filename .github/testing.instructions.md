@@ -131,6 +131,10 @@ dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Integra
 
 **Always start with surgical tests targeting your specific changes:**
 
+For Save-dialog work on the dedicated desktop runner, dispatch the Windows UI
+Integration Tests workflow with `scope=save`. This runs both WinForms and Electron
+Save tests. Pull requests still require the full desktop suite before merge.
+
 ```powershell
 # Test specific feature (e.g., after modifying keyboard functionality)
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q

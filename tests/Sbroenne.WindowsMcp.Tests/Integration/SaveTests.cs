@@ -170,6 +170,62 @@ public sealed class SaveTests : IDisposable
     }
 
     [Fact]
+    public async Task Save_ModelessOwnedDialog_SavesFile()
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        System.Windows.Forms.Form? dialog = null;
+        var path = Path.Combine(_testOutputDir, $"modeless-save-{Guid.NewGuid():N}.txt");
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Modeless save owner", KeyPreview = true };
+            target.Controls.Add(new System.Windows.Forms.TextBox());
+            target.KeyDown += (_, e) =>
+            {
+                if (!e.Control || e.KeyCode != System.Windows.Forms.Keys.S)
+                {
+                    return;
+                }
+
+                e.SuppressKeyPress = true;
+                dialog = new System.Windows.Forms.Form { Text = "Save As" };
+                var filename = new System.Windows.Forms.TextBox
+                {
+                    Name = "FileNameControlHost",
+                    AccessibleName = "File name:",
+                    Width = 260
+                };
+                var save = new System.Windows.Forms.Button { Text = "Save", Top = 40 };
+                save.Click += (_, _) =>
+                {
+                    File.WriteAllText(filename.Text, "Modeless dialog saved");
+                    dialog.Close();
+                };
+                dialog.Controls.Add(filename);
+                dialog.Controls.Add(save);
+                dialog.Show(target);
+            };
+            target.Show(fixtureForm);
+            return target.Handle;
+        });
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal("Modeless dialog saved", await File.ReadAllTextAsync(path));
+        }
+        finally
+        {
+            fixtureForm.Invoke(() =>
+            {
+                dialog?.Dispose();
+                target?.Dispose();
+            });
+        }
+    }
+
+    [Fact]
     public async Task Save_DoesNotConfirmAnUnrelatedWindow()
     {
         var fixtureForm = _fixture.Form!;
@@ -199,6 +255,7 @@ public sealed class SaveTests : IDisposable
                 null, _windowHandle, includeChildren: true);
             Assert.True(result.Success,
                 $"{result.ErrorMessage}. Window text: {failureState?.Text ?? failureState?.ErrorMessage}. " +
+                $"Keyboard: {fixtureForm.Invoke(() => fixtureForm.LastKeyDownForTesting)}. " +
                 $"Files in the owned output directory: {string.Join(", ", Directory.GetFiles(_testOutputDir))}");
             Assert.True(File.Exists(path));
 
