@@ -18,10 +18,13 @@
 
 ## Test Harnesses
 
-The shared Windows UI workflow runs one job at a time and uses `queue: max` to retain
-up to 100 pending runs instead of replacing an earlier pending validation. Keep
-`cancel-in-progress: false`. Older branches without this setting still need manual
-runner coordination; do not assume they preserve pending work.
+The shared Windows UI workflow allows one running workflow and one pending workflow.
+`cancel-in-progress: false` does not preserve multiple pending runs: a new trigger can
+replace an earlier pending validation. Coordinate PR creation, pushes to open PRs, and
+manual dispatches before using the shared runner. Do not cancel another owner's run.
+Do not mix queue policies across active branches: a trial of `queue: max` was accepted
+but canceled during runner startup when another branch submitted work. Changing the
+queue policy needs a separate coordinated rollout, not an assumption that work is safe.
 
 ### Fresh CLI/MCP Usage Evaluations
 

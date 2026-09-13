@@ -29,7 +29,6 @@ permissions:
 concurrency:
   group: windows-ui-integration-tests
   cancel-in-progress: false
-  queue: max
 
 env:
   AZURE_RESOURCE_GROUP: rg-windows-mcp-runner
