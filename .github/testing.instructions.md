@@ -135,6 +135,11 @@ For Save-dialog work on the dedicated desktop runner, dispatch the Windows UI
 Integration Tests workflow with `scope=save`. This runs both WinForms and Electron
 Save tests. Pull requests still require the full desktop suite before merge.
 
+For application-launch handoff work, use `scope=app-launch`. The owned receiver fixture
+checks early/late exits and actual received requests through MCP and CLI, without browsers,
+accounts, or user documents. `scope=window` also includes these tests. Do not run the GUI
+fixture on a shared local desktop.
+
 ```powershell
 # Test specific feature (e.g., after modifying keyboard functionality)
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q

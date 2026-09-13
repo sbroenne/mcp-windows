@@ -33,7 +33,8 @@ public sealed class WindowsAutomationPrompts
                 $"App: {target}\n" +
                 "\n" +
                 "Step 1 - Get a window handle (choose one):\n" +
-                $"• app(programPath='{target}') — launch new app instance, returns handle\n" +
+                $"• app(programPath='{target}') — observe launch; returns a handle only when one window is identified\n" +
+                "A possibleHandoff does not verify delivery or loaded content. Inspect with ui_read/ui_wait; select the intended window if several are listed.\n" +
                 $"• window_management(action='find', title='{target}') — find already-running app\n" +
                 "\n" +
                 "Step 2 - Interact with elements (using handle from step 1):\n" +
@@ -181,7 +182,7 @@ public sealed class WindowsAutomationPrompts
                 "a browser that was already open by other means may expose a reduced tree until it is interacted with. " +
                 "Browser chrome (address bar, tab bar, toolbar) is best-effort: prefer keyboard shortcuts for those. " +
                 "For authenticated or SSO-only sites, check whether a signed-in browser window is already open before launching a new instance — " +
-                "Chromium launcher helpers often exit immediately when an existing session picks up the request, so that is not a failure."),
+                "A clean launcher exit can mean an existing instance picked up the request. possibleHandoff reports that possibility, not confirmed delivery; verify the intended page before acting."),
             new(ChatRole.User,
                 $"Browser: {browser}\n" +
                 $"Goal: {goal}\n" +

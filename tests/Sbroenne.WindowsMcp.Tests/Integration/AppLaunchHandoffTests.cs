@@ -49,13 +49,13 @@ public sealed class AppLaunchHandoffTests
 
             var (success, json) = await LaunchAsync(cli, FixturePath, $"--handoff-secondary \"{directory}\" {delay} {code}");
             using var result = JsonDocument.Parse(json);
-            Assert.Equal(code == 0, success);
-            Assert.Equal(code == 0, result.RootElement.GetProperty("success").GetBoolean());
             var receipt = Path.Combine(directory, "receipt.json");
             Assert.True(File.Exists(receipt), "The owned primary must actually receive the request.");
             var received = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(receipt));
             Assert.NotNull(received);
             Assert.Equal(["owned local request"], received);
+            Assert.Equal(code == 0, success);
+            Assert.Equal(code == 0, result.RootElement.GetProperty("success").GetBoolean());
             if (code != 0)
             {
                 Assert.Contains("code 7", result.RootElement.GetProperty("error").GetString(), StringComparison.Ordinal);
@@ -82,7 +82,7 @@ public sealed class AppLaunchHandoffTests
             {
                 await RunCliAsync(["service", "stop"]);
             }
-            Directory.Delete(directory, recursive: true);
+            await DeleteFixtureDirectoryAsync(directory);
         }
     }
 
@@ -127,15 +127,92 @@ public sealed class AppLaunchHandoffTests
             {
                 await RunCliAsync(["service", "stop"]);
             }
-            Directory.Delete(directory, recursive: true);
+            await DeleteFixtureDirectoryAsync(directory);
         }
     }
 
-    private static async Task<(bool Success, string Json)> LaunchAsync(bool cli, string path, string arguments)
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, 800)]
+    [InlineData(true, 0)]
+    [InlineData(true, 800)]
+    public async Task ExecutableName_UsesActualImageNotWindowTitle(bool cli, int delay)
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, $"handoff-{Guid.NewGuid():N}")).FullName;
+        using var receiver = Start(FixturePath, ["--handoff-primary", directory, "1"]);
+        try
+        {
+            Assert.NotNull(await receiver.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)));
+            var (success, json) = await LaunchAsync(cli, Path.GetFileName(FixturePath),
+                $"--handoff-secondary \"{directory}\" {delay} 0", AppContext.BaseDirectory);
+            Assert.True(File.Exists(Path.Combine(directory, "receipt.json")));
+            Assert.True(success, json);
+            using var result = JsonDocument.Parse(json);
+            Assert.Equal("possibleHandoff", result.RootElement.GetProperty("launchStatus").GetString());
+            Assert.Equal(receiver.Id, result.RootElement.GetProperty("window").GetProperty("pid").GetInt32());
+        }
+        finally
+        {
+            await StopOwnedAsync(receiver);
+            if (cli)
+            {
+                await RunCliAsync(["service", "stop"]);
+            }
+            await DeleteFixtureDirectoryAsync(directory);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NewWindow_IsOwnedByLaunchedProcessNotExistingInstance(bool cli)
+    {
+        var root = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, $"handoff-{Guid.NewGuid():N}")).FullName;
+        var first = Directory.CreateDirectory(Path.Combine(root, "first")).FullName;
+        var second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
+        using var existing = Start(FixturePath, ["--handoff-primary", first, "1"]);
+        try
+        {
+            Assert.NotNull(await existing.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)));
+            var (success, json) = await LaunchAsync(cli, FixturePath, $"--handoff-primary \"{second}\" 1");
+            Assert.True(success, json);
+            using var result = JsonDocument.Parse(json);
+            Assert.Equal("windowObserved", result.RootElement.GetProperty("launchStatus").GetString());
+            var pid = result.RootElement.GetProperty("window").GetProperty("pid").GetInt32();
+            Assert.NotEqual(existing.Id, pid);
+            Assert.Contains("not verified", result.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await StopOwnedAsync(existing);
+            var ownerFile = Path.Combine(second, "owner.json");
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!File.Exists(ownerFile))
+            {
+                await Task.Delay(25, timeout.Token);
+            }
+            var owner = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(ownerFile));
+            Assert.NotNull(owner);
+            using var launched = Process.GetProcessById(int.Parse(Assert.Single(owner), CultureInfo.InvariantCulture));
+            await StopOwnedAsync(launched);
+            if (cli)
+            {
+                await RunCliAsync(["service", "stop"]);
+            }
+            await DeleteFixtureDirectoryAsync(root);
+        }
+    }
+
+    private static async Task<(bool Success, string Json)> LaunchAsync(bool cli, string path, string arguments, string? workingDirectory = null)
     {
         if (cli)
         {
-            var result = await RunCliAsync(["app", "--path", path, $"--args={arguments}", "--timeout", "3000"]);
+            var options = new List<string> { "app", "--path", path, $"--args={arguments}", "--timeout", "3000" };
+            if (workingDirectory is not null)
+            {
+                options.AddRange(["--working-dir", workingDirectory]);
+            }
+            var result = await RunCliAsync([.. options]);
             Assert.True(result.Code is 0 or 1, result.Error + result.Output);
             return (result.Code == 0, result.Output);
         }
@@ -151,6 +228,7 @@ public sealed class AppLaunchHandoffTests
         {
             ["programPath"] = path,
             ["arguments"] = arguments,
+            ["workingDirectory"] = workingDirectory,
             ["timeoutMs"] = 3000,
         }, cancellationToken: timeout.Token);
         return (response.IsError != true, Assert.IsType<TextContentBlock>(Assert.Single(response.Content)).Text);
@@ -195,5 +273,24 @@ public sealed class AppLaunchHandoffTests
             process.Kill();
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         }
+    }
+
+    private static async Task DeleteFixtureDirectoryAsync(string directory)
+    {
+        Exception? lastError = null;
+        var deleted = await TestWait.UntilAsync(() =>
+        {
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                lastError = ex;
+                return false;
+            }
+        }, TimeSpan.FromSeconds(10));
+        Assert.True(deleted, $"Owned fixture files remained locked after process exit: {lastError}");
     }
 }

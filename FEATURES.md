@@ -153,6 +153,30 @@ Launch applications and get their window handles for subsequent operations.
 - Returns window handle for use with other tools
 - Configurable startup parameters
 
+### Launch observations (MCP and CLI)
+
+`app` and `wincli app` report `launchStatus` separately from requested content:
+
+| Status | Meaning |
+|--------|---------|
+| `started` | The process started; no window was observed within the wait, or waiting was disabled. |
+| `windowObserved` | A visible window belongs to the launched process. |
+| `possibleHandoff` | The launcher exited zero and a pre-launch instance of the same executable still has visible windows. |
+| `exitedWithoutWindow` | The launcher exited zero but no window or matching pre-launch instance could be established; the call fails without claiming a handoff. |
+
+A possible handoff is not confirmation that a URL/document was delivered or loaded.
+Executable paths and process creation times establish the existing instance, not window titles
+or executable basenames. If Windows cannot report a fast-exiting process's image path, only
+an explicit full executable path (not a Store execution alias) can supply that identity;
+unresolved names and differently named Store launchers remain unverified.
+Nonzero exits observed during the wait fail even when another instance is open.
+Multiple matching windows are listed without selecting an arbitrary `window`.
+
+No launch status guarantees foreground focus, input readiness, or requested content.
+Inspect the intended window with `ui_read` / `ui_wait` before acting; activate it explicitly
+with `window_management` when needed. A running process without a window can still exit later;
+`started` is an observation, not a guarantee of future success.
+
 ### Example
 
 ```

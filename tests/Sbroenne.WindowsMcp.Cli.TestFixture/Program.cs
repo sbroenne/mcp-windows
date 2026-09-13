@@ -103,6 +103,8 @@ internal static class Program
             }
             Console.WriteLine(JsonSerializer.Serialize(windows.Select(w => w.Handle.ToInt64().ToString(CultureInfo.InvariantCulture))));
             Console.Out.Flush();
+            WriteArguments(Path.Combine(directory, "owner.json"),
+                [Environment.ProcessId.ToString(CultureInfo.InvariantCulture)]);
             timer.Start();
         };
         try
