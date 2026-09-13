@@ -162,6 +162,10 @@ For Save-dialog work on the dedicated desktop runner, dispatch the Windows UI
 Integration Tests workflow with `scope=save`. This runs both WinForms and Electron
 Save tests. Pull requests still require the full desktop suite before merge.
 
+For click response work, use `scope=click`. This includes owned MCP/CLI response
+regressions, disappearing targets, identity continuity, WinUI clicks, and batch
+snapshot checks. Do not run these desktop tests on a shared local machine.
+
 ```powershell
 # Test specific feature (e.g., after modifying keyboard functionality)
 dotnet test tests\Sbroenne.WindowsMcp.Tests --filter "FullyQualifiedName~Keyboard" -v q
