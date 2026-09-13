@@ -4,6 +4,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -214,15 +215,30 @@ public sealed class WinUITypeTests : IDisposable
             AutomationId = "NavEditor",
         });
         Assert.True(navigate.Success, navigate.ErrorMessage);
-        var target = await _automationService.FindElementsAsync(new ElementQuery
-        {
-            WindowHandle = _windowHandle,
-            AutomationId = "EditorTextBox",
-        });
+        UIAutomationResult? target = null;
+        var editorFound = await TestWait.RetryUntilAsync(
+            attempt: async () => target = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "EditorTextBox",
+            }),
+            condition: () => target is { Success: true, Items.Length: 1 });
+        Assert.True(editorFound, target?.ErrorMessage);
+        Assert.NotNull(target);
         Assert.True(target.Success, target.ErrorMessage);
         var targetEditor = Assert.Single(target.Items!);
         var focus = await _automationService.FocusElementAsync(targetEditor.Id);
         Assert.True(focus.Success, focus.ErrorMessage);
+        var handle = nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
+        var monitors = new MonitorService().GetMonitors();
+        Assert.InRange(targetEditor.Click[2], 0, monitors.Count - 1);
+        var monitor = monitors[targetEditor.Click[2]];
+        var click = await new MouseInputService().ClickAsync(
+            targetEditor.Click[0] + monitor.X,
+            targetEditor.Click[1] + monitor.Y,
+            ModifierKey.None,
+            handle);
+        Assert.True(click.Success, click.Error);
         UIAutomationResult? focused = null;
         var editorHasFocus = await TestWait.RetryUntilAsync(
             attempt: async () => focused = await _automationService.GetFocusedElementAsync(),
@@ -230,8 +246,9 @@ public sealed class WinUITypeTests : IDisposable
                 && focused.Items[0].Id == targetEditor.Id);
         Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
         _output.WriteLine($"Focus before keyboard calls: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+        LogModifierState("Before keyboard calls");
 
-        return nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
+        return handle;
     }
 
     [Fact]
@@ -260,6 +277,7 @@ public sealed class WinUITypeTests : IDisposable
     {
         var focusAfterInput = await _automationService.GetFocusedElementAsync();
         _output.WriteLine($"Focus after input: {System.Text.Json.JsonSerializer.Serialize(focusAfterInput)}");
+        LogModifierState("After input");
         var found = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
@@ -291,5 +309,14 @@ public sealed class WinUITypeTests : IDisposable
         Assert.NotNull(read);
         Assert.True(read.Success, read.ErrorMessage);
         Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+    }
+
+    private void LogModifierState(string stage)
+    {
+        var modifiers = new ModifierKeyManager();
+        _output.WriteLine($"{stage}: Ctrl={modifiers.IsKeyPressed(NativeConstants.VK_CONTROL)}, "
+            + $"Shift={modifiers.IsKeyPressed(NativeConstants.VK_SHIFT)}, "
+            + $"Alt={modifiers.IsKeyPressed(NativeConstants.VK_MENU)}, "
+            + $"Win={modifiers.IsKeyPressed(NativeConstants.VK_LWIN)}");
     }
 }
