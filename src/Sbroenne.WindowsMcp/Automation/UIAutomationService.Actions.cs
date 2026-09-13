@@ -1647,31 +1647,19 @@ public sealed partial class UIAutomationService
     /// </summary>
     private async Task<bool> FocusWindowAsync(nint hwnd, CancellationToken cancellationToken)
     {
-        var activated = _windowActivator is not null &&
+        // Try semantic focus before native strategies that may inject Alt and enter menu mode.
+        var focused = await _staThread.ExecuteAsync(
+            () => Uia.ElementFromHandle(hwnd)?.TrySetFocus() == true,
+            cancellationToken);
+        if (focused && NativeMethods.GetForegroundWindow() == hwnd)
+        {
+            return true;
+        }
+
+        return _windowActivator is not null &&
             await _windowActivator.ActivateWindowAsync(
                 hwnd,
                 cancellationToken: cancellationToken);
-
-        var focused = await _staThread.ExecuteAsync(() =>
-        {
-            var element = Uia.ElementFromHandle(hwnd);
-            if (element == null)
-            {
-                return false;
-            }
-
-            try
-            {
-                element.SetFocus();
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }, cancellationToken);
-
-        return activated || focused;
     }
 
     /// <summary>
@@ -1925,14 +1913,15 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
 
+        string? observedFilename = null;
         var filenameObserved = await DeterministicWait.UntilAsync(
             async () => await _staThread.ExecuteAsync(
                 () =>
                 {
-                    var currentValue = editField.TryGetValue();
-                    return currentValue != null &&
-                        (string.Equals(currentValue, normalizedPath, StringComparison.OrdinalIgnoreCase) ||
-                         currentValue.EndsWith(Path.GetFileName(normalizedPath), StringComparison.OrdinalIgnoreCase));
+                    // Dialogs can replace the edit while processing input. Verify the current
+                    // filename control in this same dialog, not the pre-input UIA object.
+                    observedFilename = FindSaveDialogEditField(dialog)?.TryGetValue();
+                    return string.Equals(observedFilename, normalizedPath, StringComparison.OrdinalIgnoreCase);
                 },
                 cancellationToken),
             TimeSpan.FromMilliseconds(750),
@@ -1943,7 +1932,8 @@ public sealed partial class UIAutomationService
         {
             return UIAutomationResult.CreateFailure(
                 "save", UIAutomationErrorType.Timeout,
-                "The filename field did not contain the requested path; Save was not pressed.",
+                "The filename field did not contain the requested path; Save was not pressed. " +
+                $"Observed filename: {(observedFilename is null ? "<unavailable>" : observedFilename[..Math.Min(observedFilename.Length, 256)])}",
                 CreateDiagnostics(stopwatch));
         }
 
