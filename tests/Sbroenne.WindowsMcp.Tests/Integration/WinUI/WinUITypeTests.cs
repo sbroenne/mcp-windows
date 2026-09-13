@@ -165,12 +165,21 @@ public sealed class WinUITypeTests : IDisposable
             AutomationId = "NavEditor",
         });
         Assert.True(navigate.Success, navigate.ErrorMessage);
-        var focus = await _automationService.ObserveAndClickAsync(new ElementQuery
+        var target = await _automationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "EditorTextBox",
         });
+        Assert.True(target.Success, target.ErrorMessage);
+        var targetEditor = Assert.Single(target.Items!);
+        var focus = await _automationService.FocusElementAsync(targetEditor.Id);
         Assert.True(focus.Success, focus.ErrorMessage);
+        UIAutomationResult? focused = null;
+        var editorHasFocus = await TestWait.RetryUntilAsync(
+            attempt: async () => focused = await _automationService.GetFocusedElementAsync(),
+            condition: () => focused is { Success: true, Items.Length: 1 }
+                && focused.Items[0].Id == targetEditor.Id);
+        Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
 
         using var keyboard = new KeyboardInputService();
         var handle = nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
