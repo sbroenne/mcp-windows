@@ -68,12 +68,10 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
                 var listed = await WindowsToolsBase.WindowService.ListWindowsAsync(includeAllDesktops: true);
                 Assert.True(listed.Success);
                 Assert.DoesNotContain(listed.Windows!, w => handles.Contains(w.Handle, StringComparer.Ordinal));
-                foreach (var handle in handles)
-                {
-                    var targeted = await WindowsToolsBase.WindowService.GetWindowInfoAsync(nint.Parse(handle, CultureInfo.InvariantCulture));
-                    Assert.NotNull(targeted);
-                    Assert.Equal("", targeted.Title);
-                }
+                var found = await WindowsToolsBase.WindowService.FindWindowAsync(
+                    title: null, processName: Path.GetFileNameWithoutExtension(FixturePath));
+                Assert.True(found.Success);
+                Assert.DoesNotContain(found.Windows!, w => handles.Contains(w.Handle, StringComparer.Ordinal));
             }
 
             var (success, json) = await LaunchAsync(cli, FixturePath, $"--handoff-secondary \"{directory}\" {delay} {code}");
@@ -97,7 +95,14 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             Assert.DoesNotContain("focused and ready", json, StringComparison.OrdinalIgnoreCase);
             if (windowCount == 1)
             {
-                Assert.Equal(handles[0], result.RootElement.GetProperty("window").GetProperty("handle").GetString());
+                var returnedHandle = result.RootElement.GetProperty("window").GetProperty("handle").GetString();
+                Assert.Equal(handles[0], returnedHandle);
+                if (untitled)
+                {
+                    var targeted = await WindowsToolsBase.WindowService.GetWindowInfoAsync(nint.Parse(returnedHandle!, CultureInfo.InvariantCulture));
+                    Assert.NotNull(targeted);
+                    Assert.Equal("", targeted.Title);
+                }
             }
             else
             {
@@ -219,6 +224,13 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             Assert.Equal(int.Parse(Assert.Single(owner), CultureInfo.InvariantCulture), pid);
             using var observedProcess = Process.GetProcessById(pid);
             Assert.False(observedProcess.HasExited);
+            if (untitled)
+            {
+                var handle = result.RootElement.GetProperty("window").GetProperty("handle").GetString();
+                var targeted = await WindowsToolsBase.WindowService.GetWindowInfoAsync(nint.Parse(handle!, CultureInfo.InvariantCulture));
+                Assert.NotNull(targeted);
+                Assert.Equal("", targeted.Title);
+            }
             Assert.Contains("not verified", result.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
         }
         finally
