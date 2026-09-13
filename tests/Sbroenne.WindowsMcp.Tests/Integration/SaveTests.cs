@@ -169,13 +169,21 @@ public sealed class SaveTests : IDisposable
         Assert.Contains("Invalid window handle", result.ErrorMessage);
     }
 
-    [Fact]
-    public async Task Save_ModelessOwnedDialog_SavesFile()
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Save_ModelessOwnedDialog_VerifiesCurrentFilename(
+        bool replaceFilenameField, bool changeDirectory)
     {
         var fixtureForm = _fixture.Form!;
         System.Windows.Forms.Form? target = null;
         System.Windows.Forms.Form? dialog = null;
+        var filenameReplaced = false;
         var path = Path.Combine(_testOutputDir, $"modeless-save-{Guid.NewGuid():N}.txt");
+        var wrongDirectory = Path.Combine(_testOutputDir, Guid.NewGuid().ToString("N"));
+        var wrongPath = Path.Combine(wrongDirectory, Path.GetFileName(path));
+        Directory.CreateDirectory(wrongDirectory);
         var handle = (nint)fixtureForm.Invoke(() =>
         {
             target = new System.Windows.Forms.Form { Text = "Modeless save owner", KeyPreview = true };
@@ -195,6 +203,38 @@ public sealed class SaveTests : IDisposable
                     AccessibleName = "File name:",
                     Width = 260
                 };
+                filename.TextChanged += (_, _) =>
+                {
+                    if (filename.Text != path)
+                    {
+                        return;
+                    }
+
+                    if (changeDirectory)
+                    {
+                        filename.Text = wrongPath;
+                        return;
+                    }
+
+                    if (!replaceFilenameField)
+                    {
+                        return;
+                    }
+
+                    var original = filename;
+                    filename = new System.Windows.Forms.TextBox
+                    {
+                        Name = original.Name,
+                        AccessibleName = original.AccessibleName,
+                        Bounds = original.Bounds,
+                        Text = original.Text
+                    };
+                    dialog.Controls.Add(filename);
+                    dialog.Controls.Remove(original);
+                    original.Dispose();
+                    filename.Focus();
+                    filenameReplaced = true;
+                };
                 var save = new System.Windows.Forms.Button { Text = "Save", Top = 40 };
                 save.Click += (_, _) =>
                 {
@@ -212,8 +252,19 @@ public sealed class SaveTests : IDisposable
         try
         {
             var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
-            Assert.True(result.Success, result.ErrorMessage);
-            Assert.Equal("Modeless dialog saved", await File.ReadAllTextAsync(path));
+            Assert.Equal(replaceFilenameField, (bool)fixtureForm.Invoke(() => filenameReplaced));
+            if (changeDirectory)
+            {
+                Assert.False(result.Success);
+                Assert.Contains("filename field", result.ErrorMessage, StringComparison.Ordinal);
+                Assert.False(File.Exists(wrongPath), "Save must not confirm a path in another directory.");
+                Assert.False(File.Exists(path));
+            }
+            else
+            {
+                Assert.True(result.Success, result.ErrorMessage);
+                Assert.Equal("Modeless dialog saved", await File.ReadAllTextAsync(path));
+            }
         }
         finally
         {
