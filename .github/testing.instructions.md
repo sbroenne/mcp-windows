@@ -22,6 +22,8 @@ The shared Windows UI workflow allows one running workflow and one pending workf
 `cancel-in-progress: false` does not preserve multiple pending runs: a new trigger can
 replace an earlier pending validation. Coordinate PR creation, pushes to open PRs, and
 manual dispatches before using the shared runner. Do not cancel another owner's run.
+Wait until the entire group is empty, including VM deallocation, before the next
+owner publishes or dispatches work. A run starting is not permission to queue another.
 Do not mix queue policies across active branches: a trial of `queue: max` was accepted
 but canceled during runner startup when another branch submitted work. Changing the
 queue policy needs a separate coordinated rollout, not an assumption that work is safe.
