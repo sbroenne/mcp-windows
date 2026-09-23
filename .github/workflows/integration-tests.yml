@@ -41,7 +41,8 @@ jobs:
     if: >-
       vars.WINDOWS_UI_RUNNER_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     environment: windows-ui-runner
@@ -309,16 +310,25 @@ jobs:
         env:
           START_RESULT: ${{ needs.start-runner.result }}
           TEST_RESULT: ${{ needs.integration-tests.result }}
+          PR_ACTOR: ${{ github.actor }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              "${{ github.event.pull_request.draft }}" -eq "true") {
+              $env:PR_IS_DRAFT -ieq "true") {
             Write-Host "Integration tests are deferred until the pull request is ready for review."
             exit 0
           }
 
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              "${{ github.event.pull_request.head.repo.full_name }}" -ne $env:GITHUB_REPOSITORY) {
+              $env:PR_HEAD_REPOSITORY -ine $env:GITHUB_REPOSITORY) {
             throw "Fork pull requests cannot execute untrusted code on the self-hosted runner. Move the reviewed commit to a repository branch before merging."
+          }
+
+          if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
+              $env:PR_ACTOR -ieq "dependabot[bot]") {
+            Write-Host "Integration tests are not run for Dependabot pull requests because they cannot access Azure credentials."
+            exit 0
           }
 
           if ($env:START_RESULT -ne "success" -or $env:TEST_RESULT -ne "success") {
@@ -331,7 +341,8 @@ jobs:
       always() &&
       vars.WINDOWS_UI_RUNNER_ENABLED == 'true' &&
       (github.event_name == 'workflow_dispatch' ||
-      (github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.actor != 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.draft == false))
     needs: [start-runner, integration-tests]
     runs-on: ubuntu-latest
