@@ -312,9 +312,10 @@ jobs:
           TEST_RESULT: ${{ needs.integration-tests.result }}
           GITHUB_ACTOR: ${{ github.actor }}
           PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              "${{ github.event.pull_request.draft }}" -eq "true") {
+              $env:PR_IS_DRAFT -eq "true") {
             Write-Host "Integration tests are deferred until the pull request is ready for review."
             exit 0
           }
