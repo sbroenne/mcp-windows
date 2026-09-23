@@ -310,6 +310,8 @@ jobs:
         env:
           START_RESULT: ${{ needs.start-runner.result }}
           TEST_RESULT: ${{ needs.integration-tests.result }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
               "${{ github.event.pull_request.draft }}" -eq "true") {
@@ -318,13 +320,13 @@ jobs:
           }
 
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              "${{ github.actor }}" -eq "dependabot[bot]") {
+              $env:GITHUB_ACTOR -eq "dependabot[bot]") {
             Write-Host "Integration tests are not run for Dependabot pull requests because they cannot access Azure credentials."
             exit 0
           }
 
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              "${{ github.event.pull_request.head.repo.full_name }}" -ne $env:GITHUB_REPOSITORY) {
+              $env:PR_HEAD_REPOSITORY -ne $env:GITHUB_REPOSITORY) {
             throw "Fork pull requests cannot execute untrusted code on the self-hosted runner. Move the reviewed commit to a repository branch before merging."
           }
 
