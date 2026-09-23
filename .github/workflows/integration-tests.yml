@@ -321,7 +321,7 @@ jobs:
           }
 
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              $env:PR_HEAD_REPOSITORY -ne $env:GITHUB_REPOSITORY) {
+              $env:PR_HEAD_REPOSITORY -ine $env:GITHUB_REPOSITORY) {
             throw "Fork pull requests cannot execute untrusted code on the self-hosted runner. Move the reviewed commit to a repository branch before merging."
           }
 
