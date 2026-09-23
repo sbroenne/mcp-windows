@@ -310,7 +310,7 @@ jobs:
         env:
           START_RESULT: ${{ needs.start-runner.result }}
           TEST_RESULT: ${{ needs.integration-tests.result }}
-          GITHUB_ACTOR: ${{ github.actor }}
+          PR_ACTOR: ${{ github.actor }}
           PR_HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           PR_IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
@@ -321,7 +321,7 @@ jobs:
           }
 
           if ($env:GITHUB_EVENT_NAME -eq "pull_request" -and
-              $env:GITHUB_ACTOR -eq "dependabot[bot]") {
+              $env:PR_ACTOR -eq "dependabot[bot]") {
             Write-Host "Integration tests are not run for Dependabot pull requests because they cannot access Azure credentials."
             exit 0
           }
