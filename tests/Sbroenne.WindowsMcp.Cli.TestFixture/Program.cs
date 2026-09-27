@@ -9,6 +9,25 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+        try
+        {
+            return Run(args);
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine(exception);
+            return 1;
+        }
+    }
+
+    private static int Run(string[] args)
+    {
+        if (args is ["--handoff-primary", var failureDirectory, var failureCount, "--fail-on-tick"])
+        {
+            return RunReceiver(failureDirectory, int.Parse(failureCount, CultureInfo.InvariantCulture), failOnTick: true);
+        }
+
         if (args is ["--handoff-primary", var untitledDirectory, var untitledCount, "--untitled"])
         {
             return RunReceiver(untitledDirectory, int.Parse(untitledCount, CultureInfo.InvariantCulture), untitled: true);
@@ -75,7 +94,7 @@ internal static class Program
         return 0;
     }
 
-    private static int RunReceiver(string directory, int count, bool untitled = false)
+    private static int RunReceiver(string directory, int count, bool untitled = false, bool failOnTick = false)
     {
         var windows = Enumerable.Range(0, count).Select(_ => new InertWindow
         {
@@ -88,6 +107,10 @@ internal static class Program
         var received = false;
         timer.Tick += (_, _) =>
         {
+            if (failOnTick)
+            {
+                throw new InvalidOperationException("Owned receiver callback failure");
+            }
             var request = Path.Combine(directory, "request.json");
             if (!received && File.Exists(request))
             {

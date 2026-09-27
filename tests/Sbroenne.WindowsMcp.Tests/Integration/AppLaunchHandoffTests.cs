@@ -18,6 +18,25 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
 
     public Task InitializeAsync() => Task.CompletedTask;
 
+    [Fact]
+    public async Task ReceiverCallbackFailure_ExitsWithEvidenceInsteadOfOpeningErrorDialog()
+    {
+        var directory = Directory.CreateDirectory(Path.Combine(AppContext.BaseDirectory, $"handoff-{Guid.NewGuid():N}")).FullName;
+        using var receiver = Start(FixturePath, ["--handoff-primary", directory, "1", "--fail-on-tick"]);
+        try
+        {
+            Assert.NotNull(await receiver.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(15)));
+            await receiver.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.NotEqual(0, receiver.ExitCode);
+            Assert.Contains("Owned receiver callback failure", await receiver.StandardError.ReadToEndAsync(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            await StopOwnedAsync(receiver);
+            await DeleteFixtureDirectoryAsync(directory);
+        }
+    }
+
     public async Task DisposeAsync()
     {
         if (_client is not null)
@@ -326,7 +345,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         return Process.Start(info) ?? throw new InvalidOperationException($"Could not start {path}.");
     }
 
-    private static async Task<(int Code, string Output, string Error)> RunCliAsync(string[] arguments)
+    private async Task<(int Code, string Output, string Error)> RunCliAsync(string[] arguments)
     {
         using var process = Start(Path.ChangeExtension(typeof(CommandDispatcher).Assembly.Location, ".exe"), arguments);
         try
@@ -342,12 +361,20 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
     }
 
-    private static async Task StopOwnedAsync(Process process)
+    private async Task StopOwnedAsync(Process process)
     {
+        var exitedBeforeCleanup = process.HasExited;
         if (!process.HasExited)
         {
             process.Kill();
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        if (process.StartInfo.RedirectStandardError &&
+            string.Equals(Path.GetFileName(process.StartInfo.FileName), Path.GetFileName(FixturePath), StringComparison.OrdinalIgnoreCase))
+        {
+            var error = await process.StandardError.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            output.WriteLine("Owned process {0}, exited before cleanup: {1}, exit code: {2}, stderr: {3}",
+                process.Id, exitedBeforeCleanup, process.ExitCode, error);
         }
     }
 
