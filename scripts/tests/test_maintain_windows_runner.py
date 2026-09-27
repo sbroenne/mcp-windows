@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -235,6 +236,17 @@ class GuestScriptTests(unittest.TestCase):
         self.assertIsNotNone(shell, "PowerShell 7 is required to test the guest script")
         result = subprocess.run(
             [shell, "-NoProfile", "-File",
+             str(ROOT / "scripts" / "tests" / "test_runner_update_worker.ps1")],
+            cwd=ROOT, capture_output=True, text=True, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    @unittest.skipUnless(sys.platform == "win32", "Windows PowerShell 5.1 requires Windows")
+    def test_guest_worker_under_the_actual_scheduled_task_shell(self):
+        shell = shutil.which("powershell.exe")
+        self.assertIsNotNone(shell, "The scheduled task uses Windows PowerShell 5.1")
+        result = subprocess.run(
+            [shell, "-NoProfile", "-NonInteractive", "-File",
              str(ROOT / "scripts" / "tests" / "test_runner_update_worker.ps1")],
             cwd=ROOT, capture_output=True, text=True, timeout=60,
         )

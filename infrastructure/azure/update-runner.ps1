@@ -108,7 +108,8 @@ function Write-MaintenanceState {
     $State.passId = $PassId
     $State | ConvertTo-Json -Compress | Set-Content "$resultPath.tmp" -Encoding UTF8
     if (Test-Path $resultPath) {
-        [IO.File]::Replace("$resultPath.tmp", $resultPath, $null)
+        # An ordinary $null is converted to an empty path by PowerShell's string binding.
+        [IO.File]::Replace("$resultPath.tmp", $resultPath, [NullString]::Value)
     }
     else {
         [IO.File]::Move("$resultPath.tmp", $resultPath)
