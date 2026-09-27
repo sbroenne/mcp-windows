@@ -180,11 +180,12 @@ public sealed class SaveTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
     public async Task Save_ModelessOwnedDialog_VerifiesCurrentFilename(
-        bool replaceFilenameField, bool changeDirectory)
+        bool replaceFilenameField, bool changeDirectory, bool replaceBeforeComplete)
     {
         var fixtureForm = _fixture.Form!;
         System.Windows.Forms.Form? target = null;
@@ -215,7 +216,7 @@ public sealed class SaveTests : IDisposable
                 };
                 filename.TextChanged += (_, _) =>
                 {
-                    if (filename.Text != path)
+                    if (filename.Text != (replaceBeforeComplete ? path[..(path.Length / 2)] : path))
                     {
                         return;
                     }
@@ -237,7 +238,8 @@ public sealed class SaveTests : IDisposable
                         Name = original.Name,
                         AccessibleName = original.AccessibleName,
                         Bounds = original.Bounds,
-                        Text = original.Text
+                        Text = original.Text,
+                        ReadOnly = replaceBeforeComplete
                     };
                     dialog.Controls.Add(filename);
                     dialog.Controls.Remove(original);
@@ -263,7 +265,7 @@ public sealed class SaveTests : IDisposable
         {
             var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
             Assert.Equal(replaceFilenameField, (bool)fixtureForm.Invoke(() => filenameReplaced));
-            if (changeDirectory)
+            if (changeDirectory || replaceBeforeComplete)
             {
                 Assert.False(result.Success);
                 Assert.Contains("filename field", result.ErrorMessage, StringComparison.Ordinal);

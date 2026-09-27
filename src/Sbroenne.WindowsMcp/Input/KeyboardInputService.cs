@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Input;
 
 /// <summary>
 /// Implementation of keyboard input operations using Windows SendInput API.
-/// Uses Unicode input, waiting for readable controls to consume each character.
+/// Uses paced Unicode input, acknowledging characters in supported live-text editors.
 /// </summary>
 public sealed class KeyboardInputService : IDisposable
 {
@@ -83,7 +83,7 @@ public sealed class KeyboardInputService : IDisposable
         }
 
         var totalCharacters = 0;
-        var observationUnavailable = false;
+        var observationWarnings = new HashSet<string>(StringComparer.Ordinal);
 
         // Process text in chunks to prevent overwhelming the input queue
         for (var offset = 0; offset < text.Length;)
@@ -108,7 +108,10 @@ public sealed class KeyboardInputService : IDisposable
             }
 
             totalCharacters += chunkResult.CharactersTyped ?? 0;
-            observationUnavailable |= chunkResult.Message is not null;
+            if (chunkResult.Message is not null)
+            {
+                observationWarnings.Add(chunkResult.Message);
+            }
             offset += currentChunkSize;
 
             // Add delay between chunks if there are more chunks to process
@@ -123,9 +126,7 @@ public sealed class KeyboardInputService : IDisposable
 
         return KeyboardControlResult.CreateTypeSuccess(totalCharacters) with
         {
-            Message = observationUnavailable
-                ? "Input was dispatched, but some controls did not expose readable text. Verify the result before continuing."
-                : null
+            Message = observationWarnings.Count > 0 ? string.Join(" ", observationWarnings) : null
         };
     }
 
@@ -145,7 +146,8 @@ public sealed class KeyboardInputService : IDisposable
     {
         var inputs = new List<INPUT>(4);
         var sentInput = false;
-        var observationUnavailable = false;
+        var observationWarnings = new HashSet<string>(StringComparer.Ordinal);
+        var observeText = true;
 
         for (var index = 0; index < chunk.Length; index++)
         {
@@ -198,7 +200,17 @@ public sealed class KeyboardInputService : IDisposable
                     "The foreground window changed before text input was sent.");
             }
 
-            var observation = await _textObserver.Value.CaptureAsync(cancellationToken).ConfigureAwait(false);
+            KeyboardTextObserver.Observation? observation = null;
+            if (observeText)
+            {
+                var capture = await _textObserver.Value.CaptureAsync(cancellationToken).ConfigureAwait(false);
+                observation = capture.Observation;
+                observeText = observation is not null;
+                if (capture.Warning is not null)
+                {
+                    observationWarnings.Add(capture.Warning);
+                }
+            }
             if (!IsExpectedForegroundWindow(expectedForegroundWindow))
             {
                 return KeyboardControlResult.CreateFailure(
@@ -206,36 +218,46 @@ public sealed class KeyboardInputService : IDisposable
                     "The foreground window changed while preparing text input.");
             }
 
-            var inputArray = inputs.ToArray();
-            var result = NativeMethods.SendInput((uint)inputArray.Length, inputArray, INPUT.Size);
-
-            if (result != inputArray.Length)
+            // Pace UTF-16 units separately, but acknowledge a complete surrogate pair.
+            // Editors may buffer its first unit without exposing any text yet.
+            for (var inputOffset = 0; inputOffset < inputs.Count; inputOffset += 2)
             {
-                var error = Marshal.GetLastWin32Error();
-                var (errorCode, errorMessage) = MapSendInputError(error);
-                return KeyboardControlResult.CreateFailure(
-                    errorCode,
-                    $"{errorMessage}. Expected {inputArray.Length} events, sent {result}.");
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+                {
+                    return KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        "The foreground window changed before text input was sent.");
+                }
+                INPUT[] inputArray = [inputs[inputOffset], inputs[inputOffset + 1]];
+                var result = NativeMethods.SendInput((uint)inputArray.Length, inputArray, INPUT.Size);
+                if (result != inputArray.Length)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    var (errorCode, errorMessage) = MapSendInputError(error);
+                    return KeyboardControlResult.CreateFailure(
+                        errorCode,
+                        $"{errorMessage}. Expected {inputArray.Length} events, sent {result}.");
+                }
+                sentInput = true;
+                await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
             }
 
-            sentInput = true;
             if (observation is not null)
             {
-                if (!await _textObserver.Value.WaitForChangeAsync(
+                var acknowledgement = await _textObserver.Value.WaitForChangeAsync(
                     observation, chunk.Substring(characterStart, index - characterStart + 1),
-                    cancellationToken).ConfigureAwait(false))
+                    cancellationToken).ConfigureAwait(false);
+                if (!acknowledgement.Consumed)
                 {
                     return KeyboardControlResult.CreateFailure(
                         KeyboardControlErrorCode.OperationTimeout,
-                        "The focused control did not show consumption of the last character. " +
+                        $"The focused control did not show consumption of character {characterStart + 1} in the current text chunk. " +
+                        $"Text length before/after: {observation.Before.Text.Length}/{acknowledgement.LastObserved?.Text.Length}; " +
+                        $"selection length before/after: {observation.Before.Selection?.Length}/{acknowledgement.LastObserved?.Selection?.Length}; " +
+                        $"focused before/after: {observation.Before.Focused}/{acknowledgement.LastObserved?.Focused}. " +
                         "Typing stopped to avoid corrupting queued text; read the current content before retrying.");
                 }
-            }
-            else
-            {
-                // Passwords and controls without readable text cannot provide an acknowledgement.
-                observationUnavailable = true;
-                await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -243,7 +265,7 @@ public sealed class KeyboardInputService : IDisposable
         var charactersTyped = sentInput ? chunk.Length : 0;
         return KeyboardControlResult.CreateTypeSuccess(charactersTyped) with
         {
-            Message = observationUnavailable ? "Text observation unavailable." : null
+            Message = observationWarnings.Count > 0 ? string.Join(" ", observationWarnings) : null
         };
     }
 

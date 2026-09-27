@@ -1,10 +1,24 @@
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Automation;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class KeyboardInputServiceTests
 {
+    [Theory]
+    [InlineData(UIA3ControlTypeIds.Edit, "RichEditD2DPT", true)]
+    [InlineData(UIA3ControlTypeIds.Document, "RichEditD2DPT", true)]
+    [InlineData(UIA3ControlTypeIds.Document, "richeditd2dpt", true)]
+    [InlineData(UIA3ControlTypeIds.DataItem, "RichEditD2DPT", false)]
+    [InlineData(UIA3ControlTypeIds.Button, "RichEditD2DPT", false)]
+    [InlineData(UIA3ControlTypeIds.Edit, "EXCEL6", false)]
+    [InlineData(UIA3ControlTypeIds.Document, "Chrome_RenderWidgetHostHWND", false)]
+    public void TextObservation_RequiresAKnownLiveEditor(int controlType, string className, bool expected)
+    {
+        Assert.Equal(expected, KeyboardTextObserver.IsTextEditor(controlType, className));
+    }
+
     [Theory]
     [InlineData("ab", "acb", null, "", "c", true)]
     [InlineData("a", "aa", null, "", "a", true)]
@@ -16,6 +30,8 @@ public sealed class KeyboardInputServiceTests
     [InlineData("a", "a\r", "", "", "\n", true)]
     [InlineData("a", "ab", "", "", "c", false)]
     [InlineData("a", "abc", "", "", "b", false)]
+    [InlineData("abc", "axc", "", "", "x", false)]
+    [InlineData("abc", "ax", "", "", "x", false)]
     [InlineData("", "\ud83d\ude80", "", "", "\ud83d\ude80", true)]
     [InlineData("", "\ud83d", "", "", "\ud83d\ude80", false)]
     public void TextAcknowledgement_RequiresTheExpectedInsertion(

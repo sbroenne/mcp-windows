@@ -23,7 +23,10 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
         { "Project: Aurora\nStatus: Draft\nOwner: Taylor", "tool" },
         { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "individual" },
         { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "tool" },
+        { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "individual" },
         { "Name\tValue\nAurora\t42", "tool" },
+        { "  Aurora  ", "tool" },
+        { "Line one\r\n\r\n", "tool" },
         { string.Concat(Enumerable.Repeat("Ab9 ", 249)) + "XyZ\U0001f680\nEnd: 0123456789", "tool" },
         { string.Concat(Enumerable.Repeat("\u03a9\u4e2d\U0001f680", 30)), "tool" },
         { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "keyboard" },
@@ -105,6 +108,10 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                 timeout: TimeSpan.FromSeconds(10)),
                 $"Expected one Notepad editor: {System.Text.Json.JsonSerializer.Serialize(found)}");
             var editor = Assert.Single(found!.Items!);
+            var editorClass = await sta.ExecuteAsync(
+                () => ElementIdGenerator.ResolveToAutomationElement(editor.Id)?.CurrentClassName);
+            Assert.True(KeyboardTextObserver.IsTextEditor(UIA3ControlTypeIds.Document, editorClass ?? ""),
+                $"Notepad editor class '{editorClass}' is not covered by live text acknowledgement.");
             var focus = await automation.FocusElementAsync(editor.Id);
             Assert.True(focus.Success, focus.ErrorMessage);
             var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
@@ -127,18 +134,23 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                 var typed = await KeyboardControlTool.ExecuteAsync(
                     window, KeyboardAction.Type, text, null, null, 1, null, null, false,
                     CancellationToken.None);
+                if (typed.IsError == true)
+                {
+                    var failedRead = await automation.GetTextAsync(editor.Id, window, false);
+                    output.WriteLine($"Failed typing readback: {System.Text.Json.JsonSerializer.Serialize(failedRead)}");
+                }
                 Assert.False(typed.IsError, System.Text.Json.JsonSerializer.Serialize(typed));
             }
             UIAutomationResult? read = null;
             await TestWait.RetryUntilAsync(
                 async () => read = await automation.GetTextAsync(editor.Id, window, false),
                 () => read is { Success: true }
-                    && read.Text?.ReplaceLineEndings("\n").TrimEnd('\n') == text.ReplaceLineEndings("\n"),
+                    && read.Text?.ReplaceLineEndings("\n") == text.ReplaceLineEndings("\n"),
                 timeout: TimeSpan.FromSeconds(3));
             output.WriteLine($"Readback: {System.Text.Json.JsonSerializer.Serialize(read)}");
             Assert.NotNull(read);
             Assert.True(read.Success, read.ErrorMessage);
-            Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n").TrimEnd('\n'));
+            Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
             if (inputMode == "save_as")
             {
                 var saved = await automation.SaveAsync(window, path + ".copy.txt", "save_as");

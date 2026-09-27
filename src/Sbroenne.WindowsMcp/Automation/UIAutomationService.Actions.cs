@@ -544,6 +544,23 @@ public sealed partial class UIAutomationService
                 expectedWindowHandle,
                 cancellationToken);
             _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+            if (!staResult.IsPassword && staResult.InitialValue is not null)
+            {
+                var cleared = await WaitForElementConditionAsync(
+                    staResult.Element!,
+                    () => staResult.Element!.GetText() == "",
+                    cancellationToken,
+                    TimeSpan.FromMilliseconds(750));
+                if (!cleared.Observed)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.VerificationFailed,
+                        "The field did not become empty after clearing. No replacement text was sent; read the current content before retrying.",
+                        CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+                }
+            }
         }
 
         if (!IsExpectedForegroundWindow(expectedWindowHandle))
@@ -1963,13 +1980,25 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
         _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-        var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
-        if (!typed.Success)
+        string? typingObservationError = null;
+        try
         {
-            return UIAutomationResult.CreateFailure(
-                "save", UIAutomationErrorType.InternalError,
-                $"Could not type the requested filename: {typed.Error}",
-                CreateDiagnostics(stopwatch));
+            var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
+            if (!typed.Success)
+            {
+                if (typed.ErrorCode != KeyboardControlErrorCode.OperationTimeout)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save", UIAutomationErrorType.InternalError,
+                        $"Could not type into the filename field: {typed.Error}",
+                        CreateDiagnostics(stopwatch));
+                }
+                typingObservationError = typed.Error;
+            }
+        }
+        catch (COMException exception) when (COMExceptionHelper.IsElementStale(exception))
+        {
+            typingObservationError = COMExceptionHelper.GetErrorMessage(exception, "Observe filename input");
         }
 
         string? observedFilename = null;
@@ -1994,6 +2023,11 @@ public sealed partial class UIAutomationService
                 "The filename field did not contain the requested path; Save was not pressed. " +
                 $"Observed filename: {(observedFilename is null ? "<unavailable>" : observedFilename[..Math.Min(observedFilename.Length, 256)])}",
                 CreateDiagnostics(stopwatch));
+        }
+
+        if (typingObservationError is not null)
+        {
+            LogSaveFilenameObservationRecovered(_logger, typingObservationError);
         }
 
         // Click the Save button directly — more reliable than Enter which can interact

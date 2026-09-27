@@ -1,5 +1,6 @@
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Utilities;
+using System.Runtime.InteropServices;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Input;
@@ -7,33 +8,58 @@ namespace Sbroenne.WindowsMcp.Input;
 /// <summary>Waits for a readable focused control to consume each text input before sending the next.</summary>
 internal sealed class KeyboardTextObserver : IDisposable
 {
+    private const int IsReadOnlyTextAttribute = 40015;
     private readonly UIAutomationThread _thread = new();
+
+    internal static bool IsTextEditor(int controlType, string className) =>
+        controlType is UIA3ControlTypeIds.Edit or UIA3ControlTypeIds.Document
+        && string.Equals(className, "RichEditD2DPT", StringComparison.OrdinalIgnoreCase);
 
     internal sealed record State(string Text, string? Selection, bool Focused);
     internal sealed record Observation(UIA.IUIAutomationElement Element, State Before);
+    internal sealed record CaptureResult(Observation? Observation, string? Warning);
 
-    public Task<Observation?> CaptureAsync(CancellationToken cancellationToken) =>
+    public Task<CaptureResult> CaptureAsync(CancellationToken cancellationToken) =>
         _thread.ExecuteAsync(() =>
         {
-            var element = UIA3Automation.Instance.GetFocusedElement();
-            if (element is null || element.CurrentIsPassword != 0)
+            const string warning = "Input was dispatched, but this control does not support live text verification. Read the result before continuing.";
+            try
             {
-                return null;
+                var element = UIA3Automation.Instance.GetFocusedElement();
+                if (element is null || element.CurrentIsPassword != 0)
+                {
+                    return new CaptureResult(null, warning);
+                }
+                var state = ReadState(element);
+                return state is null
+                    ? new CaptureResult(null, warning)
+                    : new CaptureResult(new Observation(element, state), null);
             }
-            var state = ReadState(element);
-            return state is null ? null : new Observation(element, state);
+            catch (COMException exception) when (
+                COMExceptionHelper.IsProviderTimeout(exception) || COMExceptionHelper.IsElementStale(exception))
+            {
+                return new CaptureResult(null,
+                    COMExceptionHelper.GetErrorMessage(exception, "Live text observation") +
+                    " Input was dispatched with pacing only; read the result before continuing.");
+            }
         }, cancellationToken);
 
-    public Task<bool> WaitForChangeAsync(Observation observation, string inserted, CancellationToken cancellationToken) =>
-        DeterministicWait.UntilAsync(
+    internal sealed record Acknowledgement(bool Consumed, State? LastObserved);
+
+    public async Task<Acknowledgement> WaitForChangeAsync(Observation observation, string inserted, CancellationToken cancellationToken)
+    {
+        State? current = null;
+        var consumed = await DeterministicWait.UntilAsync(
             () => _thread.ExecuteAsync(() =>
             {
-                var current = ReadState(observation.Element);
+                current = ReadState(observation.Element);
                 return current is not null && HasConsumed(observation.Before, current, inserted);
             }, cancellationToken),
             TimeSpan.FromSeconds(2),
             TimeSpan.FromMilliseconds(10),
-            cancellationToken: cancellationToken);
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        return new Acknowledgement(consumed, current);
+    }
 
     internal static bool HasConsumed(State before, State current, string inserted)
     {
@@ -78,17 +104,26 @@ internal sealed class KeyboardTextObserver : IDisposable
         {
             suffix++;
         }
-        return newText.AsSpan(prefix, newText.Length - prefix - suffix).SequenceEqual(inserted);
+        return prefix + suffix == oldText.Length
+            && newText.AsSpan(prefix, newText.Length - prefix - suffix).SequenceEqual(inserted);
     }
 
     private static State? ReadState(UIA.IUIAutomationElement element)
     {
-        if (element.CurrentIsPassword != 0)
+        // Other providers can replace cells, invoke shortcuts, or defer their value until
+        // commit. Readable text alone does not establish live insertion semantics.
+        if (!IsTextEditor(element.CurrentControlType, element.CurrentClassName)
+            || element.CurrentIsPassword != 0)
         {
             return null;
         }
         var valuePattern = element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
         var textPattern = element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text);
+        if ((valuePattern is not null && valuePattern.CurrentIsReadOnly != 0)
+            || textPattern?.DocumentRange.GetAttributeValue(IsReadOnlyTextAttribute) is true)
+        {
+            return null;
+        }
         var text = valuePattern?.CurrentValue ?? textPattern?.DocumentRange.GetText(int.MaxValue);
         if (text is null)
         {

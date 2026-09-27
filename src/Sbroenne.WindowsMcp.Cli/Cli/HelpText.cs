@@ -148,7 +148,7 @@ internal static class HelpText
             options: --text --key --modifiers --repeat --sequence --inter-key-delay-ms --clear-first
             example: keyboard press --window <h> --key A --modifiers Ctrl
             Pass the key and modifiers separately; --key 'Ctrl+A' is not a valid key.
-            Text waits for readable controls to consume each character before sending the next.
+            Text is paced, with per-character checks in supported live-text editors.
             Controls without readable text use paced input and return an observation warning.
             The type timeout includes pacing time; cancellation can leave partial text.
 
