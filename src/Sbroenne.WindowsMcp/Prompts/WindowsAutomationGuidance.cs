@@ -5,6 +5,13 @@ namespace Sbroenne.WindowsMcp.Prompts;
 /// </summary>
 public static class WindowsAutomationGuidance
 {
+    /// <summary>Resolve launch observations before using handle-based tools.</summary>
+    public const string LaunchTargetInstructions =
+        "Inspect launchStatus and window/windows. If the intended handle is missing or ambiguous, " +
+        "use window_management to inspect candidates or rediscover the target; do not call handle-based tools yet. " +
+        "Only after selecting the intended handle, verify content with ui_read/ui_wait. " +
+        "possibleHandoff does not confirm delivery.";
+
     /// <summary>
     /// Gets the instructions returned during MCP initialization.
     /// </summary>
@@ -13,6 +20,7 @@ public static class WindowsAutomationGuidance
         "### 1. WINDOW TARGETING (Required First Step)\n" +
         "window_management(action='find', title='...') → returns handle\n" +
         "Use this handle for ALL subsequent operations. Never launch twice - reuse handles.\n\n" +
+        "For app launches: " + LaunchTargetInstructions + "\n\n" +
         "### 2. UI INTERACTION (Preferred)\n" +
         "ui_snapshot(windowHandle='<handle>') - ORIENT FIRST: compact element tree. REPEATED-CHECK RULE: for before/after or any repeated inspection, you MUST explicitly pass mode='auto' on the first and every later snapshot; never omit mode or choose full. Use full only for one inspection. Use reset then auto to replace an older comparison. parentElementId revisits a known subtree id from an earlier snapshot/find; omit it to inspect the whole window.\n" +
         "ui_find(windowHandle='<handle>', name='...') - discover elements (name, controlType, coordinates)\n" +

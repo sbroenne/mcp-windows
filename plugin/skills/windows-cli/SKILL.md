@@ -25,7 +25,11 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 
 ## Preferred workflow
 
-1. `wincli window find --title <part>` (or `wincli app --path <exe>`) to get a **window handle**.
+1. Observe existing windows with `wincli window find --title <part>` or launch with `wincli app --path <exe>`.
+   Inspect `launchStatus` and `window`/`windows`: the handle may be missing or ambiguous.
+   Inspect candidates or rediscover with `window find`; do not continue with handle-based commands
+   until the intended target is identified. `possibleHandoff` does not confirm delivery or loaded
+   content; verify the intended page/document before acting.
 2. `wincli ui snapshot --window <handle>` to see the accessible element tree.
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
 4. `wincli ui read-table --window <handle> --element-id <grid-id>` to pull an observed grid/table into structured rows + headers.
@@ -94,4 +98,4 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 - Do not save files with raw `keyboard press --key s --modifiers ctrl` when a Save As dialog may appear;
   use `file-save`.
 - Do not assume coordinates are stable across machines, themes, or display scaling.
-- Do not keep re-launching an app to "retry" - reuse the existing window handle.
+- Do not keep re-launching an app to "retry" - inspect existing windows and identify the intended target instead.
