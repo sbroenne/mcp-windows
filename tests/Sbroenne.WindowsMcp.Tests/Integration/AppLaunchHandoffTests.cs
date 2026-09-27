@@ -5,12 +5,13 @@ using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Tools;
+using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
 [Collection("WindowManagement")]
 [Trait("Category", "RequiresDesktop")]
-public sealed class AppLaunchHandoffTests : IAsyncLifetime
+public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLifetime
 {
     private static string FixturePath => Path.Combine(AppContext.BaseDirectory, "Sbroenne.WindowsMcp.Cli.TestFixture.exe");
     private McpClient? _client;
@@ -93,9 +94,11 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             Assert.Equal("possibleHandoff", result.RootElement.GetProperty("launchStatus").GetString());
             Assert.Contains("not verified", result.RootElement.GetProperty("message").GetString(), StringComparison.Ordinal);
             Assert.DoesNotContain("focused and ready", json, StringComparison.OrdinalIgnoreCase);
+            Assert.True(result.RootElement.GetProperty("count").GetInt32() == windowCount, json);
             if (windowCount == 1)
             {
-                var returnedHandle = result.RootElement.GetProperty("window").GetProperty("handle").GetString();
+                Assert.True(result.RootElement.TryGetProperty("window", out var window), json);
+                var returnedHandle = window.GetProperty("handle").GetString();
                 Assert.Equal(handles[0], returnedHandle);
                 if (untitled)
                 {
@@ -107,6 +110,9 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             else
             {
                 Assert.False(result.RootElement.TryGetProperty("window", out _));
+                var returnedHandles = result.RootElement.GetProperty("windows").EnumerateArray()
+                    .Select(window => window.GetProperty("handle").GetString()).Order().ToArray();
+                Assert.Equal(handles.Order().ToArray(), returnedHandles);
             }
         }
         finally
@@ -265,6 +271,7 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             }
             var result = await RunCliAsync([.. options]);
             Assert.True(result.Code is 0 or 1, result.Error + result.Output);
+            await LogLaunchResultAsync(result.Output);
             return (result.Code == 0, result.Output);
         }
 
@@ -283,7 +290,24 @@ public sealed class AppLaunchHandoffTests : IAsyncLifetime
             ["workingDirectory"] = workingDirectory,
             ["timeoutMs"] = 3000,
         }, cancellationToken: timeout.Token);
-        return (response.IsError != true, Assert.IsType<TextContentBlock>(Assert.Single(response.Content)).Text);
+        var json = Assert.IsType<TextContentBlock>(Assert.Single(response.Content)).Text;
+        await LogLaunchResultAsync(json);
+        return (response.IsError != true, json);
+    }
+
+    private async Task LogLaunchResultAsync(string json)
+    {
+        output.WriteLine("Launch response: {0}", json);
+        using var result = JsonDocument.Parse(json);
+        if (result.RootElement.TryGetProperty("windows", out var candidates))
+        {
+            foreach (var candidate in candidates.EnumerateArray())
+            {
+                var handle = nint.Parse(candidate.GetProperty("handle").GetString()!, CultureInfo.InvariantCulture);
+                var info = await WindowsToolsBase.WindowService.GetWindowInfoAsync(handle);
+                output.WriteLine("Candidate metadata: {0}", JsonSerializer.Serialize(info));
+            }
+        }
     }
 
     private static Process Start(string path, IEnumerable<string> arguments)
