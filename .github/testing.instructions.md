@@ -140,6 +140,12 @@ checks early/late exits and actual received requests through MCP and CLI, withou
 accounts, or user documents. `scope=window` also includes these tests. Do not run the GUI
 fixture on a shared local desktop.
 
+The owned fixture publishes JSON by atomic rename. Read its immutable state through
+`FixtureState.OpenRead`, which shares delete access while a publisher's rename handle
+may still be open. `FixtureStateTests` reproduces that sharing requirement without a GUI.
+Unexpected receiver exceptions fail the test with stderr rather than opening a .NET
+error dialog; do not hide such dialogs in production window matching.
+
 For click response work, use `scope=click`. This includes owned MCP/CLI response
 regressions, disappearing targets, identity continuity, WinUI clicks, and batch
 snapshot checks. Do not run these desktop tests on a shared local machine.

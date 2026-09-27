@@ -114,7 +114,8 @@ internal static class Program
             var request = Path.Combine(directory, "request.json");
             if (!received && File.Exists(request))
             {
-                var arguments = JsonSerializer.Deserialize<string[]>(File.ReadAllText(request))!;
+                using var input = FixtureState.OpenRead(request);
+                var arguments = JsonSerializer.Deserialize<string[]>(input)!;
                 WriteArguments(Path.Combine(directory, "receipt.json"), arguments);
                 received = true;
             }

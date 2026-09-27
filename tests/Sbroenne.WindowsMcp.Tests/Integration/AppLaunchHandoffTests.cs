@@ -4,6 +4,7 @@ using System.Text.Json;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Cli;
+using Sbroenne.WindowsMcp.Cli.TestFixture;
 using Sbroenne.WindowsMcp.Tools;
 using Xunit.Abstractions;
 
@@ -100,7 +101,8 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
             using var result = JsonDocument.Parse(json);
             var receipt = Path.Combine(directory, "receipt.json");
             Assert.True(File.Exists(receipt), "The owned primary must actually receive the request.");
-            var received = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(receipt));
+            await using var receiptStream = FixtureState.OpenRead(receipt);
+            var received = await JsonSerializer.DeserializeAsync<string[]>(receiptStream);
             Assert.NotNull(received);
             Assert.Equal(["owned local request"], received);
             Assert.Equal(code == 0, success);
@@ -246,7 +248,8 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
             Assert.NotEqual(existing.Id, pid);
             var ownerFile = Path.Combine(second, "owner.json");
             Assert.True(await TestWait.UntilAsync(() => File.Exists(ownerFile), TimeSpan.FromSeconds(10)));
-            var owner = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(ownerFile));
+            await using var ownerStream = FixtureState.OpenRead(ownerFile);
+            var owner = await JsonSerializer.DeserializeAsync<string[]>(ownerStream);
             Assert.NotNull(owner);
             Assert.Equal(int.Parse(Assert.Single(owner), CultureInfo.InvariantCulture), pid);
             using var observedProcess = Process.GetProcessById(pid);
@@ -269,7 +272,8 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
             {
                 await Task.Delay(25, timeout.Token);
             }
-            var owner = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(ownerFile));
+            await using var ownerStream = FixtureState.OpenRead(ownerFile);
+            var owner = await JsonSerializer.DeserializeAsync<string[]>(ownerStream);
             Assert.NotNull(owner);
             using var launched = Process.GetProcessById(int.Parse(Assert.Single(owner), CultureInfo.InvariantCulture));
             await StopOwnedAsync(launched);
