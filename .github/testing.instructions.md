@@ -18,6 +18,35 @@
 
 ## Test Harnesses
 
+The shared Windows UI workflow allows one running workflow and one pending workflow.
+`cancel-in-progress: false` does not preserve multiple pending runs: a new trigger can
+replace an earlier pending validation. Coordinate PR creation, pushes to open PRs, and
+manual dispatches before using the shared runner. Do not cancel another owner's run.
+Wait until the entire group is empty, including VM deallocation, before the next
+owner publishes or dispatches work. A run starting is not permission to queue another.
+Do not mix queue policies across active branches: a trial of `queue: max` was accepted
+but canceled during runner startup when another branch submitted work. Changing the
+queue policy needs a separate coordinated rollout, not an assumption that work is safe.
+
+### Fresh CLI/MCP Usage Evaluations
+
+`tests/usage_evals/` is a separate pytest-skill-engineering consumer for learning whether and how
+Windows MCP should improve, and for finding reusable framework gaps. Do not copy or migrate the
+older LLM scenarios into it. See its README for current framework prerequisites and live-run gates.
+
+Its deterministic checks run without models or desktop access:
+
+```powershell
+uv run --project tests\usage_evals pytest tests\usage_evals\tests\unit -q
+```
+
+Live runs require separate approval of the model and execution budget, built CLI/MCP executables,
+and an exclusive interactive desktop. Prefer a disposable account; an existing profile requires
+explicit owner reservation and confirmation that Notepad has no work to preserve. Reports label
+that weaker isolation separately. They verify actual files and unchanged targets,
+record route and evidence limitations, and keep baseline/candidate outcomes separate. Collection
+must not launch applications or call a model. Do not count default-skipped live cases as coverage.
+
 ### Electron Test Harness (Chromium/CEF Apps)
 
 **Location:** `tests/Sbroenne.WindowsMcp.Tests/Integration/ElectronHarness/`
@@ -40,6 +69,12 @@ Tests UI automation against Electron/Chromium-based applications (like VS Code, 
 - `TestHarnessForm.cs` - Basic mouse/keyboard testing (clicks, drags, scrolls)
 - `UITestHarnessForm.cs` - Comprehensive UI controls (5 tabs, 20+ control types, dialogs)
 - `UITestHarnessFixture.cs` - xUnit fixture that launches WinForms harness in-process
+
+Mouse warmup requires a successful move and the same one-pixel tolerance as the position
+tests. Absolute input rounding can land one pixel away; exact equality in setup previously
+prevented 76 otherwise independent mouse checks from running on a local desktop.
+Focus acquisition uses the shared window activator and waits for each attempt to finish;
+it does not leave a timed-out activation task injecting input after setup has failed.
 
 **Collection:** `[Collection("UITestHarness")]`
 
@@ -69,6 +104,74 @@ dotnet build tests\Sbroenne.WindowsMcp.ModernHarness -c Debug -p:Platform=x64
 **Collection:** `[Collection("ModernTestHarness")]`
 
 **Fixture:** `ModernTestHarnessFixture.cs` - Launches harness as separate process, finds window handle
+
+`WinUITypeTests` verifies exact editor text after bulk Unicode input, individual-character
+input, virtual keys, and semantic text entry. It verifies focus and waits a bounded time
+for the actual text, rather than treating successful input dispatch as proof of delivery.
+Focus failures retain harness-window screenshots in the Windows UI workflow artifacts.
+
+Save tests must wait for their asynchronous dialog to appear and close it in `finally`.
+Use the fixture's owned-window cleanup, not optional response hints or an unguarded Escape.
+The shared fixture also closes leftover owned dialogs before bringing the harness forward
+and checks that the owner is enabled again. A leftover Save dialog previously accepted
+physical input while UI Automation still reported focus on the underlying editor.
+Passing these harness tests alone does not establish real Notepad correctness.
+
+### Chromium process cleanup
+
+Chromium cleanup retains handles to owned child processes before closing the parent window.
+Children must still exit if the parent exits first or closing the window throws. Cleanup failures
+are reported, not swallowed. Regression checks record process IDs and creation times before
+shutdown, and verify that an unrelated process is left alone.
+
+### Real Notepad typing
+
+`NotepadTypingTests` checks exact text in an owned, uniquely named Notepad document, including
+multiline text, tabs, Unicode, supplementary characters, and a text-chunk boundary. Bulk cases
+use the actual keyboard tool, including its timeout budget. A separate case sends individual
+characters without test-side delays. The test logs the installed Notepad version and closes only
+the process identified by its unique document window, checking the process creation time.
+
+Set `MCP_TEST_NOTEPAD=1` and `MCP_TEST_DESKTOP_INPUT=1` only on an exclusive approved desktop
+with no Notepad work to preserve. Never reset the user's Notepad profile. The dedicated Windows
+workflow enables this for `all` and `notepad`; ordinary local test runs skip it.
+
+Notepad 11.2607.14.0 reproduced repeated-character corruption with bulk Unicode input and with
+unpaced individual calls. Both 10ms and 50ms fixed pauses proved insufficient on long text.
+Layout-key trials also lost modifier state in the slow editor and were withdrawn. Shared keyboard
+typing now waits for a supported focused editor to show the expected insertion before sending
+the next Unicode character. Selection replacement and CR/LF/CRLF are accounted for, and surrogate
+pairs are acknowledged as complete characters, with their UTF-16 units dispatched separately at
+the same 50ms pace as other text. Observing a text change does not remove that pacing: immediate
+dispatch after observation also reproduced lost characters. A paired dispatch reproduced broken
+emoji despite retained focus. If acknowledgement times out, typing stops with an explicit error instead
+of continuing to flood the queue. Passwords and controls without readable text retain paced
+dispatch and return an observation warning. Live acknowledgement is limited to the tested
+`RichEditD2DPT` editor family: readable Excel cells and browser controls do not necessarily
+implement live insertion semantics. Other controls retain paced input and require independent
+readback. The Notepad tests assert that their editor is covered by acknowledgement.
+An unavailable or timed-out accessibility provider before dispatch falls back to paced input
+with the specific observation error in the returned warning. An acknowledgement failure after
+dispatch still stops input. Unsupported controls are not repeatedly probed within a text chunk.
+Test mixed long text, not repeated identical
+characters that can conceal corruption. The keyboard tool adds a per-character pacing allowance
+to its normal operation timeout; caller cancellation still stops typing.
+Do not equate successful `SendInput` with delivered text: retain independent exact readback.
+The Notepad tests preserve trailing spaces and blank lines in that comparison. Failures log
+readback before the success assertion; production errors report lengths and focus, not document text.
+
+Typing verification normalizes CR, LF, and CRLF because RichEdit reports different line endings.
+It must not trim extra lines, spaces, or altered characters. A failed post-input check reports
+`verification_failed` and asks for readback before retrying, not a blind repeat.
+
+Save tests cover `shortcut`, `save_as`, and `wait`. The default still sends Ctrl+S; a supplied
+path fills a dialog but does not retarget an already named document. Explicit `save_as` sends
+Ctrl+Shift+S without first saving over the source. `wait` handles an already open owned dialog.
+The real Notepad copy test checks both destination content and the unchanged original.
+If filename input loses its observation because the dialog replaces the field, Save must still
+read the current field in the same owned dialog and require the entire requested path before
+confirming. A partial path or a changed directory must never be accepted; recovered observation
+failures are logged.
 
 ### Verification Pattern
 

@@ -5,6 +5,23 @@ namespace Sbroenne.WindowsMcp.Cli;
 /// <summary>Static help, version, and command-reference text for the CLI.</summary>
 internal static class HelpText
 {
+    public static string? ForCommand(string group)
+    {
+        var canonical = group switch
+        {
+            "window-management" => "window",
+            "clip" => "clipboard",
+            "ui-macro" => "macro",
+            "filesave" or "save" => "file-save",
+            "fileopen" or "open" => "file-open",
+            "proc" => "process",
+            _ => group,
+        };
+
+        // Reuse the published reference so nested help cannot drift from "wincli tools".
+        return Tools.Split(["\r\n\r\n", "\n\n"], StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault(section => section.StartsWith(canonical + " ", StringComparison.Ordinal));
+    }
     public const string ElementIdLifetime = """
         CLI ELEMENT-ID LIFETIME
         IDs identify observations in the persistent CLI daemon, not OS handles.
@@ -38,6 +55,7 @@ internal static class HelpText
 
         DISCOVERY
           wincli --help                 Show this help.
+          wincli <group> --help         Show group options without running an action.
           wincli tools                  List every command with its key options.
           wincli tools --json           Machine-readable tool manifest (names + JSON input schemas).
           wincli guidance               Print the full automation guide (recommended read first).
@@ -128,6 +146,11 @@ internal static class HelpText
             actions: type, press, key_down, key_up, sequence, release_all,
                      get_keyboard_layout, wait_for_idle
             options: --text --key --modifiers --repeat --sequence --inter-key-delay-ms --clear-first
+            example: keyboard press --window <h> --key A --modifiers Ctrl
+            Pass the key and modifiers separately; --key 'Ctrl+A' is not a valid key.
+            Text is paced, with per-character checks in supported live-text editors.
+            Controls without readable text use paced input and return an observation warning.
+            The type timeout includes pacing time; cancellation can leave partial text.
 
         mouse <action> [options]
             actions: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position
@@ -140,8 +163,11 @@ internal static class HelpText
                      --region-height --annotate/--no-annotate --include-cursor --image-format
                      --quality --output-mode --output-path --include-image
 
-        file-save --window <h> [--path <file>]
-            Save the active document; drives the Save As dialog when needed.
+        file-save --window <h> [--path <file>] [--trigger-mode shortcut|save_as|wait]
+            shortcut saves the current document with Ctrl+S (default).
+            save_as sends Ctrl+Shift+S to save under a different path without first overwriting
+            the original. --path alone does not change an existing document's destination.
+            wait fills an already open owned Save As dialog without another shortcut.
 
         file-open --window <h> --path <file> [--trigger-mode shortcut|wait] [--timeout-ms <n>]
             Open an existing file. shortcut sends Ctrl+O; wait handles a native dialog opened by
@@ -149,8 +175,9 @@ internal static class HelpText
 
         clipboard <action> [--text <s>]
             actions: get (read clipboard text), set (write --text), clear
-            Fast bulk text IO. Pair with keyboard copy/paste: focus app, keyboard c --modifiers ctrl,
-            then clipboard get; or clipboard set --text '...' then keyboard v --modifiers ctrl.
+            Fast bulk text IO. Pair with keyboard copy/paste: focus app, then
+            keyboard press --window <h> --key C --modifiers Ctrl and clipboard get;
+            or clipboard set --text '...' then keyboard press --window <h> --key V --modifiers Ctrl.
 
         process <action> [options]
             actions: list ([--name <filter>] [--sort-by memory|name|pid] [--limit <n>]),

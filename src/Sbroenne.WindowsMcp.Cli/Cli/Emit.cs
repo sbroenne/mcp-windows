@@ -60,6 +60,13 @@ internal static class Emit
         return result.IsError == true ? ExitCodes.ToolError : ExitCodes.Success;
     }
 
+    /// <summary>Writes informational text to the active request output.</summary>
+    public static int Text(string text)
+    {
+        (Writers.Value?.Output ?? Console.Out).WriteLine(text);
+        return ExitCodes.Success;
+    }
+
     /// <summary>Writes a usage error to stderr and returns the usage exit code.</summary>
     public static int Usage(string message)
     {

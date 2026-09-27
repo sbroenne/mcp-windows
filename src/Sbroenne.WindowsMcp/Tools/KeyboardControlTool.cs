@@ -27,7 +27,7 @@ public static partial class KeyboardControlTool
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from app() or window_management 'find'). REQUIRED - ensures input goes to the correct window.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
-    /// <param name="text">Text to type (required for type action).</param>
+    /// <param name="text">Text to type (required for type action). Uses paced input, with per-character acknowledgement in supported live-text editors. Other controls return an observation warning: read back the result. The timeout includes pacing time; cancellation can leave partial text.</param>
     /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
     /// <param name="modifiers">Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.</param>
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>
@@ -49,6 +49,9 @@ public static partial class KeyboardControlTool
         [DefaultValue(false)] bool clearFirst,
         CancellationToken cancellationToken)
     {
+        var timeoutMs = action == KeyboardAction.Type
+            ? Input.KeyboardInputService.GetTextTimeoutMs(text?.Length ?? 0, WindowsToolsBase.TimeoutMs)
+            : WindowsToolsBase.TimeoutMs;
         try
         {
             // Validate windowHandle is provided
@@ -71,8 +74,8 @@ public static partial class KeyboardControlTool
 
             var handle = new IntPtr(handleValue);
 
-            // Create a linked token source with the configured timeout
-            using var timeoutCts = new CancellationTokenSource(WindowsToolsBase.TimeoutMs);
+            // Text pacing is additional to the configured operation budget.
+            using var timeoutCts = new CancellationTokenSource(timeoutMs);
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
             var linkedToken = linkedCts.Token;
 
@@ -155,7 +158,7 @@ public static partial class KeyboardControlTool
             return ToCallToolResult(
                 KeyboardControlResult.CreateFailure(
                     KeyboardControlErrorCode.OperationTimeout,
-                    $"Operation timed out after {WindowsToolsBase.TimeoutMs}ms"));
+                    $"Operation timed out or was cancelled (timeout budget: {timeoutMs}ms). Text may be partially entered."));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
