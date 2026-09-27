@@ -202,7 +202,9 @@ connecting to Azure, installing updates, or touching a desktop:
 python -m unittest scripts.tests.test_maintain_windows_runner -v
 ```
 
-These checks need Python, PowerShell 7, and Node.js. Real Windows Update installation
+These checks need Python, PowerShell 7, and Node.js. On Windows they also run the guest
+checks under Windows PowerShell 5.1, matching the scheduled task, and exercise creation
+and atomic replacement of real temporary result files. Real Windows Update installation
 and restart recovery must be verified by the first manual maintenance run on the VM.
 
 ## Configure GitHub OIDC

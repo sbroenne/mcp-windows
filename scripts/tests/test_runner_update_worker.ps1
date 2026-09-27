@@ -1,6 +1,26 @@
 $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\..\..\infrastructure\azure\update-runner.ps1"
 
+$resultDirectory = Join-Path ([IO.Path]::GetTempPath()) ('windows-mcp-state-' + [guid]::NewGuid().ToString('N'))
+New-Item $resultDirectory -ItemType Directory | Out-Null
+$resultPath = Join-Path $resultDirectory 'result.json'
+$PassId = '0123456789abcdef0123456789abcdef'
+try {
+    Write-MaintenanceState @{ state = 'running' }
+    Write-MaintenanceState @{ state = 'complete'; installed = 0; rebootRequired = $false }
+    $saved = Get-Content $resultPath -Raw | ConvertFrom-Json
+    if ($saved.state -ne 'complete' -or $saved.passId -ne $PassId) {
+        throw 'The worker must replace its running state with the final result.'
+    }
+    if (Test-Path "$resultPath.tmp") { throw 'The atomic replacement left a temporary state file.' }
+}
+finally {
+    foreach ($file in @($resultPath, "$resultPath.tmp")) {
+        if (Test-Path $file) { Remove-Item -LiteralPath $file }
+    }
+    Remove-Item -LiteralPath $resultDirectory
+}
+
 function Assert-Throws {
     param([scriptblock]$Action)
     $threw = $false
