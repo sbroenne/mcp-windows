@@ -60,6 +60,11 @@ switch (first)
 try
 {
     var parsed = ParsedArgs.Parse(args);
+    if (parsed.Has("help"))
+    {
+        return await CommandDispatcher.DispatchAsync(parsed, cts.Token);
+    }
+
     if (parsed.Group == "service")
     {
         if (args.Length != 2)

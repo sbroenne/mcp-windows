@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
+using Sbroenne.WindowsMcp.Window;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -22,16 +23,6 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
     // P/Invoke for foreground window verification
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetForegroundWindow(nint hWnd);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool AllowSetForegroundWindow(int dwProcessId);
-
-    private const int ASFW_ANY = -1;
 
     /// <summary>
     /// Gets the handle of the test window.
@@ -194,29 +185,24 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
             throw new InvalidOperationException("Test harness form is not available.");
         }
 
-        var ready = await TestWait.RetryUntilAsync(
-            attempt: () =>
-            {
-                AllowSetForegroundWindow(ASFW_ANY);
-
-                _form.Invoke(() =>
-                {
-                    _form.Activate();
-                    _form.BringToFront();
-                });
-
-                SetForegroundWindow(TestWindowHandle);
-            },
-            condition: () => GetForegroundWindow() == TestWindowHandle,
-            timeout: TimeSpan.FromMilliseconds(maxRetries * delayMs),
-            pollInterval: TimeSpan.FromMilliseconds(delayMs));
-
-        if (!ready)
+        var activator = new WindowActivator();
+        for (var attempt = 0; attempt < maxRetries; attempt++)
         {
-            throw new TimeoutException(
-                $"Test harness window {TestWindowHandle} did not become foreground; " +
-                $"actual foreground window is {GetForegroundWindow()}.");
+            _form.Invoke(() =>
+            {
+                _form.Activate();
+                _form.BringToFront();
+            });
+            if (await activator.ActivateWindowAsync(TestWindowHandle)
+                && GetForegroundWindow() == TestWindowHandle)
+            {
+                return;
+            }
+            await Task.Delay(delayMs);
         }
+        throw new TimeoutException(
+            $"Test harness window {TestWindowHandle} did not become foreground; " +
+            $"actual foreground window is {GetForegroundWindow()}.");
     }
 
     /// <summary>
@@ -241,12 +227,17 @@ public class MouseTestFixture : IAsyncLifetime, IDisposable
 
         // Move mouse to window center to "wake up" the input system
         var center = GetTestWindowCenter();
-        await MouseInputService.MoveAsync(center.X, center.Y);
-        var moved = await TestWait.UntilAsync(() =>
-            Cursor.Position.X == center.X && Cursor.Position.Y == center.Y);
+        var result = await MouseInputService.MoveAsync(center.X, center.Y);
+        var moved = result.Success && await TestWait.UntilAsync(() =>
+        {
+            var position = Cursor.Position;
+            return Math.Abs(position.X - center.X) <= 1 && Math.Abs(position.Y - center.Y) <= 1;
+        });
         if (!moved)
         {
-            throw new TimeoutException($"Mouse did not reach test window center {center}.");
+            throw new TimeoutException(
+                $"Mouse did not reach test window center {center}; actual position {Cursor.Position}; " +
+                $"move result: {System.Text.Json.JsonSerializer.Serialize(result)}.");
         }
 
         _isWarmedUp = true;
