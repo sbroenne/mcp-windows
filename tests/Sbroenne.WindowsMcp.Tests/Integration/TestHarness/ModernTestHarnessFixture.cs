@@ -26,6 +26,10 @@ public sealed class ModernTestHarnessFixture : IDisposable
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowEnabled(nint hWnd);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint FindWindow(string? lpClassName, string lpWindowName);
 
@@ -188,6 +192,10 @@ public sealed class ModernTestHarnessFixture : IDisposable
             var dialog = GetOwnedDialog();
             if (dialog == nint.Zero)
             {
+                if (!TestWait.Until(() => IsWindowEnabled(_windowHandle)))
+                {
+                    throw new TimeoutException("Modern harness remained disabled after dialog cleanup.");
+                }
                 return;
             }
 
