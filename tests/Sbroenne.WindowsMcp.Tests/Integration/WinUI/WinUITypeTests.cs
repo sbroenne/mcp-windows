@@ -244,6 +244,31 @@ public sealed class WinUITypeTests : IDisposable
             attempt: async () => focused = await _automationService.GetFocusedElementAsync(),
             condition: () => focused is { Success: true, Items.Length: 1 }
                 && focused.Items[0].Id == targetEditor.Id);
+        if (!editorHasFocus)
+        {
+            var underCursor = await _automationService.GetElementAtCursorAsync();
+            _output.WriteLine($"Expected editor: {System.Text.Json.JsonSerializer.Serialize(targetEditor)}");
+            _output.WriteLine($"Actual focus: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+            _output.WriteLine($"Under cursor: {System.Text.Json.JsonSerializer.Serialize(underCursor)}");
+            var screenshot = await new ScreenshotService(
+                new MonitorService(), new SecureDesktopDetector(), new ImageProcessor())
+                .ExecuteAsync(new ScreenshotControlRequest
+                {
+                    Action = ScreenshotAction.Capture,
+                    Target = CaptureTarget.Window,
+                    WindowHandle = _windowHandle,
+                    ImageFormat = ImageFormat.Png,
+                });
+            _output.WriteLine($"Failure screenshot: {screenshot.Success}, {screenshot.Message}");
+            if (screenshot.Success && screenshot.ImageData is not null)
+            {
+                var directory = Path.Combine(AppContext.BaseDirectory, "TestResults");
+                Directory.CreateDirectory(directory);
+                await File.WriteAllBytesAsync(
+                    Path.Combine(directory, $"editor-focus-{Guid.NewGuid():N}.png"),
+                    Convert.FromBase64String(screenshot.ImageData));
+            }
+        }
         Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
         _output.WriteLine($"Focus before keyboard calls: {System.Text.Json.JsonSerializer.Serialize(focused)}");
         LogModifierState("Before keyboard calls");

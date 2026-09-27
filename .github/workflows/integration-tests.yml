@@ -288,7 +288,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-ui-results-${{ github.run_number }}
-          path: '**/TestResults/*.trx'
+          path: |
+            **/TestResults/*.trx
+            **/TestResults/editor-focus-*.png
           if-no-files-found: warn
           retention-days: 14
 
