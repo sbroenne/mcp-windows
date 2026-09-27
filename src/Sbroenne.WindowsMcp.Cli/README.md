@@ -206,3 +206,6 @@ are not written to lifecycle logs. State remains in memory only.
   `snake_case` and `kebab-case` are accepted.
 - The CLI ships with the same DPI-awareness manifest as the server, so screen coordinates are correct
   on high-DPI and multi-monitor setups.
+For a different destination, use `file-save --window <h> --path <file> --trigger-mode save_as`.
+The default `shortcut` sends Ctrl+S; a path alone does not retarget an already named document.
+Use `--trigger-mode wait` to fill an already open owned Save As dialog without another shortcut.

@@ -1,10 +1,33 @@
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class KeyboardInputServiceTests
 {
+    [Theory]
+    [InlineData('a', false)]
+    [InlineData('A', false)]
+    [InlineData('a', true)]
+    [InlineData('A', true)]
+    public void TextKeyMapping_AccountsForCapsLockWithoutChangingIt(char character, bool capsLock)
+    {
+        var layout = NativeMethods.GetKeyboardLayout(0);
+        Assert.True(KeyboardInputService.TryGetTextKey(character, layout, capsLock, out var key, out var modifiers));
+        Assert.InRange(key, 1, 255);
+        Assert.Equal(char.IsUpper(character) != capsLock, modifiers.HasFlag(ModifierKey.Shift));
+    }
+
+    [Theory]
+    [InlineData('\n')]
+    [InlineData('\t')]
+    [InlineData('\ud83d')]
+    public void TextKeyMapping_DoesNotMapControlOrSurrogateUnits(char character)
+    {
+        Assert.False(KeyboardInputService.TryGetTextKey(character, NativeMethods.GetKeyboardLayout(0), false, out _, out _));
+    }
+
     [Theory]
     [InlineData(0, 30000, 30000)]
     [InlineData(1000, 30000, 130000)]

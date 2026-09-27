@@ -17,6 +17,7 @@ from usage_evals.runtime import (
     identify_launched_notepads,
     require_interactive_desktop,
     snapshot_notepads,
+    stage_cli,
 )
 
 pytestmark = pytest.mark.usage_live
@@ -50,6 +51,9 @@ async def test_windows_usage(
     workspace.mkdir()
     (workspace / "configuration").mkdir()
     tools = discover_tools(cli)
+    source_cli = cli
+    if interface == "cli":
+        cli = stage_cli(cli, workspace)
     agent = build_agent(
         interface,
         model,
@@ -74,15 +78,18 @@ async def test_windows_usage(
             "desktop_mode": validate_desktop(os.environ),
             "timeout_s": agent.timeout_s,
             "documents": str(tmp_path / "documents"),
+            "execution_cli": str(cli),
             "configured_tools": agent.allowed_tools,
-            **build_metadata(cli, server),
+            **build_metadata(source_cli, server),
         },
     )
     result = None
     try:
         result = await copilot_eval(agent, case.prompt)
         verdict = verify_files(case)
-        route_issues = classify_calls(interface, result.all_tool_calls, str(cli), tools)
+        route_issues = classify_calls(
+            interface, result.all_tool_calls, str(cli), tools, str(workspace)
+        )
         record_property("verification", asdict(verdict))
         record_property(
             "interface_route",
@@ -111,12 +118,21 @@ async def test_windows_usage(
         assert not route_issues, f"Interface usage is not verified: {route_issues}"
         assert verdict.passed, f"Independent document verification failed: {verdict.checks}"
     finally:
-        records = identify_launched_notepads(
-            snapshot_notepads(run_id),
-            result.all_tool_calls if result is not None else [],
-            started_at,
-            str(cli),
-        )
-        record_property("cleanup_candidates", [asdict(record) for record in records])
-        cleaned = cleanup_owned(records)
-        record_property("cleanup", {"terminated_owned_pids": cleaned})
+        try:
+            records = identify_launched_notepads(
+                snapshot_notepads(run_id),
+                result.all_tool_calls if result is not None else [],
+                started_at,
+                str(cli),
+                str(workspace),
+            )
+            record_property("cleanup_candidates", [asdict(record) for record in records])
+            cleaned = cleanup_owned(records)
+            record_property("cleanup", {"terminated_owned_pids": cleaned})
+        finally:
+            if interface == "cli":
+                stopped = subprocess.run(
+                    [str(cli), "service", "stop"], capture_output=True, text=True,
+                    encoding="utf-8", timeout=30, check=True,
+                )
+                record_property("cli_service_cleanup", {"output": stopped.stdout})

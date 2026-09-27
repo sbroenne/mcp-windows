@@ -148,7 +148,7 @@ internal static class HelpText
             options: --text --key --modifiers --repeat --sequence --inter-key-delay-ms --clear-first
             example: keyboard press --window <h> --key A --modifiers Ctrl
             Pass the key and modifiers separately; --key 'Ctrl+A' is not a valid key.
-            Text is paced for editor reliability (roughly 15-20 characters/second).
+            Text uses verified layout keys, with paced Unicode fallback when needed.
             The type timeout includes pacing time; cancellation can leave partial text.
 
         mouse <action> [options]
@@ -162,8 +162,11 @@ internal static class HelpText
                      --region-height --annotate/--no-annotate --include-cursor --image-format
                      --quality --output-mode --output-path --include-image
 
-        file-save --window <h> [--path <file>]
-            Save the active document; drives the Save As dialog when needed.
+        file-save --window <h> [--path <file>] [--trigger-mode shortcut|save_as|wait]
+            shortcut saves the current document with Ctrl+S (default).
+            save_as sends Ctrl+Shift+S to save under a different path without first overwriting
+            the original. --path alone does not change an existing document's destination.
+            wait fills an already open owned Save As dialog without another shortcut.
 
         file-open --window <h> --path <file> [--trigger-mode shortcut|wait] [--timeout-ms <n>]
             Open an existing file. shortcut sends Ctrl+O; wait handles a native dialog opened by

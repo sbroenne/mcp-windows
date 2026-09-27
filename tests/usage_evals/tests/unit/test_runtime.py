@@ -11,6 +11,7 @@ from usage_evals.runtime import (
     cleanup_owned,
     identify_launched_notepads,
     require_capture_api,
+    stage_cli,
 )
 
 
@@ -99,10 +100,28 @@ def test_cli_agent_has_no_mcp_and_no_automatic_retry(tmp_path):
     assert agent.model == "selected-model"
     assert agent.timeout_s == 123
     assert agent.max_retries == 0
-    assert agent.allowed_tools == ["powershell"]
+    assert agent.allowed_tools == ["powershell", "read_powershell"]
+    assert r".\wincli.exe" in agent.instructions
+    assert "read_powershell" in agent.instructions
     assert agent.mcp_servers == {}
     assert agent.working_directory == str(tmp_path)
 
+
+def test_cli_staging_keeps_build_dependencies_and_does_not_modify_the_source(tmp_path):
+    source = tmp_path / "build"
+    source.mkdir()
+    cli = source / "wincli.exe"
+    cli.write_bytes(b"apphost")
+    (source / "wincli.dll").write_bytes(b"assembly")
+    (source / "wincli.deps.json").write_text("{}", encoding="utf-8")
+    workspace = tmp_path / "run"
+    workspace.mkdir()
+    staged = stage_cli(cli, workspace)
+    assert staged == workspace / "cli" / "wincli.exe"
+    assert staged.read_bytes() == cli.read_bytes()
+    assert staged.with_suffix(".dll").read_bytes() == b"assembly"
+    staged.write_bytes(b"changed")
+    assert cli.read_bytes() == b"apphost"
 
 def test_mcp_agent_does_not_expose_shell(tmp_path):
     agent = build_agent(

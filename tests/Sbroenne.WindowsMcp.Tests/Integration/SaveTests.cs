@@ -70,8 +70,11 @@ public sealed class SaveTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task Save_StandardWindowsDialog_SavesFile()
+    [Theory]
+    [InlineData("shortcut")]
+    [InlineData("save_as")]
+    [InlineData("wait")]
+    public async Task Save_StandardWindowsDialog_SavesFile(string triggerMode)
     {
         // Arrange: Prepare test file path
         var testFilePath = Path.Combine(_testOutputDir, $"test-{Guid.NewGuid()}.txt");
@@ -89,7 +92,14 @@ public sealed class SaveTests : IDisposable
         // Act: Call SaveAsync on the main window
         // This sends Ctrl+S, which triggers the Save As dialog in the test harness
         // Then it fills in the filename and presses Enter
-        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
+        if (triggerMode == "wait")
+        {
+            using var keyboard = new KeyboardInputService();
+            var shortcut = await keyboard.PressKeyAsync("s", Models.ModifierKey.Ctrl, 1,
+                _fixture.TestWindowHandle, CancellationToken.None);
+            Assert.True(shortcut.Success, shortcut.Error);
+        }
+        var result = await _automationService.SaveAsync(_windowHandle, testFilePath, triggerMode);
 
         // Assert
         Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");

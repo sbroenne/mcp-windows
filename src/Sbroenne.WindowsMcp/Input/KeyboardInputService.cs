@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Input;
 
 /// <summary>
 /// Implementation of keyboard input operations using Windows SendInput API.
-/// Uses KEYEVENTF_UNICODE for layout-independent text typing.
+/// Uses verified layout keys where possible, with Unicode input for unmappable characters.
 /// </summary>
 public sealed class KeyboardInputService : IDisposable
 {
@@ -143,6 +143,26 @@ public sealed class KeyboardInputService : IDisposable
             cancellationToken.ThrowIfCancellationRequested();
             inputs.Clear();
             var c = chunk[index];
+
+            var foreground = NativeMethods.GetForegroundWindow();
+            var threadId = NativeMethods.GetWindowThreadProcessId(foreground, out _);
+            var layout = NativeMethods.GetKeyboardLayout(threadId);
+            var capsLock = (NativeMethods.GetKeyState(NativeConstants.VK_CAPITAL) & 1) != 0;
+            if (foreground != nint.Zero && !HasHeldTextModifiers()
+                && TryGetTextKey(c, layout, capsLock, out var virtualKey, out var modifiers))
+            {
+                // Real key codes do not share VK_PACKET's last-character state in slow editors.
+                var keyResult = PressKeyGuarded(c.ToString(), virtualKey, modifiers, 1,
+                    expectedForegroundWindow ?? foreground, cancellationToken);
+                if (!keyResult.Success)
+                {
+                    return keyResult;
+                }
+                sentInput = true;
+                await Task.Delay(_interKeyDelayMs, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
             // Handle special characters
             if (c == '\n' || c == '\r')
             {
@@ -200,14 +220,60 @@ public sealed class KeyboardInputService : IDisposable
             }
 
             sentInput = true;
-            // Modern Notepad corrupts rapid VK_PACKET input, even across separate API calls.
-            // Pace every character, including the last, without splitting a surrogate pair.
+            // Pace unmappable Unicode characters without splitting a surrogate pair.
             await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
         }
 
         // Count actual characters typed (excluding control characters converted to keys)
         var charactersTyped = sentInput ? chunk.Length : 0;
         return KeyboardControlResult.CreateTypeSuccess(charactersTyped);
+    }
+
+    private bool HasHeldTextModifiers() =>
+        _modifierKeyManager.IsKeyPressed(NativeConstants.VK_CONTROL)
+        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_SHIFT)
+        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_MENU)
+        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_LWIN)
+        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_RWIN);
+
+    internal static bool TryGetTextKey(char character, nint layout, bool capsLock,
+        out int virtualKey, out ModifierKey modifiers)
+    {
+        virtualKey = 0;
+        modifiers = ModifierKey.None;
+        if (char.IsControl(character) || char.IsSurrogate(character) || layout == nint.Zero)
+        {
+            return false;
+        }
+
+        var mapping = NativeMethods.VkKeyScanEx(character, layout);
+        if (mapping == -1 || (mapping >> 8 & ~7) != 0)
+        {
+            return false;
+        }
+        virtualKey = mapping & 0xff;
+        var shiftState = mapping >> 8;
+        var scanCode = NativeMethods.MapVirtualKeyEx((uint)virtualKey, 0, layout);
+        var buffer = new char[8];
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var state = new byte[256];
+            state[NativeConstants.VK_SHIFT] = (byte)((shiftState & 1) != 0 ? 0x80 : 0);
+            state[NativeConstants.VK_CONTROL] = (byte)((shiftState & 2) != 0 ? 0x80 : 0);
+            state[NativeConstants.VK_MENU] = (byte)((shiftState & 4) != 0 ? 0x80 : 0);
+            state[NativeConstants.VK_CAPITAL] = (byte)(capsLock ? 1 : 0);
+            // Flag 4 prevents this probe from changing the keyboard's dead-key state.
+            var count = NativeMethods.ToUnicodeEx((uint)virtualKey, scanCode, state, buffer, buffer.Length, 4, layout);
+            if (count == 1 && buffer[0] == character)
+            {
+                modifiers = ((shiftState & 1) != 0 ? ModifierKey.Shift : ModifierKey.None)
+                    | ((shiftState & 2) != 0 ? ModifierKey.Ctrl : ModifierKey.None)
+                    | ((shiftState & 4) != 0 ? ModifierKey.Alt : ModifierKey.None);
+                return true;
+            }
+            shiftState ^= 1;
+        }
+        return false;
     }
 
     /// <summary>

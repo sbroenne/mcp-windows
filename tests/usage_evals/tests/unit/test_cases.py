@@ -36,6 +36,12 @@ def test_claiming_saved_without_a_file_does_not_pass(tmp_path):
     assert verdict.checks[0]["reason"] == "missing"
 
 
+def test_creation_requires_a_new_document_not_a_restored_tab(tmp_path):
+    case = prepare_case("create_note", tmp_path, "unique-run")
+    assert "new blank document" in case.prompt
+    assert "Do not reuse or modify any existing open document" in case.prompt
+    assert not next(iter(case.expected)).exists()
+
 def test_wrong_contents_and_non_text_are_reported(tmp_path):
     case = prepare_case("create_note", tmp_path, "unique-run")
     output = next(iter(case.expected))

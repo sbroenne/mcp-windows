@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import re
+import shutil
 import subprocess
 from dataclasses import dataclass, replace
 from importlib.metadata import version
@@ -13,7 +14,7 @@ from pathlib import Path
 import psutil
 from pytest_skill_engineering.copilot import CopilotCLIPersona, CopilotEval
 
-from usage_evals.policy import is_cli_invocation
+from usage_evals.policy import cli_route_command
 
 
 @dataclass(frozen=True)
@@ -63,15 +64,23 @@ def build_agent(
         },
     )
     if interface == "cli":
+        invocation = (
+            ".\\" + str(cli.relative_to(working_directory)).replace("/", "\\")
+            if cli.is_relative_to(working_directory) else str(cli)
+        )
         return CopilotEval(
             **common,
-            allowed_tools=["powershell"],
+            allowed_tools=["powershell", "read_powershell"],
             instructions=(
-                f"Windows automation is available through this executable: {cli}\n"
+                f"Windows automation is available through this executable: {invocation}\n"
                 "Complete the user's task using that executable through PowerShell. "
                 "Use one invocation with literal arguments per shell call. "
+                "Copy the executable path exactly. If a call is still running, use "
+                "read_powershell with its returned shellId to retrieve the result. "
                 "Do not use other executables, scripts, file APIs, or another automation route. "
-                "Work only with the task's documents. Report what actually happened."
+                "Work only with the task's documents; "
+                "do not edit restored documents from earlier work. "
+                "Report what actually happened."
             ),
         )
     if interface == "mcp":
@@ -83,10 +92,19 @@ def build_agent(
             },
             instructions=(
                 "Complete the user's task using the attached Windows automation tools. "
-                "Work only with the task's documents. Report what actually happened."
+                "Work only with the task's documents; "
+                "do not edit restored documents from earlier work. "
+                "Report what actually happened."
             ),
         )
     raise ValueError(f"Unknown interface: {interface}")
+
+
+def stage_cli(cli: Path, workspace: Path) -> Path:
+    """Give each evaluation a short command path and a separate path-scoped daemon."""
+    destination = workspace / "cli"
+    shutil.copytree(cli.parent, destination)
+    return destination / cli.name
 
 
 def discover_tools(cli: Path) -> set[str]:
@@ -182,13 +200,16 @@ def snapshot_notepads(run_id: str) -> list[ProcessRecord]:
     ]
 
 
-def identify_launched_notepads(records, calls, started_at: float, cli: str) -> list[ProcessRecord]:
+def identify_launched_notepads(
+    records, calls, started_at: float, cli: str, working_directory: str | None = None
+) -> list[ProcessRecord]:
     launched = set()
+    sessions: dict[str, str] = {}
     for call in calls:
         is_app = call.name in {"app", "windows-app"}
-        if call.name == "powershell":
-            command = str(call.arguments.get("command", ""))
-            is_app = is_cli_invocation(command, cli) and bool(
+        if call.name in {"powershell", "read_powershell"}:
+            command = cli_route_command(call, cli, working_directory, sessions)
+            is_app = command is not None and bool(
                 re.match(r"""^(?:&\s+)?(?:'[^']*'|"[^"]*"|\S+)\s+app(?:\s|$)""", command)
             )
         if not is_app or not isinstance(call.result, str):

@@ -27,7 +27,7 @@ public static partial class KeyboardControlTool
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from app() or window_management 'find'). REQUIRED - ensures input goes to the correct window.</param>
     /// <param name="action">The keyboard action: type, press, key_down, key_up, sequence, release_all, get_keyboard_layout, or wait_for_idle.</param>
-    /// <param name="text">Text to type (required for type action). Paced at roughly 15-20 characters/second for editor reliability; the timeout includes pacing time. Cancellation can leave partial text.</param>
+    /// <param name="text">Text to type (required for type action). Uses verified layout keys with paced Unicode fallback; the timeout includes pacing time. Cancellation can leave partial text.</param>
     /// <param name="key">The MAIN key to press (for press, key_down, key_up actions). Examples: enter, tab, escape, f1, a, s, c, v, copilot. For Ctrl+S, this is 's' (not 'ctrl').</param>
     /// <param name="modifiers">Modifier keys HELD during the key press: ctrl, shift, alt, win (comma-separated). For Ctrl+S: key='s', modifiers='ctrl'. For Ctrl+Shift+S: key='s', modifiers='ctrl,shift'.</param>
     /// <param name="repeat">Number of times to repeat key press (default: 1, for press action).</param>

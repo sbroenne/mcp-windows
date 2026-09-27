@@ -33,7 +33,8 @@ def prepare_case(name: str, directory: Path, run_id: str) -> Case:
         content = "Project: Aurora\nStatus: Ready\nOwner: Morgan"
         return Case(
             name,
-            f"In Notepad, create a note containing these three lines:\n{content}\n"
+            f"In Notepad, create a new blank document containing these three lines:\n{content}\n"
+            "Do not reuse or modify any existing open document. "
             f'Save it as "{note}". Leave the document open when finished.',
             {note: content},
         )

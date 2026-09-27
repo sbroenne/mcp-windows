@@ -67,6 +67,36 @@ def test_empty_trace_cannot_prove_interface_usage():
     assert classify_calls("mcp", [], CLI, {"ui_type"})
 
 
+def test_relative_cli_path_requires_the_selected_working_directory():
+    assert is_cli_invocation(r"& '.\cli\wincli.exe' --help", r"D:\run\cli\wincli.exe", r"D:\run")
+    assert not is_cli_invocation(r"& '.\cli\wincli.exe' --help", CLI, r"D:\run")
+    assert not is_cli_invocation(r"& '.\cli\wincli.exe' --help", CLI)
+
+
+def test_cli_can_read_only_shell_sessions_started_by_its_own_invocations():
+    calls = [
+        SimpleNamespace(
+            name="powershell", arguments={"command": f"& '{CLI}' app --path notepad.exe"},
+            result="<command with shellId: 4 is still running after 30 seconds.>",
+        ),
+        SimpleNamespace(name="read_powershell", arguments={"shellId": "4", "delay": 5},
+                        result="<shellId: 4 completed with exit code 0>"),
+    ]
+    assert classify_calls("cli", calls, CLI, {"app"}) == []
+    calls.append(SimpleNamespace(name="read_powershell", arguments={"shellId": "foreign"}))
+    assert len(classify_calls("cli", calls, CLI, {"app"})) == 1
+
+
+def test_rejected_shell_command_cannot_authorize_a_followup_read():
+    calls = [
+        SimpleNamespace(
+            name="powershell", arguments={"command": "Read-Host"}, result="<shellId: 4>"
+        ),
+        SimpleNamespace(name="read_powershell", arguments={"shellId": "4"}),
+    ]
+    assert len(classify_calls("cli", calls, CLI, {"app"})) == 2
+
+
 @pytest.mark.parametrize("selected,cap", [(6, 5), (1, 0), (0, 6)])
 def test_budget_mismatch_fails_before_running(selected, cap):
     with pytest.raises(ValueError):

@@ -27,7 +27,8 @@ explicit scenario instructions and selected shell/MCP tools remain available.
 **Limitations:** this is not a sandbox or complete runtime isolation. Inherited environment,
 authentication, and runtime-level capabilities still exist; use a clean evaluation account.
 CLI shell calls are conservatively checked for a single literal
-invocation of the selected executable; unknown or alternate routes make the evaluation fail
+invocation of the selected executable. `read_powershell` is permitted only for a shell handle
+returned by an earlier verified invocation; unknown or alternate routes make the evaluation fail
 with an explicit route-verification reason. This does not prove the absence of indirect bypasses
 through desktop automation. A help lookup or recovery attempt is not automatically a product bug.
 Literal quoted multiline text and PowerShell newline escapes inside double quotes are supported;
@@ -208,6 +209,13 @@ case, interface, repetition, variant, model, and executable/assembly hashes.
 Compare **within an interface** first. CLI and MCP need not use the same number of calls.
 One run is an observation, not a reliability claim. Review repeated samples before claiming
 that a change improved performance.
+
+CLI evaluations copy the selected build into each run's `cli` directory and use the short
+relative command `.\cli\wincli.exe`. This avoids repeating a long build path and gives each run
+its own path-scoped daemon. Cleanup explicitly stops only that copied CLI's service, including
+when document cleanup fails. Reports retain the original build hashes and the execution path.
+Creation tasks explicitly require a new blank document, not a reused restored tab. Existing
+profile state remains a reported limitation; the harness does not reset Notepad settings.
 
 ## Reading the native reports
 

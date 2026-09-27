@@ -16,20 +16,26 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Trait("Category", "RequiresDesktop")]
 public sealed class NotepadTypingTests(ITestOutputHelper output)
 {
-    public static TheoryData<string, bool> TypingCases => new()
+    public static TheoryData<string, string> TypingCases => new()
     {
-        { "Project: Aurora", false },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", false },
-        { "Project: Aurora\nStatus: Draft\nOwner: Taylor", false },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", true },
-        { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", false },
-        { "Name\tValue\nAurora\t42", false },
-        { new string('a', 999) + "\U0001f680\nEnd: 0123456789", false },
+        { "Project: Aurora", "tool" },
+        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "tool" },
+        { "Project: Aurora\nStatus: Draft\nOwner: Taylor", "tool" },
+        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "individual" },
+        { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "tool" },
+        { "Name\tValue\nAurora\t42", "tool" },
+        { string.Concat(Enumerable.Repeat("Ab9 ", 249)) + "XyZ\U0001f680\nEnd: 0123456789", "tool" },
+        { string.Concat(Enumerable.Repeat("\u03a9\u4e2d\U0001f680", 30)), "tool" },
+        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "keyboard" },
+        { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "keyboard" },
+        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "value" },
+        { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "value" },
+        { "Save a copy without changing the original", "save_as" },
     };
 
     [SkippableTheory]
     [MemberData(nameof(TypingCases))]
-    public async Task KeyboardTyping_PreservesExactNotepadText(string text, bool individualCharacters)
+    public async Task KeyboardTyping_PreservesExactNotepadText(string text, string inputMode)
     {
         ArgumentNullException.ThrowIfNull(text);
         Skip.IfNot(Environment.GetEnvironmentVariable("MCP_TEST_NOTEPAD") == "1"
@@ -103,13 +109,18 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             Assert.True(focus.Success, focus.ErrorMessage);
             var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
             Assert.True(select.Success, select.Error);
-            if (individualCharacters)
+            if (inputMode == "individual")
             {
                 foreach (var character in text)
                 {
                     var typed = await keyboard.TypeTextAsync(character.ToString(), handle);
                     Assert.True(typed.Success, typed.Error);
                 }
+            }
+            else if (inputMode is "keyboard" or "value")
+            {
+                var typed = await automation.TypeIntoElementAsync(editor.Id, text, true, window, inputMode);
+                Assert.True(typed.Success, typed.ErrorMessage);
             }
             else
             {
@@ -128,6 +139,13 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             Assert.NotNull(read);
             Assert.True(read.Success, read.ErrorMessage);
             Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n").TrimEnd('\n'));
+            if (inputMode == "save_as")
+            {
+                var saved = await automation.SaveAsync(window, path + ".copy.txt", "save_as");
+                Assert.True(saved.Success, saved.ErrorMessage);
+                Assert.Equal(text, await File.ReadAllTextAsync(path + ".copy.txt"));
+                Assert.Equal("", await File.ReadAllTextAsync(path));
+            }
         }
         finally
         {
@@ -141,6 +159,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                 owned.Dispose();
             }
             File.Delete(path);
+            File.Delete(path + ".copy.txt");
         }
     }
 }

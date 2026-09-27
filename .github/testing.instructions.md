@@ -124,11 +124,22 @@ with no Notepad work to preserve. Never reset the user's Notepad profile. The de
 workflow enables this for `all` and `notepad`; ordinary local test runs skip it.
 
 Notepad 11.2607.14.0 reproduced repeated-character corruption with bulk Unicode input and with
-unpaced individual calls. A 10ms pause still failed Unicode/long-text cases. Shared keyboard
-typing now pauses 50ms after each character, preserving surrogate pairs. Expect roughly
-15-20 characters per second, not bulk-insertion speed. The keyboard tool adds a per-character
-pacing allowance to its normal operation timeout; caller cancellation still stops typing.
+unpaced individual calls. Both 10ms and 50ms fixed pauses proved insufficient on long text.
+Shared keyboard typing uses the target layout's real keys when a non-mutating translation probe
+confirms the exact character, including Caps Lock. Dead keys and unmappable characters keep a
+paced Unicode fallback with surrogate pairs intact. Test mixed long text, not repeated identical
+characters that can conceal corruption. The keyboard tool adds a per-character pacing allowance
+to its normal operation timeout; caller cancellation still stops typing.
 Do not equate successful `SendInput` with delivered text: retain independent exact readback.
+
+Typing verification normalizes CR, LF, and CRLF because RichEdit reports different line endings.
+It must not trim extra lines, spaces, or altered characters. A failed post-input check reports
+`verification_failed` and asks for readback before retrying, not a blind repeat.
+
+Save tests cover `shortcut`, `save_as`, and `wait`. The default still sends Ctrl+S; a supplied
+path fills a dialog but does not retarget an already named document. Explicit `save_as` sends
+Ctrl+Shift+S without first saving over the source. `wait` handles an already open owned dialog.
+The real Notepad copy test checks both destination content and the unchanged original.
 
 ### Verification Pattern
 

@@ -181,6 +181,20 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial nint GetKeyboardLayout(uint idThread);
 
+    [LibraryImport("user32.dll", EntryPoint = "VkKeyScanExW")]
+    internal static partial short VkKeyScanEx(ushort character, nint layout);
+
+    [LibraryImport("user32.dll", EntryPoint = "MapVirtualKeyExW")]
+    internal static partial uint MapVirtualKeyEx(uint code, uint mapType, nint layout);
+
+    [LibraryImport("user32.dll", EntryPoint = "ToUnicodeEx", StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial int ToUnicodeEx(
+        uint virtualKey, uint scanCode, byte[] keyboardState, [Out] char[] buffer,
+        int bufferLength, uint flags, nint layout);
+
+    [LibraryImport("user32.dll")]
+    internal static partial short GetKeyState(int virtualKey);
+
     /// <summary>
     /// Retrieves the name of the active keyboard layout for the calling thread.
     /// </summary>
