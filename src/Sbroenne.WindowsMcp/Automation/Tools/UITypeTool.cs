@@ -19,7 +19,7 @@ public static partial class UITypeTool
     /// <param name="withSnapshot">Attach a post-action snapshot.</param>
     /// <param name="snapshotMode">full for one verification, auto for repeated checks, reset for a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics.</param>
-    /// <param name="inputMode">auto, keyboard, or value. Auto uses keyboard input for Chromium/Electron. Keyboard input uses verified layout keys with paced Unicode fallback; value input does not simulate keystrokes.</param>
+    /// <param name="inputMode">auto, keyboard, or value. Auto uses keyboard input for Chromium/Electron. Keyboard input waits for readable controls to consume each character; value input does not simulate keystrokes.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="snapshotSince">Previous snapshot token for a checked post-action diff.</param>
     [McpServerTool(Name = "ui_type", Title = "Type Text into Element", Destructive = true, OpenWorld = false)]

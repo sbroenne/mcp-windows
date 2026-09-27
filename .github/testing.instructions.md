@@ -125,9 +125,12 @@ workflow enables this for `all` and `notepad`; ordinary local test runs skip it.
 
 Notepad 11.2607.14.0 reproduced repeated-character corruption with bulk Unicode input and with
 unpaced individual calls. Both 10ms and 50ms fixed pauses proved insufficient on long text.
-Shared keyboard typing uses the target layout's real keys when a non-mutating translation probe
-confirms the exact character, including Caps Lock. Dead keys and unmappable characters keep a
-paced Unicode fallback with surrogate pairs intact. Test mixed long text, not repeated identical
+Layout-key trials also lost modifier state in the slow editor and were withdrawn. Shared keyboard
+typing now waits for a readable focused control to show the expected insertion before sending
+the next Unicode character. Selection replacement and CR/LF/CRLF are accounted for, and surrogate
+pairs stay together. If acknowledgement times out, typing stops with an explicit error instead
+of continuing to flood the queue. Passwords and controls without readable text retain paced
+dispatch and return an observation warning. Test mixed long text, not repeated identical
 characters that can conceal corruption. The keyboard tool adds a per-character pacing allowance
 to its normal operation timeout; caller cancellation still stops typing.
 Do not equate successful `SendInput` with delivered text: retain independent exact readback.

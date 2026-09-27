@@ -6,7 +6,7 @@ namespace Sbroenne.WindowsMcp.Input;
 
 /// <summary>
 /// Implementation of keyboard input operations using Windows SendInput API.
-/// Uses verified layout keys where possible, with Unicode input for unmappable characters.
+/// Uses Unicode input, waiting for readable controls to consume each character.
 /// </summary>
 public sealed class KeyboardInputService : IDisposable
 {
@@ -26,6 +26,7 @@ public sealed class KeyboardInputService : IDisposable
     private readonly int _chunkDelayMs;
     private readonly HeldKeyTracker _heldKeyTracker;
     private readonly ModifierKeyManager _modifierKeyManager;
+    private readonly Lazy<KeyboardTextObserver> _textObserver = new(() => new KeyboardTextObserver());
     private bool _disposed;
 
     internal static int GetTextTimeoutMs(int textLength, int operationTimeoutMs) =>
@@ -82,6 +83,7 @@ public sealed class KeyboardInputService : IDisposable
         }
 
         var totalCharacters = 0;
+        var observationUnavailable = false;
 
         // Process text in chunks to prevent overwhelming the input queue
         for (var offset = 0; offset < text.Length;)
@@ -106,6 +108,7 @@ public sealed class KeyboardInputService : IDisposable
             }
 
             totalCharacters += chunkResult.CharactersTyped ?? 0;
+            observationUnavailable |= chunkResult.Message is not null;
             offset += currentChunkSize;
 
             // Add delay between chunks if there are more chunks to process
@@ -118,7 +121,12 @@ public sealed class KeyboardInputService : IDisposable
         // Wait for the target process to consume the input queue before returning.
         _ = await WaitForIdleAsync(cancellationToken).ConfigureAwait(false);
 
-        return KeyboardControlResult.CreateTypeSuccess(totalCharacters);
+        return KeyboardControlResult.CreateTypeSuccess(totalCharacters) with
+        {
+            Message = observationUnavailable
+                ? "Input was dispatched, but some controls did not expose readable text. Verify the result before continuing."
+                : null
+        };
     }
 
     /// <summary>
@@ -137,31 +145,14 @@ public sealed class KeyboardInputService : IDisposable
     {
         var inputs = new List<INPUT>(4);
         var sentInput = false;
+        var observationUnavailable = false;
 
         for (var index = 0; index < chunk.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             inputs.Clear();
             var c = chunk[index];
-
-            var foreground = NativeMethods.GetForegroundWindow();
-            var threadId = NativeMethods.GetWindowThreadProcessId(foreground, out _);
-            var layout = NativeMethods.GetKeyboardLayout(threadId);
-            var capsLock = (NativeMethods.GetKeyState(NativeConstants.VK_CAPITAL) & 1) != 0;
-            if (foreground != nint.Zero && !HasHeldTextModifiers()
-                && TryGetTextKey(c, layout, capsLock, out var virtualKey, out var modifiers))
-            {
-                // Real key codes do not share VK_PACKET's last-character state in slow editors.
-                var keyResult = PressKeyGuarded(c.ToString(), virtualKey, modifiers, 1,
-                    expectedForegroundWindow ?? foreground, cancellationToken);
-                if (!keyResult.Success)
-                {
-                    return keyResult;
-                }
-                sentInput = true;
-                await Task.Delay(_interKeyDelayMs, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
+            var characterStart = index;
 
             // Handle special characters
             if (c == '\n' || c == '\r')
@@ -207,6 +198,14 @@ public sealed class KeyboardInputService : IDisposable
                     "The foreground window changed before text input was sent.");
             }
 
+            var observation = await _textObserver.Value.CaptureAsync(cancellationToken).ConfigureAwait(false);
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed while preparing text input.");
+            }
+
             var inputArray = inputs.ToArray();
             var result = NativeMethods.SendInput((uint)inputArray.Length, inputArray, INPUT.Size);
 
@@ -220,60 +219,32 @@ public sealed class KeyboardInputService : IDisposable
             }
 
             sentInput = true;
-            // Pace unmappable Unicode characters without splitting a surrogate pair.
-            await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
+            if (observation is not null)
+            {
+                if (!await _textObserver.Value.WaitForChangeAsync(
+                    observation, chunk.Substring(characterStart, index - characterStart + 1),
+                    cancellationToken).ConfigureAwait(false))
+                {
+                    return KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.OperationTimeout,
+                        "The focused control did not show consumption of the last character. " +
+                        "Typing stopped to avoid corrupting queued text; read the current content before retrying.");
+                }
+            }
+            else
+            {
+                // Passwords and controls without readable text cannot provide an acknowledgement.
+                observationUnavailable = true;
+                await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         // Count actual characters typed (excluding control characters converted to keys)
         var charactersTyped = sentInput ? chunk.Length : 0;
-        return KeyboardControlResult.CreateTypeSuccess(charactersTyped);
-    }
-
-    private bool HasHeldTextModifiers() =>
-        _modifierKeyManager.IsKeyPressed(NativeConstants.VK_CONTROL)
-        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_SHIFT)
-        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_MENU)
-        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_LWIN)
-        || _modifierKeyManager.IsKeyPressed(NativeConstants.VK_RWIN);
-
-    internal static bool TryGetTextKey(char character, nint layout, bool capsLock,
-        out int virtualKey, out ModifierKey modifiers)
-    {
-        virtualKey = 0;
-        modifiers = ModifierKey.None;
-        if (char.IsControl(character) || char.IsSurrogate(character) || layout == nint.Zero)
+        return KeyboardControlResult.CreateTypeSuccess(charactersTyped) with
         {
-            return false;
-        }
-
-        var mapping = NativeMethods.VkKeyScanEx(character, layout);
-        if (mapping == -1 || (mapping >> 8 & ~7) != 0)
-        {
-            return false;
-        }
-        virtualKey = mapping & 0xff;
-        var shiftState = mapping >> 8;
-        var scanCode = NativeMethods.MapVirtualKeyEx((uint)virtualKey, 0, layout);
-        var buffer = new char[8];
-        for (var attempt = 0; attempt < 2; attempt++)
-        {
-            var state = new byte[256];
-            state[NativeConstants.VK_SHIFT] = (byte)((shiftState & 1) != 0 ? 0x80 : 0);
-            state[NativeConstants.VK_CONTROL] = (byte)((shiftState & 2) != 0 ? 0x80 : 0);
-            state[NativeConstants.VK_MENU] = (byte)((shiftState & 4) != 0 ? 0x80 : 0);
-            state[NativeConstants.VK_CAPITAL] = (byte)(capsLock ? 1 : 0);
-            // Flag 4 prevents this probe from changing the keyboard's dead-key state.
-            var count = NativeMethods.ToUnicodeEx((uint)virtualKey, scanCode, state, buffer, buffer.Length, 4, layout);
-            if (count == 1 && buffer[0] == character)
-            {
-                modifiers = ((shiftState & 1) != 0 ? ModifierKey.Shift : ModifierKey.None)
-                    | ((shiftState & 2) != 0 ? ModifierKey.Ctrl : ModifierKey.None)
-                    | ((shiftState & 4) != 0 ? ModifierKey.Alt : ModifierKey.None);
-                return true;
-            }
-            shiftState ^= 1;
-        }
-        return false;
+            Message = observationUnavailable ? "Text observation unavailable." : null
+        };
     }
 
     /// <summary>
@@ -970,6 +941,10 @@ public sealed class KeyboardInputService : IDisposable
         if (!_disposed)
         {
             _heldKeyTracker.Dispose();
+            if (_textObserver.IsValueCreated)
+            {
+                _textObserver.Value.Dispose();
+            }
             _disposed = true;
         }
     }
