@@ -15,6 +15,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
 {
     private static string FixturePath => Path.Combine(AppContext.BaseDirectory, "Sbroenne.WindowsMcp.Cli.TestFixture.exe");
     private McpClient? _client;
+    private readonly List<string> _receiverErrors = [];
 
     public Task InitializeAsync() => Task.CompletedTask;
 
@@ -32,7 +33,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
         finally
         {
-            await StopOwnedAsync(receiver);
+            await StopOwnedAsync(receiver, receiver.StandardError);
             await DeleteFixtureDirectoryAsync(directory);
         }
     }
@@ -43,6 +44,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         {
             await _client.DisposeAsync();
         }
+        Assert.True(_receiverErrors.Count == 0, string.Join(Environment.NewLine, _receiverErrors));
     }
 
     public static TheoryData<bool, int, int, int, bool> HandoffCases
@@ -136,7 +138,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
         finally
         {
-            await StopOwnedAsync(receiver);
+            await StopOwnedAsync(receiver, receiver.StandardError);
             if (cli)
             {
                 await RunCliAsync(["service", "stop"]);
@@ -179,7 +181,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         {
             if (receiver is not null)
             {
-                await StopOwnedAsync(receiver);
+                await StopOwnedAsync(receiver, receiver.StandardError);
                 receiver.Dispose();
             }
             if (cli)
@@ -212,7 +214,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
         finally
         {
-            await StopOwnedAsync(receiver);
+            await StopOwnedAsync(receiver, receiver.StandardError);
             if (cli)
             {
                 await RunCliAsync(["service", "stop"]);
@@ -260,7 +262,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
         finally
         {
-            await StopOwnedAsync(existing);
+            await StopOwnedAsync(existing, existing.StandardError);
             var ownerFile = Path.Combine(second, "owner.json");
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             while (!File.Exists(ownerFile))
@@ -361,7 +363,7 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
         }
     }
 
-    private async Task StopOwnedAsync(Process process)
+    private async Task StopOwnedAsync(Process process, StreamReader? standardError = null)
     {
         var exitedBeforeCleanup = process.HasExited;
         if (!process.HasExited)
@@ -369,12 +371,15 @@ public sealed class AppLaunchHandoffTests(ITestOutputHelper output) : IAsyncLife
             process.Kill();
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         }
-        if (process.StartInfo.RedirectStandardError &&
-            string.Equals(Path.GetFileName(process.StartInfo.FileName), Path.GetFileName(FixturePath), StringComparison.OrdinalIgnoreCase))
+        if (standardError is not null)
         {
-            var error = await process.StandardError.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            var error = await standardError.ReadToEndAsync().WaitAsync(TimeSpan.FromSeconds(10));
             output.WriteLine("Owned process {0}, exited before cleanup: {1}, exit code: {2}, stderr: {3}",
                 process.Id, exitedBeforeCleanup, process.ExitCode, error);
+            if (!string.IsNullOrEmpty(error))
+            {
+                _receiverErrors.Add($"Owned receiver {process.Id} failed: {error}");
+            }
         }
     }
 
