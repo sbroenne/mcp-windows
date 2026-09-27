@@ -205,10 +205,37 @@ public sealed class ModernTestHarnessFixture : IDisposable
         throw new InvalidOperationException("Modern harness still has an owned dialog after five close attempts.");
     }
 
+    public bool HasOwnedDialog => GetOwnedDialog() != nint.Zero;
+
     private nint GetOwnedDialog()
     {
-        var dialog = NativeMethods.GetWindow(_windowHandle, NativeConstants.GW_ENABLEDPOPUP);
-        return dialog == _windowHandle || !NativeMethods.IsWindowVisible(dialog) ? nint.Zero : dialog;
+        nint dialog = nint.Zero;
+        if (!NativeMethods.EnumWindows((candidate, _) =>
+        {
+            if (candidate == _windowHandle || !NativeMethods.IsWindowVisible(candidate))
+            {
+                return true;
+            }
+
+            var owner = NativeMethods.GetWindow(candidate, NativeConstants.GW_OWNER);
+            for (var depth = 0; depth < 64 && owner != nint.Zero; depth++)
+            {
+                if (owner == _windowHandle)
+                {
+                    dialog = candidate;
+                    break;
+                }
+
+                owner = NativeMethods.GetWindow(owner, NativeConstants.GW_OWNER);
+            }
+
+            return true;
+        }, nint.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        return dialog;
     }
 
     /// <summary>
@@ -221,6 +248,7 @@ public sealed class ModernTestHarnessFixture : IDisposable
             return;
         }
 
+        CloseOwnedDialogs();
         TestWait.RetryUntil(
             attempt: () =>
             {

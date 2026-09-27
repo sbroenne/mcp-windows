@@ -184,11 +184,15 @@ public sealed class WinUISaveTests : IDisposable
             {
                 var result = await _automationService.SaveAsync(_windowHandle);
                 Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
+                Assert.True(
+                    await TestWait.UntilAsync(() => _fixture.HasOwnedDialog, TimeSpan.FromSeconds(5)),
+                    "The no-path Save request did not open the harness dialog.");
             }
             finally
             {
                 _fixture.CloseOwnedDialogs();
             }
+            Assert.False(_fixture.HasOwnedDialog);
         });
     }
 }
