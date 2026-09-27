@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from usage_evals.cases import prepare_case, verify_files
-from usage_evals.policy import classify_calls
+from usage_evals.policy import classify_calls, validate_desktop
 from usage_evals.runtime import (
     build_agent,
     build_metadata,
@@ -71,6 +71,7 @@ async def test_windows_usage(
             "model": agent.model,
             "reasoning_effort": agent.reasoning_effort,
             "session_isolation": agent.extra_config,
+            "desktop_mode": validate_desktop(os.environ),
             "timeout_s": agent.timeout_s,
             "documents": str(tmp_path / "documents"),
             "configured_tools": agent.allowed_tools,

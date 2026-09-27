@@ -6,7 +6,7 @@ import pytest
 from pytest_skill_engineering.copilot.result import CopilotResult, ToolCall
 
 from usage_evals.cases import CASE_NAMES
-from usage_evals.policy import validate_budget
+from usage_evals.policy import validate_budget, validate_desktop
 from usage_evals.runtime import require_capture_api
 
 
@@ -91,16 +91,9 @@ def pytest_collection_finish(session):
                 config.getoption("--usage-timeout"),
             )
         require_capture_api(ToolCall, CopilotResult)
+        validate_desktop(os.environ)
     except (ValueError, RuntimeError) as error:
         raise pytest.UsageError(str(error)) from error
-    if (
-        os.environ.get("MCP_TEST_DESKTOP_INPUT") != "1"
-        or os.environ.get("MCP_USAGE_DISPOSABLE_DESKTOP") != "1"
-    ):
-        raise pytest.UsageError(
-            "Live runs need an exclusive disposable Windows desktop. Set "
-            "MCP_TEST_DESKTOP_INPUT=1 and MCP_USAGE_DISPOSABLE_DESKTOP=1 only on that desktop."
-        )
     options = ["--usage-cli", "--usage-server"]
     if config.getoption("--usage-baseline-cli"):
         options += ["--usage-baseline-cli", "--usage-baseline-server"]

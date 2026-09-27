@@ -148,6 +148,8 @@ internal static class HelpText
             options: --text --key --modifiers --repeat --sequence --inter-key-delay-ms --clear-first
             example: keyboard press --window <h> --key A --modifiers Ctrl
             Pass the key and modifiers separately; --key 'Ctrl+A' is not a valid key.
+            Text is paced for editor reliability (roughly 15-20 characters/second).
+            The type timeout includes pacing time; cancellation can leave partial text.
 
         mouse <action> [options]
             actions: move, click, double_click, right_click, middle_click, drag, polyline, scroll, get_position

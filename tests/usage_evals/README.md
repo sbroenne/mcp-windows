@@ -76,8 +76,13 @@ First approve the model, task selection, interfaces, repeats, total number of se
 per-session timeout. Any optional AI-generated report analysis is an additional model call and
 needs its own approval. There is no automatic model selection or whole-session retry.
 
-Use an **exclusive disposable interactive Windows desktop/account**, not an everyday profile:
-Notepad can restore old tabs even when no process was running. Explicit opt-in and an empty
+Prefer an **exclusive disposable interactive Windows desktop/account**:
+Notepad can restore old tabs even when no process was running. An existing account may be used
+only after its owner explicitly reserves the desktop and confirms Notepad has no work to preserve.
+For that case set `MCP_USAGE_RESERVED_DESKTOP=1` instead of `MCP_USAGE_DISPOSABLE_DESKTOP=1`.
+The report records `desktop_mode=reserved-existing-profile`, not clean isolation. Do not reset
+Notepad settings or remove restored tabs; report any interference separately.
+Both modes also require `MCP_TEST_DESKTOP_INPUT=1`. Explicit opt-in and an empty
 Notepad process list are required. The model is asked to leave the test document open.
 Cleanup terminates only a process associated with the run's unique document title or a
 successful recorded Notepad launch after the empty-desktop check, with its process creation

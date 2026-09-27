@@ -300,6 +300,21 @@ public class KeyboardTypeTests : DesktopInputTestBase, IDisposable
 
     #region WaitForIdle Tests
 
+    [SkippableFact]
+    public async Task TypeAsync_CancellationDuringPacing_StopsBeforeNextCharacter()
+    {
+        _fixture.EnsureTestWindowFocused();
+        using var cancellationSource = new CancellationTokenSource();
+        var typing = _fixture.KeyboardInputService.TypeTextAsync(
+            "abcdef", _fixture.TestWindowHandle, cancellationSource.Token);
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => typing);
+        Assert.True(await _fixture.WaitForInputTextAsync("a"));
+        await Task.Delay(150);
+        Assert.Equal("a", _fixture.GetInputText());
+    }
+
     /// <summary>
     /// Tests that WaitForIdle returns success when called (basic functionality).
     /// </summary>

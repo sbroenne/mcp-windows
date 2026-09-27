@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from usage_evals.policy import classify_calls, is_cli_invocation, validate_budget
+from usage_evals.policy import classify_calls, is_cli_invocation, validate_budget, validate_desktop
 
 CLI = r"D:\build with spaces\wincli.exe"
 
@@ -82,3 +82,29 @@ def test_model_and_timeout_are_required():
 
 def test_valid_budget_does_not_choose_model_or_add_runs():
     assert validate_budget(6, 6, "chosen-model", 120) is None
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {},
+        {"MCP_TEST_DESKTOP_INPUT": "1"},
+        {"MCP_USAGE_RESERVED_DESKTOP": "1"},
+        {"MCP_USAGE_DISPOSABLE_DESKTOP": "1"},
+        {"MCP_TEST_DESKTOP_INPUT": "1", "MCP_USAGE_RESERVED_DESKTOP": "true"},
+    ],
+)
+def test_live_desktop_requires_input_and_explicit_ownership_approval(environment):
+    with pytest.raises(ValueError, match="exclusive"):
+        validate_desktop(environment)
+
+
+@pytest.mark.parametrize(
+    "flag,expected",
+    [
+        ("MCP_USAGE_DISPOSABLE_DESKTOP", "disposable"),
+        ("MCP_USAGE_RESERVED_DESKTOP", "reserved-existing-profile"),
+    ],
+)
+def test_desktop_approval_records_existing_profile_without_claiming_clean_isolation(flag, expected):
+    assert validate_desktop({"MCP_TEST_DESKTOP_INPUT": "1", flag: "1"}) == expected

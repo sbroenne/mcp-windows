@@ -1,6 +1,6 @@
 import ntpath
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Protocol
 
 
@@ -21,6 +21,20 @@ def validate_budget(selected: int, cap: int, model: str, timeout: int) -> None:
         raise ValueError("An explicit --usage-model is required.")
     if timeout < 1:
         raise ValueError("A positive --usage-timeout is required.")
+
+
+def validate_desktop(environment: Mapping[str, str]) -> str:
+    if environment.get("MCP_TEST_DESKTOP_INPUT") == "1":
+        if environment.get("MCP_USAGE_RESERVED_DESKTOP") == "1":
+            return "reserved-existing-profile"
+        if environment.get("MCP_USAGE_DISPOSABLE_DESKTOP") == "1":
+            return "disposable"
+    raise ValueError(
+        "Live runs need an exclusive Windows desktop. Set MCP_TEST_DESKTOP_INPUT=1 and "
+        "MCP_USAGE_DISPOSABLE_DESKTOP=1 on a disposable account, or "
+        "MCP_USAGE_RESERVED_DESKTOP=1 only after its owner reserves the desktop and confirms "
+        "Notepad has no work to preserve. Existing profile state is not clean isolation."
+    )
 
 
 def is_cli_invocation(command: str, executable: str) -> bool:

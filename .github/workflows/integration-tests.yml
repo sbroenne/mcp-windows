@@ -14,6 +14,7 @@ on:
         options:
           - all
           - keyboard
+          - notepad
           - mouse
           - window
           - app-launch
@@ -255,6 +256,7 @@ jobs:
           $filters = @{
             all = "FullyQualifiedName~Integration&Category!=SnapshotBenchmark"
             keyboard = "FullyQualifiedName~Integration.Keyboard"
+            notepad = "FullyQualifiedName~Integration.NotepadTyping"
             mouse = "FullyQualifiedName~Integration.Mouse|FullyQualifiedName~Integration.DpiAwareness|FullyQualifiedName~Integration.ModifierKey|FullyQualifiedName~Integration.MultiMonitor"
             window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"
             "app-launch" = "FullyQualifiedName~Integration.AppLaunchHandoff"
@@ -267,6 +269,9 @@ jobs:
           }
 
           $filter = $filters[$env:TEST_SCOPE]
+          if ($env:TEST_SCOPE -in @('all', 'notepad')) {
+            $env:MCP_TEST_NOTEPAD = '1'
+          }
           if (-not $filter) {
             throw "Unsupported test scope: $env:TEST_SCOPE"
           }

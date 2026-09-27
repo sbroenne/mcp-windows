@@ -5,6 +5,25 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class KeyboardInputServiceTests
 {
+    [Theory]
+    [InlineData(0, 30000, 30000)]
+    [InlineData(1000, 30000, 130000)]
+    [InlineData(int.MaxValue, 30000, int.MaxValue)]
+    public void TextTimeout_IncludesPacingWithoutOverflow(int length, int timeout, int expected)
+    {
+        Assert.Equal(expected, KeyboardInputService.GetTextTimeoutMs(length, timeout));
+    }
+
+    [Fact]
+    public async Task TypeTextAsync_WithCancelledToken_ThrowsBeforeSendingInput()
+    {
+        using var service = new KeyboardInputService();
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.TypeTextAsync("must-not-be-typed", new nint(-1), cancellationSource.Token));
+    }
+
     [Fact]
     public async Task KeyDownAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
     {

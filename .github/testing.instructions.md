@@ -41,7 +41,9 @@ uv run --project tests\usage_evals pytest tests\usage_evals\tests\unit -q
 ```
 
 Live runs require separate approval of the model and execution budget, built CLI/MCP executables,
-and an exclusive disposable interactive desktop. They verify actual files and unchanged targets,
+and an exclusive interactive desktop. Prefer a disposable account; an existing profile requires
+explicit owner reservation and confirmation that Notepad has no work to preserve. Reports label
+that weaker isolation separately. They verify actual files and unchanged targets,
 record route and evidence limitations, and keep baseline/candidate outcomes separate. Collection
 must not launch applications or call a model. Do not count default-skipped live cases as coverage.
 
@@ -107,8 +109,26 @@ Use the fixture's owned-window cleanup, not optional response hints or an unguar
 The shared fixture also closes leftover owned dialogs before bringing the harness forward
 and checks that the owner is enabled again. A leftover Save dialog previously accepted
 physical input while UI Automation still reported focus on the underlying editor.
-Passing these harness tests does not establish that the separate Notepad typing corruption
-observed in a live model session is fixed.
+Passing these harness tests alone does not establish real Notepad correctness.
+
+### Real Notepad typing
+
+`NotepadTypingTests` checks exact text in an owned, uniquely named Notepad document, including
+multiline text, tabs, Unicode, supplementary characters, and a text-chunk boundary. Bulk cases
+use the actual keyboard tool, including its timeout budget. A separate case sends individual
+characters without test-side delays. The test logs the installed Notepad version and closes only
+the process identified by its unique document window, checking the process creation time.
+
+Set `MCP_TEST_NOTEPAD=1` and `MCP_TEST_DESKTOP_INPUT=1` only on an exclusive approved desktop
+with no Notepad work to preserve. Never reset the user's Notepad profile. The dedicated Windows
+workflow enables this for `all` and `notepad`; ordinary local test runs skip it.
+
+Notepad 11.2607.14.0 reproduced repeated-character corruption with bulk Unicode input and with
+unpaced individual calls. A 10ms pause still failed Unicode/long-text cases. Shared keyboard
+typing now pauses 50ms after each character, preserving surrogate pairs. Expect roughly
+15-20 characters per second, not bulk-insertion speed. The keyboard tool adds a per-character
+pacing allowance to its normal operation timeout; caller cancellation still stops typing.
+Do not equate successful `SendInput` with delivered text: retain independent exact readback.
 
 ### Verification Pattern
 
