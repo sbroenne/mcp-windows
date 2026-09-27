@@ -56,8 +56,8 @@ credentials in this project.
 The project pins published framework commit
 `5a533dcd149c3e27f60b0a296a047ba1d3f255ff`, including complete tool evidence,
 configuration-aware reports, recoverable paid summaries, and SDK 1.0.13 support.
-It is published in `sbroenne/pytest-skill-engineering#95`, stacked on SDK upgrade
-`sbroenne/pytest-skill-engineering#94`; publication does not mean either PR is merged.
+It is published in merged `sbroenne/pytest-skill-engineering#95`, which included
+SDK upgrade `sbroenne/pytest-skill-engineering#94`. The exact commit remains pinned.
 Older versions without `ToolCall.completion_received` and `CopilotResult.evidence_complete`
 are rejected before model execution rather than silently accepting missing evidence.
 

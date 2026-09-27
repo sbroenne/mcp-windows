@@ -97,6 +97,19 @@ dotnet build tests\Sbroenne.WindowsMcp.ModernHarness -c Debug -p:Platform=x64
 
 **Fixture:** `ModernTestHarnessFixture.cs` - Launches harness as separate process, finds window handle
 
+`WinUITypeTests` verifies exact editor text after bulk Unicode input, individual-character
+input, virtual keys, and semantic text entry. It verifies focus and waits a bounded time
+for the actual text, rather than treating successful input dispatch as proof of delivery.
+Focus failures retain harness-window screenshots in the Windows UI workflow artifacts.
+
+Save tests must wait for their asynchronous dialog to appear and close it in `finally`.
+Use the fixture's owned-window cleanup, not optional response hints or an unguarded Escape.
+The shared fixture also closes leftover owned dialogs before bringing the harness forward
+and checks that the owner is enabled again. A leftover Save dialog previously accepted
+physical input while UI Automation still reported focus on the underlying editor.
+Passing these harness tests does not establish that the separate Notepad typing corruption
+observed in a live model session is fixed.
+
 ### Verification Pattern
 
 **Use our own MCP tools for verification, NOT FlaUI or direct property access:**
