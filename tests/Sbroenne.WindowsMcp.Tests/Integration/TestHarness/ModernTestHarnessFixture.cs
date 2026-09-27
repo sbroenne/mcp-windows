@@ -179,6 +179,39 @@ public sealed class ModernTestHarnessFixture : IDisposable
     }
 
     /// <summary>
+    /// Closes only visible popups owned by this harness and verifies they disappear.
+    /// </summary>
+    public void CloseOwnedDialogs()
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var dialog = GetOwnedDialog();
+            if (dialog == nint.Zero)
+            {
+                return;
+            }
+
+            if (!NativeMethods.PostMessage(dialog, NativeConstants.WM_CLOSE, nint.Zero, nint.Zero))
+            {
+                throw new InvalidOperationException($"Could not close harness dialog {dialog}.");
+            }
+
+            if (!TestWait.Until(() => GetOwnedDialog() != dialog))
+            {
+                throw new TimeoutException($"Harness dialog {dialog} did not close.");
+            }
+        }
+
+        throw new InvalidOperationException("Modern harness still has an owned dialog after five close attempts.");
+    }
+
+    private nint GetOwnedDialog()
+    {
+        var dialog = NativeMethods.GetWindow(_windowHandle, NativeConstants.GW_ENABLEDPOPUP);
+        return dialog == _windowHandle || !NativeMethods.IsWindowVisible(dialog) ? nint.Zero : dialog;
+    }
+
+    /// <summary>
     /// Brings the harness window to the foreground.
     /// </summary>
     public void BringToFront()

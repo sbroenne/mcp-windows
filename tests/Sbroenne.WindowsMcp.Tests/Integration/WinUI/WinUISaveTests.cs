@@ -180,17 +180,14 @@ public sealed class WinUISaveTests : IDisposable
             await Task.Delay(300);
 
             // Act - no filePath provided
-            var result = await _automationService.SaveAsync(_windowHandle);
-
-            // Assert - should succeed (either saved directly or dialog hint returned)
-            Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
-
-            // Cleanup: if a dialog was opened (hint returned), close it with Escape
-            if (result.UsageHint != null && result.UsageHint.Contains("dialog"))
+            try
             {
-                var keyboardService = new KeyboardInputService();
-                await keyboardService.PressKeyAsync("Escape");
-                await Task.Delay(200);
+                var result = await _automationService.SaveAsync(_windowHandle);
+                Assert.True(result.Success, $"Save failed: {result.ErrorMessage}");
+            }
+            finally
+            {
+                _fixture.CloseOwnedDialogs();
             }
         });
     }
