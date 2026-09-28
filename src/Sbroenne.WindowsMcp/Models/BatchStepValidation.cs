@@ -2,9 +2,42 @@ using System.Text.Json;
 
 namespace Sbroenne.WindowsMcp.Models;
 
-/// <summary>Pure validation shared by inline batches and saved macros before binding erases presence.</summary>
+/// <summary>Pure batch parsing and validation shared by permission checks and execution.</summary>
 internal static class BatchStepValidation
 {
+    private static readonly JsonSerializerOptions ParseOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
+    };
+
+    internal static string? Parse(string? json, out BatchStep[] steps)
+    {
+        steps = [];
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            return "steps is required: a JSON array of step objects.";
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var error = Validate(document.RootElement);
+            if (error is not null)
+            {
+                return error;
+            }
+
+            steps = document.RootElement.Deserialize<BatchStep[]>(ParseOptions)!;
+            return null;
+        }
+        catch (JsonException ex)
+        {
+            return $"steps is not valid JSON: {ex.Message}. Expected a JSON array of step objects.";
+        }
+    }
+
     private static readonly string[] WaitSelectorNames =
         ["name", "nameContains", "namePattern", "controlType", "automationId", "className"];
 

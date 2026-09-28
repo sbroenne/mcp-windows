@@ -16,7 +16,7 @@ public static partial class UITypeTool
     /// <param name="text">Text to type.</param>
     /// <param name="elementId">Required opaque ID of the input from discovery in this owner.</param>
     /// <param name="clearFirst">Clear existing text first.</param>
-    /// <param name="withSnapshot">Attach a post-action snapshot.</param>
+    /// <param name="withSnapshot">Attach a post-action snapshot. Requires enabled ui_snapshot; checked before typing.</param>
     /// <param name="snapshotMode">full for one verification, auto for repeated checks, reset for a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics.</param>
     /// <param name="inputMode">auto, keyboard, or value. Auto uses keyboard input for Chromium/Electron. Keyboard input waits for readable controls to consume each character; value input does not simulate keystrokes.</param>

@@ -1,6 +1,6 @@
 ---
 name: code-review
-description: Review pull requests in mcp-windows for concrete bugs in MCP and CLI contracts, Windows UI automation, element identity, snapshots, bounded searches, and service lifetime. Use for pull request reviews and re-reviews, including changes to batches, macros, tests, and guidance.
+description: Review pull requests in mcp-windows for concrete bugs in MCP and CLI contracts, Windows UI automation, element identity, snapshots, bounded searches, and service lifetime. Use for pull request reviews and re-reviews, including changes to batches, tool permissions, tests, and guidance.
 ---
 
 # Review Windows MCP changes
@@ -18,7 +18,7 @@ Do not edit product code, merge pull requests, or change repository settings dur
    and tests to confirm what the public interface actually promises.
 3. Trace affected callers and result consumers, not just the edited method. Relevant
    surfaces include tool registration and schemas, raw request validation, CLI parsing
-   and dispatch, shared automation services, batches, macro save/replay, result models,
+   and dispatch, shared automation services, batches, tool permissions, result models,
    recovery hints, help, and examples.
 4. For re-reviews, inspect existing threads and the complete review summaries, including
    suppressed findings. Check each against the latest code. Do not repeat a fixed finding
@@ -32,7 +32,7 @@ Do not edit product code, merge pull requests, or change repository settings dur
 | MCP/CLI parity | Both entry points reach the same operation behavior. CLI aliases, quoting, child arguments, relative paths, working directories, output, and exit codes preserve intent. Do not infer an alias is invalid without checking the parser. |
 | Target identity | An ID resolves the original observed control or fails. Replacement, handle/process reuse, provider failure, owner restart, eviction, and automation-thread disposal must not redirect it through a name or position search. |
 | Read and action scope | A failed explicit target must not widen into whole-window text, OCR, another table, or an unrelated dialog. Parent/proximity references and coordinate fallbacks must belong to the intended window and control. |
-| Batches and macros | Validate the entire request before side effects. Save-time and replay validation must agree. Null steps and invalid property presence are handled. Only an unambiguous discovery result may supply a later action's reference. |
+| Batches and permissions | Validate the entire request before side effects. Dependency checks and execution must parse steps identically. Null steps and invalid property presence are handled. Disabled tools cannot be requested through batch steps or attached snapshots. Only an unambiguous discovery result may supply a later action's reference. |
 | Bounded work | Enforce limits before bulk fetching or allocating results, not afterward. Incomplete searches cannot prove absence or uniqueness. Check deadlines, final probes, cancellation, and cleanup without arbitrary timeout padding. |
 | Service lifetime | Check caller isolation, pipe permissions, startup coordination, build compatibility, request/output limits, and resource ownership. Whole batches must not interleave; read-only waits must not block their triggering actions. Do not replay requests after an uncertain response. |
 | Windows input and outcomes | Verify foreground ownership, focus, current coordinates/DPI, and input return values before acting. Dispatch, dialog disappearance, and an actual application outcome are different evidence. Cleanup must not close user applications or release another operation's resources. |

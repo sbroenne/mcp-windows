@@ -115,7 +115,6 @@ public sealed class CliDaemonProtocolTests
     [InlineData("file-open", "path")]
     [InlineData("file-save", "file")]
     [InlineData("screenshot", "out")]
-    [InlineData("macro", "steps-file")]
     public void CallerRelativeFiles_DoNotUseDaemonWorkingDirectory(string group, string option)
     {
         var parsed = ParsedArgs.Parse([group, $"--{option}=relative file.json"]);
