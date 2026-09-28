@@ -648,8 +648,10 @@ public sealed partial class UIAutomationService
     }
 
     private static string? ReadEditableValue(UIA.IUIAutomationElement element) =>
-        element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value)?.CurrentValue ??
-        element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text)?.DocumentRange?.GetText(int.MaxValue);
+        CanReadDirectFieldValue(element)
+            ? element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value)?.CurrentValue ??
+              element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text)?.DocumentRange?.GetText(int.MaxValue)
+            : null;
 
     internal static bool IsTypedTextObservable(string? current, string? initial, string expected, bool replace)
     {

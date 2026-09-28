@@ -348,6 +348,10 @@ Read text from elements using UI Automation or OCR.
 - Element-ID failures return errors, not unrelated window text.
   Omit `elementId` with an explicit `windowHandle` to intentionally read the window.
   Element reads never widen to whole-window OCR, even when UIA returns empty text.
+- Chrome fields with separate input parts, such as dates, must be read through
+  their child controls. Their parent value can be out of date: direct reads
+  return `pattern_not_supported`, and snapshots omit that parent value.
+  The month, day, and year remain readable and individually editable.
 - **Article mode (`format: "article"`)** for web pages in Edge/Chrome: returns the main
   content only — navigation chrome, breadcrumbs, and "in this article" rails are dropped,
   inline link URLs are stripped (visible link text is kept), and headings/lists are emitted

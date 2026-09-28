@@ -124,6 +124,17 @@ Children must still exit if the parent exits first or closing the window throws.
 are reported, not swallowed. Regression checks record process IDs and creation times before
 shutdown, and verify that an unrelated process is left alone.
 
+### Chromium date values
+
+`ChromiumDateReadTests` checks empty and populated dates through their individual
+month/day/year controls. Chromium can expose an empty or older parent value even
+when the page submits the edited date. Direct parent reads must report
+`pattern_not_supported`, and snapshots must omit that unverified parent value.
+The entry check reads every typed part and checks the page's own date output.
+Ordinary text fields must still return their empty or entered value.
+The guard inspects at most 16 raw descendants and one control-view level; it
+does not guess date order from translated labels or send corrective input.
+
 ### Real Notepad typing
 
 `NotepadTypingTests` checks exact text in an owned, uniquely named Notepad document, including

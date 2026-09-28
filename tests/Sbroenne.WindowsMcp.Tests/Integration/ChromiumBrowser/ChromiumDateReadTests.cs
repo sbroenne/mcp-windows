@@ -12,7 +12,7 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
     [SkippableTheory]
     [InlineData("Empty workshop date", "")]
     [InlineData("Populated workshop date", "2026-10-21")]
-    public async Task ReadDate_ReturnsValueNotLabel(string name, string expected)
+    public async Task ReadDate_ReturnsReadableSegmentsNotUnverifiedParentValue(string name, string expected)
     {
         ArgumentNullException.ThrowIfNull(expected);
         ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
@@ -31,6 +31,7 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
         var field = Assert.Single(found.Items!);
         var tree = await harness.AutomationService.GetTreeAsync(session.WindowHandleString, field.Id, 4, null);
         Assert.True(tree.Success, tree.ErrorMessage);
+        Assert.Null(Assert.Single(tree.Tree!).Value);
         foreach (var child in ChromiumAutomationHarness.Flatten(tree.Tree))
         {
             output.WriteLine(await harness.DescribeObservedElementAsync(child.Id));
@@ -38,10 +39,49 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
         string[] expectedSegments = expected.Length == 0 ? ["0", "0", "0"] : ["10", "21", "2026"];
         Assert.Equal(expectedSegments, ChromiumAutomationHarness.Flatten(tree.Tree)
             .Where(child => child.Type == "Spinner").Select(child => child.Value));
+        var segments = ChromiumAutomationHarness.Flatten(tree.Tree).Where(child => child.Type == "Spinner").ToArray();
+        for (var index = 0; index < segments.Length; index++)
+        {
+            var segmentRead = await harness.AutomationService.GetTextAsync(
+                segments[index].Id, session.WindowHandleString, false);
+            Assert.True(segmentRead.Success, segmentRead.ErrorMessage);
+            Assert.Equal(expectedSegments[index], segmentRead.Text);
+        }
+        var read = await harness.AutomationService.GetTextAsync(field.Id, session.WindowHandleString, false);
+        Assert.False(read.Success);
+        Assert.Equal(UIAutomationErrorType.PatternNotSupported, read.ErrorType);
+        Assert.Null(read.Text);
+        output.WriteLine("All date-read assertions passed; closing the owned browser.");
+    }
+
+    [SkippableFact]
+    public async Task ReadTextInput_PreservesEmptyAndEnteredValues()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+        DesktopInputTests.SkipUnlessEnabled();
+        using var session = ChromiumBrowserSession.LaunchLocalPage(ChromiumBrowserKind.Chrome);
+        using var harness = new ChromiumAutomationHarness();
+        var found = await harness.AutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = session.WindowHandleString,
+            Name = "Docs Search",
+            ControlType = "Edit",
+            RequireUnique = true,
+        });
+        Assert.True(found.Success, found.ErrorMessage);
+        var field = Assert.Single(found.Items!);
+        var empty = await harness.AutomationService.GetTextAsync(field.Id, session.WindowHandleString, false);
+        Assert.True(empty.Success, empty.ErrorMessage);
+        Assert.Equal("", empty.Text);
+        var typed = await harness.AutomationService.TypeIntoElementAsync(
+            field.Id, "Cedar guide", false, session.WindowHandleString, "keyboard");
+        Assert.True(typed.Success, typed.ErrorMessage);
         var read = await harness.AutomationService.GetTextAsync(field.Id, session.WindowHandleString, false);
         Assert.True(read.Success, read.ErrorMessage);
-        Assert.Equal(expected, read.Text);
-        output.WriteLine("All date-read assertions passed; closing the owned browser.");
+        Assert.Equal("Cedar guide", read.Text);
+        var tree = await harness.AutomationService.GetTreeAsync(session.WindowHandleString, field.Id, 1, null);
+        Assert.True(tree.Success, tree.ErrorMessage);
+        Assert.Equal("Cedar guide", Assert.Single(tree.Tree!).Value);
     }
 
     [SkippableFact]
@@ -88,8 +128,9 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
         output.WriteLine(System.Text.Json.JsonSerializer.Serialize(finalTree));
         var read = await harness.AutomationService.GetTextAsync(
             Assert.Single(parent.Items!).Id, session.WindowHandleString, false);
-        Assert.True(read.Success, read.ErrorMessage);
-        output.WriteLine($"Whole-field provider value: '{read.Text}'");
+        Assert.False(read.Success);
+        Assert.Equal(UIAutomationErrorType.PatternNotSupported, read.ErrorType);
+        Assert.Null(read.Text);
         var check = await harness.AutomationService.FindElementsAsync(new ElementQuery
         {
             WindowHandle = session.WindowHandleString,
@@ -107,6 +148,7 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
             ControlType = "Text",
             TimeoutMs = 2000,
             RequireUnique = true,
+            VisibleOnly = false,
         });
         Assert.True(pageValue.Success, pageValue.ErrorMessage);
         Assert.Single(pageValue.Items!);

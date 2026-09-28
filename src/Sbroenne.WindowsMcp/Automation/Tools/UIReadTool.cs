@@ -28,8 +28,9 @@ public static partial class UIReadTool
     /// Element failures are returned as errors, never as window text. An empty element read never
     /// widens to whole-window OCR. Omit elementId only for an intentional whole-window read.
     /// Browser date fields can expose separate month/day/year Spinner controls while their
-    /// whole-field value stays unchanged. Inspect those children with ui_snapshot parentElementId
-    /// and read their individual values, including the full year, before submitting.
+    /// whole-field value stays unchanged. Direct reads of segmented Chrome fields report
+    /// pattern_not_supported instead of trusting that parent value. Inspect those children with
+    /// ui_snapshot parentElementId and read their individual values, including the full year, before submitting.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="elementId">Opaque ID from discovery. Required for an element read. Omit only for an explicit whole-window read.</param>

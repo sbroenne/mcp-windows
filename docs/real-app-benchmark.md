@@ -72,6 +72,8 @@ that every failure was caused by the model or by Windows MCP.
 The figures above remain the results of that recorded run. PowerPoint discovery
 now exposes slide controls without changing views; see the
 [PowerPoint guidance](../gh-pages/docs/troubleshooting.md#powerpoint-shows-its-buttons-but-not-slide-text).
+Segmented Chrome date fields now reject an unverified parent value; read and
+enter their month, day, and year through the observed child controls.
 The original Chrome discovery failure remains unresolved. No new complete,
 controlled comparison has been published.
 

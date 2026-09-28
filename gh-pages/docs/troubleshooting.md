@@ -96,9 +96,12 @@ that nothing was typed.
 ## A browser date field reports the wrong value
 
 Some date fields expose the month, day, and year separately. Their whole-field
-value may stay empty even after those parts change. Inspect the field's child
-controls and read each part, including the full year. Check the value the page
-actually uses before treating the task as complete.
+value may stay empty or keep an older date even after those parts change.
+Windows MCP does not report that parent value for segmented Chrome fields.
+A direct read reports that a single trustworthy value is unavailable.
+Inspect the field's child controls and read each part, including the full year.
+Those parts can also be targeted individually for typing. Check the value the
+page actually uses before treating the task as complete.
 
 Do not keep typing the same date after an unverified attempt. A date field is
 not necessarily a normal text box.
