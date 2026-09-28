@@ -15,7 +15,7 @@ public static partial class UISelectTool
     /// <param name="windowHandle">Explicit target window handle.</param>
     /// <param name="value">Visible text of the option to select.</param>
     /// <param name="elementId">Required opaque ID of the containing selection control, not the hidden option.</param>
-    /// <param name="withSnapshot">Attach a post-action snapshot.</param>
+    /// <param name="withSnapshot">Attach a post-action snapshot. Requires enabled ui_snapshot; checked before selecting.</param>
     /// <param name="snapshotMode">full for one verification, auto for repeated checks, reset for a new comparison.</param>
     /// <param name="includeDiagnostics">Include diagnostics.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

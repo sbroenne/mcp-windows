@@ -4,7 +4,7 @@ using ModelContextProtocol.Server;
 namespace Sbroenne.WindowsMcp.Catalog;
 
 /// <summary>
-/// Applies an allow/deny filter and strict argument validation to registered MCP tools.
+/// Applies an allow/deny filter, dependency checks, and strict argument validation to MCP tools.
 /// </summary>
 /// <remarks>
 /// The MCP SDK's <c>WithToolsFromAssembly()</c> registers every discovered tool as an
@@ -12,11 +12,12 @@ namespace Sbroenne.WindowsMcp.Catalog;
 /// does not want to expose, so an operator can run a least-privilege server (e.g. read-only tools
 /// only, or everything except <c>process</c>) without recompiling. Filtering happens before the
 /// host is built, so excluded tools never appear in <c>tools/list</c> and cannot be invoked.
+/// Surviving tools also reject explicit requests for disabled dependencies before executing.
 /// </remarks>
 public static class ToolFilter
 {
     /// <summary>
-    /// Removes excluded registrations and guards surviving tools against unknown request arguments.
+    /// Removes excluded registrations and guards surviving tools against invalid or forbidden requests.
     /// </summary>
     /// <param name="services">The service collection already populated with tools.</param>
     /// <param name="include">
@@ -67,7 +68,7 @@ public static class ToolFilter
             if (allowed)
             {
                 kept.Add(name);
-                survivors.Add(tool is StrictArgumentTool ? tool : new StrictArgumentTool(tool));
+                survivors.Add(tool is StrictArgumentTool guarded ? guarded.Inner : tool);
             }
             else
             {
@@ -81,9 +82,10 @@ public static class ToolFilter
             services.Remove(descriptor);
         }
 
+        var permissions = new ToolPermissionPolicy(kept);
         foreach (var tool in survivors)
         {
-            services.AddSingleton(tool);
+            services.AddSingleton<McpServerTool>(new StrictArgumentTool(tool, permissions));
         }
 
         var unknown = includeSet.Concat(excludeSet)

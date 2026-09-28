@@ -72,7 +72,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | Save files | `file_save` | Handle Save As dialogs automatically |
 | Open an existing file | `file_open` | Handle Open dialogs automatically |
 | Move bulk text in/out of an app | `clipboard` | Fastest text IO; pair with copy/paste hotkeys |
-| Record & replay a workflow | `ui_macro` | Save a `ui_batch` sequence by name, replay it later |
+| Reuse a workflow | `ui_batch` | Keep a steps array in a project file and run it with `wincli ui batch --steps-file` |
 | List or kill running processes | `process` | Task-manager style: find hung apps, free resources |
 | Discover UI visually | `screenshot_control` | Annotated screenshots with element data |
 | Press hotkeys (Ctrl+S) | `keyboard_control` | Direct keyboard input |
@@ -108,7 +108,6 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 | `ui_read_table` | Extract a grid/table/list-view into structured rows + headers |
 | `ui_wait` | Wait for an element to appear, disappear, or reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
-| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog (English Windows only) |
 | `file_open` | Open an existing file via the Open dialog (English Windows only) |
 | `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
@@ -522,7 +521,11 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 - One round-trip for multi-step workflows (fill username + password + submit) and for multi-stroke drawing
 - Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
 - Chain steps with `elementId: "$prev"` only after an unambiguous immediately preceding result
-- Saved macros discover fresh controls on every replay and never persist action IDs
+- Reusable batch files should discover fresh controls on every run rather than persist action IDs
+- MCP tool filters apply to every step: `find`/`click`/`type`/`select`/`wait`/`read`/`snapshot`
+  require their matching `ui_*` tool, `key` requires `keyboard_control`, and `mouse`/`polyline`
+  require `mouse_control`. Any forbidden step rejects the entire batch before it starts,
+  regardless of `stopOnError`.
 - Add a `wait` step immediately after an action to verify consequences such as a button enabling,
   a dialog closing, or confirmation text appearing
 - Selector steps accept `scope`, `parentElementId`, `requireUnique`, `visibleOnly`, and `enabledOnly`
@@ -531,7 +534,9 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 
 ### Perceive/act fusion (`withSnapshot`)
 
-`ui_click`, `ui_type`, `ui_select`, `ui_batch`, and `ui_macro` accept `withSnapshot=true`.
+`ui_click`, `ui_type`, `ui_select`, and `ui_batch` accept `withSnapshot=true`.
+When MCP tool filtering disables `ui_snapshot`, these requests are rejected before any action.
+With the default unfiltered configuration, behavior is unchanged.
 By default they attach the complete window tree as `postActionTree`, preserving existing behavior.
 Set `snapshotMode=auto` to receive `postActionChanges` when a remembered update is clearly smaller.
 
@@ -614,28 +619,15 @@ Read and write the Windows text clipboard — often the fastest way to move bulk
 
 ---
 
-## 🔁 UI Macro (`ui_macro`)
+## Reusable workflows and macro retirement
 
-Record and replay reusable UI workflows. A macro is a saved `ui_batch` steps array; running one replays it through the identical batch engine, so a macro run behaves exactly like the equivalent inline `ui_batch` call. Macros persist on disk across sessions.
+`ui_macro` and the CLI `macro`/`ui-macro` commands have been removed. Keep reusable steps in a
+project-owned JSON array and use `ui_batch` or `wincli ui batch --steps-file workflow.json`.
+Find controls afresh on each run and reference them with `$prev`.
 
-### Parameters
-
-| Parameter | Description | Required |
-|-----------|-------------|----------|
-| `action` | `save`, `run`, `get`, `list`, or `delete` | Yes |
-| `name` | Macro name (letters, digits, `-`, `_`, `.`) | For save/run/get/delete |
-| `steps` | A `ui_batch` steps JSON array | For save |
-| `windowHandle` | Target window handle for replay | For run |
-| `stopOnError` | For run: stop at the first failing step (default: true) | No |
-| `withSnapshot` | For run: attach the window's element tree after replay (default: false) | No |
-| `includeDiagnostics` | Reserved for parity (default: false) | No |
-
-### Capabilities
-
-- `save`: build and verify a sequence with `ui_batch`, then persist it under a name
-- `run`: replay a saved macro against any window (same `$prev` chaining and `stopOnError` semantics as `ui_batch`)
-- `list` / `get` / `delete`: manage saved macros
-- Turns a repeated multi-step task (open a form, fill fields, submit) into a single named call
+Existing `%LOCALAPPDATA%\Sbroenne.WindowsMcp\macros` files are not deleted or modified.
+They are no longer loaded or replayed. Extract a saved file's `steps` array to reuse it as
+a batch file; do not pass the entire saved macro object as the batch.
 
 ---
 
