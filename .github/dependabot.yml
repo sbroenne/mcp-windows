@@ -8,7 +8,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "security"
     reviewers:
       - "sbroenne"
     commit-message:
@@ -26,7 +25,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "security"
     reviewers:
       - "sbroenne"
     commit-message:
@@ -40,7 +38,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "security"
     reviewers:
       - "sbroenne"
     commit-message:
@@ -54,7 +51,6 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "security"
     reviewers:
       - "sbroenne"
     commit-message:
