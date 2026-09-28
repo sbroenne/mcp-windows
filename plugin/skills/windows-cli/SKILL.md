@@ -36,8 +36,8 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
    For a web page, add `--format article` to `wincli ui read` to get clean main-content text (nav/breadcrumb chrome and inline link URLs stripped, headings/lists as markdown).
 5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
    Use `wincli file-open --window <handle> --path <file>` for Open flows.
-6. `wincli clipboard get|set|clear` for fast bulk text IO; `wincli macro save|run|list|get|delete`
-   to persist a `ui batch` sequence and replay it by name.
+6. `wincli clipboard get|set|clear` for fast bulk text IO; keep reusable `ui batch` steps
+   in project JSON files and run them with `--steps-file`.
 7. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
 
 ## Patterns
@@ -63,7 +63,7 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 - Reuse CLI IDs while their observed controls and daemon owner remain alive.
 - Replacement, eviction, or daemon restart invalidates old IDs. Rediscover; stale IDs never retarget by name.
 - Discovery supports `--parent-element-id` and `--near-element` from the same owner.
-- Saved macros discover controls afresh and consume same-run `$prev`, never persisted literal IDs.
+- Reusable batches should discover controls afresh and consume same-run `$prev`, never persisted literal IDs.
 - CLI `ui snapshot --mode auto` returns a full baseline without `--since <snapshotToken>`.
   Supply that token for checked diffs; interleaved callers may safely receive a full snapshot.
 
@@ -74,10 +74,10 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
   Missing values are also usage errors (exit `2`); no application launches. The equals form preserves
   the complete argument string. Ordinary values work as `--args "local document.txt"`.
 
-### Macros (record & replay)
-- Save a proven `ui batch` sequence once: `wincli macro save --name login --steps '<json>'`.
-- Replay it against any window: `wincli macro run --name login --window <h>`.
-- Manage saved macros with `wincli macro list|get --name <x>|delete --name <x>`.
+### Reusable batches
+- Keep a proven steps JSON array in your project.
+- Run it with `wincli ui batch --window <h> --steps-file workflow.json`.
+- Discover fresh targets on every run; do not store literal element IDs.
 
 ### Clipboard
 - `wincli clipboard set --text "<value>"` then paste with `wincli keyboard press --key v --modifiers ctrl`.
@@ -88,7 +88,7 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 
 ### Output
 - stdout is the tool's JSON payload - parse it directly. Use `--include-diagnostics` (alias
-  `--diagnostics`) on `ui` operations, `macro run`, `file-open`, or `file-save` for available
+  `--diagnostics`) on `ui` operations, `file-open`, or `file-save` for available
   diagnostic detail. Their command aliases have the same support; other command groups reject
   these flags. Diagnostics are not a global option.
 

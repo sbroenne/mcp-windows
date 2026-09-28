@@ -4,9 +4,11 @@ using ModelContextProtocol.Server;
 
 namespace Sbroenne.WindowsMcp.Catalog;
 
-/// <summary>Rejects unknown arguments before the SDK binder can silently discard them.</summary>
-internal sealed class StrictArgumentTool(McpServerTool inner) : McpServerTool
+/// <summary>Checks the request contract and tool dependencies before dispatch.</summary>
+internal sealed class StrictArgumentTool(McpServerTool inner, ToolPermissionPolicy permissions) : McpServerTool
 {
+    internal McpServerTool Inner => inner;
+
     private readonly HashSet<string> _argumentNames = inner.ProtocolTool.InputSchema
         .GetProperty("properties").EnumerateObject()
         .Select(property => property.Name).ToHashSet(StringComparer.Ordinal);
@@ -78,6 +80,16 @@ internal sealed class StrictArgumentTool(McpServerTool inner) : McpServerTool
                     });
                 }
             }
+        }
+
+        var permissionError = permissions.Validate(ProtocolTool.Name, request.Params?.Arguments);
+        if (permissionError is not null)
+        {
+            return ValueTask.FromResult(new CallToolResult
+            {
+                IsError = true,
+                Content = [new TextContentBlock { Text = permissionError }],
+            });
         }
 
         return inner.InvokeAsync(request, cancellationToken);

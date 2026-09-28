@@ -37,9 +37,9 @@ public static class WindowsAutomationGuidance
         "ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') - wait for an element to appear\n" +
         "ui_wait(windowHandle='<handle>', mode='disappear', nameContains='...') - wait for a spinner/dialog to close\n" +
         "ui_wait(mode='state', elementId='...', desiredState='enabled') - wait until an element reaches a state\n\n" +
-        "### 2c. BATCH, MACROS & FUSION (Fewer round-trips)\n" +
+        "### 2c. BATCH & FUSION (Fewer round-trips)\n" +
         "ui_batch(windowHandle='<handle>', steps='[...]', stopOnError=true) - run many steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in ONE call. Use for multi-field forms AND for canvas drawing instead of many separate calls.\n" +
-        "ui_macro(action='save', name='...', steps='[...]') then ui_macro(action='run', name='...', windowHandle='<handle>') - persist a ui_batch sequence and replay it later; also action='list'/'get'/'delete'.\n" +
+        "Each batch step requires its matching enabled tool; key requires keyboard_control and mouse/polyline require mouse_control. A forbidden step rejects the entire batch before any action, even with stopOnError=false. Attached snapshots require ui_snapshot. Do not route around disabled tools.\n" +
         "ui_click(windowHandle='<handle>', elementId='<observed-id>', withSnapshot=true) - add withSnapshot=true to ui_click/ui_type/ui_select to inspect post-action state without another call; this does not verify an application outcome. Use snapshotMode='full' once, 'auto' for repeated checks, or 'reset' to begin a new comparison. Pass snapshotSince for a checked diff.\n\n" +
         "### 2d. CLIPBOARD (Fast bulk text IO)\n" +
         "clipboard(action='get') - read the clipboard text; clipboard(action='set', text='...') - write it; clipboard(action='clear').\n" +

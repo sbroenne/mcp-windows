@@ -1,7 +1,6 @@
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Cli;
-using Sbroenne.WindowsMcp.Macros;
 
 namespace Sbroenne.WindowsMcp.Tests.Unit;
 
@@ -96,14 +95,6 @@ public sealed class TargetedActionValidationTests
             true, false, "full", false, CancellationToken.None);
         Assert.True(result.IsError);
         Assert.Contains("unambiguous", Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
-    }
-
-    [Fact]
-    public void MacroRejectsPersistentIds()
-    {
-        var error = MacroService.ValidateReplayReferences(
-            [new() { Action = "click", ElementId = "old-owner.1" }]);
-        Assert.Contains("cannot persist", error);
     }
 
     [Fact]

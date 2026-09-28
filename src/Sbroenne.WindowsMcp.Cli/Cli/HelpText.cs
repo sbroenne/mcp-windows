@@ -11,7 +11,6 @@ internal static class HelpText
         {
             "window-management" => "window",
             "clip" => "clipboard",
-            "ui-macro" => "macro",
             "filesave" or "save" => "file-save",
             "fileopen" or "open" => "file-open",
             "proc" => "process",
@@ -31,8 +30,8 @@ internal static class HelpText
         Targeted click/type/select/read-table and state waits require --element-id.
         Selectors belong only to discovery and appear/disappear waits.
         ui read --window <handle> without --element-id explicitly reads the whole window.
-        Batch $prev requires an unambiguous preceding result. Saved macros must discover
-        fresh targets on replay, then use elementId="$prev", never persisted IDs.
+        Batch $prev requires an unambiguous preceding result. Reusable batch files should discover
+        fresh targets on each run, then use elementId="$prev", never persisted IDs.
         """;
 
     public static string Version
@@ -80,7 +79,6 @@ internal static class HelpText
           mouse        Mouse input (move, click, drag, scroll, ...).
           screenshot   Capture screens/windows/regions (annotated element discovery by default).
           clipboard    Read/write the Windows clipboard (get, set, clear).
-          macro        Record & replay UI workflows (save, run, list, get, delete).
           file-save    Save the active document (handles the Save As dialog).
           file-open    Open an existing file (handles the Open dialog).
           process      List or kill running processes (task-manager style).
@@ -139,7 +137,7 @@ internal static class HelpText
         ui batch    --window <h> --steps '<json>' | --steps-file <path>
                      [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]
             For --with-snapshot, use full once, auto for repeated checks, or reset to begin a new comparison.
-            Add --since <token> for checked post-action diffs on click/type/select/batch/macro.
+            Add --since <token> for checked post-action diffs on click/type/select/batch.
             selectors: --name --name-contains --name-pattern --control-type --automation-id --class-name
 
         keyboard <action> --window <h> [options]
@@ -185,15 +183,8 @@ internal static class HelpText
             Task-manager style listing and termination. --force also kills the child process tree.
             Critical Windows processes and the automation server itself are protected.
 
-        macro <action> [options]
-            actions: save (--name --steps '<json>'|--steps-file <path>), run (--name --window <h>
-                     [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]),
-                     list, get (--name), delete (--name)
-            Persist a ui_batch steps array under a name, then replay it later against any window.
-            Replay uses the identical batch engine, so a macro run == the equivalent ui batch call.
-
         Diagnostics (not global): --include-diagnostics (alias --diagnostics) is supported by
-            ui operations, macro run, file-open, and file-save for available diagnostic details.
+            ui operations, file-open, and file-save for available diagnostic details.
             Their command aliases have the same support. Other command groups reject these flags.
         Machine-readable: run 'wincli tools --json' for the full tool manifest (names + JSON schemas).
         This is the MCP schema, not a CLI flag schema; use the kebab-case options above.

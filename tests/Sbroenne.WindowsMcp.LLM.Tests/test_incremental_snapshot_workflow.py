@@ -56,7 +56,7 @@ async def test_model_uses_incremental_snapshots_for_repeated_inspection(
         }:
             remembered_modes.append(call.arguments["mode"])
         elif (
-            call.name in {"ui_click", "ui_type", "ui_select", "ui_batch", "ui_macro"}
+            call.name in {"ui_click", "ui_type", "ui_select", "ui_batch"}
             and call.arguments.get("withSnapshot") is True
             and call.arguments.get("snapshotMode") in {"auto", "reset"}
         ):

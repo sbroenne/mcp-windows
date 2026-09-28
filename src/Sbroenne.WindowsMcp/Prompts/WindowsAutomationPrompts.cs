@@ -49,7 +49,7 @@ public sealed class WindowsAutomationPrompts
                 "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
                 "• Open: file_open(windowHandle='<handle>', filePath='...') — opens an existing file, handles Open dialogs automatically\n" +
                 "• Clipboard: clipboard(action='get') / clipboard(action='set', text='...') — fastest bulk text IO; pair with copy/paste hotkeys\n" +
-                "• Macro: ui_macro(action='save', name='...', steps='[...]') then ui_macro(action='run', name='...', windowHandle='<handle>') — record & replay a ui_batch sequence\n" +
+                "• Batch: ui_batch(windowHandle='<handle>', steps='[...]') — combine steps; discover fresh controls for reusable workflows\n" +
                 "\n" +
                 "If you don't know element names:\n" +
                 "• screenshot_control(target='window', windowHandle='<handle>') — see numbered elements; image stays omitted by default to save tokens\n" +

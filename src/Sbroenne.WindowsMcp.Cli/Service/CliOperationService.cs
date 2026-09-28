@@ -37,7 +37,7 @@ internal static class CliOperationService
             "app" => "working-dir cwd working-directory",
             "screenshot" => "output-path out",
             "file-open" or "fileopen" or "open" or "file-save" or "filesave" or "save" => "path file-path file",
-            "ui" or "macro" or "ui-macro" => "steps-file",
+            "ui" => "steps-file",
             _ => "",
         };
         var paths = pathOptions.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToHashSet(StringComparer.Ordinal);

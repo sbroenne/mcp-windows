@@ -375,63 +375,10 @@ public sealed class CliIntegrationTests
     }
 
     [Fact]
-    public async Task Cli_Macro_SaveListGetDelete_RoundTrips()
-    {
-        var name = "cli-macro-" + Guid.NewGuid().ToString("N");
-        const string steps = "[{\"action\":\"find\",\"name\":\"Submit\",\"requireUnique\":true},{\"action\":\"click\",\"elementId\":\"$prev\"}]";
-        try
-        {
-            var (saveCode, saveOut, _) = await RunAsync("macro", "save", "--name", name, "--steps", steps);
-            Assert.Equal(0, saveCode);
-            Assert.True(SuccessOf(saveOut), saveOut);
-
-            var (listCode, listOut, _) = await RunAsync("macro", "list");
-            Assert.Equal(0, listCode);
-            Assert.Contains(name, listOut, StringComparison.Ordinal);
-
-            var (getCode, getOut, _) = await RunAsync("macro", "get", "--name", name);
-            Assert.Equal(0, getCode);
-            using (var doc = JsonDocument.Parse(getOut))
-            {
-                Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), getOut);
-                Assert.Equal(2, doc.RootElement.GetProperty("stepCount").GetInt32());
-                Assert.Equal(JsonValueKind.Array, doc.RootElement.GetProperty("steps").ValueKind);
-            }
-
-            var (delCode, delOut, _) = await RunAsync("macro", "delete", "--name", name);
-            Assert.Equal(0, delCode);
-            Assert.True(SuccessOf(delOut), delOut);
-        }
-        finally
-        {
-            await RunAsync("macro", "delete", "--name", name);
-        }
-    }
-
-    [Fact]
-    public async Task Cli_MacroRun_MissingMacro_MatchesMcpServerOutputExactly()
-    {
-        var name = "missing-" + Guid.NewGuid().ToString("N");
-
-        // Both entry points must produce identical output for a run against a nonexistent macro.
-        var direct = await Sbroenne.WindowsMcp.Macros.Tools.UIMacroTool.ExecuteAsync(
-            Sbroenne.WindowsMcp.Models.MacroAction.Run, name, steps: null, windowHandle: _windowHandle,
-            stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
-        var directText = direct.Content
-            .OfType<ModelContextProtocol.Protocol.TextContentBlock>()
-            .Single().Text;
-
-        var (code, stdout, _) = await RunAsync("macro", "run", "--name", name, "--window", _windowHandle);
-
-        Assert.Equal(1, code);
-        Assert.Equal(directText, stdout.TrimEnd('\r', '\n'));
-    }
-
-    [Fact]
     public void Cli_HelpAndTools_AreNonEmptyAndCoverAllGroups()
     {
         Assert.Contains("wincli", HelpText.Usage, StringComparison.Ordinal);
-        foreach (var group in new[] { "app", "window", "ui", "keyboard", "mouse", "screenshot", "clipboard", "macro", "file-save", "file-open" })
+        foreach (var group in new[] { "app", "window", "ui", "keyboard", "mouse", "screenshot", "clipboard", "file-save", "file-open" })
         {
             Assert.Contains(group, HelpText.Usage, StringComparison.Ordinal);
             Assert.Contains(group, HelpText.Tools, StringComparison.Ordinal);
