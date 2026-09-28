@@ -123,7 +123,12 @@ internal static class HelpText
                      [--sort-by-prominence] [--in-region x,y,w,h]
                      [--visible-only] [--enabled-only] [--content-view-only]
                      [--scope window|active_dialog] [--require-unique]
+                     [--exact-depth <n>] [--parent-element-id <id>]
                      [--timeout-ms <n>]
+            For large/incomplete searches, discover containers with --exact-depth 1, then search
+            inside an observed container with --parent-element-id <id>. Repeat at that parent if needed.
+            Name/type/automation-id filters choose matches; unmatched nodes still count toward the limit.
+            Use ui read --element-id <id> when only that control's text is needed.
         ui click    --window <h> --element-id <id>
                      [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
         ui type     --window <h> --text <s> --element-id <id> [--clear-first]

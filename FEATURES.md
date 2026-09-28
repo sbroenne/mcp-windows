@@ -224,11 +224,23 @@ Find and discover UI elements by name, type, or automation ID.
 - Returns element IDs for use with other ui_* tools
 - Electron app support (VS Code, Teams, Slack)
 
-Substring, regex, and depth-aware searches check at most 2,000 candidates. If the
+Each search scan checks at most 2,000 nodes, including nonmatching nodes. If the
 scan limit leaves candidates unchecked, `search_incomplete` is returned instead
-of claiming the target is absent or unique. Narrow the search using an exact
-name, `automationId`, `controlType`, or `className`, or a `parentElementId` from
-the same MCP session. A longer timeout does not increase this limit.
+of claiming the target is absent or unique. Name, `automationId`, `controlType`,
+and `className` filters choose matches; they do not stop unrelated nodes from
+counting toward the limit. A longer timeout does not increase this limit.
+
+To reduce the area searched, call `ui_find` with `exactDepth=1` to discover the
+window's immediate children. Choose an observed container and pass its returned
+`id` as `parentElementId` in the next search. Repeat shallow discovery inside that
+container if needed. The CLI options are `--exact-depth 1` and
+`--parent-element-id <id>`. Use IDs within the same MCP session or CLI daemon;
+they are not interchangeable between those two connections.
+
+For smaller replies, use `ui_snapshot` with a known `parentElementId`, or use
+`ui_read` with an observed `elementId` when only that element's text is needed.
+Snapshot `maxDepth` and `controlTypeFilter` reduce the returned content, but do
+not necessarily reduce the work done by the app to provide its controls.
 
 ---
 

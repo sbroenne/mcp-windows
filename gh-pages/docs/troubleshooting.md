@@ -36,6 +36,42 @@ Ask the assistant to look at the window again; the controls may have changed.
 Some apps do not expose their controls to Windows. In those cases, screenshots
 and mouse or keyboard input may help, but they are not guaranteed to work.
 
+## A search stops at its limit
+
+`search_incomplete` means the tool could not finish checking the requested area.
+It does not prove that the control is missing. Adding more name or type filters,
+or waiting longer, does not increase the 2,000-node scan limit.
+
+Ask the assistant to inspect a smaller area. `ui_find` with `exactDepth=1` lists
+the window's immediate children. It can then search inside an observed container
+using that container's `id` as `parentElementId`. The command-line options are
+`--exact-depth 1` and `--parent-element-id <id>`. Keep those IDs within the same
+MCP connection or command-line service.
+
+If it only needs text from a known control, use `ui_read` with that control's
+`elementId` rather than another whole-window snapshot.
+
+## PowerPoint shows its buttons but not slide text
+
+PowerPoint may expose the ribbon and status bar without exposing the slide text
+in its current view. A deeper search does not necessarily reveal more. This can
+also happen in Windows' own control reader, not just Windows MCP.
+
+Check a screenshot before choosing an action. Available controls can change
+when you change views or open a dialog. Do not assume that a successful click
+or text-entry command proves that the slide was changed; check the saved result.
+
+## Chrome shows the window but not the page
+
+A shallow snapshot can stop above the page. Inspect a discovered container or
+request a deeper snapshot before concluding that the page's controls are missing.
+
+Chrome can also fail to expose its page controls. A failed snapshot or
+`search_incomplete` is not proof that the page is empty. If a deeper inspection
+still fails, check a screenshot and the page's loading state rather than repeating
+broad searches with different field names. The cause of the intermittent discovery
+failure is still unresolved; a later successful read does not prove it is fixed.
+
 ## It typed or clicked in the wrong place
 
 Stop the task and inspect the result. Check whether another window, menu, or

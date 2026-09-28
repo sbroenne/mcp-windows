@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation.Tools;
@@ -32,7 +33,12 @@ public sealed class SearchLimitHarnessFixture : IDisposable
                 });
             }
 
-            var scope = new Panel { Name = "SentinelScope", Bounds = new System.Drawing.Rectangle(0, 30, 200, 40) };
+            var scope = new Panel
+            {
+                Name = "SentinelScope",
+                AccessibleName = "Task details",
+                Bounds = new System.Drawing.Rectangle(0, 30, 200, 40)
+            };
             scope.Controls.Add(new Label
             {
                 Name = "SearchLimitSentinel",
@@ -52,7 +58,7 @@ public sealed class SearchLimitHarnessFixture : IDisposable
 
 [Collection("SearchLimitHarness")]
 [Trait("Category", "RequiresDesktop")]
-public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixture)
+public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixture, Xunit.Abstractions.ITestOutputHelper output)
 {
     [Fact]
     public async Task Find_ExactNameBeyondScanLimit_FindsTargetOrReportsIncomplete()
@@ -81,8 +87,49 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         Assert.True(result.IsError);
         Assert.Equal("search_incomplete", json.RootElement.GetProperty("errorType").GetString());
         Assert.Contains("2000", json.RootElement.GetProperty("error").GetString());
-        Assert.Contains("automationId", json.RootElement.GetProperty("recoverySuggestion").GetString());
+        var recovery = json.RootElement.GetProperty("recoverySuggestion").GetString();
+        Assert.Contains("exactDepth=1", recovery);
+        Assert.Contains("parentElementId", recovery);
+        Assert.Contains("still count", recovery);
         Assert.False(json.RootElement.TryGetProperty("diagnostics", out _));
+    }
+
+    [Fact]
+    public async Task Find_ShallowDiscoveryThenParentScope_ReachesTargetWithSmallerReplies()
+    {
+        var broad = await UISnapshotTool.ExecuteAsync(
+            fixture.WindowHandle, null, 20, null, "full", true, CancellationToken.None);
+        Assert.False(broad.IsError);
+        using var broadJson = Parse(broad);
+        Assert.Contains("exactDepth=1",
+            Assert.Single(broadJson.RootElement.GetProperty("diagnostics").GetProperty("warnings").EnumerateArray()).GetString());
+
+        var shallow = await UIFindTool.ExecuteAsync(
+            fixture.WindowHandle, null, null, null, null, null, null, 1, 1, false,
+            false, null, null, false, false, null, "window", false, null, 5000, true, CancellationToken.None);
+        Assert.False(shallow.IsError);
+        using var shallowJson = Parse(shallow);
+        var parent = Assert.Single(shallowJson.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("name").GetString() == "Task details");
+        var id = parent.GetProperty("id").GetString();
+        Assert.InRange(shallowJson.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32(), 1, 30);
+        Assert.DoesNotContain(shallowJson.RootElement.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("name").GetString() == "Quality sentinel");
+
+        var scoped = await UIFindTool.ExecuteAsync(
+            fixture.WindowHandle, "Quality sentinel", null, null, "Text", null, null, null, 1, false,
+            false, null, null, false, false, id, "window", true, null, 5000, true, CancellationToken.None);
+        Assert.False(scoped.IsError);
+        using var scopedJson = Parse(scoped);
+        var target = Assert.Single(scopedJson.RootElement.GetProperty("items").EnumerateArray());
+        Assert.Equal("Quality sentinel", target.GetProperty("name").GetString());
+        Assert.InRange(scopedJson.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32(), 1, 10);
+
+        var focusedBytes = ReplyBytes(shallow) + ReplyBytes(scoped);
+        var broadBytes = ReplyBytes(broad);
+        output.WriteLine($"Shallow discovery and scoped find: {focusedBytes} bytes; broad snapshot: {broadBytes} bytes.");
+        Assert.True(focusedBytes < broadBytes / 10,
+            $"Shallow discovery and scoped find returned {focusedBytes} bytes; the broad snapshot returned {broadBytes} bytes.");
     }
 
     [Theory]
@@ -284,6 +331,41 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         Assert.Equal("search_incomplete", json.RootElement.GetProperty("errorType").GetString());
     }
 
+    [Fact]
+    public async Task Cli_ShallowDiscoveryThenParentScope_ReachesTarget()
+    {
+        try
+        {
+            var shallow = await CliIntegrationTests.RunSeparateProcessAsync(
+                "ui", "find", "--window", fixture.WindowHandle, "--exact-depth", "1",
+                "--visible-only", "false", "--content-view-only", "false", "--include-diagnostics");
+            Assert.Equal(0, shallow.Code);
+            Assert.Empty(shallow.Stderr);
+            using var shallowJson = JsonDocument.Parse(shallow.Stdout);
+            var parent = Assert.Single(shallowJson.RootElement.GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("name").GetString() == "Task details");
+            var id = parent.GetProperty("id").GetString()!;
+            Assert.InRange(shallowJson.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32(), 1, 30);
+
+            var scoped = await CliIntegrationTests.RunSeparateProcessAsync(
+                "ui", "find", "--window", fixture.WindowHandle, "--parent-element-id", id,
+                "--name", "Quality sentinel", "--control-type", "Text", "--require-unique",
+                "--visible-only", "false", "--content-view-only", "false", "--include-diagnostics");
+            Assert.Equal(0, scoped.Code);
+            Assert.Empty(scoped.Stderr);
+            using var scopedJson = JsonDocument.Parse(scoped.Stdout);
+            var target = Assert.Single(scopedJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("Quality sentinel", target.GetProperty("name").GetString());
+            Assert.InRange(scopedJson.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32(), 1, 10);
+            Assert.True(Encoding.UTF8.GetByteCount(shallow.Stdout) + Encoding.UTF8.GetByteCount(scoped.Stdout) < 5000);
+        }
+        finally
+        {
+            var stopped = await CliIntegrationTests.RunSeparateProcessAsync("service", "stop");
+            Assert.Equal(0, stopped.Code);
+        }
+    }
+
     private Task<CallToolResult> FindAsync(
         string? name = null, string? contains = null, string? pattern = null, string? parent = null) =>
         UIFindTool.ExecuteAsync(
@@ -292,4 +374,7 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
 
     private static JsonDocument Parse(CallToolResult result) =>
         JsonDocument.Parse(Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
+
+    private static int ReplyBytes(CallToolResult result) =>
+        Encoding.UTF8.GetByteCount(Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);
 }

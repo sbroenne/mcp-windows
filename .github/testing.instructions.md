@@ -166,7 +166,8 @@ It must not trim extra lines, spaces, or altered characters. A failed post-input
 
 Save tests cover `shortcut`, `save_as`, and `wait`. The default still sends Ctrl+S; a supplied
 path fills a dialog but does not retarget an already named document. Explicit `save_as` sends
-Ctrl+Shift+S without first saving over the source. `wait` handles an already open owned dialog.
+F12 in Word/PowerPoint and Ctrl+Shift+S elsewhere without first saving over the source.
+`wait` handles an already open owned dialog.
 The real Notepad copy test checks both destination content and the unchanged original.
 If filename input loses its observation because the dialog replaces the field, Save must still
 read the current field in the same owned dialog and require the entire requested path before
