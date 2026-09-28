@@ -12,6 +12,10 @@ on:
       - 'scripts/update_star_history.py'
       - 'scripts/validate_npm_lockfiles.py'
       - 'scripts/tests/test_validate_npm_lockfiles.py'
+      - 'scripts/maintain_windows_runner.py'
+      - 'scripts/tests/test_maintain_windows_runner.py'
+      - 'scripts/tests/test_runner_update_worker.ps1'
+      - 'infrastructure/azure/update-runner.ps1'
       - '**/package-lock.json'
       - '**/npm-shrinkwrap.json'
       - '**/.npmrc'
@@ -20,6 +24,8 @@ on:
       - 'Directory.Packages.props'
       - '.github/workflows/ci.yml'
       - '.github/workflows/integration-tests.yml'
+      - '.github/workflows/runner-maintenance.yml'
+      - '.github/workflows/runner-maintenance-health.yml'
       - '.github/workflows/release-unified.yml'
       - '.github/workflows/llm-tests.yml'
   pull_request:
@@ -33,6 +39,25 @@ permissions:
   contents: read
 
 jobs:
+  usage-evals-unit:
+    name: Usage evaluation checks (no models)
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v7
+
+    - name: Setup Python and uv
+      uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      with:
+        python-version: '3.13'
+
+    - name: Check usage evaluation code
+      working-directory: tests/usage_evals
+      run: uv run ruff check .
+
+    - name: Test evaluation safeguards without model calls
+      working-directory: tests/usage_evals
+      run: uv run pytest tests/unit -q
+
   star-history:
     runs-on: ubuntu-latest
 
@@ -103,6 +128,10 @@ jobs:
     - name: Test npm Lockfile Guard
       timeout-minutes: 2
       run: python -m unittest scripts.tests.test_validate_npm_lockfiles
+
+    - name: Test runner maintenance without changing Windows
+      timeout-minutes: 2
+      run: python -m unittest scripts.tests.test_maintain_windows_runner
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v6

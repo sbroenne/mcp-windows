@@ -20,6 +20,9 @@ public static class UIAutomationErrorType
     /// <summary>The requested pattern is not supported by the element.</summary>
     public const string PatternNotSupported = "pattern_not_supported";
 
+    /// <summary>Input was dispatched, but the resulting content could not be verified.</summary>
+    public const string VerificationFailed = "verification_failed";
+
     /// <summary>The cached element reference is no longer valid.</summary>
     public const string ElementStale = "element_stale";
 

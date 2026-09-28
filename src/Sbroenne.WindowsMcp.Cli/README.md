@@ -37,16 +37,24 @@ wincli <group> [<action>] [--option value] [--flag]
 | Command | Purpose |
 | --- | --- |
 | `wincli --help` | Command map + common workflow |
+| `wincli <group> [<action>] --help` | Group options and examples, without running the action |
 | `wincli tools` | Every command with its options |
 | `wincli tools --json` | Shared MCP tool manifest, not a CLI flag schema; use `wincli tools` for CLI spellings and limitations |
 | `wincli guidance` | CLI ownership rules followed by the shared MCP automation guide |
 | `wincli --version` | Version |
 
+Help is handled before required arguments or automation. For example,
+`wincli keyboard press --help` shows the key/modifier syntax, and
+`wincli file-save --window 12345 --help` does not save anything.
+Command aliases also support `--help`. A literal option value such as
+`--text=--help` remains data, not a help request.
+Help runs locally without starting the persistent daemon, including `service --help`.
+
 ### Command groups
 
 | Group | Purpose |
 | --- | --- |
-| `app` | Launch an application and return its window handle |
+| `app` | Observe application launch; return a handle when one eligible window is identified |
 | `window` | Manage windows (find, list, activate, move, close, …) |
 | `ui` | UI automation (`snapshot`, `find`, `click`, `type`, `select`, `read`, `read-table`, `wait`, `batch`) |
 | `keyboard` | Send keystrokes (`type`, `press`, `sequence`, …) |
@@ -57,6 +65,16 @@ wincli <group> [<action>] [--option value] [--flag]
 | `file-save` | Save the active document (handles the Save As dialog) |
 | `file-open` | Open an existing file (handles the Open dialog) |
 | `service` | Start, inspect, or gracefully stop the CLI-only daemon |
+
+`wincli app` reports `launchStatus`: `started` (no observed window or `--no-wait`),
+`windowObserved` (a visible process-owned window), `possibleHandoff` (clean exit with
+a matching pre-existing instance), or `exitedWithoutWindow` (failure to establish either).
+A possible handoff does not prove delivery or loaded content. Multiple matching windows
+are listed in `windows` without selecting `window`. If the intended handle is missing
+or ambiguous, inspect candidates or rediscover with `wincli window find`; do not use
+handle-based commands until the target is identified. Then verify the intended content.
+No status guarantees focus, input readiness, or URL/document readiness.
+Observed nonzero exits fail even when another instance is open.
 
 ## Typical workflow
 
@@ -188,3 +206,6 @@ are not written to lifecycle logs. State remains in memory only.
   `snake_case` and `kebab-case` are accepted.
 - The CLI ships with the same DPI-awareness manifest as the server, so screen coordinates are correct
   on high-DPI and multi-monitor setups.
+For a different destination, use `file-save --window <h> --path <file> --trigger-mode save_as`.
+The default `shortcut` sends Ctrl+S; a path alone does not retarget an already named document.
+Use `--trigger-mode wait` to fill an already open owned Save As dialog without another shortcut.

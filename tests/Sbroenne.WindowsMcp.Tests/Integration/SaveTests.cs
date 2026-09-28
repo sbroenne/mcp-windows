@@ -70,8 +70,11 @@ public sealed class SaveTests : IDisposable
         }
     }
 
-    [Fact]
-    public async Task Save_StandardWindowsDialog_SavesFile()
+    [Theory]
+    [InlineData("shortcut")]
+    [InlineData("save_as")]
+    [InlineData("wait")]
+    public async Task Save_StandardWindowsDialog_SavesFile(string triggerMode)
     {
         // Arrange: Prepare test file path
         var testFilePath = Path.Combine(_testOutputDir, $"test-{Guid.NewGuid()}.txt");
@@ -89,7 +92,14 @@ public sealed class SaveTests : IDisposable
         // Act: Call SaveAsync on the main window
         // This sends Ctrl+S, which triggers the Save As dialog in the test harness
         // Then it fills in the filename and presses Enter
-        var result = await _automationService.SaveAsync(_windowHandle, testFilePath);
+        if (triggerMode == "wait")
+        {
+            using var keyboard = new KeyboardInputService();
+            var shortcut = await keyboard.PressKeyAsync("s", Models.ModifierKey.Ctrl, 1,
+                _fixture.TestWindowHandle, CancellationToken.None);
+            Assert.True(shortcut.Success, shortcut.Error);
+        }
+        var result = await _automationService.SaveAsync(_windowHandle, testFilePath, triggerMode);
 
         // Assert
         Assert.True(result.Success, $"Save handling failed: {result.ErrorMessage}");
@@ -170,11 +180,12 @@ public sealed class SaveTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, false, true)]
     public async Task Save_ModelessOwnedDialog_VerifiesCurrentFilename(
-        bool replaceFilenameField, bool changeDirectory)
+        bool replaceFilenameField, bool changeDirectory, bool replaceBeforeComplete)
     {
         var fixtureForm = _fixture.Form!;
         System.Windows.Forms.Form? target = null;
@@ -205,7 +216,7 @@ public sealed class SaveTests : IDisposable
                 };
                 filename.TextChanged += (_, _) =>
                 {
-                    if (filename.Text != path)
+                    if (filename.Text != (replaceBeforeComplete ? path[..(path.Length / 2)] : path))
                     {
                         return;
                     }
@@ -227,7 +238,8 @@ public sealed class SaveTests : IDisposable
                         Name = original.Name,
                         AccessibleName = original.AccessibleName,
                         Bounds = original.Bounds,
-                        Text = original.Text
+                        Text = original.Text,
+                        ReadOnly = replaceBeforeComplete
                     };
                     dialog.Controls.Add(filename);
                     dialog.Controls.Remove(original);
@@ -253,7 +265,7 @@ public sealed class SaveTests : IDisposable
         {
             var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
             Assert.Equal(replaceFilenameField, (bool)fixtureForm.Invoke(() => filenameReplaced));
-            if (changeDirectory)
+            if (changeDirectory || replaceBeforeComplete)
             {
                 Assert.False(result.Success);
                 Assert.Contains("filename field", result.ErrorMessage, StringComparison.Ordinal);

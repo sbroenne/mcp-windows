@@ -10,7 +10,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// Generalized common-dialog handling. Extends the Save-As automation to the standard Windows
 /// <b>Open</b> file dialog: send Ctrl+O, wait for the dialog, type the path into the shared
 /// File name field, and click Open. Reuses the same field-discovery and dialog-close helpers as
-/// <see cref="SaveAsync"/> so both flows share one battle-tested code path.
+/// <see cref="SaveAsync(string, string?, CancellationToken)"/> so both flows share one battle-tested code path.
 /// </summary>
 public sealed partial class UIAutomationService
 {

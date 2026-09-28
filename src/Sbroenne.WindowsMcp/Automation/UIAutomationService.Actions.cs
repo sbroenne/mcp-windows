@@ -434,7 +434,7 @@ public sealed partial class UIAutomationService
 
             var verified = await WaitForElementConditionAsync(
                 staResult.Element,
-                () => string.Equals(ReadEditableValue(staResult.Element), text, StringComparison.Ordinal),
+                () => IsTypedTextObservable(ReadEditableValue(staResult.Element), null, text, replace: true),
                 cancellationToken);
             if (verified.Observed)
             {
@@ -443,7 +443,7 @@ public sealed partial class UIAutomationService
 
             return UIAutomationResult.CreateFailure(
                 "type",
-                UIAutomationErrorType.PatternNotSupported,
+                UIAutomationErrorType.VerificationFailed,
                 "ValuePattern accepted the text, but the requested value was not observable before the bounded timeout.",
                 CreateActionDiagnostics(stopwatch, staResult.Element, "value_pattern"));
         }
@@ -544,6 +544,23 @@ public sealed partial class UIAutomationService
                 expectedWindowHandle,
                 cancellationToken);
             _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+            if (!staResult.IsPassword && staResult.InitialValue is not null)
+            {
+                var cleared = await WaitForElementConditionAsync(
+                    staResult.Element!,
+                    () => staResult.Element!.GetText() == "",
+                    cancellationToken,
+                    TimeSpan.FromMilliseconds(750));
+                if (!cleared.Observed)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "type",
+                        UIAutomationErrorType.VerificationFailed,
+                        "The field did not become empty after clearing. No replacement text was sent; read the current content before retrying.",
+                        CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
+                }
+            }
         }
 
         if (!IsExpectedForegroundWindow(expectedWindowHandle))
@@ -577,17 +594,14 @@ public sealed partial class UIAutomationService
                 () =>
                 {
                     var current = ReadEditableValue(staResult.Element!);
-                    return clearFirst
-                        ? string.Equals(current, text, StringComparison.Ordinal)
-                        : !string.Equals(current, staResult.InitialValue, StringComparison.Ordinal) &&
-                          (current?.Contains(text, StringComparison.Ordinal) == true);
+                    return IsTypedTextObservable(current, staResult.InitialValue, text, clearFirst);
                 },
                 cancellationToken);
             if (!observed.Observed)
             {
                 return UIAutomationResult.CreateFailure(
                     "type",
-                    UIAutomationErrorType.PatternNotSupported,
+                    UIAutomationErrorType.VerificationFailed,
                     "Keyboard input was sent, but the requested text change was not observable. " +
                     "Refresh the UI state and verify the field still has focus.",
                     CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
@@ -621,6 +635,23 @@ public sealed partial class UIAutomationService
 
     private static string? ReadEditableValue(UIA.IUIAutomationElement element) =>
         element.TryGetValue() ?? element.GetText();
+
+    internal static bool IsTypedTextObservable(string? current, string? initial, string expected, bool replace)
+    {
+        if (current is null)
+        {
+            return false;
+        }
+
+        // RichEdit providers can expose CR where the caller supplied LF or CRLF.
+        static string Normalize(string value) => value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        current = Normalize(current);
+        expected = Normalize(expected);
+        return replace
+            ? string.Equals(current, expected, StringComparison.Ordinal)
+            : !string.Equals(current, initial is null ? null : Normalize(initial), StringComparison.Ordinal)
+              && current.Contains(expected, StringComparison.Ordinal);
+    }
 
     internal Task<UIAutomationResult?> ValidateElementTargetAsync(
         string elementId, string? windowHandle, CancellationToken cancellationToken) =>
@@ -1519,9 +1550,20 @@ public sealed partial class UIAutomationService
     /// 5. Wait for dialog to close
     /// 6. When a path was supplied, wait for an observable file creation or change before success
     /// </remarks>
-    public async Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default)
+    public Task<UIAutomationResult> SaveAsync(string windowHandle, string? filePath = null, CancellationToken cancellationToken = default) =>
+        SaveAsync(windowHandle, filePath, "shortcut", cancellationToken);
+
+    /// <summary>Saves using Ctrl+S, explicit Ctrl+Shift+S, or an already open owned dialog.</summary>
+    public async Task<UIAutomationResult> SaveAsync(
+        string windowHandle, string? filePath, string triggerMode, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
+
+        if (triggerMode is not ("shortcut" or "save_as" or "wait"))
+        {
+            return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.InvalidParameter,
+                "triggerMode must be shortcut, save_as, or wait. No save input was sent.");
+        }
 
         try
         {
@@ -1541,28 +1583,31 @@ public sealed partial class UIAutomationService
                 filePath = Path.GetFullPath(filePath);
             }
 
-            // Step 1: Focus the target window (FlaUI/White pattern)
-            var focusResult = await FocusWindowAsync(hwnd, cancellationToken);
-            if (!focusResult)
+            // An already open modal dialog can prevent its owner from becoming foreground.
+            if (triggerMode != "wait")
             {
-                return UIAutomationResult.CreateFailure(
-                    "save",
-                    UIAutomationErrorType.ElementNotFound,
-                    "Could not focus the target window.",
-                    CreateDiagnostics(stopwatch));
-            }
+                var focusResult = await FocusWindowAsync(hwnd, cancellationToken);
+                if (!focusResult)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save",
+                        UIAutomationErrorType.ElementNotFound,
+                        "Could not focus the target window.",
+                        CreateDiagnostics(stopwatch));
+                }
 
-            var foregroundReady = await DeterministicWait.UntilAsync(
-                () => NativeMethods.GetForegroundWindow() == hwnd,
-                TimeSpan.FromMilliseconds(500),
-                TimeSpan.FromMilliseconds(25),
-                cancellationToken: cancellationToken);
-            if (!foregroundReady)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "save", UIAutomationErrorType.WrongTargetWindow,
-                    "The target window did not become foreground; no save shortcut was sent.",
-                    CreateDiagnostics(stopwatch));
+                var foregroundReady = await DeterministicWait.UntilAsync(
+                    () => NativeMethods.GetForegroundWindow() == hwnd,
+                    TimeSpan.FromMilliseconds(500),
+                    TimeSpan.FromMilliseconds(25),
+                    cancellationToken: cancellationToken);
+                if (!foregroundReady)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save", UIAutomationErrorType.WrongTargetWindow,
+                        "The target window did not become foreground; no save shortcut was sent.",
+                        CreateDiagnostics(stopwatch));
+                }
             }
 
             SaveFileObservation? fileBeforeSave = null;
@@ -1581,19 +1626,29 @@ public sealed partial class UIAutomationService
                 fileBeforeSave = SaveFileObservation.Read(filePath);
             }
 
-            // Step 2: Send Ctrl+S (universal save - pywinauto/FlaUI pattern)
-            var shortcut = await _keyboardService.PressKeyAsync("s", ModifierKey.Ctrl, 1, hwnd, cancellationToken);
-            if (!shortcut.Success)
+            if (triggerMode != "wait")
             {
-                return UIAutomationResult.CreateFailure(
-                    "save", UIAutomationErrorType.InternalError,
-                    $"Could not send the save shortcut: {shortcut.Error}",
-                    CreateDiagnostics(stopwatch));
+                var modifiers = triggerMode == "save_as" ? ModifierKey.Ctrl | ModifierKey.Shift : ModifierKey.Ctrl;
+                var shortcut = await _keyboardService.PressKeyAsync("s", modifiers, 1, hwnd, cancellationToken);
+                if (!shortcut.Success)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save", UIAutomationErrorType.InternalError,
+                        $"Could not send the save shortcut: {shortcut.Error}",
+                        CreateDiagnostics(stopwatch));
+                }
             }
 
             // Step 3: Wait for Save dialog using retry loop (FlaUI Retry.WhileEmpty pattern)
             var dialogObservations = new HashSet<string>();
             var dialog = await WaitForSaveDialogAsync(hwnd, dialogObservations, cancellationToken);
+
+            if (triggerMode != "shortcut" && dialog is null)
+            {
+                return UIAutomationResult.CreateFailure("save", UIAutomationErrorType.Timeout,
+                    "No ready owned Save As dialog was observed. No filename or confirmation was sent.",
+                    CreateDiagnostics(stopwatch));
+            }
 
             if (dialog != null)
             {
@@ -1925,13 +1980,25 @@ public sealed partial class UIAutomationService
                 CreateDiagnostics(stopwatch));
         }
         _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-        var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
-        if (!typed.Success)
+        string? typingObservationError = null;
+        try
         {
-            return UIAutomationResult.CreateFailure(
-                "save", UIAutomationErrorType.InternalError,
-                $"Could not type the requested filename: {typed.Error}",
-                CreateDiagnostics(stopwatch));
+            var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHandle, cancellationToken);
+            if (!typed.Success)
+            {
+                if (typed.ErrorCode != KeyboardControlErrorCode.OperationTimeout)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "save", UIAutomationErrorType.InternalError,
+                        $"Could not type into the filename field: {typed.Error}",
+                        CreateDiagnostics(stopwatch));
+                }
+                typingObservationError = typed.Error;
+            }
+        }
+        catch (COMException exception) when (COMExceptionHelper.IsElementStale(exception))
+        {
+            typingObservationError = COMExceptionHelper.GetErrorMessage(exception, "Observe filename input");
         }
 
         string? observedFilename = null;
@@ -1956,6 +2023,11 @@ public sealed partial class UIAutomationService
                 "The filename field did not contain the requested path; Save was not pressed. " +
                 $"Observed filename: {(observedFilename is null ? "<unavailable>" : observedFilename[..Math.Min(observedFilename.Length, 256)])}",
                 CreateDiagnostics(stopwatch));
+        }
+
+        if (typingObservationError is not null)
+        {
+            LogSaveFilenameObservationRecovered(_logger, typingObservationError);
         }
 
         // Click the Save button directly — more reliable than Enter which can interact
