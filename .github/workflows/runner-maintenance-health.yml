@@ -1,0 +1,92 @@
+name: Windows Runner Maintenance Health
+
+on:
+  schedule:
+    - cron: '43 8 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [Windows Runner Maintenance]
+    types: [completed]
+
+permissions:
+  actions: read
+  issues: write
+
+# This must not wait behind the VM lock: it detects missed or stuck maintenance.
+concurrency:
+  group: windows-runner-maintenance-health
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: vars.WINDOWS_UI_RUNNER_ENABLED == 'true'
+    steps:
+      - name: Check maintenance age and report failures
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const repo = context.repo;
+            const branch = context.payload.repository.default_branch;
+            const workflow_id = 'runner-maintenance.yml';
+            const workflow = (await github.rest.actions.getWorkflow({...repo, workflow_id})).data;
+            const runs = (await github.rest.actions.listWorkflowRuns({
+              ...repo, workflow_id, branch, status: 'success', per_page: 1
+            })).data.workflow_runs;
+            const last = runs[0];
+            const latest = (await github.rest.actions.listWorkflowRuns({
+              ...repo, workflow_id, branch, status: 'completed', per_page: 1
+            })).data.workflow_runs[0];
+            // A later retry of cleanup must not make an old update scan look fresh.
+            const jobs = last ? await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+              ...repo, run_id: last.id, filter: 'all', per_page: 100
+            }) : [];
+            const checkedAt = jobs
+              .filter(job => job.name === 'Patch Windows and restart' && job.conclusion === 'success')
+              .flatMap(job => job.steps || [])
+              .filter(step => step.name === 'Install updates and verify recovery' &&
+                              step.conclusion === 'success')
+              .map(step => Date.parse(step.completed_at))
+              .filter(Number.isFinite)
+              .sort((a, b) => b - a)[0];
+            const maxAge = 10 * 24 * 60 * 60 * 1000;
+            let problem;
+            if (workflow.state !== 'active') {
+              problem = `Maintenance workflow is ${workflow.state}.`;
+            } else if (latest && latest.conclusion !== 'success') {
+              problem = `Maintenance ${latest.conclusion}: ${latest.html_url}`;
+            } else if (!checkedAt || Date.now() - checkedAt > maxAge) {
+              problem = 'No verified update check in successful default-branch maintenance in the last 10 days.';
+            }
+            const marker = '<!-- windows-runner-maintenance-health -->';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              ...repo, state: 'open', creator: 'github-actions[bot]', per_page: 100
+            });
+            const issue = issues.find(item => !item.pull_request && item.body?.includes(marker));
+            const lastStatus = checkedAt
+              ? `Last verified update check: ${new Date(checkedAt).toISOString()}\n${last.html_url}`
+              : 'No verified update check in successful maintenance has been recorded.';
+            await core.summary.addHeading('Windows runner maintenance')
+              .addRaw(`${problem || 'Maintenance is current.'}\n\n${lastStatus}`).write();
+            if (problem) {
+              const body = `${marker}\n${problem}\n\n${lastStatus}\n\n` +
+                'Inspect the update report and desktop results, then rerun Windows Runner ' +
+                'Maintenance from the default branch. Do not count a VM boot as successful patching.';
+              if (issue) {
+                await github.rest.issues.update({...repo, issue_number: issue.number, body});
+              } else {
+                await github.rest.issues.create({
+                  ...repo, title: 'Windows runner maintenance needs attention', body
+                });
+              }
+              core.setFailed(problem);
+            } else if (issue && latest?.conclusion === 'success') {
+              await github.rest.issues.createComment({
+                ...repo, issue_number: issue.number,
+                body: `Maintenance recovered: ${latest.html_url}`
+              });
+              await github.rest.issues.update({
+                ...repo, issue_number: issue.number, state: 'closed', state_reason: 'completed'
+              });
+            }

@@ -26,6 +26,10 @@ public sealed class ModernTestHarnessFixture : IDisposable
     [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowEnabled(nint hWnd);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint FindWindow(string? lpClassName, string lpWindowName);
 
@@ -179,6 +183,70 @@ public sealed class ModernTestHarnessFixture : IDisposable
     }
 
     /// <summary>
+    /// Closes only visible popups owned by this harness and verifies they disappear.
+    /// </summary>
+    public void CloseOwnedDialogs()
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var dialog = GetOwnedDialog();
+            if (dialog == nint.Zero)
+            {
+                if (!TestWait.Until(() => IsWindowEnabled(_windowHandle)))
+                {
+                    throw new TimeoutException("Modern harness remained disabled after dialog cleanup.");
+                }
+                return;
+            }
+
+            if (!NativeMethods.PostMessage(dialog, NativeConstants.WM_CLOSE, nint.Zero, nint.Zero))
+            {
+                throw new InvalidOperationException($"Could not close harness dialog {dialog}.");
+            }
+
+            if (!TestWait.Until(() => GetOwnedDialog() != dialog))
+            {
+                throw new TimeoutException($"Harness dialog {dialog} did not close.");
+            }
+        }
+
+        throw new InvalidOperationException("Modern harness still has an owned dialog after five close attempts.");
+    }
+
+    public bool HasOwnedDialog => GetOwnedDialog() != nint.Zero;
+
+    private nint GetOwnedDialog()
+    {
+        nint dialog = nint.Zero;
+        if (!NativeMethods.EnumWindows((candidate, _) =>
+        {
+            if (candidate == _windowHandle || !NativeMethods.IsWindowVisible(candidate))
+            {
+                return true;
+            }
+
+            var owner = NativeMethods.GetWindow(candidate, NativeConstants.GW_OWNER);
+            for (var depth = 0; depth < 64 && owner != nint.Zero; depth++)
+            {
+                if (owner == _windowHandle)
+                {
+                    dialog = candidate;
+                    break;
+                }
+
+                owner = NativeMethods.GetWindow(owner, NativeConstants.GW_OWNER);
+            }
+
+            return true;
+        }, nint.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+
+        return dialog;
+    }
+
+    /// <summary>
     /// Brings the harness window to the foreground.
     /// </summary>
     public void BringToFront()
@@ -188,6 +256,7 @@ public sealed class ModernTestHarnessFixture : IDisposable
             return;
         }
 
+        CloseOwnedDialogs();
         TestWait.RetryUntil(
             attempt: () =>
             {

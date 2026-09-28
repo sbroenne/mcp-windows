@@ -20,6 +20,17 @@ internal static class CommandDispatcher
 
     public static async Task<int> DispatchAsync(ParsedArgs args, CancellationToken ct)
     {
+        if (args.Has("help"))
+        {
+            var help = HelpText.ForCommand(args.Group);
+            if (help is null)
+            {
+                return Emit.Usage($"unknown command '{args.Group}'.");
+            }
+
+            return Emit.Text(help);
+        }
+
         var optionError = ValidateNonUiOptions(args);
         if (optionError is not null)
         {
@@ -73,7 +84,7 @@ internal static class CommandDispatcher
             "keyboard" => $"{WindowOptions} text key modifiers repeat sequence inter-key-delay-ms delay-ms delay clear-first clear",
             "mouse" => $"{WindowOptions} target x y end-x endx end-y endy direction amount modifiers button monitor-index monitor expected-window-title expected-title expected-process-name expected-process points",
             "screenshot" => $"{WindowOptions} action no-annotate annotate target monitor-index monitor region-x region-y region-width region-height include-cursor cursor image-format format quality output-mode output-path out include-image",
-            "file-save" or "filesave" or "save" => $"{WindowOptions} path file-path file {Diagnostics}",
+            "file-save" or "filesave" or "save" => $"{WindowOptions} path file-path file trigger-mode {Diagnostics}",
             "file-open" or "fileopen" or "open" => $"{WindowOptions} path file-path file {Diagnostics} trigger-mode trigger timeout-ms timeout",
             "process" or "proc" => "name pid sort-by sort limit force",
             "clipboard" or "clip" => "text",
@@ -225,6 +236,7 @@ internal static class CommandDispatcher
             Window(a) ?? string.Empty,
             a.GetString("path", "file-path", "file"),
             a.GetFlag("include-diagnostics", "diagnostics"),
+            a.GetString("trigger-mode") ?? "shortcut",
             ct);
         return Emit.Result(result);
     }
