@@ -97,7 +97,7 @@ public sealed partial class McpContractConsistencyTests
         }
     }
 
-    private static Process StartServer()
+    private static Process StartServer(params string[] arguments)
     {
         var serverDllPath = typeof(WindowManagementTool).Assembly.Location;
         var process = new Process
@@ -105,7 +105,6 @@ public sealed partial class McpContractConsistencyTests
             StartInfo = new ProcessStartInfo
             {
                 FileName = "dotnet",
-                Arguments = $"\"{serverDllPath}\"",
                 RedirectStandardInput = true,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -113,6 +112,13 @@ public sealed partial class McpContractConsistencyTests
                 CreateNoWindow = true,
             }
         };
+        process.StartInfo.ArgumentList.Add(serverDllPath);
+        foreach (var argument in arguments)
+        {
+            process.StartInfo.ArgumentList.Add(argument);
+        }
+        process.StartInfo.Environment.Remove("WINDOWS_MCP_TOOLS");
+        process.StartInfo.Environment.Remove("WINDOWS_MCP_EXCLUDE_TOOLS");
 
         Assert.True(process.Start(), "Failed to start MCP server process.");
         return process;

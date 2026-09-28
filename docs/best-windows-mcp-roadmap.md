@@ -82,8 +82,8 @@ Three moats:
   and physical-input fallback (`mouse`/`keyboard` by coordinates) already covers controls with no
   automation provider. Not worth the surface-area and maintenance cost now; revisit if a concrete
   must-support app has no UIA tree at all.
-- Workflow record & replay (à la terminator). ✅ done (`ui_macro` — save/run/list/get/delete,
-  replayed through the identical `ui_batch` engine)
+- Workflow record & replay was implemented as `ui_macro`, then retired in issue #236.
+  Reusable workflows now use project-owned steps arrays with `ui_batch` / `wincli ui batch --steps-file`.
 
 ### 5. Dual entry point: MCP + CLI + Skills
 The desktop is shared, but discovered element references and snapshot baselines need a
@@ -126,7 +126,7 @@ from the shared catalog with a build-breaking drift guard.
 | **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
 | **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard ✅ (`clipboard`), generalized dialogs ✅ (`file_open`); UIA event waits deferred (polling proven, see pillar 3) | The unbeatable part |
 | **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill + shared `ToolCatalog` (`wincli tools --json`, drift-guard test, issue #159) | Strategic ✅ CLI + Skill + tool catalog done (full verb generator deferred, #159) |
-| **4** | Deterministic macros | Workflow record & replay ✅ (`ui_macro`); Win32/MSAA fallback deferred (UIA bridges MSAA; physical-input fallback covers the gap — see pillar 4) | Long tail |
+| **4** | Reusable workflows | Project-owned batch files replace the retired `ui_macro` (#236); Win32/MSAA fallback deferred (UIA bridges MSAA; physical-input fallback covers the gap — see pillar 4) | Long tail |
 
 Phase 0 is almost entirely wiring code already written and tested in the service layer —
 highest ROI, lowest risk. Phases 1–2 make us the best *Windows* automation experience for

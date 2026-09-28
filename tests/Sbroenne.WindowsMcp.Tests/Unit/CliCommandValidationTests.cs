@@ -4,6 +4,23 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class CliCommandValidationTests
 {
+    [Theory]
+    [InlineData("macro")]
+    [InlineData("ui-macro")]
+    public async Task RetiredMacro_ReturnsUnknownCommand(string group)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = await CommandDispatcher.DispatchAsync(
+            ParsedArgs.Parse([group, "list"]), output, error, CancellationToken.None);
+
+        Assert.Equal(2, code);
+        Assert.Contains($"unknown command '{group}'", error.ToString(), StringComparison.Ordinal);
+        Assert.Empty(output.ToString());
+        Assert.Null(HelpText.ForCommand(group));
+        Assert.DoesNotContain("ui_macro", CliCommandCatalog.ToolToCommand.Keys);
+    }
+
     [Fact]
     public void Help_DiagnosticsAreExplicitlyCommandScoped()
     {
@@ -19,7 +36,7 @@ public sealed class CliCommandValidationTests
     [InlineData("diagnostics")]
     public void DiagnosticsAliases_AreAcceptedOnlyBySupportingNonUiGroups(string option)
     {
-        foreach (var group in new[] { "macro", "ui-macro", "file-open", "fileopen", "open", "file-save", "filesave", "save" })
+        foreach (var group in new[] { "file-open", "fileopen", "open", "file-save", "filesave", "save" })
         {
             Assert.Null(CommandDispatcher.ValidateNonUiOptions(ParsedArgs.Parse([group, "run", $"--{option}"])));
         }
@@ -39,8 +56,6 @@ public sealed class CliCommandValidationTests
     [InlineData("screenshot", null)]
     [InlineData("clipboard", "clear")]
     [InlineData("clip", "clear")]
-    [InlineData("macro", "delete")]
-    [InlineData("ui-macro", "delete")]
     [InlineData("file-save", null)]
     [InlineData("filesave", null)]
     [InlineData("save", null)]
@@ -93,7 +108,6 @@ public sealed class CliCommandValidationTests
     [InlineData("file-save --window 123 --path copy.txt --trigger-mode save_as")]
     [InlineData("file-save --window 123 --path copy.txt --trigger-mode wait")]
     [InlineData("proc list --sort memory --limit 5 --force")]
-    [InlineData("ui-macro run --name sample --handle 123 --snapshot --since token --no-stop-on-error")]
     [InlineData("clip set --text sample")]
     public void SupportedOptionsAndAliases_RemainAccepted(string command)
     {
