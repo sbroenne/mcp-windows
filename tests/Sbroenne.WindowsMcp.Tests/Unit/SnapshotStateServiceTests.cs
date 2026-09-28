@@ -17,13 +17,50 @@ public sealed class SnapshotStateServiceTests
     [Fact]
     public void RequestKey_ParentElementIdUsesItsWindowHandle()
     {
+        var parent = ElementIdGenerator.RegisterFullId("window:987654321|runtime:1|path:cached");
         var key = SnapshotRequestKey.Create(
             windowHandle: null,
-            parentElementId: "window:987654321|runtime:1|path:cached",
+            parentElementId: parent,
             maxDepth: 5,
             controlTypeFilter: null);
 
         Assert.Equal(987654321, key.WindowHandle);
+    }
+
+    [Fact]
+    public async Task ExplicitBaseline_RequiresLatestTokenAndKeepsOneEntry()
+    {
+        using var service = new SnapshotStateService(requireExplicitBaseline: true);
+        var snapshot = LargeResult("Window");
+        var first = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None);
+        var second = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None, first.SnapshotToken);
+        var interleaved = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None, first.SnapshotToken);
+        var withoutToken = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None);
+
+        Assert.Equal("full", first.Kind);
+        Assert.NotNull(first.SnapshotToken);
+        Assert.Equal("diff", second.Kind);
+        Assert.Equal(first.SnapshotToken, second.BaseSnapshotToken);
+        Assert.NotEqual(first.SnapshotToken, second.SnapshotToken);
+        Assert.Equal("full", interleaved.Kind);
+        Assert.Null(interleaved.BaseSnapshotToken);
+        Assert.Equal("full", withoutToken.Kind);
+        Assert.Equal(1, service.Count);
+    }
+
+    [Fact]
+    public async Task ExplicitBaseline_WrongOwnerOrCaptureSettingsReturnsFull()
+    {
+        using var firstOwner = new SnapshotStateService(requireExplicitBaseline: true);
+        using var secondOwner = new SnapshotStateService(requireExplicitBaseline: true);
+        var snapshot = LargeResult("Window");
+        var first = await firstOwner.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None);
+        _ = await secondOwner.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None);
+        var wrongOwner = await secondOwner.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None, first.SnapshotToken);
+        var wrongSettings = await firstOwner.CaptureAsync(Key with { MaxDepth = 3 }, SnapshotMode.Auto, _ => Task.FromResult(snapshot), false, CancellationToken.None, first.SnapshotToken);
+
+        Assert.Equal("full", wrongOwner.Kind);
+        Assert.Equal("full", wrongSettings.Kind);
     }
 
     [Fact]
@@ -271,10 +308,10 @@ public sealed class SnapshotStateServiceTests
             var result = await service.CaptureAsync(Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
 
             Assert.Equal("diff", result.Kind);
-            Assert.Empty(result.Changes!);
+            Assert.Equal(afterId, Assert.Single(result.Changes!).Set!["id"]);
             Assert.Equal(21, result.ElementCount);
             Assert.Equal(
-                "window:1|runtime:2|path:cached",
+                "window:1|runtime:1|path:cached",
                 ElementIdGenerator.ResolveFullId(beforeId));
         }
         finally
@@ -576,7 +613,7 @@ public sealed class SnapshotStateServiceTests
     }
 
     [Fact]
-    public async Task Auto_LayoutWrapperReplacement_ReturnsSemanticDiffAndPreservesActionIds()
+    public async Task Auto_LayoutWrapperReplacement_ReportsNewActionIdsWithoutReassignment()
     {
         ElementIdGenerator.Clear();
         try
@@ -615,10 +652,18 @@ public sealed class SnapshotStateServiceTests
             var result = await service.CaptureAsync(
                 Key, SnapshotMode.Auto, _ => Task.FromResult(after), CancellationToken.None);
 
-            Assert.Equal("diff", result.Kind);
-            Assert.Empty(result.Changes!);
+            Assert.True(result.Kind is "full" or "diff");
+            if (result.Kind == "diff")
+            {
+                Assert.Contains(result.Changes!, change => change.Set?.GetValueOrDefault("id") as string == currentButtons[0].Id);
+            }
+            else
+            {
+                Assert.Equal(currentButtons[0].Id, result.Tree![0].Children![0].Id);
+            }
+
             Assert.Equal(
-                "window:42|runtime:101|path:cached|sel:Button~Action 1",
+                "window:42|runtime:1|path:cached|sel:Button~Action 1",
                 ElementIdGenerator.ResolveFullId(previousActionId));
         }
         finally

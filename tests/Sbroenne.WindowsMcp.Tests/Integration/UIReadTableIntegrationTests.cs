@@ -47,7 +47,7 @@ public sealed class UIReadTableIntegrationTests : IDisposable
 
     private async Task SwitchToTabAsync(string tabName)
     {
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = tabName,
@@ -63,7 +63,7 @@ public sealed class UIReadTableIntegrationTests : IDisposable
         await SwitchToTabAsync("Data Grid");
 
         var result = await _automationService.ReadTableAsync(
-            elementId: null, _windowHandle, maxRows: 200, maxColumns: 50, CancellationToken.None);
+            await DiscoverGridAsync(), _windowHandle, maxRows: 200, maxColumns: 50, CancellationToken.None);
 
         Assert.True(result.Success, $"ReadTable failed: {result.ErrorMessage}");
         var table = result.Table;
@@ -111,7 +111,7 @@ public sealed class UIReadTableIntegrationTests : IDisposable
         await SwitchToTabAsync("Data Grid");
 
         var result = await _automationService.ReadTableAsync(
-            elementId: null, _windowHandle, maxRows: 2, maxColumns: 50, CancellationToken.None);
+            await DiscoverGridAsync(), _windowHandle, maxRows: 2, maxColumns: 50, CancellationToken.None);
 
         Assert.True(result.Success, $"ReadTable failed: {result.ErrorMessage}");
         Assert.NotNull(result.Table);
@@ -145,10 +145,15 @@ public sealed class UIReadTableIntegrationTests : IDisposable
     {
         await SwitchToTabAsync("Data Grid");
 
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "ProductsDataGrid",
+            RequireUnique = true
+        });
         var callResult = await UIReadTableTool.ExecuteAsync(
-            _windowHandle, name: null, nameContains: null, namePattern: null,
-            controlType: null, automationId: "ProductsDataGrid", className: null, elementId: null,
-            foundIndex: 1, maxRows: 200, maxColumns: 50, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, Assert.Single(found.Items!).Id,
+            maxRows: 200, maxColumns: 50, includeDiagnostics: false, CancellationToken.None);
 
         Assert.False(callResult.IsError == true, "Tool reported an error.");
         var text = callResult.Content
@@ -166,5 +171,17 @@ public sealed class UIReadTableIntegrationTests : IDisposable
     {
         _staThread.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private async Task<string> DiscoverGridAsync()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "ProductsDataGrid",
+            RequireUnique = true
+        });
+        Assert.True(found.Success, found.ErrorMessage);
+        return Assert.Single(found.Items!).Id;
     }
 }

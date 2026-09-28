@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
@@ -61,6 +62,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
     private readonly Process? _windowProcess;
     private readonly string _browserProcessName;
     private readonly string? _userDataDirectory;
+    private readonly Action? _beforeCleanup;
     private bool _disposed;
 
     private ChromiumBrowserSession(
@@ -68,7 +70,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
         nint windowHandle,
         string browserProcessName,
         string? userDataDirectory,
-        IReadOnlySet<int> existingProcessIds)
+        IReadOnlySet<int> existingProcessIds,
+        Action? beforeCleanup = null)
     {
         _browserProcess = browserProcess;
         _ = NativeMethods.GetWindowThreadProcessId(windowHandle, out var windowProcessId);
@@ -79,6 +82,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
             : null;
         _browserProcessName = browserProcessName;
         _userDataDirectory = userDataDirectory;
+        _beforeCleanup = beforeCleanup;
         WindowHandle = windowHandle;
         WindowHandleString = WindowHandleParser.Format(windowHandle);
     }
@@ -114,7 +118,9 @@ internal sealed class ChromiumBrowserSession : IDisposable
     }
 
     internal static ChromiumBrowserSession LaunchLocalPageForReadinessFailureTest(
-        ChromiumBrowserKind browser)
+        ChromiumBrowserKind browser,
+        Action<int>? processStarted = null,
+        Action? beforeCleanup = null)
     {
         var pagePath = FindLocalPagePath();
         return Launch(browser, new BrowserTarget(
@@ -122,11 +128,14 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new Uri(pagePath).AbsoluteUri,
             "MCP Chromium Browser Test Page",
             TimeSpan.FromMilliseconds(500),
-            [new ReadyElement("Control that does not exist")]));
+            [new ReadyElement("Control that does not exist")]),
+            processStarted, beforeCleanup);
     }
 
     internal static ChromiumBrowserSession LaunchLocalPageForWindowFailureTest(
-        ChromiumBrowserKind browser)
+        ChromiumBrowserKind browser,
+        Action<int>? processStarted = null,
+        Action? beforeCleanup = null)
     {
         var pagePath = FindLocalPagePath();
         return Launch(browser, new BrowserTarget(
@@ -135,7 +144,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
             "Window title that does not exist",
             TimeSpan.FromMilliseconds(500),
             [],
-            WindowTimeout: TimeSpan.FromMilliseconds(500)));
+            WindowTimeout: TimeSpan.FromMilliseconds(500)),
+            processStarted, beforeCleanup);
     }
 
     public static ChromiumBrowserSession LaunchPublicSite(ChromiumBrowserKind browser, ChromiumPublicSite site)
@@ -169,7 +179,11 @@ internal sealed class ChromiumBrowserSession : IDisposable
         return LaunchLocalPage();
     }
 
-    private static ChromiumBrowserSession Launch(ChromiumBrowserKind browser, BrowserTarget target)
+    private static ChromiumBrowserSession Launch(
+        ChromiumBrowserKind browser,
+        BrowserTarget target,
+        Action<int>? processStarted = null,
+        Action? beforeCleanup = null)
     {
         var browserExecutable = FindBrowserExecutable(browser)
             ?? throw new InvalidOperationException($"{GetBrowserDisplayName(browser)} executable was not found.");
@@ -191,12 +205,15 @@ internal sealed class ChromiumBrowserSession : IDisposable
         };
 
         ChromiumBrowserSession? session = null;
+        var started = false;
         try
         {
             if (!process.Start())
             {
                 throw new InvalidOperationException($"Failed to start {browserDescriptor.DisplayName} for Chromium browser smoke tests.");
             }
+            started = true;
+            processStarted?.Invoke(process.Id);
 
             var windowHandle = WaitForWindow(
                 process.Id,
@@ -210,7 +227,8 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 windowHandle,
                 browserDescriptor.ProcessName,
                 userDataDirectory,
-                existingProcessIds);
+                existingProcessIds,
+                beforeCleanup);
             session.BringToFront();
             WaitForPageReady(target, session.WindowHandleString);
             return session;
@@ -223,9 +241,24 @@ internal sealed class ChromiumBrowserSession : IDisposable
             }
             else
             {
-                EnsureProcessExited(process);
-                DeleteUserDataDirectory(userDataDirectory);
-                process.Dispose();
+                try
+                {
+                    if (started)
+                    {
+                        CloseOwnedProcesses(() => beforeCleanup?.Invoke(), process);
+                    }
+                }
+                finally
+                {
+                    try
+                    {
+                        DeleteUserDataDirectory(userDataDirectory);
+                    }
+                    finally
+                    {
+                        process.Dispose();
+                    }
+                }
             }
 
             throw;
@@ -256,19 +289,23 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
         try
         {
-            CloseWindow();
-        }
-        catch
-        {
-            // Best-effort cleanup in test code.
+            CloseOwnedProcesses(() =>
+            {
+                _beforeCleanup?.Invoke();
+                CloseWindow();
+            }, _windowProcess, _browserProcess);
         }
         finally
         {
-            EnsureProcessExited(_windowProcess);
-            EnsureProcessExited(_browserProcess);
-            DeleteUserDataDirectory(_userDataDirectory);
-            _windowProcess?.Dispose();
-            _browserProcess.Dispose();
+            try
+            {
+                DeleteUserDataDirectory(_userDataDirectory);
+            }
+            finally
+            {
+                _windowProcess?.Dispose();
+                _browserProcess.Dispose();
+            }
         }
 
     }
@@ -515,6 +552,87 @@ internal sealed class ChromiumBrowserSession : IDisposable
             pollInterval: TimeSpan.FromMilliseconds(100));
     }
 
+    internal static void CloseOwnedProcesses(Action closeWindows, params Process?[] roots)
+    {
+        var children = new List<Process>();
+        var errors = new List<Exception>();
+        try
+        {
+            // Retain handles before closing a browser window can terminate its parent
+            // process and make the remaining descendants impossible to rediscover.
+            var parents = SnapshotProcessParents();
+            var capturedAt = DateTime.Now;
+            var seen = new HashSet<int>();
+            foreach (var root in roots)
+            {
+                if (root is null || root.HasExited)
+                {
+                    continue;
+                }
+                foreach (var id in parents.Keys.Where(id => IsDescendantProcess(id, root.Id, parents)))
+                {
+                    if (!seen.Add(id))
+                    {
+                        continue;
+                    }
+                    Process? child = null;
+                    try
+                    {
+                        child = Process.GetProcessById(id);
+                        _ = child.SafeHandle;
+                        if (child.StartTime >= root.StartTime && child.StartTime <= capturedAt)
+                        {
+                            children.Add(child);
+                            child = null;
+                        }
+                    }
+                    catch (ArgumentException)
+                    {
+                        // A descendant exited before its handle could be opened.
+                    }
+                    finally
+                    {
+                        child?.Dispose();
+                    }
+                }
+            }
+        }
+        catch (Exception exception)
+        {
+            errors.Add(exception);
+        }
+        try
+        {
+            closeWindows();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(exception);
+        }
+        finally
+        {
+            foreach (var process in roots.Concat(children))
+            {
+                try
+                {
+                    EnsureProcessExited(process);
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+            }
+            foreach (var child in children)
+            {
+                child.Dispose();
+            }
+        }
+        if (errors.Count > 0)
+        {
+            throw new AggregateException("Failed to completely close the owned browser process tree.", errors);
+        }
+    }
+
     private static void EnsureProcessExited(Process? process)
     {
         if (process is null)
@@ -529,7 +647,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 return;
             }
         }
-        catch
+        catch (InvalidOperationException)
         {
             return;
         }
@@ -542,11 +660,14 @@ internal sealed class ChromiumBrowserSession : IDisposable
         try
         {
             process.Kill(entireProcessTree: true);
-            process.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds);
         }
-        catch
+        catch (InvalidOperationException) when (process.HasExited)
         {
-            // Best-effort cleanup in test code.
+            return;
+        }
+        if (!process.WaitForExit((int)ProcessExitTimeout.TotalMilliseconds))
+        {
+            throw new TimeoutException($"Owned browser process {process.Id} did not exit after termination.");
         }
     }
 
@@ -685,7 +806,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     private static bool TryDismissKnownPopup(UIAutomationService automationService, string windowHandle)
     {
-        var gotItResult = automationService.FindAndClickAsync(new ElementQuery
+        var gotItResult = automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = windowHandle,
             Name = "Got it",
@@ -714,7 +835,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
             foreach (var buttonName in popupSignal.DismissButtons)
             {
-                var clickResult = automationService.FindAndClickAsync(new ElementQuery
+                var clickResult = automationService.ObserveAndClickAsync(new ElementQuery
                 {
                     WindowHandle = windowHandle,
                     Name = buttonName,
@@ -796,8 +917,11 @@ internal sealed class ChromiumBrowserSession : IDisposable
     }
 
     private static bool IsDescendantProcess(int candidateProcessId, int ancestorProcessId)
+        => IsDescendantProcess(candidateProcessId, ancestorProcessId, SnapshotProcessParents());
+
+    private static bool IsDescendantProcess(
+        int candidateProcessId, int ancestorProcessId, Dictionary<int, int> parentsByProcessId)
     {
-        var parentsByProcessId = SnapshotProcessParents();
         var visited = new HashSet<int>();
         var currentProcessId = candidateProcessId;
 
@@ -821,7 +945,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
         var snapshot = CreateToolhelp32Snapshot(Th32csSnapProcess, 0);
         if (snapshot == InvalidHandleValue)
         {
-            return [];
+            throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not enumerate owned browser processes.");
         }
 
         try
@@ -834,6 +958,11 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
             if (!Process32First(snapshot, ref entry))
             {
+                var error = Marshal.GetLastWin32Error();
+                if (error != 18)
+                {
+                    throw new Win32Exception(error, "Could not read the process snapshot.");
+                }
                 return result;
             }
 
@@ -844,6 +973,11 @@ internal sealed class ChromiumBrowserSession : IDisposable
             }
             while (Process32Next(snapshot, ref entry));
 
+            var lastError = Marshal.GetLastWin32Error();
+            if (lastError != 18)
+            {
+                throw new Win32Exception(lastError, "Could not finish reading the process snapshot.");
+            }
             return result;
         }
         finally

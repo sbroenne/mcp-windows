@@ -100,13 +100,17 @@ internal sealed class SnapshotStateService : IDisposable
     public SnapshotStateService(
         int maxEntries = DefaultMaxEntries,
         TimeSpan? idleExpiration = null,
-        Func<DateTimeOffset>? utcNow = null)
+        Func<DateTimeOffset>? utcNow = null,
+        bool requireExplicitBaseline = false)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(maxEntries, 1);
         _maxEntries = maxEntries;
         _idleExpiration = idleExpiration ?? DefaultIdleExpiration;
         _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
+        RequireExplicitBaseline = requireExplicitBaseline;
     }
+
+    internal bool RequireExplicitBaseline { get; set; }
 
     public static bool TryParseMode(string? value, out SnapshotMode mode)
     {
@@ -165,14 +169,16 @@ internal sealed class SnapshotStateService : IDisposable
         SnapshotMode mode,
         Func<CancellationToken, Task<UIAutomationResult>> capture,
         bool includeDiagnostics,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        string? since = null) =>
         await CaptureCoreAsync(
             key,
             mode,
             capture,
             cleanDisplay: true,
             includeDiagnostics,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken,
+            since).ConfigureAwait(false);
 
     internal async Task<UIAutomationResult> CaptureWithoutDisplayCleanupAsync(
         SnapshotRequestKey key,
@@ -193,7 +199,8 @@ internal sealed class SnapshotStateService : IDisposable
         Func<CancellationToken, Task<UIAutomationResult>> capture,
         bool cleanDisplay,
         bool includeDiagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? since = null)
     {
         ArgumentNullException.ThrowIfNull(capture);
 
@@ -236,23 +243,26 @@ internal sealed class SnapshotStateService : IDisposable
             var now = _utcNow();
             var semanticTree = SnapshotDiffEngine.CreateSemanticTree(captured.Tree);
             var comparableTree = SnapshotDiffEngine.CreateComparableTree(semanticTree);
-            var full = EnsureSemanticFull(captured, semanticTree, cleanDisplay);
+            var token = Guid.NewGuid().ToString("N");
+            var full = EnsureSemanticFull(captured, semanticTree, cleanDisplay) with { SnapshotToken = token };
 
-            if (mode == SnapshotMode.Reset || previous is null)
+            if (mode == SnapshotMode.Reset || previous is null ||
+                ((RequireExplicitBaseline || since is not null) &&
+                 !string.Equals(previous.Token, since, StringComparison.Ordinal)))
             {
-                StoreTree(key, comparableTree, now);
+                StoreTree(key, comparableTree, now, token);
                 return full;
             }
 
             if (!RootSemanticsMatch(previous.Tree, comparableTree))
             {
-                StoreTree(key, comparableTree, now);
+                StoreTree(key, comparableTree, now, token);
                 return full;
             }
 
             if (!SnapshotDiffEngine.HasCompatibleOrder(previous.Tree, comparableTree))
             {
-                StoreTree(key, comparableTree, now);
+                StoreTree(key, comparableTree, now, token);
                 return full;
             }
 
@@ -266,31 +276,24 @@ internal sealed class SnapshotStateService : IDisposable
                 Tree = null,
                 FullTree = null,
                 Kind = "diff",
+                SnapshotToken = token,
+                BaseSnapshotToken = previous.Token,
                 ElementCount = CountElements(cleanDisplay
                     ? SnapshotDiffEngine.CreateDisplayTree(semanticTree)
                     : semanticTree),
                 Changes = displayChanges,
                 UsageHint = displayChanges.Length == 0
                     ? "No UI changes since the previous automatic snapshot."
-                    : $"{displayChanges.Length} UI change(s) since the previous automatic snapshot. Added nodes include current element ids for the next action."
+                    : $"{displayChanges.Length} UI change(s) since the previous automatic snapshot. Apply all changes, including updated ids, before the next action."
             };
 
             if (!IsWorthReturning(diff, full, includeDiagnostics))
             {
-                StoreTree(key, comparableTree, now);
+                StoreTree(key, comparableTree, now, token);
                 return full;
             }
 
-            if (!SnapshotDiffEngine.TryPreserveMatchedIds(
-                    previous.Tree,
-                    comparableTree,
-                    out var rememberedTree))
-            {
-                StoreTree(key, comparableTree, now);
-                return full;
-            }
-
-            StoreTree(key, rememberedTree, now);
+            StoreTree(key, comparableTree, now, token);
             return diff;
         }
         finally
@@ -353,9 +356,9 @@ internal sealed class SnapshotStateService : IDisposable
             string.Equals(pair.First.Type, pair.Second.Type, StringComparison.Ordinal) &&
             string.Equals(pair.First.Name, pair.Second.Name, StringComparison.Ordinal));
 
-    private void Store(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now)
+    private void Store(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now, string token)
     {
-        _entries[key] = new Entry(tree, now);
+        _entries[key] = new Entry(tree, now, token);
         while (_entries.Count > _maxEntries)
         {
             var oldest = _entries.MinBy(pair => pair.Value.LastUsedUtc).Key;
@@ -363,11 +366,11 @@ internal sealed class SnapshotStateService : IDisposable
         }
     }
 
-    private void StoreTree(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now)
+    private void StoreTree(SnapshotRequestKey key, UIElementCompactTree[] tree, DateTimeOffset now, string token)
     {
         lock (_stateLock)
         {
-            Store(key, tree, now);
+            Store(key, tree, now, token);
         }
     }
 
@@ -382,5 +385,5 @@ internal sealed class SnapshotStateService : IDisposable
         }
     }
 
-    private sealed record Entry(UIElementCompactTree[] Tree, DateTimeOffset LastUsedUtc);
+    private sealed record Entry(UIElementCompactTree[] Tree, DateTimeOffset LastUsedUtc, string Token);
 }

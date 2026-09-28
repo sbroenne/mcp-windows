@@ -87,6 +87,7 @@ internal static class SnapshotBenchmarkRunner
 
                 using var state = new SnapshotStateService();
                 using var semanticState = new SnapshotStateService();
+                var comparisonTokens = new Dictionary<string, string>(StringComparer.Ordinal);
                 var baselineHandle = GetCurrentWindowHandle(scenario);
                 var key = SnapshotRequestKey.Create(
                 baselineHandle,
@@ -120,6 +121,7 @@ internal static class SnapshotBenchmarkRunner
                     Assert.True(
                         semanticBaseline.Success,
                         $"Could not establish semantic auto baseline: {semanticBaseline.ErrorMessage}");
+                    _ = AlignComparisonTokens(semanticBaseline, baseline, comparisonTokens);
                 }
 
                 var actionMs = 0.0;
@@ -198,7 +200,7 @@ internal static class SnapshotBenchmarkRunner
                             $"{scenario.Name} semantic auto sample {sample} action {actionIndex + 1} failed: " +
                             semanticSnapshot.ErrorMessage);
                         var semanticJson = JsonSerializer.Serialize(
-                            semanticSnapshot,
+                            AlignComparisonTokens(semanticSnapshot, snapshot, comparisonTokens),
                             WindowsToolsBase.JsonOptions);
                         comparableSemanticBytes += System.Text.Encoding.UTF8.GetByteCount(semanticJson);
                         comparableSemanticTokens += TokenEncoding.Encode(semanticJson).Count;
@@ -236,6 +238,28 @@ internal static class SnapshotBenchmarkRunner
         Validate(result);
         WriteReport(result);
         return result;
+    }
+
+    internal static UIAutomationResult AlignComparisonTokens(
+        UIAutomationResult comparison,
+        UIAutomationResult actual,
+        Dictionary<string, string> tokenPairs)
+    {
+        if (comparison.SnapshotToken is { } comparisonToken)
+        {
+            Assert.NotNull(actual.SnapshotToken);
+            tokenPairs.Add(comparisonToken, actual.SnapshotToken);
+        }
+
+        // Measure cleanup, not tokenizer differences between independently generated GUIDs.
+        // Preserve each response's shape, including full/diff decisions and metadata cost.
+        return comparison with
+        {
+            SnapshotToken = actual.SnapshotToken,
+            BaseSnapshotToken = comparison.BaseSnapshotToken is { } baseline
+                ? tokenPairs[baseline]
+                : null
+        };
     }
 
     public static string FormatReport(SnapshotBenchmarkResult result)

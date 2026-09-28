@@ -656,6 +656,9 @@ internal static class NativeConstants
 
     #region GetWindow Commands (GW_*)
 
+    /// <summary>Retrieves the owner window.</summary>
+    public const uint GW_OWNER = 4;
+
     /// <summary>Retrieves the enabled popup window owned by the specified window.</summary>
     public const uint GW_ENABLEDPOPUP = 6;
 

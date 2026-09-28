@@ -24,7 +24,13 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
 
 ### Semantic-first automation
 
-- Prefer element names, control types, automation IDs, and window handles over screen coordinates.
+- Discover using names, control types, and automation IDs; act using the returned opaque `elementId`.
+- Click, double-click, type, select, table reads, and state waits require IDs. Selection values still
+  identify option text, while the ID identifies the containing control.
+- Selectors are only for discovery and appear/disappear waits. Removed action selectors are errors.
+- Read an element with its ID; omit the ID only for an explicit whole-window read. Element reads never widen to window OCR.
+- Stale IDs require rediscovery. IDs belong to one owner and never transfer between MCP instances or the CLI daemon.
+- Batch `$prev` requires one unambiguous immediately preceding result. Saved macros discover fresh controls on every replay.
 - Re-check the UI tree after dialogs, page changes, or tab switches.
 - Treat screenshots as discovery or fallback tools, not the primary control surface.
 

@@ -14,9 +14,13 @@ on:
         options:
           - all
           - keyboard
+          - notepad
           - mouse
           - window
+          - app-launch
           - ui-automation
+          - click
+          - save
           - winui
           - electron
           - chromium
@@ -252,15 +256,22 @@ jobs:
           $filters = @{
             all = "FullyQualifiedName~Integration&Category!=SnapshotBenchmark"
             keyboard = "FullyQualifiedName~Integration.Keyboard"
+            notepad = "FullyQualifiedName~Integration.NotepadTyping"
             mouse = "FullyQualifiedName~Integration.Mouse|FullyQualifiedName~Integration.DpiAwareness|FullyQualifiedName~Integration.ModifierKey|FullyQualifiedName~Integration.MultiMonitor"
             window = "FullyQualifiedName~Integration.Window|FullyQualifiedName~Integration.AppLaunch"
+            "app-launch" = "FullyQualifiedName~Integration.AppLaunchHandoff"
             "ui-automation" = "FullyQualifiedName~Integration.UI|FullyQualifiedName~Integration.AnnotatedScreenshot|FullyQualifiedName~Integration.CaptureAnnotated|FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.TestHarnessInput"
+            save = "FullyQualifiedName~Integration.SaveTests|FullyQualifiedName~Integration.ElectronHarness.ElectronSaveTests"
+            click = "FullyQualifiedName~Integration.UIClick|FullyQualifiedName~Integration.UIAutomationClickClosesWindow|FullyQualifiedName~Integration.CliSnapshotContinuity|FullyQualifiedName~Integration.WinUI.WinUIClick|FullyQualifiedName~Integration.UIBatchAndFusion"
             winui = "FullyQualifiedName~Integration.WinUI"
             electron = "FullyQualifiedName~Integration.ElectronHarness"
             chromium = "FullyQualifiedName~Integration.ChromiumBrowser"
           }
 
           $filter = $filters[$env:TEST_SCOPE]
+          if ($env:TEST_SCOPE -in @('all', 'notepad')) {
+            $env:MCP_TEST_NOTEPAD = '1'
+          }
           if (-not $filter) {
             throw "Unsupported test scope: $env:TEST_SCOPE"
           }
@@ -282,7 +293,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: windows-ui-results-${{ github.run_number }}
-          path: '**/TestResults/*.trx'
+          path: |
+            **/TestResults/*.trx
+            **/TestResults/editor-focus-*.png
           if-no-files-found: warn
           retention-days: 14
 

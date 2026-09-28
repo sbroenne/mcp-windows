@@ -210,18 +210,36 @@ public sealed class MouseScrollTests : DesktopInputTestBase, IDisposable
     public async Task ScrollAsync_AccumulatesScrollDelta()
     {
         // Arrange - scroll multiple times and verify delta accumulates
-        var panelCenter = _fixture.GetScrollPanelCenter();
         _fixture.EnsureTestWindowForeground();
+        var panelCenter = _fixture.GetScrollPanelCenter();
 
-        // Focus the scroll panel first
-        await _fixture.MouseInputService.ClickAsync(panelCenter.X, panelCenter.Y);
-        await Task.Delay(50);
-        _fixture.Reset();
+        var panelFocused = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                await _fixture.EnsureTestWindowForegroundAsync();
+                panelCenter = _fixture.GetScrollPanelCenter();
+                var click = await _fixture.MouseInputService.ClickAsync(
+                    panelCenter.X, panelCenter.Y, ModifierKey.None, _fixture.TestWindowHandle);
+                Assert.True(click.Success, $"Scroll-panel focus click failed: {click.ErrorMessage}");
+            },
+            condition: () => _fixture.GetValue(form => form.ScrollPanelFocused),
+            timeout: TimeSpan.FromSeconds(2),
+            pollInterval: TimeSpan.FromMilliseconds(50));
+        Assert.True(panelFocused,
+            $"Scroll panel never received focus. Recent events: {string.Join(" | ", _fixture.GetEventHistory().TakeLast(15))}");
 
         async Task ScrollAndWaitAsync(ScrollDirection direction, int expectedScrollEventCount)
         {
+            _fixture.EnsureTestWindowForeground();
+
             // First attempt
-            await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+            var result = await _fixture.MouseInputService.ScrollAsync(
+                direction,
+                1,
+                panelCenter.X,
+                panelCenter.Y,
+                _fixture.TestWindowHandle);
+            Assert.True(result.Success, $"Initial {direction} scroll failed: {result.ErrorCode}: {result.ErrorMessage}");
 
             if (await _fixture.WaitForScrollEventAsync(expectedScrollEventCount, TimeSpan.FromSeconds(2)))
             {
@@ -232,7 +250,13 @@ public sealed class MouseScrollTests : DesktopInputTestBase, IDisposable
             _fixture.EnsureTestWindowForeground();
             await _fixture.MouseInputService.MoveAsync(panelCenter.X, panelCenter.Y);
             await Task.Delay(50);
-            await _fixture.MouseInputService.ScrollAsync(direction, 1, panelCenter.X, panelCenter.Y);
+            result = await _fixture.MouseInputService.ScrollAsync(
+                direction,
+                1,
+                panelCenter.X,
+                panelCenter.Y,
+                _fixture.TestWindowHandle);
+            Assert.True(result.Success, $"Retried {direction} scroll failed: {result.ErrorCode}: {result.ErrorMessage}");
 
             var ok = await _fixture.WaitForScrollEventAsync(expectedScrollEventCount, TimeSpan.FromSeconds(2));
             if (!ok)

@@ -123,27 +123,41 @@ public sealed class SystemResources
 
             | Tool | Purpose |
             |------|---------|
-            | `app` | Launch applications (notepad.exe, chrome.exe, winword.exe). Returns window handle. |
+            | `app` | Observe application launch. Returns a window handle only when one eligible window is identified. |
             | `window_management` | Find, activate, close, move existing windows. Get window handles. |
             | `screenshot_control` | Capture screenshots with element discovery (annotate=true). |
             | `ui_click` | Click buttons, checkboxes, menu items, links. |
             | `ui_type` | Type text into input fields. |
             | `ui_find` | Find elements, get details, inspect properties. |
-            | `ui_read` | Read text from elements (with OCR fallback). |
+            | `ui_read` | Read element text; explicit window reads can use OCR fallback. |
             | `file_save` | 💾 Save files to disk (handles Save As dialogs automatically!). |
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
             | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
 
             ## The Standard Workflow: Launch App, Then Interact
 
-            1. **Launch the application** with `app` - returns a window handle
-            2. **Use the handle** for all subsequent operations
+            1. **Launch the application** with `app` - inspect `launchStatus` and any returned `window` or `windows`
+            2. **Resolve the intended window**. Only after selecting the intended handle may handle-based discovery proceed.
+               If the handle is missing or ambiguous, use `window_management` to inspect candidates or rediscover the target.
+               If no handle is identified, do not call handle-based tools.
+            3. **Discover controls** with `ui_snapshot` or `ui_find`; verify the intended content before acting
+            4. **Use the handle and returned element ID** for targeted actions
+
+            `started` may have no window. `windowObserved` reports a visible process-owned window.
+            `possibleHandoff` reports a clean launcher exit with a matching pre-existing instance,
+            not confirmed request delivery or loaded content. Multiple windows are listed without a
+            selected `window`; inspect and choose the intended target. `exitedWithoutWindow` fails
+            when no matching window/instance can be established. None guarantees focus or readiness.
 
             ```
             app(programPath="notepad.exe")
-            → Returns: { "handle": "123456", "title": "Untitled - Notepad", ... }
+            → Example: { "success": true, "launchStatus": "windowObserved",
+                         "window": { "handle": "123456", "title": "Untitled - Notepad", ... } }
 
-            ui_click(windowHandle="123456", nameContains="Save")
+            # Only after a window is identified; verify the intended content before acting
+            ui_find(windowHandle="123456", nameContains="Save")
+            → Choose the intended control's returned id
+            ui_click(windowHandle="123456", elementId="<save-id>")
             screenshot_control(target="window", windowHandle="123456")
             ```
 
@@ -157,10 +171,12 @@ public sealed class SystemResources
             → Get the handle from the result
             ```
 
-            ### 2. Interact with Elements
+            ### 2. Discover, Then Interact with Elements
             ```
-            ui_click(windowHandle="<handle>", nameContains="Save")
-            ui_type(windowHandle="<handle>", controlType="Edit", text="Hello")
+            ui_snapshot(windowHandle="<handle>")
+            → Choose IDs from the returned tree
+            ui_click(windowHandle="<handle>", elementId="<save-id>")
+            ui_type(windowHandle="<handle>", elementId="<input-id>", text="Hello")
             ```
 
             ### 3. If You Don't Know the Element Name → Discover First
@@ -171,7 +187,8 @@ public sealed class SystemResources
 
             ### 4. For Toggles → Click handles state
             ```
-            ui_click(windowHandle="<handle>", nameContains="Dark Mode", controlType="CheckBox")
+            ui_find(windowHandle="<handle>", nameContains="Dark Mode", controlType="CheckBox")
+            ui_click(windowHandle="<handle>", elementId="<checkbox-id>")
             ```
             The result includes toggle state after clicking.
 
@@ -191,22 +208,23 @@ public sealed class SystemResources
 
             | Goal | Primary Tool | Fallback |
             |------|-------------|----------|
-            | Click button/checkbox | ui_click(windowHandle=..., nameContains=...) | mouse_control(windowHandle=...) |
-            | Type in text field | ui_type(windowHandle=..., text=...) | ✅ Works on elevated windows! |
+            | Click button/checkbox | ui_click(windowHandle=..., elementId=...) | Explicit coordinate action only if no semantic action was dispatched |
+            | Type in text field | ui_type(windowHandle=..., elementId=..., text=...) | Rediscover if the ID is stale |
             | Save a file | file_save(windowHandle=..., filePath=...) | ⚠️ keyboard_control CANNOT handle Save As dialogs! |
-            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | ⚠️ Fails on elevated windows - use ui_type |
+            | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | Requires a matching permission level |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
-            | Read text from element | ui_read(windowHandle=..., nameContains=...) | ui_read with OCR fallback |
+            | Read text from element | ui_read(windowHandle=..., elementId=...) | Rediscover; element reads never widen to window OCR |
             | Wait for new window | window_management(action='wait_for', title='...') | - |
             | Take screenshot | screenshot_control(target='window', windowHandle=...) | - |
             | Find visible elements | screenshot_control with annotate=true | ui_find(windowHandle=...) |
 
             ## ⚠️ Elevated Windows (GitHub Actions, Admin processes)
 
-            On elevated processes, `keyboard_control` fails. Use these alternatives:
-            - **Type text**: `ui_type(windowHandle=..., text="Hello")` ← works!
-            - **Notepad specifically**: `ui_type(windowHandle=..., controlType="Document", text="Hello")`
-            - **Click buttons**: `ui_click(windowHandle=..., nameContains="Button")` ← works!
+            Match the target application's permission level. Windows can deny both UI Automation
+            and physical input when the target is more privileged.
+            - **Type text**: discover the input, then `ui_type(windowHandle=..., elementId="<input-id>", text="Hello")`.
+            - **Notepad**: discover its Edit or Document control, then use its returned ID.
+            - **Click buttons**: discover the button, then `ui_click(windowHandle=..., elementId="<button-id>")`.
 
             ## Key Principles
 
@@ -216,9 +234,13 @@ public sealed class SystemResources
             4. **Use window_management(wait_for) for dialogs** - wait for new windows to appear
             5. **Use file_save for saving** - handles Save As dialogs automatically (⚠️ NOT keyboard_control!)
 
-            ## When to Use `ui_find` (Optional)
+            ## When to Use `ui_find`
 
-            All ui_* tools support direct search, so `ui_find` is rarely needed. Use it when:
+            Targeted actions require IDs. Discover with `ui_snapshot` or `ui_find`; selectors
+            belong to discovery and appear/disappear waits, not click/type/select/read actions.
+            IDs belong to the CLI daemon or MCP process that returned them. Rediscover after
+            a restart or a stale-reference error; never silently substitute a same-name control.
+            Use `ui_find` when:
 
             - **Getting clickable_point** for mouse fallback: `ui_find` returns coordinates
             - **Multiple matches** - see all matching elements, pick the right one
@@ -226,7 +248,9 @@ public sealed class SystemResources
 
             ## Fallback Strategy
 
-            If ui_click doesn't work (custom controls, games, etc.):
+            For controls without a semantic action (custom controls, games, etc.), use explicit
+            coordinates only when no earlier action was dispatched. Never replay an action with
+            an unknown outcome:
 
             ```
             window_management(action="find", title="MyApp")
@@ -395,7 +419,19 @@ public sealed class SystemResources
               "targetWindow": { "handle": "12345678", "title": "My App", "processName": "myapp" },
               "elementCount": 1
             }
-            // ui_click/ui_type returns single element:
+            // ui_click (including doubleClick) separates dispatch from application outcome:
+            {
+              "success": true,
+              "action": "click",
+              "actionDispatched": true,
+              "outcomeVerified": false,
+              "target": { "id": "<observed-id>", "name": "Open", "type": "Button", "enabled": true },
+              "postActionState": "available",
+              "postActionElement": { "id": "<observed-id>", "name": "Close", "type": "Button", "enabled": true }
+            }
+            // If the target cannot be read afterward, postActionState is "unavailable"
+            // and postActionElement is omitted. This does not turn dispatch into failure.
+            // ui_type returns single element:
             {
               "success": true,
               "el": { "id": "...", "name": "Save", "type": "Button", "ts": "on" },
@@ -411,6 +447,8 @@ public sealed class SystemResources
             ```
 
             **Key fields:**
+            - Click `target` is pre-action; `postActionElement` is an immediate later observation, not proof of saving/publishing/navigation.
+            - `outcomeVerified:false` remains false with an optional snapshot. Inspect it or use bounded `ui_wait`; never replay merely because the target renamed, disabled itself, or disappeared.
             - `id` (element_id) - pass to other ui_* tools
             - `cp` (clickable_point) - fallback coords for mouse_control
             - `fw` (framework_type) - "Electron", "WPF", "WinForms" (affects search strategy)

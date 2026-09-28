@@ -14,16 +14,21 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIFindTool
 {
     /// <summary>
-    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns element names, types, and coordinates for use with ui_click/ui_type/mouse_control.
+    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns observed IDs for elementId targeting with ui_click/ui_type, plus names, types, and coordinates.
+    /// Each bounded scan has a budget of 2000 visited UIA nodes, including nonmatching nodes.
     /// Keywords: find, locate, search element, discover, inspect, look for, get element, query UI,
     /// element by name, control, accessibility tree, where is.
     /// </summary>
     /// <remarks>
     /// Finds UI elements by name, type, ID, or other criteria. Returns each element's name, automationId, controlType, and click coordinates.
-    /// To act on a result, pass its name/automationId/controlType to ui_click or ui_type (add foundIndex to disambiguate), or its coordinates to mouse_control.
+    /// To act on a result, pass its returned id as elementId to ui_click or ui_type. Selectors and foundIndex are discovery-only; use them here to disambiguate before acting.
+    /// Use coordinates with mouse_control only as a fallback.
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
     /// REQUIRED: windowHandle (from window_management tool).
     /// For Electron/Chromium, visible text and ARIA labels usually show up here as element names.
+    /// If unvisited nodes remain at the scan limit, search_incomplete means absence or uniqueness could not be established.
+    /// Narrow with exact name, automationId, controlType, className or a known parentElementId;
+    /// increasing timeoutMs does not increase this limit.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive). For Electron apps and Chromium browsers, this is often the visible label or ARIA label.</param>
@@ -40,6 +45,10 @@ public static partial class UIFindTool
     /// <param name="nearElement">Find elements near this elementId (results sorted by distance).</param>
     /// <param name="visibleOnly">Exclude off-screen elements. Default (unset): excluded for Chromium/Edge/Electron (which expose many hidden nodes), included elsewhere. Set false to include hidden nodes.</param>
     /// <param name="contentViewOnly">Scan only the leaner UI Automation content view (meaningful, user-facing elements) instead of the full control view. Default (unset): content view for Chromium/Edge/Electron (whose control view is bloated with structural nodes), control view elsewhere; automatically falls back to the control view if nothing is found. Set false to force the full control view.</param>
+    /// <param name="parentElementId">Limit the search to a known parent element from ui_find/ui_snapshot.</param>
+    /// <param name="scope">Search root: window (default) or active_dialog. Use active_dialog after opening a modal or native file dialog.</param>
+    /// <param name="requireUnique">Fail with ambiguity details when more than one element matches. Default: false.</param>
+    /// <param name="enabledOnly">Exclude disabled elements when true.</param>
     /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -61,6 +70,10 @@ public static partial class UIFindTool
         [DefaultValue(null)] string? nearElement,
         [DefaultValue(null)] bool? visibleOnly,
         [DefaultValue(null)] bool? contentViewOnly,
+        [DefaultValue(null)] string? parentElementId,
+        [DefaultValue("window")] string? scope,
+        [DefaultValue(false)] bool requireUnique,
+        [DefaultValue(null)] bool? enabledOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -98,6 +111,10 @@ public static partial class UIFindTool
                 NearElement = nearElement,
                 VisibleOnly = visibleOnly,
                 ContentViewOnly = contentViewOnly,
+                ParentElementId = parentElementId,
+                Scope = scope,
+                RequireUnique = requireUnique,
+                EnabledOnly = enabledOnly,
                 TimeoutMs = Math.Clamp(timeoutMs, 0, 60000)
             };
 
@@ -109,4 +126,48 @@ public static partial class UIFindTool
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
+    /// <summary>Compatibility overload for the original window-scoped find surface.</summary>
+    public static Task<CallToolResult> ExecuteAsync(
+        string windowHandle,
+        string? name,
+        string? nameContains,
+        string? namePattern,
+        string? controlType,
+        string? automationId,
+        string? className,
+        int? exactDepth,
+        int foundIndex,
+        bool includeChildren,
+        bool sortByProminence,
+        string? inRegion,
+        string? nearElement,
+        bool? visibleOnly,
+        bool? contentViewOnly,
+        int timeoutMs,
+        bool includeDiagnostics,
+        CancellationToken cancellationToken) =>
+        ExecuteAsync(
+            windowHandle,
+            name,
+            nameContains,
+            namePattern,
+            controlType,
+            automationId,
+            className,
+            exactDepth,
+            foundIndex,
+            includeChildren,
+            sortByProminence,
+            inRegion,
+            nearElement,
+            visibleOnly,
+            contentViewOnly,
+            null,
+            "window",
+            false,
+            null,
+            timeoutMs,
+            includeDiagnostics,
+            cancellationToken);
 }

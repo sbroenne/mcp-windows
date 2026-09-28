@@ -1,5 +1,6 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
+using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
@@ -10,7 +11,8 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 /// block behavior introduced in PR #130 (screenshot_control now returns inline images
 /// as a dedicated <see cref="ImageContentBlock"/> instead of a base64 JSON field).
 /// </summary>
-public sealed class ScreenshotControlToolCallResultTests
+[Collection("UITestHarness")]
+public sealed class ScreenshotControlToolCallResultTests(UITestHarnessFixture fixture)
 {
     /// <summary>
     /// Inline capture (annotate=false) should return an image content block (image/jpeg)
@@ -64,13 +66,15 @@ public sealed class ScreenshotControlToolCallResultTests
     [Fact]
     public async Task ExecuteAsync_AnnotatedDefault_ReturnsTextOnlyContent()
     {
+        fixture.Reset();
+
         // Act
         var result = await ScreenshotControlTool.ExecuteAsync(
             action: "capture",
             annotate: true,
-            target: "primary_screen",
+            target: "window",
             monitorIndex: null,
-            windowHandle: null,
+            windowHandle: fixture.TestWindowHandleString,
             regionX: null,
             regionY: null,
             regionWidth: null,
@@ -84,7 +88,7 @@ public sealed class ScreenshotControlToolCallResultTests
             cancellationToken: CancellationToken.None);
 
         // Assert
-        Assert.False(result.IsError, "Annotated capture should succeed");
+        Assert.False(result.IsError, $"Annotated capture should succeed: {string.Join(" ", result.Content.OfType<TextContentBlock>().Select(block => block.Text))}");
         Assert.NotNull(result.Content);
         Assert.Empty(result.Content.OfType<ImageContentBlock>());
         Assert.Single(result.Content.OfType<TextContentBlock>());
@@ -96,13 +100,15 @@ public sealed class ScreenshotControlToolCallResultTests
     [Fact]
     public async Task ExecuteAsync_AnnotatedWithIncludeImage_ReturnsImageAndTextBlocks()
     {
+        fixture.Reset();
+
         // Act
         var result = await ScreenshotControlTool.ExecuteAsync(
             action: "capture",
             annotate: true,
-            target: "primary_screen",
+            target: "window",
             monitorIndex: null,
-            windowHandle: null,
+            windowHandle: fixture.TestWindowHandleString,
             regionX: null,
             regionY: null,
             regionWidth: null,
@@ -116,7 +122,7 @@ public sealed class ScreenshotControlToolCallResultTests
             cancellationToken: CancellationToken.None);
 
         // Assert
-        Assert.False(result.IsError, "Annotated capture with includeImage=true should succeed");
+        Assert.False(result.IsError, $"Annotated capture with includeImage=true should succeed: {string.Join(" ", result.Content.OfType<TextContentBlock>().Select(block => block.Text))}");
         Assert.NotNull(result.Content);
 
         var imageBlock = Assert.Single(result.Content.OfType<ImageContentBlock>());

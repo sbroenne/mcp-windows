@@ -3,6 +3,7 @@ using ModelContextProtocol.Protocol;
 using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
+using Sbroenne.WindowsMcp.Tools;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -15,6 +16,25 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Trait("Category", "Integration")]
 public sealed class UIBatchAndFusionIntegrationTests
 {
+    [Theory]
+    [InlineData("""{"action":"unknown"}""")]
+    [InlineData("""{"action":"type","elementId":"$prev"}""")]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_InvalidLaterStep_DoesNotClickEarlierTarget(string invalidStep)
+    {
+        var id = await DiscoverIdAsync("Submit", null);
+        var before = _fixture.Form!.SubmitClickCount;
+        var steps = $$"""[{"action":"click","elementId":"{{id}}"},{{invalidStep}}]""";
+
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, false, false, "full", false, CancellationToken.None);
+
+        Assert.True(result.IsError);
+        Assert.Equal(before, _fixture.Form.SubmitClickCount);
+        using var payload = JsonDocument.Parse(ExtractText(result));
+        Assert.False(payload.RootElement.TryGetProperty("stepsRun", out _));
+    }
+
     private static readonly string[] SnapshotKinds = ["full", "diff"];
     private readonly UITestHarnessFixture _fixture;
     private readonly string _windowHandle;
@@ -39,23 +59,77 @@ public sealed class UIBatchAndFusionIntegrationTests
         DesktopInputTests.SkipUnlessEnabled();
 
     [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_AmbiguousAppearWait_CannotSupplyPreviousTarget()
+    {
+        var steps = """
+            [{"action":"wait","mode":"appear","controlType":"Button","timeoutMs":1000},
+             {"action":"read","elementId":"$prev"}]
+            """;
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.Equal(2, batch.StepsRun);
+        Assert.True(batch.Steps[0].Success);
+        Assert.Null(batch.Steps[0].ElementId);
+        Assert.False(batch.Steps[1].Success);
+        Assert.Contains("unambiguous", batch.Steps[1].Error, StringComparison.Ordinal);
+        Assert.Null(batch.Steps[1].Text);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_UniqueAppearWait_SuppliesPreviousTarget()
+    {
+        var steps = """
+            [{"action":"wait","mode":"appear","automationId":"SubmitButton","timeoutMs":1000},
+             {"action":"read","elementId":"$prev"}]
+            """;
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, steps, true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.True(batch.Success, ExtractText(result));
+        Assert.NotNull(batch.Steps[0].ElementId);
+        Assert.Equal(batch.Steps[0].ElementId, batch.Steps[1].ElementId);
+        Assert.Contains("Submit", batch.Steps[1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Batch_ReadWithoutId_PreservesWholeWindowScope()
+    {
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle, """[{"action":"read","includeChildren":true}]""",
+            true, false, "full", false, CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.True(batch.Success, ExtractText(result));
+        Assert.Contains("Submit", Assert.Single(batch.Steps).Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Batch_FillFormAndSubmit_AllStepsSucceed()
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "batch-user", clearFirst = true },
-            new { action = "type", automationId = "PasswordInput", controlType = "Edit", text = "batch-pass", clearFirst = true },
-            new { action = "click", name = "Submit", controlType = "Button" },
+            new { action = "find", automationId = "UsernameInput", controlType = "Edit", requireUnique = true },
+            new { action = "type", elementId = "$prev", text = "batch-user", clearFirst = true },
+            new { action = "find", automationId = "PasswordInput", controlType = "Edit", requireUnique = true },
+            new { action = "type", elementId = "$prev", text = "batch-pass", clearFirst = true },
+            new { action = "find", name = "Submit", controlType = "Button", requireUnique = true },
+            new { action = "click", elementId = "$prev" },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Batch failed: {ExtractText(result)}");
         Assert.False(result.IsError);
-        Assert.Equal(3, batch.StepsRun);
-        Assert.Equal(3, batch.StepsSucceeded);
+        Assert.Equal(6, batch.StepsRun);
+        Assert.Equal(6, batch.StepsSucceeded);
         Assert.All(batch.Steps, s => Assert.True(s.Success, $"Step {s.Index} ({s.Action}) failed: {s.Error}"));
     }
 
@@ -64,13 +138,13 @@ public sealed class UIBatchAndFusionIntegrationTests
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "abc" },
-            new { action = "click", name = "NoSuchButton_ZZZ", controlType = "Button" },
-            new { action = "click", name = "Submit", controlType = "Button" },
+            new { action = "type", elementId = await DiscoverIdAsync(null, "UsernameInput"), text = "abc" },
+            new { action = "click", elementId = "unknown-id" },
+            new { action = "click", elementId = await DiscoverIdAsync("Submit", null) },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.False(batch.Success);
@@ -81,16 +155,45 @@ public sealed class UIBatchAndFusionIntegrationTests
     }
 
     [Fact]
+    public async Task Batch_WaitDisappear_RequireUnique_ReportsAmbiguity()
+    {
+        var steps = JsonSerializer.Serialize(new object[]
+        {
+            new
+            {
+                action = "wait",
+                mode = "disappear",
+                controlType = "Button",
+                requireUnique = true,
+                timeoutMs = 1000,
+            },
+        });
+
+        var result = await UIBatchTool.ExecuteAsync(
+            _windowHandle,
+            steps,
+            stopOnError: true,
+            withSnapshot: false,
+            snapshotMode: "full", includeDiagnostics: false,
+            CancellationToken.None);
+
+        var batch = ParseBatch(result);
+        Assert.False(batch.Success);
+        Assert.True(result.IsError);
+        Assert.Contains("matching elements", Assert.Single(batch.Steps).Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Batch_ContinueOnError_RunsEveryStep()
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "click", name = "NoSuchButton_ZZZ", controlType = "Button" },
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "still-runs" },
+            new { action = "click", elementId = "unknown-id" },
+            new { action = "type", elementId = await DiscoverIdAsync(null, "UsernameInput"), text = "still-runs" },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: false, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: false, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.False(batch.Success);
@@ -108,7 +211,7 @@ public sealed class UIBatchAndFusionIntegrationTests
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Chained batch failed: {ExtractText(result)}");
@@ -120,11 +223,11 @@ public sealed class UIBatchAndFusionIntegrationTests
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "snap" },
+            new { action = "type", elementId = await DiscoverIdAsync(null, "UsernameInput"), text = "snap" },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: true, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: true, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Batch failed: {ExtractText(result)}");
@@ -138,7 +241,7 @@ public sealed class UIBatchAndFusionIntegrationTests
     {
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "click", name = "Submit", controlType = "Button" },
+            new { action = "click", elementId = "not-dispatched" },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
@@ -179,7 +282,7 @@ public sealed class UIBatchAndFusionIntegrationTests
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Mouse batch failed: {ExtractText(result)}");
@@ -201,7 +304,7 @@ public sealed class UIBatchAndFusionIntegrationTests
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Polyline batch failed: {ExtractText(result)}");
@@ -219,11 +322,11 @@ public sealed class UIBatchAndFusionIntegrationTests
         var steps = JsonSerializer.Serialize(new object[]
         {
             new { action = "mouse", mouseAction = "click", x, y, expectedProcessName = "definitely_not_this_process_zzz" },
-            new { action = "type", automationId = "UsernameInput", controlType = "Edit", text = "should-not-run" },
+            new { action = "type", elementId = await DiscoverIdAsync(null, "UsernameInput"), text = "should-not-run" },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.False(batch.Success);
@@ -243,15 +346,15 @@ public sealed class UIBatchAndFusionIntegrationTests
 
         var steps = JsonSerializer.Serialize(new object[]
         {
-            new { action = "click", name = "Submit", controlType = "Button", doubleClick = true },
+            new { action = "click", elementId = await DiscoverIdAsync("Submit", null), doubleClick = true },
         });
 
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, steps, stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, steps, stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         var batch = ParseBatch(result);
         Assert.True(batch.Success, $"Double-click batch failed: {ExtractText(result)}");
-        Assert.Equal("double-clicked", batch.Steps[0].Summary);
+        Assert.Equal("double-click dispatched; application outcome not verified", batch.Steps[0].Summary);
 
         // The tool waits for an observable change before returning, which the first mouse-up already causes;
         // poll briefly for the second so the assertion does not race the message pump.
@@ -269,15 +372,9 @@ public sealed class UIBatchAndFusionIntegrationTests
 
         var result = await UIClickTool.ExecuteAsync(
             _windowHandle,
-            name: "Submit",
-            nameContains: null,
-            namePattern: null,
-            controlType: "Button",
-            automationId: null,
-            className: null,
-            elementId: null,
-            foundIndex: 1,
+            elementId: await DiscoverIdAsync("Submit", null),
             withSnapshot: false,
+            snapshotMode: "full",
             includeDiagnostics: false,
             doubleClick: true,
             CancellationToken.None);
@@ -296,7 +393,7 @@ public sealed class UIBatchAndFusionIntegrationTests
     public async Task Batch_InvalidJson_FailsGracefully()
     {
         var result = await UIBatchTool.ExecuteAsync(
-            _windowHandle, "not json", stopOnError: true, withSnapshot: false, includeDiagnostics: false, CancellationToken.None);
+            _windowHandle, "not json", stopOnError: true, withSnapshot: false, snapshotMode: "full", includeDiagnostics: false, CancellationToken.None);
 
         Assert.True(result.IsError);
         Assert.Contains("not valid JSON", ExtractText(result));
@@ -307,15 +404,9 @@ public sealed class UIBatchAndFusionIntegrationTests
     {
         var result = await UIClickTool.ExecuteAsync(
             _windowHandle,
-            name: "Submit",
-            nameContains: null,
-            namePattern: null,
-            controlType: "Button",
-            automationId: null,
-            className: null,
-            elementId: null,
-            foundIndex: 1,
+            elementId: await DiscoverIdAsync("Submit", null),
             withSnapshot: true,
+            snapshotMode: "full",
             includeDiagnostics: false,
             doubleClick: false,
             CancellationToken.None);
@@ -323,6 +414,8 @@ public sealed class UIBatchAndFusionIntegrationTests
         var text = ExtractText(result);
         var doc = JsonDocument.Parse(text);
         Assert.True(doc.RootElement.GetProperty("success").GetBoolean(), $"Click failed: {text}");
+        Assert.True(doc.RootElement.GetProperty("actionDispatched").GetBoolean());
+        Assert.False(doc.RootElement.GetProperty("outcomeVerified").GetBoolean());
         Assert.Equal("full", doc.RootElement.GetProperty("postActionKind").GetString());
         Assert.True(doc.RootElement.TryGetProperty("postActionTree", out _));
         Assert.False(doc.RootElement.TryGetProperty("postActionChanges", out _));
@@ -336,14 +429,7 @@ public sealed class UIBatchAndFusionIntegrationTests
 
         var result = await UIClickTool.ExecuteAsync(
             _windowHandle,
-            name: "Submit",
-            nameContains: null,
-            namePattern: null,
-            controlType: "Button",
-            automationId: null,
-            className: null,
-            elementId: null,
-            foundIndex: 1,
+            elementId: await DiscoverIdAsync("Submit", null),
             withSnapshot: true,
             snapshotMode: "auto",
             includeDiagnostics: false,
@@ -370,20 +456,40 @@ public sealed class UIBatchAndFusionIntegrationTests
         var result = await UITypeTool.ExecuteAsync(
             _windowHandle,
             text: "no-snapshot",
-            name: null,
-            nameContains: null,
-            namePattern: null,
-            controlType: "Edit",
-            automationId: "UsernameInput",
-            className: null,
-            elementId: null,
-            foundIndex: 1,
+            elementId: await DiscoverIdAsync(null, "UsernameInput"),
             clearFirst: true,
             withSnapshot: false,
+            snapshotMode: "full",
             includeDiagnostics: false,
+            inputMode: "auto",
             CancellationToken.None);
 
         var doc = JsonDocument.Parse(ExtractText(result));
         Assert.False(doc.RootElement.TryGetProperty("postActionTree", out _), "postActionTree should be absent when withSnapshot=false.");
+    }
+
+    private async Task<string> DiscoverIdAsync(string? name, string? automationId)
+    {
+        var result = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = name,
+            AutomationId = automationId,
+            RequireUnique = true
+        });
+        Assert.True(result.Success, result.ErrorMessage);
+        return Assert.Single(result.Items!).Id;
+    }
+
+    [Fact]
+    public async Task BatchAmbiguousFindCannotSupplyPreviousActionTarget()
+    {
+        var result = await UIBatchTool.ExecuteAsync(_windowHandle,
+            """[{"action":"find","controlType":"Button"},{"action":"click","elementId":"$prev"}]""",
+            true, false, "full", false, CancellationToken.None);
+        var batch = ParseBatch(result);
+        Assert.False(batch.Success);
+        Assert.Null(batch.Steps[0].ElementId);
+        Assert.Contains("unambiguous", batch.Steps[1].Error);
     }
 }

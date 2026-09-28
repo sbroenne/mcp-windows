@@ -1,0 +1,160 @@
+name: Windows Runner Maintenance
+
+on:
+  schedule:
+    - cron: '17 1 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# The lock covers updates, restarts, the desktop check, and deallocation.
+concurrency:
+  group: windows-ui-integration-tests
+  cancel-in-progress: false
+
+env:
+  AZURE_RESOURCE_GROUP: rg-windows-mcp-runner
+  AZURE_VM_NAME: vm-windows-mcp-runner
+
+jobs:
+  patch:
+    name: Patch Windows and restart
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment: windows-ui-runner
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Require an enabled runner and the default branch
+        shell: pwsh
+        env:
+          RUNNER_ENABLED: ${{ vars.WINDOWS_UI_RUNNER_ENABLED }}
+          DEFAULT_REF: refs/heads/${{ github.event.repository.default_branch }}
+        run: |
+          if ($env:RUNNER_ENABLED -ne 'true' -or $env:GITHUB_REF -ne $env:DEFAULT_REF) {
+            throw 'Maintenance requires WINDOWS_UI_RUNNER_ENABLED=true and the default branch.'
+          }
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set four-hour shutdown backstop before starting the VM
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $shutdownTime = (Get-Date).ToUniversalTime().AddHours(4).ToString('HHmm')
+          az vm auto-shutdown --resource-group $env:AZURE_RESOURCE_GROUP `
+            --name $env:AZURE_VM_NAME --time $shutdownTime
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to set the shutdown backstop.' }
+
+      - name: Start VM
+        timeout-minutes: 20
+        run: az vm start --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_VM_NAME"
+
+      - name: Install updates and verify recovery
+        timeout-minutes: 155
+        run: >-
+          python scripts/maintain_windows_runner.py
+          --resource-group "$AZURE_RESOURCE_GROUP"
+          --vm-name "$AZURE_VM_NAME"
+          --report maintenance-results/windows-update.json
+
+      - name: Upload update report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-update-${{ github.run_id }}-${{ github.run_attempt }}
+          path: maintenance-results/*.json
+          if-no-files-found: warn
+          retention-days: 90
+
+  desktop-check:
+    name: Verify the patched desktop
+    needs: patch
+    runs-on: [self-hosted, windows, x64, windows-ui]
+    timeout-minutes: 25
+    env:
+      MCP_TEST_DESKTOP_INPUT: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Verify interactive desktop and browsers
+        shell: pwsh
+        run: |
+          if (-not [Environment]::UserInteractive) { throw 'No interactive desktop.' }
+          $session = (Get-Process -Id $PID).SessionId
+          $explorer = Get-Process explorer -ErrorAction SilentlyContinue |
+            Where-Object SessionId -eq $session
+          if (-not $explorer) { throw 'Explorer is not running in the runner session.' }
+          foreach ($browser in @(
+            "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+            "$env:ProgramFiles\Google\Chrome\Application\chrome.exe"
+          )) {
+            if (-not (Test-Path $browser)) { throw "Required browser is missing: $browser" }
+            Write-Host "$browser version: $((Get-Item $browser).VersionInfo.ProductVersion)"
+          }
+
+      - name: Run the desktop smoke test
+        shell: pwsh
+        run: |
+          dotnet test tests/Sbroenne.WindowsMcp.Tests/Sbroenne.WindowsMcp.Tests.csproj `
+            --configuration Debug `
+            --filter "FullyQualifiedName~Integration.KeyboardControlToolIntegrationTests" `
+            --results-directory maintenance-results `
+            --logger "trx;LogFileName=maintenance-desktop.trx" `
+            --blame-hang-timeout 5m --nologo
+          if ($LASTEXITCODE -ne 0) { throw 'The patched desktop failed its smoke test.' }
+          [xml]$results = Get-Content 'maintenance-results\maintenance-desktop.trx' -Raw
+          $counts = $results.TestRun.ResultSummary.Counters
+          if ([int]$counts.total -lt 1 -or [int]$counts.passed -ne [int]$counts.total) {
+            throw 'The desktop smoke test must actually run and pass; skipped or missing tests are not sufficient.'
+          }
+
+      - name: Upload desktop results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: maintenance-desktop-${{ github.run_id }}-${{ github.run_attempt }}
+          path: maintenance-results/maintenance-desktop.trx
+          if-no-files-found: error
+          retention-days: 90
+
+  deallocate:
+    name: Deallocate after maintenance
+    if: >-
+      always() &&
+      vars.WINDOWS_UI_RUNNER_ENABLED == 'true' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: [patch, desktop-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: windows-ui-runner
+    permissions:
+      id-token: write
+    steps:
+      - uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Stop compute billing
+        run: az vm deallocate --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_VM_NAME"

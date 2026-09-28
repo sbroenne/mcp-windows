@@ -19,6 +19,36 @@ public sealed record UIAutomationResult
     [JsonPropertyName("action")]
     public required string Action { get; init; }
 
+    /// <summary>True when a click was sent successfully, not proof of an application outcome.</summary>
+    [JsonPropertyName("actionDispatched")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? ActionDispatched { get; init; }
+
+    /// <summary>Clicks do not verify application outcomes, even when a control state changed.</summary>
+    [JsonPropertyName("outcomeVerified")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? OutcomeVerified { get; init; }
+
+    /// <summary>The click target as observed before sending the action.</summary>
+    [JsonPropertyName("target")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIActionElement? Target { get; init; }
+
+    /// <summary>Whether the same target's post-action properties were available or unavailable.</summary>
+    [JsonPropertyName("postActionState")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionState { get; init; }
+
+    /// <summary>An immediate observation after dispatch, not an expected-state check.</summary>
+    [JsonPropertyName("postActionElement")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public UIActionElement? PostActionElement { get; init; }
+
+    /// <summary>Provider read failure after successful dispatch; distinct from snapshot warnings.</summary>
+    [JsonPropertyName("postActionElementWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionElementWarning { get; init; }
+
     /// <summary>
     /// Full element details. Only populated for single-element results or get_element_details.
     /// </summary>
@@ -55,6 +85,16 @@ public sealed record UIAutomationResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Kind { get; init; }
 
+    /// <summary>Opaque token for the latest automatic snapshot of this target and capture settings.</summary>
+    [JsonPropertyName("snapshotToken")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SnapshotToken { get; init; }
+
+    /// <summary>Token of the tree to which this diff applies.</summary>
+    [JsonPropertyName("baseSnapshotToken")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? BaseSnapshotToken { get; init; }
+
     /// <summary>
     /// Changes from the previous remembered tree when <see cref="Kind"/> is diff.
     /// </summary>
@@ -76,6 +116,16 @@ public sealed record UIAutomationResult
     [JsonPropertyName("postActionKind")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PostActionKind { get; init; }
+
+    /// <summary>Token returned by the optional post-action snapshot.</summary>
+    [JsonPropertyName("postActionSnapshotToken")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionSnapshotToken { get; init; }
+
+    /// <summary>Baseline token for an optional post-action diff.</summary>
+    [JsonPropertyName("postActionBaseSnapshotToken")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? PostActionBaseSnapshotToken { get; init; }
 
     /// <summary>Post-action changes when <see cref="PostActionKind"/> is diff.</summary>
     [JsonPropertyName("postActionChanges")]
@@ -247,6 +297,30 @@ public sealed record UIAutomationResult
         };
     }
 
+    /// <summary>Reports click dispatch separately from its unverified application outcome.</summary>
+    public static UIAutomationResult CreateClickDispatched(
+        string action,
+        UIActionElement target,
+        UIActionElement? postActionElement,
+        UIAutomationDiagnostics? diagnostics = null)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return new UIAutomationResult
+        {
+            Success = true,
+            Action = action,
+            ActionDispatched = true,
+            OutcomeVerified = false,
+            Target = target,
+            PostActionState = postActionElement is null ? "unavailable" : "available",
+            PostActionElement = postActionElement,
+            UsageHint = "Action dispatched; application outcome not verified. " +
+                (postActionElement is null ? "Post-action target unavailable (for example, a closed dialog). " : "") +
+                "Inspect a snapshot or use ui_wait for the expected state; do not replay automatically.",
+            Diagnostics = diagnostics,
+        };
+    }
+
     /// <summary>
     /// Creates a success result with multiple elements.
     /// </summary>
@@ -299,19 +373,13 @@ public sealed record UIAutomationResult
     /// </summary>
     private static string GetActionHint(string action, UIElementInfo[] elements)
     {
-        // For click actions, remind that all UI interactions require tools
-        if (action == "click")
-        {
-            return "Click completed. Continue using ui_click or ui_find for all UI interactions - never skip tool calls.";
-        }
-
         // For find actions, provide element usage guidance
         if (elements.Length == 1)
         {
-            return "Use the returned name, automationId, and controlType with ui_click or ui_type. Always use ui_click/ui_find for UI operations.";
+            return "Use the returned id as elementId with ui_click, ui_type, or ui_select.";
         }
 
-        return $"Found {elements.Length} elements. Use their selectors and foundIndex with ui_click or ui_type. Always use ui_click/ui_find for UI operations.";
+        return $"Found {elements.Length} elements. Choose the intended control and pass its id as elementId to the action.";
     }
 
     /// <summary>
@@ -338,7 +406,7 @@ public sealed record UIAutomationResult
             FullTree = elements,
             Kind = "full",
             ElementCount = totalCount,
-            UsageHint = $"Tree contains {totalCount} elements. To act on one, call ui_click/ui_type/ui_read with its name, automationId, or controlType (add foundIndex to disambiguate). Use ui_find to fetch full details for a specific element.",
+            UsageHint = $"Tree contains {totalCount} elements. Pass a control's id as elementId to ui_click/ui_type/ui_read. Rediscover if an ID is stale; never substitute a same-name control automatically.",
             Diagnostics = diagnostics
         };
     }
@@ -430,7 +498,13 @@ public sealed record UIAutomationResult
     private static string GetDefaultRecoverySuggestion(string errorType) => errorType switch
     {
         UIAutomationErrorType.ElementNotFound =>
-            "Element not found. Try ui_snapshot to see the window's element tree, or pass parentElementId to ui_snapshot to drill into a specific subtree, then act with the returned selectors.",
+            "Element not found. Run ui_snapshot or ui_find in the same CLI daemon or MCP connection, then act with a newly returned element ID.",
+
+        UIAutomationErrorType.SearchIncomplete =>
+            "Search stopped at its scan limit; the target may still exist. Narrow the search with exact name, " +
+            "automationId, controlType or className, or parentElementId within the same MCP session or CLI daemon. " +
+            "MCP sessions and the CLI daemon are separate owners; their element IDs are not interchangeable. " +
+            "A longer timeout does not increase the scan limit.",
 
         UIAutomationErrorType.MultipleMatches =>
             "Multiple elements matched. Add automationId, scope with ui_snapshot parentElementId, or specify foundIndex to select which match.",
@@ -438,8 +512,11 @@ public sealed record UIAutomationResult
         UIAutomationErrorType.PatternNotSupported =>
             "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",
 
+        UIAutomationErrorType.VerificationFailed =>
+            "Input may already have changed the document. Read the current text before retrying; do not blindly repeat or append it.",
+
         UIAutomationErrorType.ElementStale =>
-            "Element reference expired. Run ui_find again and use the refreshed selectors.",
+            "Element reference expired or belongs to another owner. Rediscover with ui_find or ui_snapshot and use the new ID; do not reuse IDs after a restart.",
 
         UIAutomationErrorType.ElevatedTarget =>
             "Target window runs as Administrator. Run MCP server elevated or target a non-admin window.",
@@ -471,35 +548,20 @@ public sealed record UIAutomationResult
 
         // Check for invokable patterns
         var patterns = element.SupportedPatterns ?? Array.Empty<string>();
-        var hasInvoke = patterns.Any(p => p.Contains("Invoke", StringComparison.OrdinalIgnoreCase));
         var hasToggle = patterns.Any(p => p.Contains("Toggle", StringComparison.OrdinalIgnoreCase));
         var hasValue = patterns.Any(p => p.Contains("Value", StringComparison.OrdinalIgnoreCase));
 
-        // Build a selector the interaction tools actually accept (name or automationId).
-        var selector = !string.IsNullOrEmpty(element.Name)
-            ? $"name='{element.Name}'"
-            : !string.IsNullOrEmpty(element.AutomationId)
-                ? $"automationId='{element.AutomationId}'"
-                : $"controlType='{element.ControlType}'";
-
-        // Primary recommendation: use clickablePoint for direct interaction
-        var cp = element.ClickablePoint;
-        hints.Add($"To click: mouse_control(action='click', x={cp.X}, y={cp.Y}, monitorIndex={cp.MonitorIndex})");
-
-        // Add pattern-specific hints
-        if (hasInvoke)
-        {
-            hints.Add($"Or use: ui_click(windowHandle='...', {selector})");
-        }
+        var target = $"elementId='{element.ElementId}'";
+        hints.Add($"To click: ui_click(windowHandle='...', {target})");
 
         if (hasToggle)
         {
-            hints.Add($"To toggle: ui_click(windowHandle='...', {selector})");
+            hints.Add($"To toggle: ui_click(windowHandle='...', {target})");
         }
 
         if (hasValue)
         {
-            hints.Add($"To type text: ui_type(windowHandle='...', {selector}, text='...')");
+            hints.Add($"To type text: ui_type(windowHandle='...', {target}, text='...')");
         }
 
         return string.Join(" | ", hints);

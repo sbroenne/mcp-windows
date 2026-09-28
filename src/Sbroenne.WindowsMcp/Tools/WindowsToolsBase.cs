@@ -104,6 +104,13 @@ public static class WindowsToolsBase
     /// <summary>Gets the process-local memory used by automatic UI snapshots.</summary>
     internal static SnapshotStateService SnapshotStateService => _snapshotStateService;
 
+    /// <summary>CLI callers must identify the baseline they received; MCP has its own local history.</summary>
+    public static bool RequireExplicitSnapshotBaseline
+    {
+        get => _snapshotStateService.RequireExplicitBaseline;
+        set => _snapshotStateService.RequireExplicitBaseline = value;
+    }
+
     /// <summary>
     /// JSON serializer options for tool response serialization, optimized for LLM token efficiency.
     /// </summary>
@@ -345,7 +352,8 @@ public static class WindowsToolsBase
         string? windowHandle,
         bool withSnapshot,
         SnapshotMode snapshotMode,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? snapshotSince = null)
     {
         ArgumentNullException.ThrowIfNull(result);
 
@@ -362,14 +370,18 @@ public static class WindowsToolsBase
                 maxDepth: 5,
                 controlTypeFilter: null,
                 snapshotMode,
-                cancellationToken);
+                includeDiagnostics: false,
+                cancellationToken,
+                snapshotSince);
             if (snapshot.Success)
             {
                 return result with
                 {
                     PostActionKind = snapshot.Kind,
                     PostActionTree = snapshot.Tree,
-                    PostActionChanges = snapshot.Changes
+                    PostActionChanges = snapshot.Changes,
+                    PostActionSnapshotToken = snapshot.SnapshotToken,
+                    PostActionBaseSnapshotToken = snapshot.BaseSnapshotToken
                 };
             }
 
@@ -414,7 +426,8 @@ public static class WindowsToolsBase
         string? controlTypeFilter,
         SnapshotMode mode,
         bool includeDiagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? since = null)
     {
         var effectiveWindowHandle = windowHandle;
         if (string.IsNullOrWhiteSpace(effectiveWindowHandle) &&
@@ -442,7 +455,8 @@ public static class WindowsToolsBase
                 controlTypeFilter,
                 token),
             includeDiagnostics,
-            cancellationToken);
+            cancellationToken,
+            since);
     }
 
     private static int GetTimeoutFromEnvironment()

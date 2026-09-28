@@ -83,9 +83,10 @@ var includeTools = ParseToolList(
 var excludeTools = ParseToolList(
     GetOption(args, "--exclude-tools") ?? Environment.GetEnvironmentVariable("WINDOWS_MCP_EXCLUDE_TOOLS"));
 
+// Always enforce the advertised argument contract, including without an allow/deny list.
+var filter = ToolFilter.Apply(builder.Services, includeTools, excludeTools);
 if (includeTools.Count > 0 || excludeTools.Count > 0)
 {
-    var filter = ToolFilter.Apply(builder.Services, includeTools, excludeTools);
     Console.Error.WriteLine(
         $"[windows-mcp] tool filter active: {filter.Kept.Count} enabled, {filter.Removed.Count} disabled.");
     if (filter.Removed.Count > 0)

@@ -15,26 +15,21 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIReadTool
 {
     /// <summary>
-    /// Reads text from a UI element. If UIA text extraction fails, automatically tries OCR.
+    /// Reads an observed element by ID, or an explicit whole window. Only whole-window reads may fall back to OCR.
     /// Keywords: read, read text, get text, extract text, OCR, text content, contents, value,
     /// scrape, article text, web page text, what does it say.
     /// </summary>
     /// <remarks>
-    /// Extract text from UI elements or screen regions. Auto-falls back to OCR if normal text extraction fails.
+    /// Extract text from observed elements or explicit windows. Selectors are not accepted.
     /// For web pages in Edge/Chrome, pass format='article' to get clean, token-efficient article text
     /// (main content only, navigation chrome and inline link URLs stripped, headings/lists as markdown).
     /// Reading the live signed-in browser window this way also works for authenticated/internal pages that
     /// an HTTP fetch cannot reach.
+    /// Element failures are returned as errors, never as window text. An empty element read never
+    /// widens to whole-window OCR. Omit elementId only for an intentional whole-window read.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
-    /// <param name="name">Element name (exact match, case-insensitive).</param>
-    /// <param name="nameContains">Substring in element name (case-insensitive).</param>
-    /// <param name="namePattern">Regex pattern for element name matching.</param>
-    /// <param name="controlType">Control type (Text, Edit, Document, etc.)</param>
-    /// <param name="automationId">AutomationId for precise matching.</param>
-    /// <param name="className">Element class name.</param>
-    /// <param name="elementId">Stable element id from a prior ui_find/ui_snapshot. When provided, reads that exact element directly and ignores the name/type selectors (avoids re-querying).</param>
-    /// <param name="foundIndex">Return Nth match (1-based, default: 1).</param>
+    /// <param name="elementId">Opaque ID from discovery. Required for an element read. Omit only for an explicit whole-window read.</param>
     /// <param name="includeChildren">Include child element text (default: false). Ignored when format='article'.</param>
     /// <param name="language">OCR language code (e.g., 'en-US', 'de-DE'). Uses system default if not specified. Only used if OCR fallback triggers.</param>
     /// <param name="format">Text extraction mode: 'raw' (default, complete but includes nav chrome and link URLs) or 'article' (clean main-content text for web pages, chrome and inline URLs stripped, headings/lists as markdown).</param>
@@ -44,14 +39,7 @@ public static partial class UIReadTool
     [McpServerTool(Name = "ui_read", Title = "Read Text from Element", Destructive = false, OpenWorld = false)]
     public static async partial Task<CallToolResult> ExecuteAsync(
         string windowHandle,
-        [DefaultValue(null)] string? name,
-        [DefaultValue(null)] string? nameContains,
-        [DefaultValue(null)] string? namePattern,
-        [DefaultValue(null)] string? controlType,
-        [DefaultValue(null)] string? automationId,
-        [DefaultValue(null)] string? className,
         [DefaultValue(null)] string? elementId,
-        [DefaultValue(1)] int foundIndex,
         [DefaultValue(false)] bool includeChildren,
         [DefaultValue(null)] string? language,
         [DefaultValue(null)] string? format,
@@ -66,10 +54,14 @@ public static partial class UIReadTool
                 "windowHandle is required. Get it from window_management(action='find').");
         }
 
-        var foundIndexError = WindowsToolsBase.ValidateFoundIndex(foundIndex);
-        if (foundIndexError is not null)
+        if (!WindowHandleParser.TryParse(windowHandle, out var hwnd) || hwnd == nint.Zero)
         {
-            return foundIndexError;
+            return WindowsToolsBase.FailResult("windowHandle must be a nonzero decimal window handle.");
+        }
+
+        if (elementId is not null && string.IsNullOrWhiteSpace(elementId))
+        {
+            return WindowsToolsBase.FailResult("elementId must not be empty. Omit it only for an explicit whole-window read.");
         }
 
         if (!TryParseTextExtractionMode(format, out var mode))
@@ -80,48 +72,9 @@ public static partial class UIReadTool
 
         try
         {
-            var query = new ElementQuery
-            {
-                WindowHandle = windowHandle,
-                Name = name,
-                NameContains = nameContains,
-                NamePattern = namePattern,
-                ControlType = controlType,
-                AutomationId = automationId,
-                ClassName = className,
-                FoundIndex = Math.Max(1, foundIndex)
-            };
-
             var automationService = WindowsToolsBase.UIAutomationService;
-
-            // Try normal text extraction first
-            // If no specific element criteria, just read from the window
-            string? elementIdToRead = null;
-            if (!string.IsNullOrWhiteSpace(elementId))
-            {
-                // Caller supplied a stable element id from a prior find/snapshot - use it directly.
-                elementIdToRead = elementId;
-            }
-            else if (!string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) || !string.IsNullOrEmpty(namePattern) ||
-                !string.IsNullOrEmpty(controlType) || !string.IsNullOrEmpty(automationId) || !string.IsNullOrEmpty(className))
-            {
-                // Find the element first
-                var findResult = await automationService.FindElementsAsync(query, cancellationToken);
-                if (findResult.Success && findResult.Items?.Length > 0)
-                {
-                    elementIdToRead = findResult.Items[0].Id;
-                }
-            }
-
-            var result = await automationService.GetTextAsync(elementIdToRead, windowHandle, includeChildren, mode, cancellationToken);
-            if (result.Success && !string.IsNullOrWhiteSpace(result.Text))
-            {
-                return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
-            }
-
-            // Article mode is a UIA-only, structure-aware extraction; OCR (which returns raw pixels
-            // as flat text) cannot honor it, so skip the OCR fallback and return the UIA result.
-            if (mode == TextExtractionMode.Article)
+            var result = await automationService.GetTextAsync(elementId, windowHandle, includeChildren, mode, cancellationToken);
+            if (!ShouldTryWindowOcr(result, elementId, mode))
             {
                 return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
             }
@@ -129,14 +82,20 @@ public static partial class UIReadTool
             // Fallback: try OCR on the window region
             try
             {
-                if (!nint.TryParse(windowHandle, out var hwnd) || hwnd == IntPtr.Zero)
+                if (!NativeMethods.IsWindow(hwnd) || !NativeMethods.IsWindowVisible(hwnd) ||
+                    NativeMethods.IsIconic(hwnd))
                 {
-                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.WindowNotFound,
+                        "The requested window is unavailable for whole-window OCR."), includeDiagnostics);
                 }
 
-                if (!NativeMethods.GetWindowRect(hwnd, out var rect))
+                if (!NativeMethods.GetWindowRect(hwnd, out var rect) ||
+                    rect.Right <= rect.Left || rect.Bottom <= rect.Top)
                 {
-                    return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.InvalidRegion,
+                        "The requested window has no capturable region."), includeDiagnostics);
                 }
 
                 var captureRect = new System.Drawing.Rectangle(rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top);
@@ -152,22 +111,51 @@ public static partial class UIReadTool
                 {
                     var ocrSuccessResult = UIAutomationResult.CreateSuccessWithText("ui_read", ocrResult.Text, null) with
                     {
-                        UsageHint = $"Text extracted via OCR (fallback). Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
+                        UsageHint = $"Text extracted via whole-window OCR for the explicit window read. " +
+                            $"Engine: {ocrResult.Engine}, Duration: {ocrResult.DurationMs}ms"
                     };
                     return WindowsToolsBase.ToCallToolResult(ocrSuccessResult, includeDiagnostics);
                 }
+
+                if (!ocrResult.Success)
+                {
+                    return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                        actionName, UIAutomationErrorType.InternalError,
+                        $"Whole-window OCR failed: {ocrResult.ErrorMessage}") with
+                    {
+                        UsageHint = result.ErrorMessage
+                    }, includeDiagnostics);
+                }
             }
-            catch (Exception) when (!cancellationToken.IsCancellationRequested)
+            catch (Exception ex) when (ex is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
             {
-                // OCR fallback failed - ignore and return original result
+                return WindowsToolsBase.ToCallToolResult(UIAutomationResult.CreateFailure(
+                    actionName, UIAutomationErrorType.InternalError,
+                    $"Whole-window OCR failed: {ex.Message}") with
+                {
+                    UsageHint = result.ErrorMessage
+                }, includeDiagnostics);
             }
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
+    }
+
+    internal static bool ShouldTryWindowOcr(UIAutomationResult result, string? elementId, TextExtractionMode mode)
+    {
+        if (elementId is not null || mode != TextExtractionMode.Raw)
+        {
+            return false;
+        }
+
+        return result.Success
+            ? string.IsNullOrWhiteSpace(result.Text)
+            : result.ErrorType is UIAutomationErrorType.InternalError or UIAutomationErrorType.PatternNotSupported
+                or UIAutomationErrorType.NoTextFound or UIAutomationErrorType.Timeout;
     }
 
     private static bool TryParseTextExtractionMode(string? format, out TextExtractionMode mode)

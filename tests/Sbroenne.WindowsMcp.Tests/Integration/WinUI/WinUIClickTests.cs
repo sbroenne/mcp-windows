@@ -56,7 +56,7 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_CommandBarButton_Succeeds()
     {
         // Act - Click the New button in the CommandBar
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NewButton",
@@ -70,7 +70,7 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_NavigationViewItem_SwitchesPage()
     {
         // Act - Click on the Form Controls navigation item
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -96,7 +96,7 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_AccentButton_UpdatesStatus()
     {
         // Navigate to Form Controls page first
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -104,7 +104,7 @@ public sealed class WinUIClickTests : IDisposable
         await Task.Delay(200);
 
         // Act - Click the Submit button (styled as AccentButton in WinUI 3)
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",
@@ -130,7 +130,7 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_CheckBox_TogglesState()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -138,7 +138,7 @@ public sealed class WinUIClickTests : IDisposable
         await Task.Delay(200);
 
         // Act - Click the EnableNotifications checkbox
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "EnableNotificationsCheckbox",
@@ -149,7 +149,7 @@ public sealed class WinUIClickTests : IDisposable
         await Task.Delay(100);
 
         // Navigate to home page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavHome",
@@ -172,20 +172,36 @@ public sealed class WinUIClickTests : IDisposable
     public async Task FindAndClick_ClickTestButton_IncrementsCount()
     {
         // Navigate to Editor page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        var navigation = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",
         });
-        await Task.Delay(200);
+        Assert.True(navigation.Success, $"Editor navigation failed: {navigation.ErrorMessage}");
+
+        var editorReady = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "ClickTestButton",
+            },
+            timeoutMs: 5000);
+        Assert.True(editorReady.Success, $"Editor page did not become ready: {editorReady.ErrorMessage}");
+        var clickTarget = Assert.Single(editorReady.Items!);
+        var scrollResult = await _automationService.ScrollIntoViewAsync(
+            clickTarget.Id,
+            query: null,
+            timeoutMs: 5000);
+        Assert.True(scrollResult.Success, $"Click test button could not be scrolled into view: {scrollResult.ErrorMessage}");
 
         // Act - Click the ClickTestButton multiple times
         for (int i = 0; i < 3; i++)
         {
-            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            var result = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = "ClickTestButton",
+                TimeoutMs = 5000,
             });
             Assert.True(result.Success, $"Click test button click failed: {result.ErrorMessage}");
             await Task.Delay(50);

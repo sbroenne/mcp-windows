@@ -129,6 +129,7 @@ public sealed class UIAutomationThread : IDisposable
         finally
         {
             CancelPendingWork();
+            ElementIdGenerator.RetireCurrentThread();
             CleanupResources();
         }
     }

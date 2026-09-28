@@ -16,6 +16,23 @@ internal static class ExitCodes
 /// </summary>
 internal static class Emit
 {
+    private static readonly AsyncLocal<(TextWriter Output, TextWriter Error)?> Writers = new();
+
+    internal static async Task<int> WithWritersAsync(
+        TextWriter output, TextWriter error, Func<Task<int>> action)
+    {
+        var previous = Writers.Value;
+        Writers.Value = (output, error);
+        try
+        {
+            return await action();
+        }
+        finally
+        {
+            Writers.Value = previous;
+        }
+    }
+
     /// <summary>
     /// Writes every text content block of the result to stdout and returns the process exit code
     /// (0 when the tool succeeded, 1 when <see cref="CallToolResult.IsError"/> is set).
@@ -29,7 +46,7 @@ internal static class Emit
         {
             if (block is TextContentBlock text)
             {
-                Console.Out.WriteLine(text.Text);
+                (Writers.Value?.Output ?? Console.Out).WriteLine(text.Text);
                 wrote = true;
             }
         }
@@ -37,17 +54,25 @@ internal static class Emit
         if (!wrote)
         {
             // Non-text content (e.g. an image block) - surface a minimal acknowledgement.
-            Console.Out.WriteLine("{\"status\":\"ok\",\"note\":\"non-text content returned\"}");
+            (Writers.Value?.Output ?? Console.Out).WriteLine("{\"status\":\"ok\",\"note\":\"non-text content returned\"}");
         }
 
         return result.IsError == true ? ExitCodes.ToolError : ExitCodes.Success;
     }
 
+    /// <summary>Writes informational text to the active request output.</summary>
+    public static int Text(string text)
+    {
+        (Writers.Value?.Output ?? Console.Out).WriteLine(text);
+        return ExitCodes.Success;
+    }
+
     /// <summary>Writes a usage error to stderr and returns the usage exit code.</summary>
     public static int Usage(string message)
     {
-        Console.Error.WriteLine($"error: {message}");
-        Console.Error.WriteLine("Run 'wincli --help' for usage, or 'wincli guidance' for the full automation guide.");
+        var error = Writers.Value?.Error ?? Console.Error;
+        error.WriteLine($"error: {message}");
+        error.WriteLine("Run 'wincli --help' for usage, or 'wincli guidance' for the full automation guide.");
         return ExitCodes.UsageError;
     }
 }

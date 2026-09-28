@@ -113,24 +113,25 @@ public sealed class SnapshotDiffEngineTests
         var change = Assert.Single(SnapshotDiffEngine.Compare(before, after));
 
         Assert.Equal("update", change.Op);
-        Assert.False(change.Set!.ContainsKey("id"));
+        Assert.Equal("9", change.Set!["id"]);
         Assert.Equal(true, change.Set["enabled"]);
         Assert.Equal([30, 40, 0], Assert.IsType<int[]>(change.Set["click"]));
     }
 
     [Fact]
-    public void Compare_RuntimeIdChurnWithoutSemanticOrActionChange_ReturnsNoChanges()
+    public void Compare_RuntimeIdChurnWithoutSemanticChange_ReturnsCurrentActionReference()
     {
         var before = new[] { Node("1", "Save", "Button") };
         var after = new[] { Node("9", "Save", "Button") };
 
         var changes = SnapshotDiffEngine.Compare(before, after);
 
-        Assert.Empty(changes);
+        var change = Assert.Single(changes);
+        Assert.Equal("9", change.Set!["id"]);
     }
 
     [Fact]
-    public void Compare_RuntimeIdChurn_RefreshesPreviousShortId()
+    public void Compare_ReplacementNeverReassignsPreviousReference()
     {
         ElementIdGenerator.Clear();
         try
@@ -141,15 +142,9 @@ public sealed class SnapshotDiffEngineTests
             var previous = new[] { Node(previousId, "Save", "Button") };
             var current = new[] { Node(currentId, "Save", "Button") };
             var changes = SnapshotDiffEngine.Compare(previous, current);
-            var transferred = SnapshotDiffEngine.TryPreserveMatchedIds(
-                previous,
-                current,
-                out _);
-
-            Assert.Empty(changes);
-            Assert.True(transferred);
+            Assert.Equal(currentId, Assert.Single(changes).Set!["id"]);
             Assert.Equal(
-                "window:1|runtime:2|path:cached|sel:Button~Save",
+                "window:1|runtime:1|path:cached|sel:Button~Save",
                 ElementIdGenerator.ResolveFullId(previousId));
         }
         finally
@@ -159,7 +154,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void Compare_RepeatedRuntimeIdChurn_RefreshesOriginalShortId()
+    public void Compare_RepeatedReplacementDoesNotChangeOriginalReference()
     {
         ElementIdGenerator.Clear();
         try
@@ -170,19 +165,11 @@ public sealed class SnapshotDiffEngineTests
             var original = new[] { Node(originalId, "Save", "Button") };
             var second = new[] { Node(secondId, "Save", "Button") };
 
-            _ = SnapshotDiffEngine.Compare(original, second);
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
-                original,
-                second,
-                out var remembered));
-            _ = SnapshotDiffEngine.Compare(remembered, [Node(thirdId, "Save", "Button")]);
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
-                remembered,
-                [Node(thirdId, "Save", "Button")],
-                out _));
+            Assert.Equal(secondId, Assert.Single(SnapshotDiffEngine.Compare(original, second)).Set!["id"]);
+            Assert.Equal(thirdId, Assert.Single(SnapshotDiffEngine.Compare(second, [Node(thirdId, "Save", "Button")])).Set!["id"]);
 
             Assert.Equal(
-                "window:1|runtime:3|path:cached|sel:Button~Save",
+                "window:1|runtime:1|path:cached|sel:Button~Save",
                 ElementIdGenerator.ResolveFullId(originalId));
         }
         finally
@@ -192,7 +179,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void PreserveMatchedIds_ReusedFullIdGetsANewShortId()
+    public void Compare_ExistingRegistrationRemainsUnchanged()
     {
         ElementIdGenerator.Clear();
         try
@@ -202,14 +189,13 @@ public sealed class SnapshotDiffEngineTests
             var originalId = ElementIdGenerator.RegisterFullId(originalFullId);
             var currentId = ElementIdGenerator.RegisterFullId(currentFullId);
 
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
+            _ = SnapshotDiffEngine.Compare(
                 [Node(originalId, "Save", "Button")],
-                [Node(currentId, "Save", "Button")],
-                out _));
+                [Node(currentId, "Save", "Button")]);
 
             var reusedId = ElementIdGenerator.RegisterFullId(originalFullId);
-            Assert.NotEqual(originalId, reusedId);
-            Assert.Equal(currentFullId, ElementIdGenerator.ResolveFullId(originalId));
+            Assert.Equal(originalId, reusedId);
+            Assert.Equal(originalFullId, ElementIdGenerator.ResolveFullId(originalId));
             Assert.Equal(currentFullId, ElementIdGenerator.ResolveFullId(currentId));
             Assert.Equal(originalFullId, ElementIdGenerator.ResolveFullId(reusedId));
         }
@@ -220,7 +206,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void PreserveMatchedIds_NonBijectiveIds_ReturnsFalseWithoutMutation()
+    public void Compare_DuplicateCurrentIdsDoesNotMutateRegistrations()
     {
         ElementIdGenerator.Clear();
         try
@@ -229,7 +215,7 @@ public sealed class SnapshotDiffEngineTests
             var previousTwo = ElementIdGenerator.RegisterFullId("window:1|runtime:2|path:cached");
             var current = ElementIdGenerator.RegisterFullId("window:1|runtime:3|path:cached");
 
-            var transferred = SnapshotDiffEngine.TryPreserveMatchedIds(
+            var changes = SnapshotDiffEngine.Compare(
                     [
                         Node(previousOne, "Item", "Button"),
                         Node(previousTwo, "Item", "Button")
@@ -237,10 +223,9 @@ public sealed class SnapshotDiffEngineTests
                     [
                         Node(current, "Item", "Button"),
                         Node(current, "Item", "Button")
-                    ],
-                    out _);
+                    ]);
 
-            Assert.False(transferred);
+            Assert.Equal(2, changes.Count);
             Assert.Equal("window:1|runtime:1|path:cached", ElementIdGenerator.ResolveFullId(previousOne));
             Assert.Equal("window:1|runtime:2|path:cached", ElementIdGenerator.ResolveFullId(previousTwo));
             Assert.Equal("window:1|runtime:3|path:cached", ElementIdGenerator.ResolveFullId(current));
@@ -252,7 +237,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void PreserveMatchedIds_RuntimeIdCycle_DoesNotEvictRefreshedAliasEarly()
+    public void Compare_DoesNotChangeRegistryEvictionOrder()
     {
         ElementIdGenerator.Clear();
         try
@@ -261,16 +246,14 @@ public sealed class SnapshotDiffEngineTests
             const string fullB = "window:1|runtime:2|path:cached";
             var stableId = ElementIdGenerator.RegisterFullId(fullA);
             var idB = ElementIdGenerator.RegisterFullId(fullB);
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
+            _ = SnapshotDiffEngine.Compare(
                     [Node(stableId, "Save", "Button")],
-                    [Node(idB, "Save", "Button")],
-                    out var remembered));
+                    [Node(idB, "Save", "Button")]);
 
             var newIdA = ElementIdGenerator.RegisterFullId(fullA);
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
-                remembered,
-                [Node(newIdA, "Save", "Button")],
-                out _));
+            _ = SnapshotDiffEngine.Compare(
+                [Node(idB, "Save", "Button")],
+                [Node(newIdA, "Save", "Button")]);
 
             for (var index = 0; index < ElementIdGenerator.MaxRetainedIds - 2; index++)
             {
@@ -286,7 +269,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void PreserveMatchedIds_UnchangedAliasDoesNotDisplaceCurrentId()
+    public void Compare_RepeatedComparisonDoesNotDisplaceCurrentId()
     {
         ElementIdGenerator.Clear();
         try
@@ -295,17 +278,15 @@ public sealed class SnapshotDiffEngineTests
             const string fullB = "window:1|runtime:2|path:cached";
             var stableId = ElementIdGenerator.RegisterFullId(fullA);
             var currentId = ElementIdGenerator.RegisterFullId(fullB);
-            Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
+            _ = SnapshotDiffEngine.Compare(
                 [Node(stableId, "Save", "Button")],
-                [Node(currentId, "Save", "Button")],
-                out var remembered));
+                [Node(currentId, "Save", "Button")]);
 
             for (var index = 0; index < ElementIdGenerator.MaxRetainedIds; index++)
             {
-                Assert.True(SnapshotDiffEngine.TryPreserveMatchedIds(
-                    remembered,
+                _ = SnapshotDiffEngine.Compare(
                     [Node(currentId, "Save", "Button")],
-                    out _));
+                    [Node(currentId, "Save", "Button")]);
             }
 
             for (var index = 0; index < ElementIdGenerator.MaxRetainedIds - 2; index++)
@@ -322,7 +303,7 @@ public sealed class SnapshotDiffEngineTests
     }
 
     [Fact]
-    public void PreserveMatchedIds_EvictedPreviousId_ReturnsFalse()
+    public void Compare_EvictedPreviousIdIsNotRevived()
     {
         ElementIdGenerator.Clear();
         try
@@ -334,12 +315,11 @@ public sealed class SnapshotDiffEngineTests
             }
 
             var currentId = ElementIdGenerator.RegisterFullId("window:1|runtime:99999|path:cached");
-            var transferred = SnapshotDiffEngine.TryPreserveMatchedIds(
+            var changes = SnapshotDiffEngine.Compare(
                 [Node(previousId, "Save", "Button")],
-                [Node(currentId, "Save", "Button")],
-                out _);
+                [Node(currentId, "Save", "Button")]);
 
-            Assert.False(transferred);
+            Assert.Equal(currentId, Assert.Single(changes).Set!["id"]);
             Assert.Null(ElementIdGenerator.ResolveFullId(previousId));
             Assert.NotNull(ElementIdGenerator.ResolveFullId(currentId));
         }
@@ -366,11 +346,11 @@ public sealed class SnapshotDiffEngineTests
         Assert.Equal("update", change.Op);
         Assert.Equal("after", change.Set!["value"]);
         Assert.Equal("On", change.Set["toggle"]);
-        Assert.False(change.Set.ContainsKey("id"));
+        Assert.Equal("9", change.Set["id"]);
     }
 
     [Fact]
-    public void Compare_RuntimeIdChurnAcrossEqualDuplicateSiblings_ReturnsNoChanges()
+    public void Compare_RuntimeIdChurnAcrossEqualDuplicateSiblings_ReportsCurrentReferences()
     {
         var before = new[]
         {
@@ -387,7 +367,9 @@ public sealed class SnapshotDiffEngineTests
 
         var changes = SnapshotDiffEngine.Compare(before, after);
 
-        Assert.Empty(changes);
+        Assert.Equal(2, changes.Count);
+        Assert.Equal("4", changes[0].Set!["id"]);
+        Assert.Equal("5", changes[1].Set!["id"]);
     }
 
     [Fact]
@@ -401,9 +383,9 @@ public sealed class SnapshotDiffEngineTests
         };
         var after = new[]
         {
-            Node("9", "Window", "Window",
-                Node("8", "Item", "Button", enabled: false, click: [10, 20, 0]),
-                Node("7", "Item", "Button", enabled: true, click: [30, 40, 0]))
+            Node("1", "Window", "Window",
+                Node("2", "Item", "Button", enabled: false, click: [10, 20, 0]),
+                Node("3", "Item", "Button", enabled: true, click: [30, 40, 0]))
         };
 
         var change = Assert.Single(SnapshotDiffEngine.Compare(before, after));

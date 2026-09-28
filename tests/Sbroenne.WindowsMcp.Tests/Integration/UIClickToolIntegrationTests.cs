@@ -5,6 +5,7 @@ using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
+using System.Text.RegularExpressions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -71,7 +72,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var initialClickCount = _fixture.Form?.SubmitClickCount ?? 0;
 
         // Act - Click via UI Automation on the Submit button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -89,7 +90,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     [Fact]
     public async Task FindAndClick_Button_PrefersSemanticInvoke()
     {
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",
@@ -127,7 +128,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
             // Element discovery can take long enough for another desktop window to gain focus.
             // Re-establish foreground immediately before exercising the physical fallback.
             _fixture.BringToFront();
-            var result = await _automationService.FindAndClickAsync(new ElementQuery
+            var result = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 AutomationId = "PhysicalFallbackTarget",
@@ -157,7 +158,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         });
         Assert.Single(target.Items!);
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "InertTarget",
@@ -198,7 +199,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     public async Task FindAndClick_TabControl_SwitchesTab()
     {
         // Act - Click on the List View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -220,14 +221,14 @@ public sealed class UIClickToolIntegrationTests : IDisposable
     public async Task FindAndClick_CheckBox_TogglesState()
     {
         // Ensure we're on the Form Controls tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Form Controls",
             ControlType = "TabItem",
         });
         // Find and click a checkbox to toggle it
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NotificationsCheckbox",
@@ -251,7 +252,7 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         var initialCount = _fixture.Form?.SubmitClickCount ?? 0;
 
         // Act - Click specifically on Submit button by name and type
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -262,5 +263,81 @@ public sealed class UIClickToolIntegrationTests : IDisposable
         Assert.True(result.Success, $"Click failed: {result.ErrorMessage}");
         await Task.Delay(100);
         Assert.True((_fixture.Form?.SubmitClickCount ?? 0) > initialCount);
+    }
+
+    [Fact]
+    public async Task ClickElement_StaleId_DoesNotRetargetReplacementWithSameName()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var oldElementId = Assert.Single(found.Items!).Id;
+
+        _fixture.Form!.Invoke(_fixture.Form.ReplaceSubmitButtonForTesting);
+
+        var result = await _automationService.ClickElementAsync(oldElementId, _windowHandle);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form.SubmitClickCount);
+    }
+
+    [Fact]
+    public async Task ClickElement_PositionOnlyId_FailsClosed()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var elementId = Assert.Single(found.Items!).Id;
+        var pathBasedElementId = await _staThread.ExecuteAsync(() =>
+        {
+            var element = ElementIdGenerator.ResolveToAutomationElement(
+                elementId);
+            Assert.NotNull(element);
+            var root = UIA3Automation.Instance.ElementFromHandle(
+                nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture));
+            Assert.NotNull(root);
+            return ElementIdGenerator.GenerateId(element, root);
+        });
+        var fullId = Assert.IsType<string>(ElementIdGenerator.ResolveFullId(pathBasedElementId));
+        var positionOnlyId = ElementIdGenerator.RegisterFullId(
+            Regex.Replace(fullId, @"(?<=\|runtime:)[^|]+", "0"));
+
+        var result = await _automationService.ClickElementAsync(positionOnlyId, _windowHandle);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form!.SubmitClickCount);
+    }
+
+    [Fact]
+    public async Task FindAndClick_StaleParentId_DoesNotRetargetReplacementContainer()
+    {
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            ControlType = "Button",
+        });
+        var oldParentId = Assert.Single(found.Items!).Id;
+
+        _fixture.Form!.Invoke(_fixture.Form.ReplaceSubmitButtonForTesting);
+
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ParentElementId = oldParentId,
+            ControlType = "Button",
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.ElementStale, result.ErrorType);
+        Assert.Equal(0, _fixture.Form.SubmitClickCount);
     }
 }

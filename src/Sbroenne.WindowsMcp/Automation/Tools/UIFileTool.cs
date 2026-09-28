@@ -26,8 +26,9 @@ public static partial class UIFileTool
     /// WHY NOT KEYBOARD: keyboard_control sends Ctrl+S but CANNOT detect or interact with the Save As dialog that appears.
     /// </remarks>
     /// <param name="windowHandle">Window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window handle, not a dialog.</param>
-    /// <param name="filePath">Full path to save to (e.g., C:/Users/User/doc.txt). REQUIRED for new files. Forward/back slashes both work.</param>
+    /// <param name="filePath">Full destination path. Fills a Save As dialog; it does not retarget Ctrl+S for an already named document. To save an existing document under a different path, also set triggerMode='save_as'. Forward/back slashes both work.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
+    /// <param name="triggerMode">shortcut (default): Ctrl+S for the current document. save_as: Ctrl+Shift+S to choose a different destination without first saving over the original. wait: handle an already open owned Save As dialog without sending another shortcut. Save As shortcuts are application-specific; wait also works after opening a dialog through the application's menu.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload describing the save operation's success status. <c>IsError</c> reflects operation success.</returns>
     [McpServerTool(Name = "file_save", Title = "💾 SAVE FILE (handles Save As dialogs)", Destructive = true, OpenWorld = false)]
@@ -35,6 +36,7 @@ public static partial class UIFileTool
         string windowHandle,
         [DefaultValue(null)] string? filePath,
         [DefaultValue(false)] bool includeDiagnostics,
+        [DefaultValue("shortcut")] string triggerMode,
         CancellationToken cancellationToken)
     {
         const string actionName = "save";
@@ -47,7 +49,7 @@ public static partial class UIFileTool
 
         try
         {
-            var result = await WindowsToolsBase.UIAutomationService.SaveAsync(windowHandle, filePath, cancellationToken);
+            var result = await WindowsToolsBase.UIAutomationService.SaveAsync(windowHandle, filePath, triggerMode, cancellationToken);
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
         catch (Exception ex)

@@ -11,7 +11,44 @@ The full response contains the documented compact `tree` and no longer serialize
 redundant full-detail `elements` copy. Consumers that relied on that duplicate should migrate to
 `tree`, or call `ui_find` for a flat result.
 
-## Result
+## Reference safety and CLI baselines
+
+Element IDs now belong to the process that observed the controls: the persistent CLI daemon,
+or a separate MCP process. They are opaque references, not names or positions. A replacement
+control gets a new reference; snapshots never redirect an old reference to that replacement.
+Diffs include changed `id` fields, or return a complete view when the change list is too large.
+
+CLI automatic snapshots return `snapshotToken`. Supply it as `--since <token>` on the next
+`--mode auto` request for the same target and settings. The daemon keeps only the latest
+snapshot for each target/settings combination. A missing, expired, or superseded token returns
+a full view. This needs no separate CLI sessions. For a diff, `baseSnapshotToken` identifies
+the view to update and `snapshotToken` identifies the resulting view.
+
+`CliSnapshotContinuityTests` exercises real separate CLI processes, checks the payload threshold,
+and prints full/diff byte sizes and call durations. These local fixture results are separate
+from the historical multi-application measurements below. Longer references, token metadata,
+and explicit replacement updates can change both payload sizes and full/diff frequency.
+
+The before/after display-cleanup comparison uses the same snapshot-token values for each
+paired capture. Both responses still include their token metadata. This prevents random
+token spelling from appearing as a cleanup saving or regression, while preserving each
+response's full/diff decision and actual screen content.
+
+### Local CLI continuity check
+
+One Release-mode comparison against the owned WinForms fixture returned:
+
+| Response | UTF-8 bytes | End-to-end CLI call |
+|---|---:|---:|
+| Automatic full baseline | 5,866 | 313.2 ms |
+| Next snapshot with matching token | 251 | 233.3 ms |
+
+That unchanged-window diff was **95.7% smaller**. Interleaved and missing tokens
+returned full snapshots as required. These are single-check measurements, not a
+multi-application performance benchmark or token-cost estimate. The first call includes
+startup only if the daemon was not already running; no cold-start speed claim is made.
+
+## Historical result (before immutable references and CLI daemon)
 
 Four representative workflows were run five times per comparison arm on Windows
 `10.0.26220.0`. The browser pages were the public `microsoft/vscode` GitHub repository, not a

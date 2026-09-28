@@ -123,7 +123,7 @@ public sealed class WinUIFindTests : IDisposable
     public async Task Find_CheckBox_OnFormControlsPage()
     {
         // Navigate to Form Controls page first
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -147,7 +147,7 @@ public sealed class WinUIFindTests : IDisposable
     public async Task Find_TextBoxes_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -193,7 +193,7 @@ public sealed class WinUIFindTests : IDisposable
     public async Task Find_ListView_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -217,7 +217,7 @@ public sealed class WinUIFindTests : IDisposable
     public async Task Find_ComboBox_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -305,7 +305,7 @@ public sealed class WinUIFindTests : IDisposable
     public async Task AdvancedSearch_NameContains_WorksInWinUIApp()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",

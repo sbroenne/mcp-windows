@@ -136,7 +136,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Click_TabItem_SwitchesTab()
     {
         // Click on List View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -180,7 +180,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         var initialStates = _fixture.Form?.CheckboxStates ?? (false, false, false);
 
         // Toggle the Notifications checkbox
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Notifications",
@@ -222,7 +222,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Click_RadioButton_ChangesSelection()
     {
         // Click on Large radio button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Large",
@@ -298,7 +298,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Find_ListView_AfterTabSwitch()
     {
         // Switch to List View tab first
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -326,7 +326,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Find_TreeView_AfterTabSwitch()
     {
         // Switch to Tree View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Tree View",
@@ -350,7 +350,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Find_TreeItems_InTreeView()
     {
         // Switch to Tree View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Tree View",
@@ -378,7 +378,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task Find_DataGrid_AfterTabSwitch()
     {
         // Switch to Data Grid tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Data Grid",
@@ -429,7 +429,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     {
         var testText = "Hello UI Automation";
 
-        var result = await _automationService.FindAndTypeAsync(
+        var result = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -454,7 +454,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     {
         var initialCount = _fixture.Form?.SubmitClickCount ?? 0;
 
-        var result = await _automationService.FindAndClickAsync(new ElementQuery
+        var result = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Submit",
@@ -590,7 +590,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task ListView_FindListItems_ReturnsItems()
     {
         // Switch to List View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -621,7 +621,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task ListView_ClickItem_SelectsItem()
     {
         // Switch to List View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -644,7 +644,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         if (item2 != null)
         {
             // Click the item to select it
-            var selectResult = await _automationService.FindAndClickAsync(new ElementQuery
+            var selectResult = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 ControlType = "ListItem",
@@ -666,7 +666,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task DataGrid_FindDataItems_ReturnsRows()
     {
         // Switch to Data Grid tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Data Grid",
@@ -693,7 +693,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task DataGrid_FindDataGrid_ReturnsControl()
     {
         // Switch to Data Grid tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Data Grid",
@@ -723,7 +723,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task DataGrid_HeadersExposed_AsHeaders()
     {
         // Switch to Data Grid tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Data Grid",
@@ -772,7 +772,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task TreeView_FindTreeItems_ReturnsItems()
     {
         // Switch to Tree View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Tree View",
@@ -801,7 +801,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
     public async Task TreeView_SelectNode_UpdatesSelection()
     {
         // Switch to Tree View tab
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Tree View",
@@ -830,7 +830,7 @@ public sealed class UIAutomationWinFormsTests : IDisposable
         Assert.NotNull(targetNode);
 
         // Click on the target node
-        var selectResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var selectResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             ControlType = "TreeItem",

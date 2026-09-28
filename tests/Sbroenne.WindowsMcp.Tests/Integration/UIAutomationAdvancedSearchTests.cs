@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Text.Json;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
@@ -71,6 +72,191 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     #region FoundIndex Tests
+
+    [Fact]
+    public async Task Find_WithTimeout_WaitsForElementToAppear()
+    {
+        _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+
+        try
+        {
+            var reveal = Task.Run(async () =>
+            {
+                await Task.Delay(250);
+                _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+            });
+
+            var result = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "SubmitButton",
+                TimeoutMs = 2000,
+            });
+
+            await reveal;
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.NotEmpty(result.Items ?? []);
+        }
+        finally
+        {
+            _fixture.Form.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+        }
+    }
+
+    [Fact]
+    public async Task Find_WithTimeout_PerformsFinalProbeAtDeadline()
+    {
+        const string DelayedAutomationId = "DelayedSubmitButton";
+
+        try
+        {
+            var query = new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = DelayedAutomationId,
+            };
+            long elapsed = 0;
+            var probes = 0;
+            var result = await UIAutomationService.WaitForFindResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.False(observed.Success);
+                        // Model a provider probe that captured absence before the deadline,
+                        // then completed after it. Publish the control change synchronously.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonAutomationIdForTesting(DelayedAutomationId));
+                        elapsed = 2001;
+                    }
+
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("The deadline has expired; probe without delay."),
+                () => elapsed,
+                CancellationToken.None);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Single(result.Items!);
+            Assert.Equal(2, probes);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() =>
+                _fixture.Form.SetSubmitButtonAutomationIdForTesting("SubmitButton"));
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "RequiresDesktop")]
+    public async Task Disappear_FinalProbeObservesVisibilityChangeWithoutStructureSignal()
+    {
+        var query = new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "SubmitButton",
+            VisibleOnly = true
+        };
+        long elapsed = 0;
+        var probes = 0;
+        try
+        {
+            var result = await UIAutomationService.WaitForDisappearResultAsync(
+                query, 2000,
+                async () =>
+                {
+                    probes++;
+                    var observed = await _automationService.FindElementsAsync(query);
+                    if (probes == 1)
+                    {
+                        Assert.True(observed.Success, observed.ErrorMessage);
+                        // No event signal is wired to this wait. Visibility must be re-probed
+                        // even when the first provider call used the entire deadline.
+                        _fixture.Form!.Invoke(() =>
+                            _fixture.Form.SetSubmitButtonVisibleForTesting(false));
+                        elapsed = 2001;
+                    }
+
+                    return observed;
+                },
+                (_, _) => throw new InvalidOperationException("No sleep is allowed after the deadline."),
+                () => elapsed,
+                CancellationToken.None);
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(2, probes);
+        }
+        finally
+        {
+            _fixture.Form!.Invoke(() => _fixture.Form.SetSubmitButtonVisibleForTesting(true));
+        }
+    }
+
+    [Fact]
+    public async Task WaitForAppear_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.WaitForElementAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task WaitForDisappear_RequireUnique_DoesNotTreatAmbiguityAsGone()
+    {
+        var result = await _automationService.WaitForElementDisappearAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            timeoutMs: 1000);
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Find_RequireUniqueWithFoundIndex_ReturnsInvalidParameter()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+            FoundIndex = 2,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.InvalidParameter, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Select_RequireUnique_PropagatesAmbiguity()
+    {
+        var result = await _automationService.ObserveAndSelectAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                ControlType = "Button",
+                RequireUnique = true,
+            },
+            "unused");
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+    }
 
     [Fact]
     public async Task Find_WithFoundIndex1_ReturnsAllButtons()
@@ -158,6 +344,58 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
         // Assert - Should fail with ElementNotFound
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.ElementNotFound, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_ReturnsAmbiguityDetails()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Button",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.NotNull(result.Diagnostics?.MultipleMatches);
+        Assert.True(result.Diagnostics!.MultipleMatches!.Length > 1);
+        Assert.All(result.Diagnostics.MultipleMatches, item =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(item.ControlType));
+            Assert.NotNull(item.Name);
+        });
+    }
+
+    [Fact]
+    public async Task Find_RequireUnique_RedactsTextFieldValuesFromDiagnostics()
+    {
+        const string SensitiveValue = "private-field-value";
+        var typed = await _automationService.ObserveAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "UsernameInput",
+                ControlType = "Edit",
+            },
+            SensitiveValue,
+            clearFirst: true,
+            inputMode: "value");
+        Assert.True(typed.Success, typed.ErrorMessage);
+
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            ControlType = "Edit",
+            RequireUnique = true,
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, result.ErrorType);
+        Assert.DoesNotContain(
+            SensitiveValue,
+            JsonSerializer.Serialize(result.Diagnostics),
+            StringComparison.Ordinal);
     }
 
     #endregion

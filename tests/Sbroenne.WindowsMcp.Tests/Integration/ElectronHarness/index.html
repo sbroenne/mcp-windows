@@ -485,6 +485,9 @@
         document.getElementById('nav-settings').addEventListener('click', () => updateStatus('Navigated to Settings'));
 
         // Form buttons
+        document.getElementById('username').addEventListener('input', (e) => {
+            updateStatus(`Username input observed: ${e.target.value}`);
+        });
         document.getElementById('submit-btn').addEventListener('click', () => {
             const username = document.getElementById('username').value;
             const email = document.getElementById('email').value;

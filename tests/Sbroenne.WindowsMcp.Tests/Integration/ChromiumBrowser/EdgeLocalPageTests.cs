@@ -108,7 +108,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
 
         const string expectedText = "Lambert local query";
 
-        var typeResult = await harness.AutomationService.FindAndTypeAsync(
+        var typeResult = await harness.AutomationService.ObserveAndTypeAsync(
             CreateLocalPageQuery(session.WindowHandleString, SearchInputName, "Edit"),
             expectedText,
             clearFirst: true);
@@ -132,7 +132,7 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
         using var harness = new ChromiumAutomationHarness();
 
-        var clickResult = await harness.AutomationService.FindAndClickAsync(
+        var clickResult = await harness.AutomationService.ObserveAndClickAsync(
             CreateLocalPageQuery(session.WindowHandleString, SignInButtonName, "Button"));
 
         Assert.True(clickResult.Success, $"Click failed: {clickResult.ErrorMessage}");
@@ -146,7 +146,12 @@ public sealed class ChromiumLocalPageTests : IClassFixture<ChromiumReadOnlySessi
         var readResult = await harness.AutomationService.GetTextAsync(focusMessage.Id, session.WindowHandleString, includeChildren: false);
 
         Assert.True(readResult.Success, $"Read failed: {readResult.ErrorMessage}");
-        Assert.Equal(FocusedButtonMessage, readResult.Text);
+        var diagnostic = readResult.Text == FocusedButtonMessage
+            ? string.Empty
+            : await harness.DescribeObservedElementAsync(focusMessage.Id);
+        Assert.True(readResult.Text == FocusedButtonMessage,
+            $"Expected '{FocusedButtonMessage}', read '{readResult.Text}'. " +
+            $"Discovery name='{focusMessage.Name}', window={session.WindowHandleString}. {diagnostic}");
     }
 
     [SkippableTheory]

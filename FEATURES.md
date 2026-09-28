@@ -84,6 +84,7 @@ LLM tests are intentionally manual-only and never run as part of PR, CI, or rele
 
 - Edge, Chrome, and other Chromium apps are auto-detected and searched with the deeper Chromium strategy.
 - Launch with `app(programPath='msedge.exe', arguments='https://example.com')` or find an existing browser window first.
+- Inspect `launchStatus` and `window`/`windows` before handle-based calls. If the intended handle is missing or ambiguous, inspect candidates or rediscover with `window_management`; stop handle-based steps until the target is identified. Verify the intended page before acting.
 - Page links, buttons, and form fields usually surface visible text or ARIA labels as the UIA `name`, so start with `ui_find`, `ui_click`, and `ui_type`.
 - For authenticated or SSO-only sites, prefer reusing an already-open signed-in Edge/Chrome window first. A Chromium launcher helper exiting immediately is often normal existing-session behavior, so check the browser window before retrying the launch.
 - Keep discovery compact: `screenshot_control` already returns annotated element metadata without image bytes unless you opt in.
@@ -135,7 +136,7 @@ Every tool listed above is available through **two equal entry points that share
 
 ## � App (`app`)
 
-Launch applications and get their window handles for subsequent operations.
+Launch applications and observe process/window status. A selected window handle is optional.
 
 ### Parameters
 
@@ -149,15 +150,48 @@ Launch applications and get their window handles for subsequent operations.
 ### Capabilities
 
 - Launch applications by name or full path
-- Automatic window detection after launch
-- Returns window handle for use with other tools
+- Observe visible windows belonging to the launched process or a matching pre-launch instance
+- Return a selected window only when uniquely identified; otherwise inspect candidates or rediscover the target
 - Configurable startup parameters
+
+### Launch observations (MCP and CLI)
+
+`app` and `wincli app` report `launchStatus` separately from requested content:
+
+| Status | Meaning |
+|--------|---------|
+| `started` | The process started; no window was observed within the wait, or waiting was disabled. |
+| `windowObserved` | A visible window belongs to the launched process. |
+| `possibleHandoff` | The launcher exited zero and a pre-launch instance of the same executable still has visible windows. |
+| `exitedWithoutWindow` | The launcher exited zero but no window or matching pre-launch instance could be established; the call fails without claiming a handoff. |
+
+A possible handoff is not confirmation that a URL/document was delivered or loaded.
+Native executable image paths and process creation times establish the existing instance,
+not window titles or executable basenames. The retained process handle identifies even
+an already-exited launcher; bare names still use Windows' own executable lookup.
+Launch observations include visible untitled windows; ordinary window listings retain
+their existing filtering, while explicit handle operations can inspect those windows.
+If image identity cannot be read, or a Store launcher redirects to a different executable,
+the relationship remains unverified rather than being inferred from a title or requested path.
+Nonzero exits observed during the wait fail even when another instance is open.
+Multiple matching windows are listed without selecting an arbitrary `window`.
+
+No launch status guarantees foreground focus, input readiness, or requested content.
+If the handle is missing or ambiguous, use `window_management` to inspect candidates or
+rediscover the target; do not call handle-based tools until the intended handle is identified.
+Then inspect the intended content with `ui_read` / `ui_wait` before acting; activate it explicitly
+with `window_management` when needed. A running process without a window can still exit later;
+`started` is an observation, not a guarantee of future success.
 
 ### Example
 
 ```
-app(programPath='notepad.exe') → handle='123456'
-ui_type(windowHandle='123456', text='Hello World')
+app(programPath='notepad.exe')
+→ Example only: { "success": true, "launchStatus": "windowObserved", "window": { "handle": "123456", ... } }
+# Continue only after identifying the intended handle; a launch may omit it.
+ui_find(windowHandle='123456', controlType='Edit')
+# Select the intended input's observed ID and verify the document before typing.
+ui_type(windowHandle='123456', elementId='<discovered-input-id>', text='Hello World')
 ```
 
 ---
@@ -189,6 +223,12 @@ Find and discover UI elements by name, type, or automation ID.
 - Returns element IDs for use with other ui_* tools
 - Electron app support (VS Code, Teams, Slack)
 
+Substring, regex, and depth-aware searches check at most 2,000 candidates. If the
+scan limit leaves candidates unchecked, `search_incomplete` is returned instead
+of claiming the target is absent or unique. Narrow the search using an exact
+name, `automationId`, `controlType`, or `className`, or a `parentElementId` from
+the same MCP session. A longer timeout does not increase this limit.
+
 ---
 
 ## 🖱️ UI Click (`ui_click`)
@@ -200,14 +240,10 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
-| `name` / `nameContains` | Element name/partial match | No* |
-| `namePattern` | Regex pattern for element name | No* |
-| `automationId` | Automation ID | No* |
-| `controlType` | Control type filter | No |
-| `foundIndex` | Click the Nth match (1-based) | No |
+| `elementId` | Opaque ID from `ui_find` or `ui_snapshot` | Yes |
 | `doubleClick` | Double-click instead of single-click | No |
 
-*Selectors are optional; without one, the first actionable match in the target window is used.
+Selectors are not accepted. Discover the target first; stale IDs fail without retargeting.
 
 ### Capabilities
 
@@ -215,7 +251,9 @@ Click buttons, tabs, checkboxes, and other interactive elements.
 - Toggle checkboxes and toggle buttons
 - Handles various control patterns automatically
 - Falls back to coordinate-based click if pattern fails
-- `doubleClick=true` double-clicks an element by name/id - no coordinates needed for list/grid items that open on double-click. UI Automation has no double-click pattern, so this is always a physical double-click at the element's clickable point.
+- Validates the observed identity, target window, visibility, and enabled state before acting
+- Discover duplicate labels using `ui_find(scope='active_dialog', requireUnique=true)`
+- `doubleClick=true` double-clicks an element by ID. UI Automation has no double-click pattern, so this is physical input at the validated element's clickable point.
 
 ---
 
@@ -229,11 +267,9 @@ Type text into edit controls and text fields.
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
 | `text` | Text to type | Yes |
-| `name` / `nameContains` | Element name/partial match | No* |
-| `namePattern` | Regex pattern for element name | No* |
-| `automationId` | Automation ID | No* |
-| `controlType` | Control type (default: Edit) | No |
+| `elementId` | Opaque ID of the discovered input | Yes |
 | `clearFirst` | Clear existing text before typing | No (default: false) |
+| `inputMode` | `auto`, `keyboard`, or `value` | No (default: auto) |
 
 ### Capabilities
 
@@ -241,6 +277,9 @@ Type text into edit controls and text fields.
 - Clear existing content before typing with `clearFirst=true`
 - Append text to existing content
 - Unicode support for any language
+- `auto` uses normal focus and keyboard input for Chromium/Electron so React-style input handlers observe the change
+- `keyboard` forces the normal focus/key event path; `value` forces UIA ValuePattern
+- The tool verifies the requested value became observable and fails instead of reporting an unobserved change
 
 ---
 
@@ -253,9 +292,7 @@ Read text from elements using UI Automation or OCR.
 | Parameter | Description | Required |
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
-| `name` / `nameContains` | Element name/partial match | No |
-| `automationId` | Automation ID | No |
-| `controlType` | Control type filter | No |
+| `elementId` | Opaque ID of the discovered element; omit only for an explicit whole-window read | For element reads |
 | `includeChildren` | Include child element text | No (default: false) |
 | `language` | OCR language code (e.g., 'en-US') | No |
 | `format` | `raw` (default) or `article` for clean web-page text | No |
@@ -263,9 +300,14 @@ Read text from elements using UI Automation or OCR.
 ### Capabilities
 
 - Extract text from any UI element
-- Automatic OCR fallback for custom-rendered text
+- Automatic whole-window OCR fallback only for explicit window reads
+  with empty UIA text or a provider/extraction failure. Invalid targets and
+  access failures remain errors; malformed window handles never select the foreground window.
 - Windows.Media.Ocr for local text recognition
 - Language support for international text
+- Element-ID failures return errors, not unrelated window text.
+  Omit `elementId` with an explicit `windowHandle` to intentionally read the window.
+  Element reads never widen to whole-window OCR, even when UIA returns empty text.
 - **Article mode (`format: "article"`)** for web pages in Edge/Chrome: returns the main
   content only — navigation chrome, breadcrumbs, and "in this article" rails are dropped,
   inline link URLs are stripped (visible link text is kept), and headings/lists are emitted
@@ -284,18 +326,14 @@ WPF `DataGrid`, and Win32 `ListView` (Details view) all return clean row/column 
 
 | Parameter | Description | Required |
 |-----------|-------------|----------|
-| `windowHandle` | Target window handle | No |
-| `name` / `nameContains` / `namePattern` | Locate the grid by name | No |
-| `automationId` | Locate the grid by automation id | No |
-| `controlType` / `className` | Additional selectors | No |
-| `elementId` | Grid element id from a prior snapshot/find | No |
-| `foundIndex` | Nth match when selectors are ambiguous (1-based) | No (default: 1) |
+| `windowHandle` | Target window handle | Yes |
+| `elementId` | Opaque ID of the grid itself from discovery | Yes |
 | `maxRows` | Cap rows returned (protects token budget) | No (default: 200) |
 | `maxColumns` | Cap columns returned | No (default: 50) |
 | `includeDiagnostics` | Include timing/framework diagnostics | No (default: false) |
 
-If no selector matches an element that exposes the Grid pattern, the first grid-capable descendant
-of the target (or window root) is used automatically.
+The target itself must expose Grid pattern. A stale ID or a non-grid target fails;
+the tool never searches for a different grid elsewhere in the window.
 
 ### Response shape
 
@@ -396,10 +434,7 @@ Select a value in a combo box, drop-down, list box, or tab control using the pro
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle | Yes |
 | `value` | Visible text of the option to select | Yes |
-| `name` / `nameContains` | Name/partial match of the selection control | No |
-| `automationId` | Automation ID of the control | No |
-| `controlType` | Control type (ComboBox, List, Tab) | No |
-| `foundIndex` | Nth matching control (1-based) | No (default: 1) |
+| `elementId` | Opaque ID of the containing selection control, not a hidden option | Yes |
 
 ### Capabilities
 
@@ -422,15 +457,19 @@ Wait until a UI condition is met before continuing - no blind sleeps or screensh
 | `name` / `nameContains` | Selector for appear/disappear | No |
 | `automationId` | Automation ID selector | No |
 | `controlType` | Control type selector | No |
-| `elementId` | Element id for `mode='state'` | No |
-| `desiredState` | Target state for `mode='state'` (enabled, disabled, on, off, indeterminate, visible, offscreen) | No |
+| `elementId` | Element id for `mode='state'`; rejected for appear/disappear | For state |
+| `desiredState` | Target state for `mode='state'` (enabled, disabled, on, off, indeterminate, visible, offscreen) | For state |
 | `timeoutMs` | Max wait in milliseconds | No (default: 5000) |
+| `scope` | `window` (default) or `active_dialog` | No |
+| `parentElementId` | Restrict appear/disappear to a known subtree | No |
+| `requireUnique` | Require exactly one matching element for appear or disappear | No |
 
 ### Capabilities
 
 - Wait for dialogs/controls to appear before acting
 - Wait for spinners/progress dialogs to disappear
 - Wait for a specific element to become enabled/visible/toggled
+- State mode rejects selectors; appear/disappear reject `elementId` and `desiredState`
 
 ---
 
@@ -453,11 +492,11 @@ Run a sequence of UI automation steps against a window in a single call. Built f
 Each step is a JSON object with an `action` plus the fields that action needs:
 
 - `find` - selectors; resolves an element and exposes its id to the next step as `$prev`
-- `click` - selectors or `elementId`, optional `doubleClick`
-- `type` - selectors or `elementId`, plus `text` (optional `clearFirst`)
-- `select` - selectors, plus `value` (visible option text)
+- `click` - required `elementId`, optional `doubleClick`
+- `type` - required `elementId`, plus `text` (optional `clearFirst`, `inputMode`)
+- `select` - required selection-control `elementId`, plus `value` (visible option text)
 - `wait` - `mode` (`appear`/`disappear`/`state`), selectors or `elementId`+`desiredState`, optional `timeoutMs`
-- `read` - selectors or `elementId` (or neither, to read the whole window), optional `includeChildren`
+- `read` - `elementId` (omit for an explicit whole-window read), optional `includeChildren`
 - `snapshot` - capture the window element tree (optional `maxDepth`)
 - `key` - `key` (e.g. `enter`, `tab`, `f5`) with optional `modifiers` (`ctrl,shift,alt,win`) and `repeat`
 - `mouse` - `mouseAction` (`move`/`click`/`double_click`/`right_click`/`middle_click`/`drag`/`polyline`/`scroll`/`get_position`) plus `x`,`y` (and `endX`,`endY` for drag), optional `button`, `modifiers`, `direction`, `amount`
@@ -472,7 +511,8 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 `polyline` presses once at the first point, traces every vertex, and releases at the last - a single continuous stroke. This is better than N segment-drags, which lift the pen at every vertex, and costs one round-trip instead of N.
 
 ```json
-[{"action":"click","name":"Pencil"},
+[{"action":"find","name":"Pencil","requireUnique":true},
+ {"action":"click","elementId":"$prev"},
  {"action":"polyline","points":[[300,200],[500,200],[500,400],[300,200]]},
  {"action":"mouse","mouseAction":"drag","x":600,"y":200,"endX":700,"endY":400}]
 ```
@@ -481,7 +521,11 @@ The target window is activated before each mouse step, so a batch cannot fail wi
 
 - One round-trip for multi-step workflows (fill username + password + submit) and for multi-stroke drawing
 - Per-step results: `{ index, action, success, summary, error?, elementId?, text? }`
-- Chain steps by referencing the prior step's element with `elementId: "$prev"`
+- Chain steps with `elementId: "$prev"` only after an unambiguous immediately preceding result
+- Saved macros discover fresh controls on every replay and never persist action IDs
+- Add a `wait` step immediately after an action to verify consequences such as a button enabling,
+  a dialog closing, or confirmation text appearing
+- Selector steps accept `scope`, `parentElementId`, `requireUnique`, `visibleOnly`, and `enabledOnly`
 - `stopOnError=false` runs every step and reports each outcome
 - Mouse steps delegate to the same engine as `mouse_control`, so monitor resolution, foreground guards, secure-desktop and elevation checks behave identically
 
@@ -512,6 +556,17 @@ Save files via Save As dialog. Handles the entire save workflow: triggers save, 
 - Handle overwrite confirmation dialogs
 - Works with Office apps, Notepad, and more
 
+Save requires the target window and filename field to have focus before sending input.
+Dialog discovery checks ownership, title, and a recognized filename field; a Save-like title alone is insufficient.
+Native window ownership is used even when UI Automation nests the dialog or does not mark it as modal.
+The current filename field must contain the exact full path before Save is pressed, even if the dialog replaced that field after typing.
+When a path is supplied, success requires
+observing a new file or a change in its size, creation time, or last-write time after the shortcut.
+An unchanged existing file is not proof of a successful save; if no change is observed, the
+operation reports an unverified outcome. Error and overwrite dialogs are restricted to the
+requested Save dialog, and cleanup input is guarded against a change of foreground window.
+Do not automatically repeat it: the original shortcut may still be processed by the application.
+
 ---
 
 ## 📂 File Open (`file_open`)
@@ -525,11 +580,15 @@ Open an existing file via the standard Windows Open dialog — the counterpart t
 | `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
 | `filePath` | Absolute path of an existing file to open (forward/back slashes both work) | Yes |
 | `includeDiagnostics` | Include timing/diagnostic details in the response (default: false) | No |
+| `triggerMode` | `shortcut` sends Ctrl+O; `wait` waits for a dialog opened by a prior click | No (default: shortcut) |
+| `timeoutMs` | Maximum wait for the native dialog | No (default: 5000) |
 
 ### Capabilities
 
 - Trigger Ctrl+O to open
 - Auto-detect Open dialog appearance (shares the Save-As dialog engine)
+- `triggerMode='wait'` supports browser-to-native-dialog handoff after `ui_click`
+- Dialog selection prefers the enabled popup owned by the requested app and reports observed candidate windows on timeout
 - Fill in the file path and click Open
 - Validates the file exists up front for deterministic behavior
 
@@ -634,7 +693,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 | `modifiers` | `ctrl`, `shift`, `alt` (comma-separated) | No |
 | `direction` / `amount` | Scroll direction and click count | For `scroll` |
 | `target` / `monitorIndex` | Monitor targeting | With coordinates |
-| `windowHandle` | Window-relative coordinate mode | No |
+| `windowHandle` | Window-relative coordinate mode and foreground guard | No |
 | `expectedWindowTitle` / `expectedProcessName` | Abort unless the foreground window matches | No |
 
 ### Capabilities
@@ -647,7 +706,7 @@ Control mouse input on Windows with full multi-monitor and DPI awareness.
 - Multi-monitor support with DPI awareness
 - Easy targeting with `target='primary_screen'` or `'secondary_screen'`
 - Modifier key support (Ctrl+click, Shift+click, etc.)
-- Wrong window detection with `expectedWindowTitle` / `expectedProcessName`
+- Wrong window detection with `windowHandle`, `expectedWindowTitle`, or `expectedProcessName`
 
 ---
 

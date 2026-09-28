@@ -21,6 +21,13 @@ public sealed partial class UIAutomationService
                 UIA.IUIAutomationElement? rootElement;
                 if (!string.IsNullOrEmpty(parentElementId))
                 {
+                    if (!ReferenceMatchesWindow(parentElementId, windowHandle))
+                    {
+                        return UIAutomationResult.CreateFailure(
+                            "get_tree", UIAutomationErrorType.InvalidParameter,
+                            "The parent reference does not belong to the requested window. Rediscover within that window.");
+                    }
+
                     rootElement = ElementIdGenerator.ResolveToAutomationElement(parentElementId);
                     if (rootElement == null)
                     {
@@ -201,44 +208,23 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
-        var delay = 50;
-        const int MaxDelay = 500;
-
         // Subscribe before the first probe, so a change that lands between probing and sleeping
         // still wakes us instead of being lost.
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            while (stopwatch.ElapsedMilliseconds < timeoutMs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-                if (result.Success)
-                {
-                    return result with { Action = "wait_for" };
-                }
-
-                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
-                delay = Math.Min(delay * 2, MaxDelay);
-            }
-
-            stopwatch.Stop();
-
-            return UIAutomationResult.CreateFailure(
-                "wait_for",
-                UIAutomationErrorType.Timeout,
-                $"Element not found within {timeoutMs}ms timeout.",
-                new UIAutomationDiagnostics
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    Query = query,
-                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-                });
+            return await WaitForFindResultAsync(
+                query,
+                timeoutMs,
+                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
+                () => stopwatch.ElapsedMilliseconds,
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            stopwatch.Stop();
             if (signal is not null)
             {
                 LastWaitEventCount = signal.EventCount;
@@ -253,50 +239,21 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
-        var delay = 50;
-        const int MaxDelay = 500;
-
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
         try
         {
-            while (stopwatch.ElapsedMilliseconds < timeoutMs)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var result = await FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken);
-                if (!result.Success || (result.Items?.Length ?? 0) == 0)
-                {
-                    // Element no longer found - success!
-                    stopwatch.Stop();
-                    return UIAutomationResult.CreateSuccess(
-                        "wait_for_disappear",
-                        new UIAutomationDiagnostics
-                        {
-                            DurationMs = stopwatch.ElapsedMilliseconds,
-                            Query = query
-                        });
-                }
-
-                await DelayOrUntilStructureChangedAsync(signal, delay, cancellationToken).ConfigureAwait(false);
-                delay = Math.Min(delay * 2, MaxDelay);
-            }
-
-            stopwatch.Stop();
-
-            return UIAutomationResult.CreateFailure(
-                "wait_for_disappear",
-                UIAutomationErrorType.Timeout,
-                $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
-                new UIAutomationDiagnostics
-                {
-                    DurationMs = stopwatch.ElapsedMilliseconds,
-                    Query = query,
-                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
-                });
+            return await WaitForDisappearResultAsync(
+                query,
+                timeoutMs,
+                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
+                () => stopwatch.ElapsedMilliseconds,
+                cancellationToken).ConfigureAwait(false);
         }
         finally
         {
+            stopwatch.Stop();
             if (signal is not null)
             {
                 LastWaitEventCount = signal.EventCount;
@@ -304,6 +261,14 @@ public sealed partial class UIAutomationService
             }
         }
     }
+
+    private static bool IsRetryableWaitAbsence(string? errorType) =>
+        errorType is UIAutomationErrorType.ElementNotFound or UIAutomationErrorType.WindowNotFound;
+
+    private static bool IsSatisfiedDisappearAbsence(string? errorType) =>
+        errorType is UIAutomationErrorType.ElementNotFound or
+            UIAutomationErrorType.ElementStale or
+            UIAutomationErrorType.WindowNotFound;
 
     /// <inheritdoc/>
     public async Task<UIAutomationResult> WaitForElementStateAsync(string elementId, string desiredState, int timeoutMs, CancellationToken cancellationToken = default)

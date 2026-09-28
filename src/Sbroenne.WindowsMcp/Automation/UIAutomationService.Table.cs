@@ -23,8 +23,8 @@ public sealed partial class UIAutomationService
     /// <summary>
     /// Extracts structured tabular data from a grid/table/list control via the UIA Grid pattern.
     /// </summary>
-    /// <param name="elementId">Stable element id of the grid (or a container holding it). When null, the window root is used.</param>
-    /// <param name="windowHandle">Window handle used to resolve the root when <paramref name="elementId"/> is null.</param>
+    /// <param name="elementId">Required opaque ID of the grid itself.</param>
+    /// <param name="windowHandle">Explicit target window, validated against the observed grid.</param>
     /// <param name="maxRows">Maximum number of rows to read (&lt;= 0 uses the default).</param>
     /// <param name="maxColumns">Maximum number of columns to read (&lt;= 0 uses the default).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -35,44 +35,41 @@ public sealed partial class UIAutomationService
         var rowCap = maxRows <= 0 ? DefaultMaxTableRows : maxRows;
         var columnCap = maxColumns <= 0 ? DefaultMaxTableColumns : maxColumns;
 
+        if (string.IsNullOrWhiteSpace(elementId))
+        {
+            return UIAutomationResult.CreateFailure("read_table", UIAutomationErrorType.InvalidParameter,
+                "elementId is required. Discover the grid before reading it.");
+        }
+
         try
         {
             return await _staThread.ExecuteAsync(() =>
             {
-                UIA.IUIAutomationElement? targetElement;
-
-                if (!string.IsNullOrEmpty(elementId))
+                var targetElement = ElementIdGenerator.ResolveToAutomationElement(elementId);
+                if (targetElement == null)
                 {
-                    targetElement = ElementIdGenerator.ResolveToAutomationElement(elementId);
-                    if (targetElement == null)
-                    {
-                        return UIAutomationResult.CreateFailure(
-                            "read_table",
-                            UIAutomationErrorType.ElementNotFound,
-                            $"Element with ID '{elementId}' not found or stale.",
-                            CreateDiagnostics(stopwatch));
-                    }
-                }
-                else
-                {
-                    targetElement = GetRootElement(windowHandle);
-                    if (targetElement == null)
-                    {
-                        return UIAutomationResult.CreateFailure(
-                            "read_table",
-                            UIAutomationErrorType.WindowNotFound,
-                            "No window found. Provide a valid windowHandle or an elementId.",
-                            CreateDiagnostics(stopwatch));
-                    }
+                    return UIAutomationResult.CreateFailure(
+                        "read_table",
+                        UIAutomationErrorType.ElementStale,
+                        $"Element with ID '{elementId}' not found or stale.",
+                        CreateDiagnostics(stopwatch));
                 }
 
-                var gridElement = FindGridElement(targetElement);
+                if (!string.IsNullOrWhiteSpace(windowHandle) &&
+                    (!nint.TryParse(windowHandle, out var requestedHandle) || requestedHandle == nint.Zero ||
+                    !IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(targetElement), requestedHandle)))
+                {
+                    return UIAutomationResult.CreateFailure("read_table", UIAutomationErrorType.WrongTargetWindow,
+                        "The resolved grid does not belong to the requested window.");
+                }
+
+                var gridElement = SupportsGridPattern(targetElement) ? targetElement : null;
                 if (gridElement == null)
                 {
                     return UIAutomationResult.CreateFailure(
                         "read_table",
                         UIAutomationErrorType.PatternNotSupported,
-                        "No grid/table control was found on the target. The element and its descendants do not expose the UIA Grid pattern.",
+                        "The observed target does not expose the UIA Grid pattern. No other grid was searched.",
                         CreateDiagnostics(stopwatch),
                         "Point ui_read_table at a data grid, table, or details/report list-view. Use ui_snapshot to inspect the tree, or ui_read for plain text.");
                 }
@@ -151,54 +148,6 @@ public sealed partial class UIAutomationService
                 $"An error occurred: {ex.Message}",
                 CreateDiagnostics(stopwatch));
         }
-    }
-
-    /// <summary>
-    /// Returns the target element if it exposes the Grid pattern, otherwise the first descendant
-    /// (control view) that does. Null when no grid-capable element exists in the subtree.
-    /// </summary>
-    private UIA.IUIAutomationElement? FindGridElement(UIA.IUIAutomationElement root)
-    {
-        if (SupportsGridPattern(root))
-        {
-            return root;
-        }
-
-        UIA.IUIAutomationElementArray? descendants;
-        try
-        {
-            descendants = root.FindAll(UIA.TreeScope.TreeScope_Descendants, Uia.TrueCondition);
-        }
-        catch (COMException)
-        {
-            return null;
-        }
-
-        if (descendants == null)
-        {
-            return null;
-        }
-
-        var count = Math.Min(descendants.Length, MaxElementsToScan);
-        for (var i = 0; i < count; i++)
-        {
-            UIA.IUIAutomationElement candidate;
-            try
-            {
-                candidate = descendants.GetElement(i);
-            }
-            catch (COMException)
-            {
-                continue;
-            }
-
-            if (SupportsGridPattern(candidate))
-            {
-                return candidate;
-            }
-        }
-
-        return null;
     }
 
     private static bool SupportsGridPattern(UIA.IUIAutomationElement element)

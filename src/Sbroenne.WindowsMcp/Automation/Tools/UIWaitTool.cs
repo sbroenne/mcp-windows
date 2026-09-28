@@ -38,6 +38,10 @@ public static partial class UIWaitTool
     /// <param name="controlType">Control type (Button, Edit, Window, etc.)</param>
     /// <param name="automationId">AutomationId for precise matching.</param>
     /// <param name="className">Element class name.</param>
+    /// <param name="parentElementId">Limit appear/disappear search to a known parent element.</param>
+    /// <param name="scope">Search root: window (default) or active_dialog.</param>
+    /// <param name="requireUnique">For appear or disappear, fail if more than one element matches.</param>
+    /// <param name="enabledOnly">Exclude disabled elements when true.</param>
     /// <param name="timeoutMs">Maximum time to wait in milliseconds (default: 5000).</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -54,6 +58,10 @@ public static partial class UIWaitTool
         [DefaultValue(null)] string? controlType,
         [DefaultValue(null)] string? automationId,
         [DefaultValue(null)] string? className,
+        [DefaultValue(null)] string? parentElementId,
+        [DefaultValue("window")] string? scope,
+        [DefaultValue(false)] bool requireUnique,
+        [DefaultValue(null)] bool? enabledOnly,
         [DefaultValue(5000)] int timeoutMs,
         [DefaultValue(false)] bool includeDiagnostics,
         CancellationToken cancellationToken)
@@ -72,6 +80,13 @@ public static partial class UIWaitTool
 
             if (normalizedMode == "state")
             {
+                if (name is not null || nameContains is not null || namePattern is not null ||
+                    controlType is not null || automationId is not null || className is not null ||
+                    parentElementId is not null || requireUnique || enabledOnly is not null ||
+                    (scope is not null && scope != "window"))
+                {
+                    return WindowsToolsBase.FailResult("State waits accept elementId and desiredState, not selectors.");
+                }
                 if (string.IsNullOrWhiteSpace(elementId))
                 {
                     return WindowsToolsBase.FailResult(
@@ -84,6 +99,11 @@ public static partial class UIWaitTool
                         "mode='state' requires desiredState. Valid values: enabled, disabled, on, off, indeterminate, visible, offscreen.");
                 }
 
+                var targetError = await automationService.ValidateElementTargetAsync(elementId, windowHandle, cancellationToken);
+                if (targetError is not null)
+                {
+                    return WindowsToolsBase.ToCallToolResult(targetError, includeDiagnostics);
+                }
                 var stateResult = await automationService.WaitForElementStateAsync(elementId, desiredState, timeoutMs, cancellationToken);
                 return WindowsToolsBase.ToCallToolResult(stateResult, includeDiagnostics);
             }
@@ -92,6 +112,11 @@ public static partial class UIWaitTool
             {
                 return WindowsToolsBase.FailResult(
                     $"Invalid mode '{mode}'. Valid values: appear, disappear, state.");
+            }
+
+            if (elementId is not null || desiredState is not null)
+            {
+                return WindowsToolsBase.FailResult("Appear/disappear waits accept selectors, not elementId or desiredState.");
             }
 
             var hasSelector = !string.IsNullOrEmpty(name) || !string.IsNullOrEmpty(nameContains) ||
@@ -111,7 +136,11 @@ public static partial class UIWaitTool
                 NamePattern = namePattern,
                 ControlType = controlType,
                 AutomationId = automationId,
-                ClassName = className
+                ClassName = className,
+                ParentElementId = parentElementId,
+                Scope = scope,
+                RequireUnique = requireUnique,
+                EnabledOnly = enabledOnly
             };
 
             var result = normalizedMode == "appear"
@@ -120,9 +149,10 @@ public static partial class UIWaitTool
 
             return WindowsToolsBase.ToCallToolResult(result, includeDiagnostics);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return WindowsToolsBase.ErrorCallToolResult(actionName, ex);
         }
     }
+
 }

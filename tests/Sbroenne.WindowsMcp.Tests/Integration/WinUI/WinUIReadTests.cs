@@ -56,7 +56,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_StatusLabel_Succeeds()
     {
         // Navigate to Home page first
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavHome",
@@ -80,7 +80,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_ButtonClicksDisplay_Succeeds()
     {
         // Navigate to Home
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavHome",
@@ -104,7 +104,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_SliderValueDisplay_Succeeds()
     {
         // Navigate to Home
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavHome",
@@ -128,7 +128,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_CheckboxStateDisplay_Succeeds()
     {
         // Navigate to Home
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavHome",
@@ -152,7 +152,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_VolumeValueText_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -176,7 +176,7 @@ public sealed class WinUIReadTests : IDisposable
     public async Task Find_CharacterCountText_OnEditorPage()
     {
         // Navigate to Editor page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavEditor",

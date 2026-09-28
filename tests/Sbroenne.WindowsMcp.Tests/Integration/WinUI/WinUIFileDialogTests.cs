@@ -58,7 +58,7 @@ public sealed class WinUIFileDialogTests : IDisposable
     public async Task ComboBox_CanBeFound_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -81,7 +81,7 @@ public sealed class WinUIFileDialogTests : IDisposable
     public async Task Slider_CanBeFound_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -104,7 +104,7 @@ public sealed class WinUIFileDialogTests : IDisposable
     public async Task Slider_VolumeDisplay_Exists()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",
@@ -127,7 +127,7 @@ public sealed class WinUIFileDialogTests : IDisposable
     public async Task ListView_CanBeFound_OnFormControlsPage()
     {
         // Navigate to Form Controls page
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "NavFormControls",

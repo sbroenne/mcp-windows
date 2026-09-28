@@ -21,7 +21,8 @@ public sealed class MacroService
     private static readonly JsonSerializerOptions StepParseOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow
     };
 
     private readonly string _rootDirectory;
@@ -41,9 +42,46 @@ public sealed class MacroService
     /// <summary>The directory macros are stored in.</summary>
     public string RootDirectory => _rootDirectory;
 
+    internal static string? ValidateReplayReferences(BatchStep[] steps)
+    {
+        var previousMayProvideId = false;
+        foreach (var step in steps)
+        {
+            if (step is null)
+            {
+                return "Every macro step must be an object; null steps are not valid.";
+            }
+            var usesPrevious = string.Equals(step.ElementId?.Trim(), "$prev", StringComparison.OrdinalIgnoreCase);
+            if ((step.ElementId is not null && !usesPrevious) || step.ParentElementId is not null)
+            {
+                return "Macros cannot persist action IDs. Discover fresh targets on each replay and use elementId='$prev'.";
+            }
+            var action = step.Action?.Trim().ToLowerInvariant();
+            var stateWait = action == "wait" && string.Equals(step.Mode?.Trim(), "state", StringComparison.OrdinalIgnoreCase);
+            if (action is "click" or "type" or "select" ||
+                stateWait)
+            {
+                if (!usesPrevious)
+                {
+                    return "Targeted macro actions require a fresh discovery step and elementId='$prev'.";
+                }
+            }
+            if (usesPrevious && !previousMayProvideId)
+            {
+                return "elementId='$prev' requires an immediately preceding step that can return an observed ID. Discover a fresh target first.";
+            }
+            var appearWait = action == "wait" && (string.IsNullOrWhiteSpace(step.Mode) ||
+                string.Equals(step.Mode.Trim(), "appear", StringComparison.OrdinalIgnoreCase));
+            previousMayProvideId = action == "find" || appearWait ||
+                (usesPrevious && (action is "click" or "type" or "select" or "read" || stateWait));
+        }
+        return null;
+    }
+
     /// <summary>
     /// Saves (or overwrites) a macro named <paramref name="name"/> from a ui_batch steps array.
     /// The steps JSON must parse to a non-empty array of batch step objects.
+    /// Previous-ID references must follow a step capable of returning an ID; ambiguity is checked during replay.
     /// </summary>
     public async Task<MacroResult> SaveAsync(string name, string stepsJson, CancellationToken cancellationToken = default)
     {
@@ -58,9 +96,17 @@ public sealed class MacroService
         }
 
         BatchStep[]? parsed;
+        JsonElement stepsElement;
         try
         {
-            parsed = JsonSerializer.Deserialize<BatchStep[]>(stepsJson, StepParseOptions);
+            using var document = JsonDocument.Parse(stepsJson);
+            var validationError = BatchStepValidation.Validate(document.RootElement);
+            if (validationError is not null)
+            {
+                return MacroResult.Failure("save", validationError);
+            }
+            parsed = document.RootElement.Deserialize<BatchStep[]>(StepParseOptions);
+            stepsElement = document.RootElement.Clone();
         }
         catch (JsonException ex)
         {
@@ -72,15 +118,10 @@ public sealed class MacroService
             return MacroResult.Failure("save", "steps must be a non-empty JSON array of step objects.");
         }
 
-        JsonElement stepsElement;
-        try
+        var referenceError = ValidateReplayReferences(parsed);
+        if (referenceError is not null)
         {
-            using var document = JsonDocument.Parse(stepsJson);
-            stepsElement = document.RootElement.Clone();
-        }
-        catch (JsonException ex)
-        {
-            return MacroResult.Failure("save", $"steps is not valid JSON: {ex.Message}.");
+            return MacroResult.Failure("save", referenceError);
         }
 
         var definition = new MacroDefinition

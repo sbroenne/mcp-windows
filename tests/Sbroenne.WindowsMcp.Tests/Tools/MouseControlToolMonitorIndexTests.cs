@@ -29,6 +29,32 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
     }
 
     [Fact]
+    public async Task ExecuteAsync_ClickWithNonForegroundWindowHandle_ReturnsGuardFailure()
+    {
+        var callResult = await MouseControlTool.ExecuteAsync(
+            action: MouseAction.Click,
+            target: null,
+            x: null,
+            y: null,
+            endX: null,
+            endY: null,
+            direction: null,
+            amount: 1,
+            modifiers: null,
+            button: null,
+            monitorIndex: null,
+            expectedWindowTitle: null,
+            expectedProcessName: null,
+            windowHandle: "999999",
+            points: null,
+            cancellationToken: CancellationToken.None);
+
+        var result = DeserializeResult(callResult);
+        Assert.False(result.Success);
+        Assert.Contains("foreground window changed", result.Error, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_ClickWithCoordinatesNoMonitorIndex_ReturnsMissingParameterError()
     {
         // Arrange
@@ -428,5 +454,3 @@ public sealed class MouseControlToolMonitorIndexTests : IClassFixture<MultiMonit
         Assert.InRange(result.FinalPosition.Y, 0, identifiedMonitor.Height - 1);
     }
 }
-
-

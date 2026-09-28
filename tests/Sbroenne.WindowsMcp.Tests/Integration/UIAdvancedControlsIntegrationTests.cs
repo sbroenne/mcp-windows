@@ -101,7 +101,7 @@ public sealed class UIAdvancedControlsIntegrationTests : IDisposable
     public async Task ListView_CanBeFound_OnListViewTab()
     {
         // Click on List View tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "List View",
@@ -124,7 +124,7 @@ public sealed class UIAdvancedControlsIntegrationTests : IDisposable
     public async Task TreeView_CanBeFound_OnTreeViewTab()
     {
         // Click on Tree View tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Tree View",
@@ -147,7 +147,7 @@ public sealed class UIAdvancedControlsIntegrationTests : IDisposable
     public async Task DataGrid_CanBeFound_OnDataGridTab()
     {
         // Click on Data Grid tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Data Grid",
@@ -170,7 +170,7 @@ public sealed class UIAdvancedControlsIntegrationTests : IDisposable
     public async Task SaveAsButton_CanBeFound_OnDialogsTab()
     {
         // Click on Dialogs tab
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             Name = "Dialogs",

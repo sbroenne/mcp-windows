@@ -71,7 +71,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         foreach (var (tabName, expectedControl) in tabNames)
         {
             // Click on the tab
-            var tabResult = await _automationService.FindAndClickAsync(new ElementQuery
+            var tabResult = await _automationService.ObserveAndClickAsync(new ElementQuery
             {
                 WindowHandle = _windowHandle,
                 Name = tabName.Replace("Tab", " ").Trim(),
@@ -79,7 +79,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
             // Note: tabs may be accessed differently, try by automation ID if name fails
             if (!tabResult.Success)
             {
-                tabResult = await _automationService.FindAndClickAsync(new ElementQuery
+                tabResult = await _automationService.ObserveAndClickAsync(new ElementQuery
                 {
                     WindowHandle = _windowHandle,
                     AutomationId = tabName,
@@ -108,7 +108,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
     public async Task Workflow_FillLoginForm_AllValuesSet()
     {
         // 1. Type username
-        var usernameResult = await _automationService.FindAndTypeAsync(
+        var usernameResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -120,7 +120,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // 2. Type password
-        var passwordResult = await _automationService.FindAndTypeAsync(
+        var passwordResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -132,7 +132,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // 3. Toggle a checkbox
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "AutosaveCheckbox",
@@ -140,7 +140,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // 4. Click submit
-        var submitResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var submitResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",
@@ -161,7 +161,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
     public async Task Workflow_SelectRadioButtons_CorrectSelectionMade()
     {
         // Click "Large" radio button
-        var clickResult = await _automationService.FindAndClickAsync(new ElementQuery
+        var clickResult = await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "LargeRadio",
@@ -173,7 +173,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         Assert.Equal("Large", _fixture.Form!.SelectedSize);
 
         // Now click "Small"
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SmallRadio",
@@ -212,7 +212,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
     public async Task Workflow_CompleteFormInteraction_AllStateCorrect()
     {
         // Step 1: Fill username
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -223,7 +223,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // Step 2: Toggle dark mode checkbox
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "DarkModeCheckbox",
@@ -231,7 +231,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // Step 3: Select "Large" size
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "LargeRadio",
@@ -239,7 +239,7 @@ public sealed class UIWorkflowIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // Step 4: Click submit
-        await _automationService.FindAndClickAsync(new ElementQuery
+        await _automationService.ObserveAndClickAsync(new ElementQuery
         {
             WindowHandle = _windowHandle,
             AutomationId = "SubmitButton",

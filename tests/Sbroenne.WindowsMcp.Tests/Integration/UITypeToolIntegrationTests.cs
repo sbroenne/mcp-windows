@@ -70,7 +70,7 @@ public sealed class UITypeToolIntegrationTests : IDisposable
         var testText = "Hello from UI Automation";
 
         // Act - Use automationId to target the specific UsernameInput textbox
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -89,39 +89,39 @@ public sealed class UITypeToolIntegrationTests : IDisposable
     }
 
     [Fact]
-    public async Task FindAndType_WithNoSelector_TypesIntoFirstTextControl()
+    public async Task Type_WithoutObservedId_DoesNotChooseFirstTextControl()
     {
-        // Arrange
-        var testText = "Fallback typing works";
+        var before = _fixture.Form?.UsernameText;
+        var result = await Sbroenne.WindowsMcp.Automation.Tools.UITypeTool.ExecuteAsync(
+            _windowHandle, "must not be typed", "", true, false, "full", false, "auto", CancellationToken.None);
+        Assert.True(result.IsError);
+        Assert.Equal(before, _fixture.Form?.UsernameText);
+    }
 
-        // Act - Rely on default Document/Edit fallback when no selector is provided
-        var typeResult = await _automationService.FindAndTypeAsync(
+    [Fact]
+    public async Task FindAndType_RequireUnique_DoesNotFallThroughAfterAmbiguousEditSearch()
+    {
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
+                RequireUnique = true,
             },
-            text: testText,
-            clearFirst: true);
+            text: "must-not-be-typed",
+            clearFirst: true,
+            inputMode: "value");
 
-        // Assert
-        Assert.True(typeResult.Success, $"FindAndType failed: {typeResult.ErrorMessage}");
-        Assert.NotNull(typeResult.Items);
-        var typedElementId = typeResult.Items![0].Id;
-
-        var getTextResult = await _automationService.GetTextAsync(
-            elementId: typedElementId,
-            windowHandle: _windowHandle,
-            includeChildren: false);
-
-        Assert.True(getTextResult.Success, $"GetText failed: {getTextResult.ErrorMessage}");
-        Assert.Equal(testText, getTextResult.Text);
+        Assert.False(typeResult.Success);
+        Assert.Equal(UIAutomationErrorType.MultipleMatches, typeResult.ErrorType);
+        Assert.Equal(string.Empty, _fixture.Form?.UsernameText);
+        Assert.Equal(string.Empty, _fixture.Form?.PasswordText);
     }
 
     [Fact]
     public async Task FindAndType_ClearFirst_ReplacesExistingText()
     {
         // Arrange - type initial text
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -133,7 +133,7 @@ public sealed class UITypeToolIntegrationTests : IDisposable
         await Task.Delay(50);
 
         // Act - type new text with clearFirst=true
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -154,7 +154,7 @@ public sealed class UITypeToolIntegrationTests : IDisposable
     public async Task FindAndType_AppendText_TypesText()
     {
         // Arrange - type initial text
-        await _automationService.FindAndTypeAsync(
+        await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,
@@ -168,7 +168,7 @@ public sealed class UITypeToolIntegrationTests : IDisposable
         // Act - type more text with clearFirst=false
         // Note: clearFirst=false sends text to focused element without clearing
         // The exact behavior depends on the element's cursor position
-        var typeResult = await _automationService.FindAndTypeAsync(
+        var typeResult = await _automationService.ObserveAndTypeAsync(
             new ElementQuery
             {
                 WindowHandle = _windowHandle,

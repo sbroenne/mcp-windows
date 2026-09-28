@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Sbroenne.WindowsMcp.Native;
 using UIA = Interop.UIAutomationClient;
 
 namespace Sbroenne.WindowsMcp.Automation;
@@ -25,6 +26,21 @@ public sealed partial class UIAutomationService
     {
         var stopwatch = Stopwatch.StartNew();
 
+        if (windowHandle is not null &&
+            (!WindowHandleParser.TryParse(windowHandle, out var hwnd) || hwnd == nint.Zero))
+        {
+            return UIAutomationResult.CreateFailure(
+                "get_text", UIAutomationErrorType.InvalidParameter,
+                "windowHandle must be a nonzero decimal window handle.", CreateDiagnostics(stopwatch));
+        }
+
+        if (elementId is not null && string.IsNullOrWhiteSpace(elementId))
+        {
+            return UIAutomationResult.CreateFailure(
+                "get_text", UIAutomationErrorType.InvalidParameter,
+                "elementId must not be empty. Omit it only for a whole-window read.", CreateDiagnostics(stopwatch));
+        }
+
         try
         {
             return await _staThread.ExecuteAsync(() =>
@@ -42,6 +58,13 @@ public sealed partial class UIAutomationService
                             $"Element with ID '{elementId}' not found.",
                             CreateDiagnostics(stopwatch));
                     }
+                    if (!string.IsNullOrWhiteSpace(windowHandle) &&
+                        (!nint.TryParse(windowHandle, out var requestedHandle) || requestedHandle == nint.Zero ||
+                        !IsRequestedWindowHandleCompatible(ResolveElementWindowHandle(targetElement), requestedHandle)))
+                    {
+                        return UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.WrongTargetWindow,
+                            "The resolved element does not belong to the requested window.");
+                    }
                 }
                 else
                 {
@@ -51,7 +74,7 @@ public sealed partial class UIAutomationService
                         return UIAutomationResult.CreateFailure(
                             "get_text",
                             UIAutomationErrorType.WindowNotFound,
-                            "No foreground window found.",
+                            windowHandle is null ? "No foreground window found." : "The requested window was not found.",
                             CreateDiagnostics(stopwatch));
                     }
                 }
