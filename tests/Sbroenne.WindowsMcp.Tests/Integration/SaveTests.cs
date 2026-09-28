@@ -132,6 +132,113 @@ public sealed class SaveTests : IDisposable
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task Save_LeavesOwnedPromptsOpenWithoutAnswering(bool overwrite)
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        System.Windows.Forms.Form? dialog = null;
+        System.Windows.Forms.Form? prompt = null;
+        nint dialogHandle = nint.Zero;
+        nint promptHandle = nint.Zero;
+        var submissions = 0;
+        var answers = 0;
+        var path = Path.Combine(_testOutputDir, $"prompt-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path, "Original file");
+
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Save prompt owner", KeyPreview = true };
+            target.Controls.Add(new System.Windows.Forms.TextBox());
+            target.KeyDown += (_, e) =>
+            {
+                if (!e.Control || e.KeyCode != System.Windows.Forms.Keys.S)
+                {
+                    return;
+                }
+
+                e.SuppressKeyPress = true;
+                dialog = new System.Windows.Forms.Form { Text = "Save As" };
+                dialog.Controls.Add(new System.Windows.Forms.TextBox
+                {
+                    Name = "FileNameControlHost",
+                    AccessibleName = "File name:",
+                    Width = 260
+                });
+                var save = new System.Windows.Forms.Button { Text = "Save", Top = 40 };
+                save.Click += (_, _) =>
+                {
+                    submissions++;
+                    prompt = new System.Windows.Forms.Form { Text = overwrite ? "Confirm Save As" : "Save As" };
+                    prompt.Controls.Add(new System.Windows.Forms.Label
+                    {
+                        Text = overwrite ? "File already exists." : "Path does not exist.",
+                        AutoSize = true
+                    });
+                    var answer = new System.Windows.Forms.Button { Text = overwrite ? "Yes" : "OK", Top = 40 };
+                    answer.Click += (_, _) =>
+                    {
+                        answers++;
+                        if (overwrite)
+                        {
+                            File.WriteAllText(path, "Overwritten");
+                        }
+                        prompt.Close();
+                    };
+                    prompt.Controls.Add(answer);
+                    prompt.Show(dialog);
+                    promptHandle = prompt.Handle;
+                    prompt.Activate();
+                };
+                dialog.Controls.Add(save);
+                dialog.Show(target);
+                dialogHandle = dialog.Handle;
+            };
+            target.Show(fixtureForm);
+            return target.Handle;
+        });
+
+        try
+        {
+            var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
+            Assert.False(result.Success);
+            Assert.Equal(overwrite ? Models.UIAutomationErrorType.ConfirmationRequired : Models.UIAutomationErrorType.PathError,
+                result.ErrorType);
+            Assert.Equal(1, (int)fixtureForm.Invoke(() => submissions));
+            Assert.Equal(0, (int)fixtureForm.Invoke(() => answers));
+            var remainingPrompt = await _automationService.FindElementsAsync(new Models.ElementQuery
+            {
+                WindowHandle = WindowHandleParser.Format(promptHandle),
+                Name = overwrite ? "Yes" : "OK",
+                ControlType = "Button",
+                RequireUnique = true
+            });
+            Assert.True(remainingPrompt.Success, remainingPrompt.ErrorMessage);
+            Assert.Single(remainingPrompt.Items!);
+            var remainingFilename = await _automationService.FindElementsAsync(new Models.ElementQuery
+            {
+                WindowHandle = WindowHandleParser.Format(dialogHandle),
+                AutomationId = "FileNameControlHost",
+                RequireUnique = true
+            });
+            Assert.True(remainingFilename.Success, remainingFilename.ErrorMessage);
+            Assert.Single(remainingFilename.Items!);
+            Assert.Equal("Original file", await File.ReadAllTextAsync(path));
+            Assert.Contains("windowHandle=", result.UsageHint, StringComparison.Ordinal);
+        }
+        finally
+        {
+            fixtureForm.Invoke(() =>
+            {
+                prompt?.Dispose();
+                dialog?.Dispose();
+                target?.Dispose();
+            });
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task Save_MissingDialogAndFileChange_DoesNotReportSuccess(bool existingFile)
     {
         var fixtureForm = _fixture.Form!;

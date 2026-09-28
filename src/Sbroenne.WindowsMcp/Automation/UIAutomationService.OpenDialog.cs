@@ -463,75 +463,49 @@ public sealed partial class UIAutomationService
 
         var normalizedPath = filePath.Replace('/', '\\');
 
-        // Enter the path robustly, verify it actually landed in the File name field, and only then
-        // confirm. A loaded, shared CI desktop can drop the first keystrokes right after the field
-        // gains focus (observed: the leading "C:" of the path went missing, leaving a driveless path
-        // the CheckFileExists resolver rejects, so the dialog never closes). The classic Win32 edit
-        // also ignores ValuePattern SetValue, so keyboard input is the only thing that updates it.
-        //
-        // So type, read the field back (GetText reads ValuePattern/TextPattern reliably even though
-        // writes are ignored), and retype until the field holds the full path before clicking Open. We
-        // click the Open button rather than pressing Enter, which can commit an autocomplete suggestion.
-        string? lastObservedValue = null;
-        ElementActionOutcome? lastOpenButtonOutcome = null;
-
-        // Prefer semantic assignment and invocation. This path is background-safe and avoids exposing
-        // the local path through global keyboard input when another application owns the foreground.
-        await _staThread.ExecuteAsync(
+        var assignment = await _staThread.ExecuteAsync(
             () =>
             {
-                editField.TrySetValue(normalizedPath);
-                return true;
+                var pattern = editField.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
+                if (pattern is null)
+                {
+                    return (Dispatched: false, ReadOnly: false);
+                }
+                if (pattern.CurrentIsReadOnly != 0)
+                {
+                    return (Dispatched: false, ReadOnly: true);
+                }
+
+                pattern.SetValue(normalizedPath);
+                return (Dispatched: true, ReadOnly: false);
             },
             cancellationToken);
-        lastObservedValue = await _staThread.ExecuteAsync(
-            () => editField.GetText(),
-            cancellationToken);
-        if (PathMatches(lastObservedValue, normalizedPath))
+        if (assignment.ReadOnly)
         {
-            lastOpenButtonOutcome = await ClickOpenButtonAsync(
-                dialog,
-                allowPhysicalFallback: false,
-                cancellationToken);
-            if (lastOpenButtonOutcome.Value.Success &&
-                await WaitForDialogCloseAsync(dialog, cancellationToken))
+            return UIAutomationResult.CreateFailure(
+                "open", UIAutomationErrorType.InvalidParameter,
+                "The Open dialog's filename field is read-only. No path input was sent.",
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+        }
+
+        if (!assignment.Dispatched)
+        {
+            if (dialogHwnd == IntPtr.Zero || _windowActivator == null)
             {
-                return UIAutomationResult.CreateSuccess(
-                    "open",
-                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath + "+semantic" });
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.WrongTargetWindow,
+                    "The native Open dialog could not be activated before keyboard input.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
             }
-        }
 
-        if (dialogHwnd == IntPtr.Zero || _windowActivator == null)
-        {
-            return UIAutomationResult.CreateFailure(
-                "open",
-                UIAutomationErrorType.WrongTargetWindow,
-                "The native Open dialog could not be activated before keyboard input.",
-                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
-        }
-
-        var activated = await _windowActivator.ActivateWindowAsync(
-            dialogHwnd,
-            cancellationToken: cancellationToken);
-        if (!activated || !_windowActivator.IsForegroundWindow(dialogHwnd))
-        {
-            return UIAutomationResult.CreateFailure(
-                "open",
-                UIAutomationErrorType.WrongTargetWindow,
-                "The native Open dialog was found but could not be confirmed as foreground, so the file path was not typed.",
-                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
-        }
-
-        await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
-
-        for (var attempt = 0; attempt < 3; attempt++)
-        {
-            if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+            var activated = await _windowActivator.ActivateWindowAsync(
+                dialogHwnd, cancellationToken: cancellationToken);
+            if (!activated || !_windowActivator.IsForegroundWindow(dialogHwnd))
             {
                 return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
             }
 
+            await _keyboardService.ReleaseAllKeysAsync(cancellationToken);
             await _staThread.ExecuteAsync(() => { editField.TrySetFocus(); return true; }, cancellationToken);
             if (editFieldCenter is { Length: 2 })
             {
@@ -540,125 +514,111 @@ public sealed partial class UIAutomationService
                     return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
                 }
 
-                await _mouseService.ClickAsync(
+                var focusClick = await _mouseService.ClickAsync(
                     editFieldCenter[0],
                     editFieldCenter[1],
                     ModifierKey.None,
                     dialogHwnd,
                     cancellationToken);
-            }
-
-            // Clear then type, verifying the field reads back the full path. Retype on mismatch so a
-            // dropped leading character (a contended-desktop hazard) is corrected before we confirm.
-            var matched = false;
-            for (var typeAttempt = 0; typeAttempt < 4 && !matched; typeAttempt++)
-            {
-                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+                if (!focusClick.Success)
                 {
-                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                    return UIAutomationResult.CreateFailure(
+                        "open", UIAutomationErrorType.WrongTargetWindow,
+                        $"Could not focus the filename field: {focusClick.Error}",
+                        CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
                 }
-
-                await _keyboardService.PressKeyAsync(
-                    "a",
-                    ModifierKey.Ctrl,
-                    1,
-                    dialogHwnd,
-                    cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
-                {
-                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
-                }
-
-                await _keyboardService.PressKeyAsync(
-                    "Delete",
-                    ModifierKey.None,
-                    1,
-                    dialogHwnd,
-                    cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-                if (!_windowActivator.IsForegroundWindow(dialogHwnd))
-                {
-                    return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
-                }
-
-                await _keyboardService.TypeTextAsync(
-                    normalizedPath,
-                    dialogHwnd,
-                    cancellationToken);
-                _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
-
-                lastObservedValue = await _staThread.ExecuteAsync(
-                    () => editField.GetText(), cancellationToken);
-                matched = PathMatches(lastObservedValue, normalizedPath);
             }
 
-            if (!matched)
+            var focusReady = await WaitForElementConditionAsync(
+                editField, () => editField.CurrentHasKeyboardFocus != 0, cancellationToken);
+            if (!focusReady.Observed || focusReady.ElementUnavailable)
             {
-                // Best-effort populate for dialogs that honor ValuePattern, then verify before any
-                // confirmation action.
-                await _staThread.ExecuteAsync(() => { editField.TrySetValue(normalizedPath); return true; }, cancellationToken);
-                lastObservedValue = await _staThread.ExecuteAsync(
-                    () => editField.GetText(), cancellationToken);
-                matched = PathMatches(lastObservedValue, normalizedPath);
-            }
-
-            if (!matched)
-            {
-                continue;
-            }
-
-            // Confirm through the dialog's default Open button first. This avoids sending another
-            // global key when the shell exposes a reliable semantic action.
-            lastOpenButtonOutcome = await ClickOpenButtonAsync(
-                dialog,
-                allowPhysicalFallback: true,
-                cancellationToken);
-            if (lastOpenButtonOutcome.Value.Success &&
-                await WaitForDialogCloseAsync(dialog, cancellationToken))
-            {
-                return UIAutomationResult.CreateSuccess(
-                    "open",
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.WrongTargetWindow,
+                    "The filename field did not obtain focus; no path input was sent.",
                     CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
             }
 
-            // Some classic dialogs expose Invoke but do not commit it. The field still contains the
-            // verified absolute path, so Enter is a bounded fallback.
-            if (!_windowActivator.IsForegroundWindow(dialogHwnd))
+            var selected = await _keyboardService.PressKeyAsync(
+                "a", ModifierKey.Ctrl, 1, dialogHwnd, cancellationToken);
+            if (!selected.Success)
             {
-                return CreateOpenDialogForegroundFailure(stopwatch, actionPath);
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.VerificationFailed,
+                    $"Could not select the filename: {selected.Error}. No further input was sent.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+            }
+            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+            var cleared = await _keyboardService.PressKeyAsync(
+                "Delete", ModifierKey.None, 1, dialogHwnd, cancellationToken);
+            if (!cleared.Success)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.VerificationFailed,
+                    $"Could not clear the filename: {cleared.Error}. No further input was sent.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+            }
+            _ = await _keyboardService.WaitForIdleAsync(cancellationToken);
+
+            var empty = await WaitForElementConditionAsync(
+                editField, () => editField.GetText() == "", cancellationToken);
+            if (!empty.Observed || empty.ElementUnavailable)
+            {
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.VerificationFailed,
+                    "The filename did not become empty. No replacement path was sent; inspect the dialog.",
+                    CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
             }
 
-            await _keyboardService.PressKeyAsync(
-                "Return",
-                ModifierKey.None,
-                1,
-                dialogHwnd,
-                cancellationToken);
-            if (await WaitForDialogCloseAsync(dialog, cancellationToken))
+            var typed = await _keyboardService.TypeTextAsync(normalizedPath, dialogHwnd, cancellationToken);
+            if (!typed.Success)
             {
-                return UIAutomationResult.CreateSuccess(
-                    "open",
+                return UIAutomationResult.CreateFailure(
+                    "open", UIAutomationErrorType.VerificationFailed,
+                    $"Filename input failed: {typed.Error}. No retry or submission was sent; inspect the dialog.",
                     CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
             }
         }
 
+        var verified = await WaitForElementConditionAsync(
+            editField, () => PathMatches(editField.GetText(), normalizedPath), cancellationToken);
+        if (!verified.Observed || verified.ElementUnavailable)
+        {
+            return UIAutomationResult.CreateFailure(
+                "open", UIAutomationErrorType.VerificationFailed,
+                "The filename field did not show the requested path. No correction or submission was sent. " +
+                "Inspect the dialog before deciding how to continue.",
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+        }
+
+        var openOutcome = await ClickOpenButtonAsync(dialog, cancellationToken);
+        if (!openOutcome.Success)
+        {
+            return UIAutomationResult.CreateFailure(
+                "open", UIAutomationErrorType.VerificationFailed,
+                $"Open could not be activated or verified: {openOutcome.ErrorMessage}. No second submission was sent.",
+                CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
+        }
+
+        if (await WaitForDialogCloseAsync(dialog, cancellationToken))
+        {
+            return UIAutomationResult.CreateSuccess(
+                "open",
+                CreateDiagnostics(stopwatch) with
+                {
+                    ActionPath = assignment.Dispatched && openOutcome.ActionPath == "semantic_invoke"
+                        ? actionPath + "+semantic"
+                        : actionPath
+                });
+        }
+
         return UIAutomationResult.CreateFailure(
             "open",
-            UIAutomationErrorType.Timeout,
-            "Open could not be verified because the native dialog remained open after the path " +
-            "was entered and confirmed. The app may have rejected the file.",
-            CreateDiagnostics(stopwatch) with
-            {
-                ActionPath = actionPath,
-                Warnings =
-                [
-                    $"File name field matched requested path: {PathMatches(lastObservedValue, normalizedPath)}",
-                    $"Open button outcome: {lastOpenButtonOutcome?.Success}; " +
-                    $"path={lastOpenButtonOutcome?.ActionPath ?? "<none>"}; " +
-                    $"error={lastOpenButtonOutcome?.ErrorMessage ?? "<none>"}"
-                ]
-            });
+            UIAutomationErrorType.VerificationFailed,
+            "Open was sent, but the dialog remained open. No second submission was sent. " +
+            "Inspect the dialog; the application may have rejected the file or requested a decision.",
+            CreateDiagnostics(stopwatch) with { ActionPath = actionPath });
     }
 
     private static UIAutomationResult CreateOpenDialogForegroundFailure(
@@ -736,7 +696,6 @@ public sealed partial class UIAutomationService
     /// </summary>
     private async Task<ElementActionOutcome> ClickOpenButtonAsync(
         UIA.IUIAutomationElement dialog,
-        bool allowPhysicalFallback,
         CancellationToken cancellationToken)
     {
         UIA.IUIAutomationElement? openButton = null;
@@ -793,19 +752,6 @@ public sealed partial class UIAutomationService
                 false,
                 ErrorMessage: "No visible Open button was found in the native dialog.",
                 ActionPath: "open_button_find");
-        }
-
-        if (!allowPhysicalFallback)
-        {
-            var invoked = await _staThread.ExecuteAsync(
-                () => openButton.TryInvoke(),
-                cancellationToken);
-            return invoked
-                ? new ElementActionOutcome(true, ActionPath: "semantic_invoke")
-                : new ElementActionOutcome(
-                    false,
-                    ErrorMessage: "The native dialog's default Open button did not support semantic invocation.",
-                    ActionPath: "semantic_invoke");
         }
 
         return await ExecuteElementActionAsync(

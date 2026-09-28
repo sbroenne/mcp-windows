@@ -11,7 +11,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 [McpServerToolType]
 public static partial class UITypeTool
 {
-    /// <summary>Type text into an input discovered by ui_find or ui_snapshot. Use file_save for Save As dialogs. Keywords: type, input, text, fill, edit, field.</summary>
+    /// <summary>Type text into an input discovered by ui_find or ui_snapshot. Reports mismatches without automatically correcting application changes. Use file_save for Save As dialogs. Keywords: type, input, text, fill, edit, field.</summary>
     /// <param name="windowHandle">Explicit target window handle.</param>
     /// <param name="text">Text to type.</param>
     /// <param name="elementId">Required opaque ID of the input from discovery in this owner.</param>

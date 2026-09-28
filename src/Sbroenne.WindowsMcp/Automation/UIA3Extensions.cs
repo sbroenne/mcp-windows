@@ -652,29 +652,6 @@ public static class UIA3Extensions
     }
 
     /// <summary>
-    /// Tries the legacy accessible default action used by some WinForms controls.
-    /// </summary>
-    public static bool TryLegacyDefaultAction(this UIA.IUIAutomationElement element)
-    {
-        ArgumentNullException.ThrowIfNull(element);
-        try
-        {
-            var pattern = element.GetPattern<UIA.IUIAutomationLegacyIAccessiblePattern>(UIA3PatternIds.LegacyIAccessible);
-            if (pattern == null)
-            {
-                return false;
-            }
-
-            pattern.DoDefaultAction();
-            return true;
-        }
-        catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Tries to toggle the element.
     /// </summary>
     public static bool TryToggle(this UIA.IUIAutomationElement element)

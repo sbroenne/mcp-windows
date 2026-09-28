@@ -60,6 +60,17 @@ public sealed class KeyboardInputServiceTests
     }
 
     [Fact]
+    public async Task TypeTextAsync_WithCancelledToken_DoesNotInjectInput()
+    {
+        using var service = new KeyboardInputService();
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.TypeTextAsync("must-not-be-typed", cancellationSource.Token));
+    }
+
+    [Fact]
     public async Task KeyDownAsync_WithWrongForegroundWindow_ReturnsGuardFailure()
     {
         using var service = new KeyboardInputService();

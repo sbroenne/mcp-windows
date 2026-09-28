@@ -173,6 +173,13 @@ read the current field in the same owned dialog and require the entire requested
 confirming. A partial path or a changed directory must never be accepted; recovered observation
 failures are logged.
 
+`ExplicitRecoveryContractTests` guards the single-dispatch boundary without desktop access.
+The owned-dialog cases in `SaveTests` check that overwrite/error prompts remain open, receive
+no answer, and leave the original file unchanged. `OpenFileTests` checks that a changed filename
+is not rewritten and an unverified submission is not repeated. Run these live cases only on
+an exclusive desktop. Radio-button verification must not dispatch another activation after
+the first selection was sent; an unavailable pattern and a failed provider call are different cases.
+
 ### Verification Pattern
 
 **Use our own MCP tools for verification, NOT FlaUI or direct property access:**

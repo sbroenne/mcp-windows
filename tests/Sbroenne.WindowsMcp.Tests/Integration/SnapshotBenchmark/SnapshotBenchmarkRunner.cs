@@ -25,7 +25,8 @@ internal sealed record SnapshotBenchmarkScenario(
     Func<ValueTask>? CleanupAsync = null,
     int MaxDepth = 5,
     string? ControlTypeFilter = null,
-    Func<string>? CurrentWindowHandle = null) : IAsyncDisposable
+    Func<string>? CurrentWindowHandle = null,
+    Func<CancellationToken, Task<IReadOnlyList<UIAutomationResult>>>? FocusedRead = null) : IAsyncDisposable
 {
     public ValueTask DisposeAsync() => CleanupAsync?.Invoke() ?? ValueTask.CompletedTask;
 }

@@ -1,7 +1,7 @@
 {
   "name": "windows-mcp",
   "displayName": "Windows MCP Server",
-  "description": "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA",
+  "description": "Give AI agents Windows controls, not just screenshots — named buttons, field values, table rows, and changes-only views.",
   "version": "1.0.0",
   "publisher": "sbroenne",
   "icon": "icon.png",
@@ -31,6 +31,8 @@
     "windows",
     "automation",
     "ui automation",
+    "token efficiency",
+    "incremental snapshots",
     "mouse",
     "keyboard",
     "screenshot",

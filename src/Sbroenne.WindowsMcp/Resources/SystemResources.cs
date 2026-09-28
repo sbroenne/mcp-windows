@@ -202,7 +202,7 @@ public sealed class SystemResources
             ```
             file_save(windowHandle="<handle>", filePath="C:\\Users\\User\\document.docx")
             ```
-            Handles Save As dialogs automatically - enters filename, clicks Save, handles overwrite prompts.
+            Enters the filename and clicks Save once. Overwrite and error prompts remain open for an explicit caller decision.
 
             ## When to Use Each Tool
 
@@ -210,7 +210,7 @@ public sealed class SystemResources
             |------|-------------|----------|
             | Click button/checkbox | ui_click(windowHandle=..., elementId=...) | Explicit coordinate action only if no semantic action was dispatched |
             | Type in text field | ui_type(windowHandle=..., elementId=..., text=...) | Rediscover if the ID is stale |
-            | Save a file | file_save(windowHandle=..., filePath=...) | ⚠️ keyboard_control CANNOT handle Save As dialogs! |
+            | Save a file | file_save(windowHandle=..., filePath=...) | Inspect and answer remaining prompts explicitly; do not blindly repeat the save. |
             | Press hotkey (Ctrl+S) | keyboard_control(action='press', key='s', modifiers='ctrl') | Requires a matching permission level |
             | Navigate (Tab, arrows) | keyboard_control(action='press') | - |
             | Read text from element | ui_read(windowHandle=..., elementId=...) | Rediscover; element reads never widen to window OCR |
@@ -232,7 +232,7 @@ public sealed class SystemResources
             2. **Use explicit handles** - you control which window when multiple match
             3. **Use screenshot_control(annotate=true) when you don't know element names**
             4. **Use window_management(wait_for) for dialogs** - wait for new windows to appear
-            5. **Use file_save for saving** - handles Save As dialogs automatically (⚠️ NOT keyboard_control!)
+            5. **Use file_save for supported Save As dialogs** - inspect any remaining prompt and choose the next action explicitly.
 
             ## When to Use `ui_find`
 
@@ -296,14 +296,15 @@ public sealed class SystemResources
             | `timeout` | Increase `timeoutMs` parameter, or verify the target element exists with `screenshot_control(annotate=true)`. |
             | `window_not_found` | Window closed or handle is stale. Re-run `window_management(action='find')`. |
 
-            ## File Operation Errors (file_save)
+            ## File Operation Errors (file_save, file_open)
 
             | Error Code | Recovery Action |
             |------------|-----------------|
-            | `save_failed` | File save operation failed. Check file path is valid, disk has space, and file is not locked by another process. |
-            | `dialog_not_found` | Save As dialog didn't appear. Try `keyboard_control(key='s', modifiers='ctrl')` first, then retry. |
-            | `com_interop_failed` | Office COM automation failed. Ensure Office app is responding. Try closing and reopening the document. |
-            | `invalid_file_path` | File path is malformed. Use backslashes (C:\\Users\\...) and ensure directory exists. |
+            | `confirmation_required` | Inspect the open overwrite dialog and decide whether to proceed or cancel. No answer was selected. |
+            | `path_error` | Inspect the reported path problem and any open error dialog before choosing a correction. Dialogs are not dismissed automatically. |
+            | `verification_failed` | Input may already have been sent. Inspect the filename and dialog state before choosing another action. |
+            | `timeout` | Inspect the current state; the application may still be processing the first request. Do not automatically send the shortcut again. |
+            | `invalid_parameter` | Check the path, window handle, and trigger mode. |
 
             ## Mouse/Keyboard Errors
 
@@ -460,20 +461,19 @@ public sealed class SystemResources
             // Save successful:
             {
               "success": true,
-              "filePath": "C:\\Users\\User\\document.docx",
-              "method": "com_interop",
-              "targetWindow": { "handle": "12345678", "title": "Document1 - Word", "processName": "WINWORD" }
+              "action": "save"
             }
-            // Save via dialog:
+            // Overwrite decision required:
             {
-              "success": true,
-              "filePath": "C:\\Users\\User\\file.txt",
-              "method": "save_dialog",
-              "targetWindow": { "handle": "12345678", "title": "Untitled - Notepad", "processName": "notepad" }
+              "success": false,
+              "action": "save",
+              "errorType": "confirmation_required",
+              "error": "Save requires an overwrite decision. The confirmation dialog remains open; no answer was selected.",
+              "hint": "Confirmation dialog windowHandle='12345678'."
             }
             ```
 
-            **Key fields:** `filePath` - where file was saved. `method` - how it was saved (com_interop for Office, save_dialog for others).
+            A failed or pending save is not reported as success. Inspect the existing dialog before choosing the next action.
 
             ## mouse_control
 

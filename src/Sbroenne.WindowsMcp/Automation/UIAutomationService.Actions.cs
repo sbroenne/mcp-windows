@@ -603,7 +603,7 @@ public sealed partial class UIAutomationService
                     "type",
                     UIAutomationErrorType.VerificationFailed,
                     "Keyboard input was sent, but the requested text change was not observable. " +
-                    "Refresh the UI state and verify the field still has focus.",
+                    "Read the current field before retrying; no automatic correction was attempted.",
                     CreateActionDiagnostics(stopwatch, staResult.Element, "keyboard"));
             }
         }
@@ -1545,8 +1545,8 @@ public sealed partial class UIAutomationService
     /// Implementation based on FlaUI, pywinauto, and White Framework patterns:
     /// 1. Focus window and send Ctrl+S (universal save shortcut)
     /// 2. Wait for modal dialog using retry loop (FlaUI pattern)
-    /// 3. If dialog appears and filePath provided: type path + Enter (pywinauto pattern)
-    /// 4. Handle overwrite confirmation dialogs
+    /// 3. If dialog appears and filePath provided: type the path and click Save once
+    /// 4. Report error or overwrite dialogs without answering or dismissing them
     /// 5. Wait for dialog to close
     /// 6. When a path was supplied, wait for an observable file creation or change before success
     /// </remarks>
@@ -1667,8 +1667,11 @@ public sealed partial class UIAutomationService
                         return UIAutomationResult.CreateFailure(
                             "save",
                             UIAutomationErrorType.Timeout,
-                            "Save could not be verified because the Save dialog remained open.",
-                            CreateDiagnostics(stopwatch));
+                            "Save could not be verified because the Save dialog remained open. No additional input was sent.",
+                            CreateDiagnostics(stopwatch)) with
+                        {
+                            RecoverySuggestion = "Inspect the existing dialog and decide how to continue. Do not automatically repeat the save."
+                        };
                     }
                 }
                 else
@@ -1695,7 +1698,10 @@ public sealed partial class UIAutomationService
                         ? "A Save dialog was confirmed and closed. "
                         : $"No ready Save dialog was observed. Discovery: {string.Join("; ", dialogObservations)}. ") +
                     "The save shortcut was sent, but its outcome could not be verified.",
-                    CreateDiagnostics(stopwatch));
+                    CreateDiagnostics(stopwatch)) with
+                {
+                    RecoverySuggestion = "Inspect the file and current application state before choosing another action. Do not automatically repeat the save."
+                };
             }
 
             return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
@@ -1760,23 +1766,7 @@ public sealed partial class UIAutomationService
             {
                 result = await _staThread.ExecuteAsync(() =>
                 {
-                    // Owned dialogs can be UIA children without reporting IsModal. Enumerate native
-                    // top-level windows so discovery does not depend on that provider-specific layout.
-                    var handles = new List<nint>();
-                    if (!NativeMethods.EnumWindows((candidate, _) =>
-                    {
-                        if (candidate != parentHwnd &&
-                            NativeMethods.IsWindowVisible(candidate) &&
-                            IsSaveDialogWindow(candidate, parentHwnd))
-                        {
-                            handles.Add(candidate);
-                        }
-
-                        return true;
-                    }, nint.Zero))
-                    {
-                        throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
-                    }
+                    var handles = GetOwnedSaveDialogHandles(parentHwnd);
 
                     if (handles.Count == 0 && observations.Count < 8)
                     {
@@ -2036,27 +2026,18 @@ public sealed partial class UIAutomationService
 
         if (!saveClicked)
         {
-            // Fallback: press Enter
-            var confirm = await _keyboardService.PressKeyAsync(
-                "Return", ModifierKey.None, 1, dialogHandle, cancellationToken);
-            if (!confirm.Success)
-            {
-                return UIAutomationResult.CreateFailure(
-                    "save", UIAutomationErrorType.InternalError,
-                    $"Could not confirm the Save dialog: {confirm.Error}",
-                    CreateDiagnostics(stopwatch));
-            }
+            return UIAutomationResult.CreateFailure(
+                "save", UIAutomationErrorType.VerificationFailed,
+                "The Save button could not be activated or verified. No additional submission was sent. " +
+                "Inspect the current dialog before deciding what to do next.",
+                CreateDiagnostics(stopwatch));
         }
 
-        // Check for error dialogs (e.g., "Path does not exist")
-        var errorResult = await HandleSaveErrorDialogAsync(dialogHandle, cancellationToken);
-        if (errorResult != null)
+        var promptResult = await ObserveSaveDialogOutcomeAsync(dialogHandle, cancellationToken);
+        if (promptResult != null)
         {
-            return errorResult;
+            return promptResult;
         }
-
-        // Handle overwrite confirmation if it appears
-        await HandleOverwriteConfirmationAsync(dialogHandle, cancellationToken);
 
         return UIAutomationResult.CreateSuccess("save", CreateDiagnostics(stopwatch));
     }
@@ -2222,12 +2203,9 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>
-    /// Checks for and handles error dialogs that appear during save (e.g., "Path does not exist").
-    /// Returns an error result if an error dialog was found and handled, null otherwise.
-    /// Polls for error dialogs for the bounded save-dialog timeout to handle timing variations.
-    /// Only checks the FOREGROUND window to avoid false positives from unrelated windows.
+    /// Reports owned save error or confirmation dialogs without changing their state.
     /// </summary>
-    private async Task<UIAutomationResult?> HandleSaveErrorDialogAsync(nint saveDialogHandle, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult?> ObserveSaveDialogOutcomeAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
 
@@ -2247,61 +2225,47 @@ public sealed partial class UIAutomationService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            (UIA.IUIAutomationElement? dialog, UIA.IUIAutomationElement? okButton, string? errorText) errorInfo;
+            (nint Handle, string? ErrorText) errorInfo;
             try
             {
+                var confirmation = await ObserveOverwriteConfirmationAsync(saveDialogHandle, cancellationToken);
+                if (confirmation is not null)
+                {
+                    return confirmation;
+                }
+
                 errorInfo = await _staThread.ExecuteAsync(() =>
                 {
-                    var foregroundHwnd = NativeMethods.GetForegroundWindow();
-                    if (foregroundHwnd == IntPtr.Zero ||
-                        !IsSaveDialogWindow(foregroundHwnd, saveDialogHandle))
+                    foreach (var handle in GetOwnedSaveDialogHandles(saveDialogHandle))
                     {
-                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                    }
-
-                    var window = Uia.ElementFromHandle(foregroundHwnd);
-                    if (window == null)
-                    {
-                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                    }
-
-                    var windowName = window.CurrentName ?? "";
-
-                    // Error dialogs from Save must have "Save" in the title
-                    if (!windowName.Contains("Save", StringComparison.OrdinalIgnoreCase))
-                    {
-                        return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
-                    }
-
-                    // Look for error text in the dialog
-                    var textCondition = Uia.CreatePropertyCondition(
-                        UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Text);
-                    var textElements = window.FindAll(UIA.TreeScope.TreeScope_Descendants, textCondition);
-
-                    if (textElements != null)
-                    {
-                        for (int j = 0; j < textElements.Length; j++)
+                        var window = Uia.ElementFromHandle(handle);
+                        if (window == null ||
+                            !(window.CurrentName ?? "").Contains("Save", StringComparison.OrdinalIgnoreCase))
                         {
-                            var textElement = textElements.GetElement(j);
-                            var text = textElement.CurrentName ?? "";
+                            continue;
+                        }
 
-                            foreach (var pattern in errorPatterns)
+                        var textCondition = Uia.CreatePropertyCondition(
+                            UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Text);
+                        var textElements = window.FindAll(UIA.TreeScope.TreeScope_Descendants, textCondition);
+
+                        if (textElements != null)
+                        {
+                            for (int j = 0; j < textElements.Length; j++)
                             {
-                                if (text.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                var text = textElements.GetElement(j).CurrentName ?? "";
+                                foreach (var pattern in errorPatterns)
                                 {
-                                    // Found error - now find the OK button
-                                    var buttonCondition = Uia.CreateAndCondition(
-                                        Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Button),
-                                        Uia.CreatePropertyCondition(UIA3PropertyIds.Name, "OK"));
-                                    var okBtn = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
-
-                                    return (dialog: (UIA.IUIAutomationElement?)window, okButton: (UIA.IUIAutomationElement?)okBtn, errorText: (string?)text);
+                                    if (text.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        return (Handle: handle, ErrorText: (string?)text);
+                                    }
                                 }
                             }
                         }
                     }
 
-                    return (dialog: (UIA.IUIAutomationElement?)null, okButton: (UIA.IUIAutomationElement?)null, errorText: (string?)null);
+                    return (Handle: nint.Zero, ErrorText: (string?)null);
                 }, cancellationToken);
             }
             catch (COMException exception) when (COMExceptionHelper.IsTransientProviderFailure(exception))
@@ -2310,76 +2274,46 @@ public sealed partial class UIAutomationService
                 continue;
             }
 
-            if (errorInfo.dialog != null)
+            if (errorInfo.ErrorText is not null)
             {
-                // Found error dialog - click OK to dismiss it
-                if (errorInfo.okButton != null)
-                {
-                    _ = await ExecuteElementActionAsync(
-                        errorInfo.okButton,
-                        errorInfo.dialog,
-                        fallbackClickPoint: null,
-                        cancellationToken);
-                }
-
-                string? cleanupWarning = null;
-                if (await WaitForDialogCloseAsync(errorInfo.dialog, cancellationToken, SaveDialogTimeout))
-                {
-                    var cancelled = await _keyboardService.PressKeyAsync(
-                        "Escape", ModifierKey.None, 1, saveDialogHandle, cancellationToken);
-                    if (!cancelled.Success)
-                    {
-                        cleanupWarning = $"The Save dialog could not be closed safely: {cancelled.Error}";
-                    }
-                }
-                else
-                {
-                    cleanupWarning = "The error dialog remained open; no Escape key was sent.";
-                }
-
-                // Return error to LLM
                 return UIAutomationResult.CreateFailure(
                     "save",
                     UIAutomationErrorType.PathError,
-                    $"Save failed: {errorInfo.errorText}",
+                    $"Save failed: {errorInfo.ErrorText}. The error dialog was left open.",
                     CreateDiagnostics(stopwatch)) with
                 {
-                    UsageHint = cleanupWarning
+                    UsageHint = $"Error dialog windowHandle='{errorInfo.Handle}'.",
+                    RecoverySuggestion = "Inspect the open error dialog and decide how to correct or cancel the operation. No dialog was dismissed."
                 };
             }
 
-            await Task.Delay(100, cancellationToken);
+            if (!NativeMethods.IsWindow(saveDialogHandle) || !NativeMethods.IsWindowVisible(saveDialogHandle))
+            {
+                return null;
+            }
+
+            await Task.Delay(SaveDialogPollInterval, cancellationToken);
         }
 
         return null; // No error dialog found
     }
 
     /// <summary>
-    /// Handles the "Confirm Save As" overwrite confirmation dialog if it appears.
-    /// Based on pywinauto pattern: check for Yes/Replace button and click it.
+    /// Reports an owned overwrite confirmation without selecting an answer.
     /// </summary>
-    private async Task HandleOverwriteConfirmationAsync(nint saveDialogHandle, CancellationToken cancellationToken)
+    private async Task<UIAutomationResult?> ObserveOverwriteConfirmationAsync(nint saveDialogHandle, CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         // Check for common overwrite confirmation dialogs
         string[] confirmPatterns = ["Confirm Save As", "Replace or Skip Files", "Confirm", "already exists"];
         string[] buttonNames = ["Yes", "Replace", "Confirm", "&Yes"];
 
-        var buttonToClick = await _staThread.ExecuteAsync(() =>
+        var confirmationHandle = await _staThread.ExecuteAsync(() =>
         {
-            // Search for confirmation dialogs
-            var windowCondition = Uia.CreatePropertyCondition(
-                UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
-            var windows = Uia.RootElement.FindAll(UIA.TreeScope.TreeScope_Children, windowCondition);
-
-            if (windows == null)
+            foreach (var handle in GetOwnedSaveDialogHandles(saveDialogHandle))
             {
-                return (UIA.IUIAutomationElement?)null;
-            }
-
-            for (int i = 0; i < windows.Length; i++)
-            {
-                var window = windows.GetElement(i);
-                if (!IsSaveDialogWindow(ResolveElementWindowHandle(window), saveDialogHandle))
+                var window = Uia.ElementFromHandle(handle);
+                if (window is null)
                 {
                     continue;
                 }
@@ -2411,25 +2345,47 @@ public sealed partial class UIAutomationService
                     var button = window.FindFirst(UIA.TreeScope.TreeScope_Descendants, buttonCondition);
                     if (button != null)
                     {
-                        return button;
+                        return handle;
                     }
                 }
             }
 
-            return (UIA.IUIAutomationElement?)null;
+            return nint.Zero;
         }, cancellationToken);
 
-        if (buttonToClick != null)
+        if (confirmationHandle != nint.Zero)
         {
-            var root = await _staThread.ExecuteAsync(
-                () => GetRootElementForScroll(buttonToClick),
-                cancellationToken);
-            _ = await ExecuteElementActionAsync(
-                buttonToClick,
-                root,
-                fallbackClickPoint: null,
-                cancellationToken);
+            return UIAutomationResult.CreateFailure(
+                "save",
+                UIAutomationErrorType.ConfirmationRequired,
+                "Save requires an overwrite decision. The confirmation dialog remains open; no answer was selected.",
+                CreateDiagnostics(stopwatch)) with
+            {
+                UsageHint = $"Confirmation dialog windowHandle='{confirmationHandle}'."
+            };
         }
+
+        return null;
+    }
+
+    private static List<nint> GetOwnedSaveDialogHandles(nint owner)
+    {
+        // Owned dialogs may be nested in UIA without reporting IsModal.
+        var handles = new List<nint>();
+        if (!NativeMethods.EnumWindows((candidate, _) =>
+        {
+            if (candidate != owner &&
+                NativeMethods.IsWindowVisible(candidate) &&
+                IsSaveDialogWindow(candidate, owner))
+            {
+                handles.Add(candidate);
+            }
+            return true;
+        }, nint.Zero))
+        {
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+        }
+        return handles;
     }
 
     private static bool IsSaveDialogWindow(nint candidate, nint saveDialogHandle)

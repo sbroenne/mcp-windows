@@ -28,12 +28,6 @@ internal sealed class ChromiumBrowserSession : IDisposable
     ];
 
     [DllImport("user32.dll")]
-    private static extern bool SetForegroundWindow(nint hWnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool AllowSetForegroundWindow(int dwProcessId);
-
-    [DllImport("user32.dll")]
     private static extern nint GetForegroundWindow();
 
     [DllImport("user32.dll")]
@@ -130,6 +124,18 @@ internal sealed class ChromiumBrowserSession : IDisposable
             TimeSpan.FromMilliseconds(500),
             [new ReadyElement("Control that does not exist")]),
             processStarted, beforeCleanup);
+    }
+
+    internal static ChromiumBrowserSession LaunchAddressBar(ChromiumBrowserKind browser)
+    {
+        var pagePath = FindLocalPagePath();
+        return Launch(browser, new BrowserTarget(
+            "address bar",
+            new Uri(pagePath).AbsoluteUri,
+            "MCP Chromium Browser Test Page",
+            TimeSpan.FromSeconds(15),
+            [new ReadyElement("Address and search bar", "Edit")],
+            AppMode: false));
     }
 
     internal static ChromiumBrowserSession LaunchLocalPageForWindowFailureTest(
@@ -230,7 +236,7 @@ internal sealed class ChromiumBrowserSession : IDisposable
                 existingProcessIds,
                 beforeCleanup);
             session.BringToFront();
-            WaitForPageReady(target, session.WindowHandleString);
+            WaitForPageReady(target, session);
             return session;
         }
         catch
@@ -267,15 +273,10 @@ internal sealed class ChromiumBrowserSession : IDisposable
 
     public void BringToFront()
     {
-        TestWait.RetryUntil(
-            attempt: () =>
-            {
-                AllowSetForegroundWindow(-1);
-                SetForegroundWindow(WindowHandle);
-            },
-            condition: () => GetForegroundWindow() == WindowHandle,
-            timeout: TimeSpan.FromSeconds(1),
-            pollInterval: TimeSpan.FromMilliseconds(50));
+        if (!new WindowActivator().ActivateWindowAsync(WindowHandle).GetAwaiter().GetResult())
+        {
+            throw new InvalidOperationException($"Could not activate the test browser window {WindowHandleString}.");
+        }
     }
 
     public void Dispose()
@@ -735,8 +736,9 @@ internal sealed class ChromiumBrowserSession : IDisposable
         return string.Join(" ", arguments);
     }
 
-    private static void WaitForPageReady(BrowserTarget target, string windowHandle)
+    private static void WaitForPageReady(BrowserTarget target, ChromiumBrowserSession session)
     {
+        var windowHandle = session.WindowHandleString;
         using var staThread = new UIAutomationThread();
         using var automationService = new UIAutomationService(
             staThread,
@@ -747,16 +749,28 @@ internal sealed class ChromiumBrowserSession : IDisposable
             new ElevationDetector(),
             NullLogger<UIAutomationService>.Instance);
         string? missingReadyElement = null;
+        UIAutomationResult? lastSnapshot = null;
+        var readinessAttempts = new List<string>();
+        var readinessClock = Stopwatch.StartNew();
 
         var ready = TestWait.Until(
             condition: () =>
             {
-                if (IsReady(target, automationService, windowHandle, out missingReadyElement))
+                session.BringToFront();
+                var isReady = IsReady(target, automationService, windowHandle, out missingReadyElement, out lastSnapshot);
+                readinessAttempts.Add(
+                    $"{readinessClock.ElapsedMilliseconds}ms: count={lastSnapshot.ElementCount}, " +
+                    $"readMs={lastSnapshot.Diagnostics?.DurationMs}, missing={missingReadyElement ?? "none"}");
+                if (isReady)
                 {
                     return true;
                 }
 
-                TryDismissKnownPopup(automationService, windowHandle);
+                var dismissalError = TryDismissKnownPopup(automationService, windowHandle, lastSnapshot);
+                if (dismissalError is not null)
+                {
+                    readinessAttempts.Add($"Popup dismissal: {dismissalError}");
+                }
                 return false;
             },
             timeout: target.ReadyTimeout,
@@ -765,8 +779,11 @@ internal sealed class ChromiumBrowserSession : IDisposable
         if (!ready)
         {
             throw new InvalidOperationException(
-                $"Timed out waiting for Chromium target '{target.Name}' to become ready without Edge first-run UI interference. " +
-                $"Missing control: {missingReadyElement ?? "unknown"}.");
+                $"Timed out waiting for Chromium target '{target.Name}' to expose its required controls. " +
+                $"Missing control: {missingReadyElement ?? "unknown"}. " +
+                $"Requested window: {windowHandle}; foreground: {GetForegroundWindow()}. " +
+                $"Readiness attempts: {string.Join("; ", readinessAttempts)}. " +
+                $"Window snapshot: {System.Text.Json.JsonSerializer.Serialize(lastSnapshot)}");
         }
     }
 
@@ -774,21 +791,21 @@ internal sealed class ChromiumBrowserSession : IDisposable
         BrowserTarget target,
         UIAutomationService automationService,
         string windowHandle,
-        out string? missingReadyElement)
+        out string? missingReadyElement,
+        out UIAutomationResult snapshot)
     {
+        snapshot = automationService.GetTreeAsync(windowHandle, null, 20, null)
+            .GetAwaiter().GetResult();
+        if (!snapshot.Success)
+        {
+            missingReadyElement = $"{snapshot.ErrorType}: {snapshot.ErrorMessage}";
+            return false;
+        }
+
+        var controls = ChromiumAutomationHarness.Flatten(snapshot.Tree).ToArray();
         foreach (var readyElement in target.ReadyElements)
         {
-            var result = automationService.FindElementsAsync(new ElementQuery
-            {
-                WindowHandle = windowHandle,
-                Name = readyElement.Name,
-                ControlType = readyElement.ControlType,
-                TimeoutMs = 1000,
-            }).GetAwaiter().GetResult();
-
-            if (!result.Success ||
-                result.Items is not { Length: > 0 } ||
-                !result.Items.Any(item =>
+            if (!controls.Any(item =>
                     string.Equals(item.Name, readyElement.Name, StringComparison.Ordinal) &&
                     (readyElement.ControlType is null ||
                      string.Equals(item.Type, readyElement.ControlType, StringComparison.Ordinal))))
@@ -804,53 +821,49 @@ internal sealed class ChromiumBrowserSession : IDisposable
         return true;
     }
 
-    private static bool TryDismissKnownPopup(UIAutomationService automationService, string windowHandle)
+    internal static IEnumerable<UIElementCompactTree> GetKnownPopupDismissButtons(
+        IEnumerable<UIElementCompactTree>? tree)
     {
-        var gotItResult = automationService.ObserveAndClickAsync(new ElementQuery
-        {
-            WindowHandle = windowHandle,
-            Name = "Got it",
-            ControlType = "Button",
-            TimeoutMs = 500,
-        }).GetAwaiter().GetResult();
-
-        if (gotItResult.Success)
-        {
-            return true;
-        }
-
+        var controls = ChromiumAutomationHarness.Flatten(tree).ToArray();
+        var buttonNames = new List<string> { "Got it" };
         foreach (var popupSignal in KnownPopupSignals)
         {
-            var popupResult = automationService.FindElementsAsync(new ElementQuery
+            if (controls.Any(control =>
+                    control.Name?.Contains(popupSignal.SignalText, StringComparison.OrdinalIgnoreCase) == true))
             {
-                WindowHandle = windowHandle,
-                NameContains = popupSignal.SignalText,
-                TimeoutMs = 500,
-            }).GetAwaiter().GetResult();
-
-            if (!popupResult.Success || popupResult.Items is not { Length: > 0 })
-            {
-                continue;
-            }
-
-            foreach (var buttonName in popupSignal.DismissButtons)
-            {
-                var clickResult = automationService.ObserveAndClickAsync(new ElementQuery
-                {
-                    WindowHandle = windowHandle,
-                    Name = buttonName,
-                    ControlType = "Button",
-                    TimeoutMs = 1000,
-                }).GetAwaiter().GetResult();
-
-                if (clickResult.Success)
-                {
-                    return true;
-                }
+                buttonNames.AddRange(popupSignal.DismissButtons);
             }
         }
 
-        return false;
+        foreach (var name in buttonNames.Distinct(StringComparer.Ordinal))
+        {
+            var matches = controls.Where(control =>
+                control.Enabled && control.Type == "Button" && control.Name == name).Take(2).ToArray();
+            if (matches.Length == 1)
+            {
+                yield return matches[0];
+            }
+        }
+    }
+
+    private static string? TryDismissKnownPopup(
+        UIAutomationService automationService, string windowHandle, UIAutomationResult snapshot)
+    {
+        var errors = new List<string>();
+        // Searching for absent popups can consume the page-ready timeout while the page loads.
+        foreach (var button in GetKnownPopupDismissButtons(snapshot.Tree))
+        {
+            var clickResult = automationService.ClickElementAsync(button.Id, windowHandle)
+                .GetAwaiter().GetResult();
+            if (clickResult.Success)
+            {
+                return null;
+            }
+
+            errors.Add($"{button.Name}: {clickResult.ErrorType}: {clickResult.ErrorMessage}");
+        }
+
+        return errors.Count == 0 ? null : string.Join("; ", errors);
     }
 
     private static nint WaitForWindow(

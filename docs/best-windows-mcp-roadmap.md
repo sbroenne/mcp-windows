@@ -1,139 +1,101 @@
-# Roadmap: The Best Windows MCP Server
+# Roadmap: Windows controls, not just screenshots
 
-> Strategy for making `mcp-windows` the best Windows automation server for AI/coding agents.
-> Companion to the phased work tracked in issues. Living document — update as phases land.
+## Position
 
-## Thesis
+**Give your AI agent Windows controls, not just screenshots.**
 
-We do not win by being a better cross-platform automator than
-[terminator](https://github.com/mediar-ai/terminator), or a better browser tool than
-[Playwright MCP](https://github.com/microsoft/playwright-mcp). We win on the axis **only a
-native Windows server can own**: deep UI Automation integration + agent-shaped ergonomics +
-the dual MCP/CLI entry point the sister projects (`mcp-server-excel`, `mcp-server-powerpoint`)
-already standardize on.
+Windows MCP gives Copilot, Claude, Cursor, and other compatible agents tools
+for Windows apps. It is not a replacement for those agents. The MCP server
+and command line use the same automation code.
 
-Three moats:
+Lead with three practical benefits:
 
-1. **Native depth** — full UIA pattern coverage, event-driven waits, structured data
-   extraction, and OS integration that browser/cross-platform tools structurally cannot reach.
-2. **Agent ergonomics** at Playwright's level — perceive+act fusion, one orient primitive,
-   batching, and self-healing.
-3. **Dual entry point** — MCP + CLI + Skills, the token-efficient path coding agents are moving
-   toward, matching the Excel/PowerPoint architecture.
+1. **Find controls, not just pixels:** find actual buttons and fields, then use their returned IDs.
+2. **Send useful changes:** avoid repeated full views, read only what is needed,
+   and combine steps.
+3. **Choose the agent:** use an MCP client or an agent that runs shell commands.
 
-## What the field is doing (grounding)
+Explain token efficiency as less repeated information for the model to process.
+Do not call every alternative screenshot-only: some other Windows MCP servers
+also read accessibility information. Do not claim a measured advantage over
+GitHub Copilot app computer use without a direct comparison.
 
-- **Playwright MCP** — accessibility snapshot is the source of truth; no vision; deterministic;
-  **every action returns a fresh snapshot** (perceive+act fused); elements addressed by `ref`.
-  Their team openly notes coding agents increasingly prefer **CLI + Skills over MCP** for token
-  efficiency.
-- **CursorTouch/Windows-MCP** (2M+ users) — leads with **one `State-Tool`** returning the
-  combined a11y element list + app state as the single orient primitive, plus a `use_dom` mode.
-- **terminator** ("Playwright for desktop", Rust UIA) — **batched/sequenced actions** and a
-  **workflow recorder** (record → replay deterministically).
-- **`mcp-server-excel`** (our sibling) — ships the endgame architecture: `Core` + `Service` +
-  `ComInterop`, with `McpServer` and `CLI` as twin entry points generated from one definition
-  (`Generators.Cli` / `Generators.Mcp` / `Generators.Shared`), plus `skills/excel-cli` and
-  `skills/excel-mcp`.
+Do not compete on raw tool counts, unsupported reliability rankings, or broad
+system-administration features that the host already provides. Dedicated browser
+and Office tools remain appropriate for their specialized tasks.
 
-## The 6 pillars
+## Shipped in the codebase
 
-### 1. Perception: a single "desktop snapshot" primitive
-- `ui_snapshot` — a compact tree for a window or subtree, with optional remembered change-only updates,
-  depth-bounded and content-view filtered. The "orient" verb agents reach for first.
-- Stable element `ref`s returned in the snapshot that every action tool accepts.
-- Diff snapshots — return only what changed since the last snapshot (token savings on long
-  sessions).
+| Area | Current capability | Boundary |
+|------|--------------------|----------|
+| Discovery and targeting | Window/subtree snapshots, scoped search, uniqueness checks, observed IDs | Stale IDs fail; they do not retarget similar controls |
+| Incremental observations | Automatic differences with safe full fallback | Results depend on the workload; capture still reads the full tree |
+| Actions | Click, type, select, bounded waits, batches, optional post-action snapshots | Dispatch is not proof of the application's outcome |
+| Data extraction | Element/window reads, article text, table rows/headers, clipboard | Depends on accessible content; explicit window reads can use OCR |
+| Windows integration | Window/process management, launch, supported Save As/Open dialogs | English dialog labels and Windows privilege boundaries remain limitations |
+| Fallback | Annotated screenshots, mouse, keyboard, continuous drawing strokes | Coordinate-based input still depends on layout and shared focus |
+| Reusable sequences | Run supplied batch steps from project-owned files | Not a passive recording of a user's mouse/keyboard session |
+| CLI | Shared tool implementation, catalog, persistent CLI service, checked snapshot tokens | MCP and CLI have separate IDs and baselines |
+| Quality | Native/WinUI/Electron/Chromium harnesses and a manual model-driven suite | Coverage is not universal application certification |
 
-### 2. Action: fewer, richer verbs + fusion
-- Perceive+act fusion — `ui_click`/`ui_type` optionally return the updated snapshot, halving
-  interaction round-trips (the core Playwright insight).
-- `ui_batch` — ordered steps (`find/click/type/select/wait/key`), stop-on-error, one
-  consolidated result. Biggest multi-step token win.
-- Full UIA pattern coverage — `ui_select` (combobox/list), expand/collapse, toggle, setValue,
-  scrollIntoView, RangeValue (sliders).
+Installation is a separate concern from implementation. The current release workflow
+packages the MCP executable and VS Code extension, not the CLI. The tracked plugin
+directory contains skills but no installable manifest or download bootstrap.
+See [Installation](https://windowsmcpserver.dev/installation/) for supported routes.
 
-### 3. Reliability: event-driven, self-healing
-- `ui_wait` — wait for an element to appear/disappear/reach a state. ✅ done (`ui_wait`)
-- UIA event subscriptions (window-open, focus-change, structure/property-changed) instead of
-  polling — a genuine Windows superpower for deterministic waiting.
-  **Deferred (with rationale):** `ui_wait` and the auto-wait inside `ui_batch` already give
-  deterministic waits via short, bounded polling loops that are proven stable across Win32 / WinUI3 /
-  Electron on the CI desktop. Native `IUIAutomation.AddAutomationEventHandler` subscriptions must be
-  created and disposed on the STA thread, marshal callbacks back across threads, and are notoriously
-  leaky/racy with virtualized providers — a large, high-risk change for a latency win measured in tens
-  of milliseconds. We keep the reliable polling and revisit event subscriptions only if a concrete
-  workload shows polling latency as a real bottleneck.
-- Auto-wait inside actions (retry until actionable) and self-healing selectors (auto re-find on
-  `ElementStale`).
+## Priorities
 
-### 4. Windows-native moat (the differentiator)
-- Structured data extraction via GridPattern/TablePattern/Selection → grids/tables/trees/lists
-  as JSON rows/columns instead of OCR. ✅ done (`ui_read_table`)
-- Clipboard read/write — often the fastest bulk text IO in/out of apps. ✅ done (`clipboard`)
-- Generalized dialog handling — extend the Save-As handling to Open/Print/common dialogs.
-  ✅ done (`file_open`, sharing the Save-As dialog engine)
-- Whole-desktop orchestration across windows; toast/notification reading.
-- Win32/MSAA fallback for legacy apps with no UIA tree.
-  **Deferred (with rationale):** UIA already bridges MSAA automatically, so the vast majority of
-  legacy Win32/MFC apps surface a usable UIA tree today (the harness includes Win32 controls that the
-  existing tools drive). A *separate* raw MSAA/`IAccessible` path would duplicate the entire
-  find/click/type/read surface against a second, weaker accessibility API for a shrinking set of apps,
-  and physical-input fallback (`mouse`/`keyboard` by coordinates) already covers controls with no
-  automation provider. Not worth the surface-area and maintenance cost now; revisit if a concrete
-  must-support app has no UIA tree at all.
-- Workflow record & replay was implemented as `ui_macro`, then retired in issue #236.
-  Reusable workflows now use project-owned steps arrays with `ui_batch` / `wincli ui batch --steps-file`.
+### 1. Evidence and clear documentation
 
-### 5. Dual entry point: MCP + CLI + Skills
-The desktop is shared, but discovered element references and snapshot baselines need a
-persistent owner. CLI calls use one background daemon; MCP keeps its own in-process state.
-Discover a control, then pass its returned ID to `wincli ui click --window 123 --element-id <id>`.
-Clicks are not idempotent: never automatically replay an action after losing its response.
+Keep [benchmark results](incremental-snapshot-benchmark.md) tied to measured code,
+application versions, comparison baselines, and sample counts. Separate approximate
+snapshot tokens from agent billing and capture latency. Preserve unfavorable results.
+Refresh measurements when ID formats or response metadata change.
 
-**Shipped (Phase 3):** `wincli` — a twin command-line entry point in `Sbroenne.WindowsMcp.Cli`.
-Rather than the full Excel-style generator refactor, the CLI is a thin argument→tool adapter that
-calls the **exact same tool `ExecuteAsync` methods** the MCP server registers. This guarantees
-MCP/CLI parity from a single source of truth with zero business-logic duplication (an integration
-test asserts the CLI and MCP JSON outputs are byte-for-byte equal). Ships with a `windows-cli`
-plugin skill and `wincli guidance`/`tools`/`--help` discovery.
+Keep public descriptions and examples aligned with current contracts. Follow the
+[documentation guidelines](../.github/documentation.instructions.md), including
+the canonical-source model for GitHub Pages.
 
-**Shared tool catalog (issue #159, increment 1):** the tool surface now also has a single,
-programmatic source of truth. `Sbroenne.WindowsMcp.Catalog.ToolCatalog` reads the exact SDK tool
-registrations (`WithToolsFromAssembly`) and both surfaces derive from it: the MCP server advertises
-them via `tools/list`, and the CLI exposes the identical manifest through `wincli tools --json`
-(names, descriptions, JSON input schemas) for machine discovery by coding agents. A contract test
-(`CliToolCoverageTests`) fails the build if any MCP tool lacks a matching `wincli` command, so the
-two entry points cannot drift.
+### 2. Installation consistency
 
-**Deferred (issue #159, remaining):** generating the CLI argument-binding verbs themselves from the
-op definitions (the full `Core`/`Service` + source-generator refactor — define each op once, emit
-both the MCP tool and the CLI verb). Valuable for scaling the op count, but lower priority now that
-(a) parity is structurally guaranteed by reusing the tool methods and (b) tool discovery is driven
-from the shared catalog with a build-breaking drift guard.
+Consider packaging the CLI alongside the MCP server and providing a real installable
+plugin if that remains the intended distribution route. Correct the VS Code runtime
+acquisition mismatch before promising automatic .NET 10 setup.
+These are distribution follow-ups, not completed documentation features.
 
-### 6. Trust: safety, observability, testing
-- Consistent, real recovery hints (no references to non-existent tools).
-- Dry-run/preview mode and a structured action trace for debugging.
-- Keep the LLM-test harness; add per-app-class regression suites (Win32 / WinUI / Electron /
-  browser).
+### 3. Observable, controlled automation
 
-## Phased roadmap
+Continue improving explicit outcomes and recovery hints without blindly retrying
+side-effecting actions. Evaluate action history, preview support, and optional
+confirmation mechanisms against concrete user needs. Tool filters and host approvals
+already help limit exposure, but are not desktop isolation or rollback.
 
-| Phase | Theme | Contents | Nature |
-|-------|-------|----------|--------|
-| **0** | Correctness | Fix dead recovery hints; expose already-built `ui_snapshot` (get_tree), `ui_wait`, `ui_select`; elementId reuse in interactive tools | Plumbing over existing services ✅ done |
-| **1** | Ergonomics parity | `ui_batch` + perceive/act fusion (`withSnapshot`) + auto-wait/self-heal | Core differentiator ✅ ui_batch + fusion done |
-| **2** | Windows moat | Structured grid/table extraction ✅ (`ui_read_table`), clipboard ✅ (`clipboard`), generalized dialogs ✅ (`file_open`); UIA event waits deferred (polling proven, see pillar 3) | The unbeatable part |
-| **3** | Dual entry point | `wincli` CLI (twin of the MCP server, identical JSON, exact-parity test) + `windows-cli` skill + shared `ToolCatalog` (`wincli tools --json`, drift-guard test, issue #159) | Strategic ✅ CLI + Skill + tool catalog done (full verb generator deferred, #159) |
-| **4** | Reusable workflows | Project-owned batch files replace the retired `ui_macro` (#236); Win32/MSAA fallback deferred (UIA bridges MSAA; physical-input fallback covers the gap — see pillar 4) | Long tail |
+### 4. Real application coverage
 
-Phase 0 is almost entirely wiring code already written and tested in the service layer —
-highest ROI, lowest risk. Phases 1–2 make us the best *Windows* automation experience for
-agents. Phase 3 makes us the best *coding-agent* experience and aligns the sister-project family.
+Prioritize reported failures in native apps, WinUI, Electron, and Chromium.
+Keep page controls and browser chrome distinct in coverage claims.
+Expand dialog languages and app-specific regressions when a concrete use case
+justifies the maintenance cost.
 
-## Sister-project note
+## Deferred choices
 
-If a fix or capability here (session lifecycle, CLI/MCP parity, batching, record/replay) applies
-to `mcp-server-excel` / `mcp-server-powerpoint`, flag it so the same change can be considered
-there.
+- **General UIA event subscriptions:** retain bounded polling where it is reliable.
+  Revisit event complexity only when a measured workload justifies it.
+- **A separate raw MSAA backend:** UIA already bridges many legacy controls.
+  Add another backend only for a demonstrated unsupported application.
+- **Generated CLI argument bindings:** shared tool implementations and catalog checks
+  already reduce drift. Full code generation remains a separate architecture change.
+- **Page-only browser snapshots:** retain the complete-window approach until page
+  scoping can reliably preserve the intended content.
+
+## References and sister projects
+
+[Playwright](https://github.com/microsoft/playwright) provides useful patterns for
+accessibility snapshots. [FlaUI](https://github.com/FlaUI/FlaUI) and
+[pywinauto](https://github.com/pywinauto/pywinauto) are Windows automation references.
+These are design references, not evidence that Windows MCP outperforms those projects.
+
+The Excel and PowerPoint MCP servers share the goal of equal MCP/CLI access.
+Check their approaches before changing cross-cutting lifecycle or distribution
+patterns, and flag relevant fixes for those repositories without assuming identical
+implementations.

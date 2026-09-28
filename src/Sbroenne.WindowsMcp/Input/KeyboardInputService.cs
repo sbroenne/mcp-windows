@@ -362,7 +362,7 @@ public sealed class KeyboardInputService : IDisposable
         {
             // Provide helpful error message, especially for shortcut attempts like "Ctrl+S"
             var errorMsg = keyName.Contains('+', StringComparison.Ordinal)
-                ? $"Unknown key: '{keyName}'. For shortcuts like Ctrl+S, use key='S' with modifiers='Ctrl'. ⚠️ For saving files, use file_save tool instead!"
+                ? $"Unknown key: '{keyName}'. For shortcuts like Ctrl+S, use key='S' with modifiers='Ctrl'."
                 : $"Unknown key: '{keyName}'. See documentation for valid key names.";
 
             return Task.FromResult(KeyboardControlResult.CreateFailure(

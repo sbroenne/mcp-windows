@@ -1,163 +1,217 @@
 ---
 template: home.html
 title: Home
-description: >-
-  Windows computer use for AI agents. Automate any Windows app, browser or
-  website by name — not pixels. Tested with real AI models. Works with GitHub
-  Copilot, Claude Desktop and Cursor.
-keywords: "Windows MCP Server, Windows computer use, MCP server, Windows UI Automation, browser automation, Edge automation, Chrome automation, accessibility API, GitHub Copilot Windows, Claude Desktop, Cursor, agentic automation, RPA, UIA"
+description: Put your AI to work in Windows. In 32 real-app trials, controls first completed 11 of 16 tasks; screenshots alone completed 7 of 16.
 hide:
   - navigation
   - toc
 ---
 
-!!! success "Control Windows apps by name, not pixels"
-    Windows MCP Server gives your AI assistant direct access to Windows
-    applications through the **Windows UI Automation API** — the same API screen
-    readers use to read buttons, menus and text fields.
+**Your assistant. Your Windows apps. One set of tools.**
 
-    Your AI says *"click Save"* and the server finds the Save button by name. No
-    screenshots. No pixel parsing. No coordinate guessing. It's deterministic —
-    the same command works every time, regardless of DPI, theme or resolution.
+Use Windows MCP with GitHub Copilot, Claude, Cursor, or another compatible
+assistant. Connect through **MCP or the command line (CLI)**. Keep the AI you
+prefer and give it the tools to act in Windows. Both routes work with AI agents:
+an agent with command access can run the CLI for you.
 
-!!! tip "Also automating Excel?"
-    Check out [Excel MCP Server](https://excelmcpserver.dev/) — the sister
-    project, built the same way.
+[Set up your assistant](installation.md){ .md-button .md-button--primary }
 
-!!! tip "Also building PowerPoint decks?"
-    Check out [PowerPoint MCP Server](https://powerpointmcpserver.dev/) — another
-    sister project, built the same way.
+<span id="why-controls-not-just-screenshots"></span>
+<span id="less-information-to-repeat"></span>
+<span id="fewer-tokens-when-a-picture-is-not-needed"></span>
 
-## Key features
+## Why choose Windows MCP?
 
 <div class="grid cards" markdown>
 
--   :material-brain:{ .lg .middle } __Semantic UI access__
+-   **Save tokens**
 
     ---
 
-    Find elements by name, type or ID — not coordinates. Works regardless of
-    DPI, theme, resolution or window position.
+    Read the answer, not a picture of the answer. Get a field's value or a
+    checkbox's state as text, then request only changes instead of repeating
+    the whole window.
 
--   :material-web:{ .lg .middle } __Browser automation__
-
-    ---
-
-    Automate Edge and Chrome page content by name — links, buttons, forms and
-    ARIA labels. Works with signed-in sessions via the dedicated
-    `windows_mcp_browser_automation` prompt.
-
--   :material-monitor-multiple:{ .lg .middle } __Multi-monitor__
+-   **Target real controls**
 
     ---
 
-    Full support for multiple displays with per-monitor DPI scaling. Move
-    windows between monitors and capture any screen.
+    Find the Save button and act on that particular button, rather than work
+    out where to click in a screenshot. Read text, checked states, and table
+    rows directly.
 
--   :material-application-cog:{ .lg .middle } __Broad app support__
-
-    ---
-
-    Tested against classic Windows apps, modern Windows 11 apps, Electron apps
-    (VS Code, Teams, Slack) and Chromium browsers. Same commands everywhere.
-
--   :material-cursor-default-click:{ .lg .middle } __Full fallback__
+-   **Keep screenshots as a fallback**
 
     ---
 
-    Screenshot + mouse + keyboard for games and custom controls. Annotated
-    screenshots return element metadata — image omitted by default to save
-    tokens.
+    Both approaches are built in. When appearance matters or controls are not
+    available, return a screenshot for the AI to inspect and use mouse and
+    keyboard actions.
 
--   :material-test-tube:{ .lg .middle } __LLM-tested quality__
+-   **Use your preferred assistant**
 
     ---
 
-    Every tool tested with **real AI models** before release. 54 automated tests
-    across 7 scenarios. 100% pass rate required.
+    Connect through MCP, a standard way to give an assistant tools, or the
+    command line (CLI). Use the same Windows capabilities with Copilot, Claude,
+    Cursor, and other compatible assistants.
 
 </div>
 
-[See all tools and operations :material-arrow-right:](features.md){ .md-button .md-button--primary }
+<span id="measured-token-savings"></span>
 
-## See it in action
+## Real tasks: controls first versus screenshots
 
-Ask your AI assistant in plain language — it drives Windows for you:
+**Controls first completed 11 of 16 tasks. Screenshots alone completed 7 of 16.**
+We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
+documents in Notepad and Word, change and reorder PowerPoint slides, and
+submit a booking form in Chrome.
 
-!!! example "🖱️ Control any app"
-    **You:** "Click the Save button in Notepad, then type my email in the login
-    field and toggle Dark Mode in Settings."
+We checked the actual files and submitted values, not just whether the AI
+said it had finished. All original input files stayed unchanged.
 
-    The AI finds each control by name through the UI Automation API and acts on
-    it — no screenshots or coordinates required.
+For the **seven matching tasks where both approaches succeeded**, controls
+first used **51.1% fewer input tokens** and took **49.3% less time**, at the
+middle of each set of savings. This route could still use screenshots.
+One PowerPoint comparison used **21.9% more input tokens with controls**,
+with almost the same time.
 
-!!! example "🌐 Automate the browser"
-    **You:** "Open my banking site in Edge and click Transfer, then fill out the
-    form on this page in Chrome."
+This was one trial per app/model/approach, with Windows MCP providing both
+approaches. It supports **controls first, screenshots when needed**, not
+a claim that screenshots are always worse. We did not test Copilot's or
+Claude's built-in computer use directly.
 
-    The AI drives page content by name — links, buttons, forms and ARIA labels —
-    working with your signed-in sessions.
+[See model results, failures, and the full method](benchmark.md#real-tasks-in-notepad-word-powerpoint-and-chrome)
 
-!!! example "🪟 Manage windows"
-    **You:** "Move this window to my second monitor, then read the error message
-    from that dialog."
+## How Windows MCP saves tokens
 
-    The AI finds, activates, moves and resizes windows and reads on-screen text
-    (with OCR fallback).
+AI services count the text and images they read in units called **tokens**.
+Windows MCP can reduce what your assistant has to read in two ways.
 
-## Why this approach
+### Read one field instead of the whole window
 
-Most automation tools take screenshots and ask vision models to find buttons in
-the pixels. That approach is slow, expensive and breaks when windows move or
-themes change.
+Need a name from a form? Read that field, rather than send every button, field,
+and menu in the window. We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and
+GPT-5.6 Luna to read the same field from text and screenshots.
+**All 300 answers were correct. Direct reads used fewer tokens with every model.**
 
-Windows MCP Server asks Windows directly: *"What buttons exist?"* Windows knows.
-It's deterministic — the same command works every time.
+--8<-- "assets/charts/screenshot-form.html"
 
-For repeated observations, automatic snapshots compare a simplified semantic view and return a
-compact diff only when it is safely smaller. A five-run benchmark measured **84-96% median
-byte/token savings** for Electron, Word, and Excel changes. The same Playwright-style view reduced
-realistic Chrome navigation by **13.1% in bytes and 13.4% in approximate tokens**, even though 18 of
-20 responses were complete simplified views. A later strict Chrome run measured the conservative
-display cleanup on the same captures: another **10.6% fewer bytes and 13.6% fewer tokens**.
+**Get the value directly, not from a picture.** Your assistant receives the
+text it needs for the next step, without interpreting the rest of the window.
+Screenshots also worked at both low and high detail in this form test, so
+your assistant can use a picture when it needs one.
 
-[Read the reproducible benchmark :material-arrow-right:](benchmark.md){ .md-button }
+[See the full screenshot comparison](benchmark.md#screenshots-versus-direct-reads)
 
-## Tested with real AI models
+### Send changes instead of repeating everything
 
-Tool descriptions that seem clear to humans often confuse AI. Parameters get
-misunderstood. Actions get skipped.
+After a value changes, your assistant can receive just the changes instead
+of another full description of the window. These tests show how much that
+reduced the text sent to the AI.
 
-We test every tool with a **real AI model** (GPT-5.5 via GitHub Copilot) using
-[pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering). 130+ automated tests.
-The tests are intentionally manual-only and isolated from PR, CI, and release workflows.
-If the AI can't use a tool correctly, we fix the tool — not the prompt.
+--8<-- "assets/charts/text-updates.html"
 
-[Run the LLM Integration Tests workflow :material-arrow-right:](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml){ .md-button }
+This second chart compares text with text, not screenshots. The percentages
+are not extra savings to add to the first chart.
 
-## Quick start
+These two smaller tests measure information sent, not a complete task or a
+dollar bill. Do not add their savings to the real-task figures above.
 
-=== "VS Code (recommended)"
+[See all results and how we measured them](benchmark.md)
 
-    Install directly from the VS Code Marketplace:
+## Start with a small task
 
-    [Install from VS Code Marketplace :material-arrow-right:](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp){ .md-button .md-button--primary }
+After setup, open Notepad and ask your assistant:
 
-=== "Other MCP clients"
+> Type "Hello from Windows MCP" in Notepad and save it as a new file named
+> windows-mcp-demo.txt on my Desktop.
 
-    Download from [GitHub Releases](https://github.com/sbroenne/mcp-windows/releases)
-    and add to your MCP config:
+Use a new test file, not an important document. Your assistant may ask for
+permission before it acts.
 
-    ```json
-    { "servers": { "windows": { "command": "path/to/Sbroenne.WindowsMcp.exe" } } }
-    ```
+## What can it help with?
 
-!!! warning "Caution"
-    This MCP server controls your Windows desktop. Use responsibly.
+| You want to... | Try asking... |
+|----------------|---------------|
+| Understand a message | "Read the error in this window and explain it." |
+| Fill in a form | "Fill in this form with these details. Stop before submitting it." |
+| Read a table | "Read this table and list the rows with missing values." |
+| Save your work | "Save this document as a new file." |
+| Arrange your windows | "Move Notepad to my second monitor." |
 
-## GitHub star history
+[More examples and limits](features.md)
 
-![GitHub stars over time for mcp-windows](assets/images/star-history.svg){ loading=lazy }
+## How it works
 
-Updated daily from GitHub's exact public star count. The historical seed and
-persisted snapshots contain aggregate dates and counts only.
+**Your assistant makes the decisions. Windows MCP carries out the Windows
+actions and returns the results.** It runs locally on your PC.
+
+<figure class="mcp-flow">
+  <div class="mcp-flow__node">
+    <strong>Your AI assistant or script</strong>
+    <span>MCP or command line (CLI)</span>
+  </div>
+  <div class="mcp-flow__arrow" aria-hidden="true">&#8597;</div>
+  <div class="mcp-flow__node">
+    <strong>Windows MCP</strong>
+    <span>Runs on your PC</span>
+  </div>
+  <div class="mcp-flow__arrow" aria-hidden="true">&#8597;</div>
+  <div class="mcp-flow__branches">
+    <div class="mcp-flow__node">
+      <strong>Windows UI Automation</strong>
+      <span>Read and use actual controls</span>
+    </div>
+    <div class="mcp-flow__node">
+      <strong>Screenshots, mouse and keyboard</strong>
+      <span>For visual tasks</span>
+    </div>
+  </div>
+  <div class="mcp-flow__arrow" aria-hidden="true">&#8597;</div>
+  <div class="mcp-flow__node"><strong>Your Windows apps</strong></div>
+  <figcaption>Requests go to Windows MCP. Results return to your assistant.</figcaption>
+</figure>
+
+**Connect through MCP or CLI.** An assistant can call MCP tools, or a coding
+agent can run `wincli` through its existing terminal tool on your Windows PC.
+You ask for the task; the agent chooses the calls or commands. Both routes
+use the same Windows automation code. The CLI also works in scripts.
+
+**Read and act on controls.** Windows MCP uses **Windows UI Automation**,
+Windows' system for exposing buttons, fields, tables, and their values.
+It gives the assistant a reference to each control it finds. The assistant
+can then target that control, rather than work out where to click in a picture.
+
+**Return the information needed.** Read a field as text, or request a view of
+the window. For repeated views, Windows MCP can return only changes when that
+is safe and smaller. When appearance matters or controls are not available,
+the assistant can request a screenshot and use mouse and keyboard actions.
+
+The assistant should check what happened after an action. A successful click
+does not, by itself, prove that a file was saved or a form was submitted.
+
+[More about how it works](architecture.md)
+
+## How does this compare with built-in computer use?
+
+**Keep your assistant. Give it purpose-built Windows tools.** GitHub Copilot app
+and Claude Code have built-in computer use, and both can connect to Windows MCP.
+
+Add Windows MCP for focused text reads, changes-only updates, and actions on
+the exact controls it finds. Save tokens without giving up screenshot-based
+use when a task needs it. You are not tied to one AI app's built-in tools.
+
+[Compare Windows MCP with Copilot app and Claude Code](comparison.md)
+
+## Before you begin
+
+Windows MCP uses your real desktop, including apps where you are already signed
+in. Keep private information out of view unless it is needed for the task.
+Review your AI app's permission settings, and leave the mouse and keyboard
+alone while the assistant is working.
+
+Screenshot-based use needs an AI that understands images and a client that
+passes those images to it.
+
+[Use it safely](security.md) | [Understand what data is shared](privacy.md)

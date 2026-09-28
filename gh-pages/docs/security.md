@@ -1,61 +1,64 @@
 ---
-title: Security
-description: How Windows MCP Server handles Windows security boundaries — UAC, UIPI, the secure desktop and input simulation — plus responsible-use guidance and how to report vulnerabilities.
-keywords: "Windows MCP security, UAC, UIPI, secure desktop, SendInput, elevated windows, responsible use, report vulnerability"
+title: Use it safely
+description: Choose what your assistant may do, protect important files, and understand Windows permission limits.
 ---
 
-# Security
+# Use it safely
 
-Windows MCP Server automates your desktop the same way an assistive technology
-does — through the official **Windows UI Automation API** and standard input
-APIs. It does not bypass any Windows security boundary, and it cannot do
-anything your own user account cannot already do.
+**Your assistant can act in your real apps.** It can type, click, open files,
+and use accounts where you are already signed in. A mistake can change a
+document, submit a form, or send information.
 
-!!! warning "This server controls your desktop"
-    Windows MCP Server can click buttons, type text, launch applications and move
-    windows on your behalf. Only connect it to AI clients you trust, and review
-    what your agent is doing — especially in autonomous workflows.
+## Before a task
 
-## Windows security boundaries
+- Connect only an AI app you trust.
+- Review that app's settings for approving tool use.
+- Start with a test file or a copy of an important document.
+- Close private documents and unrelated apps when they are not needed.
+- Tell the assistant where to stop, especially before sending, deleting, or paying.
 
-The server respects the operating system's privilege model. These boundaries are
-enforced by Windows itself and **no MCP server can bypass them**:
+Asking the assistant to stop before an action is useful guidance, but it is not
+an enforced permission setting. Use your AI app's approval settings too.
 
-- **UIPI (User Interface Privilege Isolation)** — Windows blocks input from a
-  non-elevated process to elevated (Administrator) windows. UI tools return an
-  `ElevatedWindowActive` error rather than silently failing.
-- **Secure desktop** — Input cannot be sent during UAC prompts, the lock screen
-  or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Del</kbd>. A user must approve or unlock
-  manually.
-- **Input simulation** — The server uses `SendInput`, the standard Windows API
-  for simulating keyboard and mouse input.
+## While it works
 
-Because of these boundaries, an AI agent cannot approve its own UAC prompts or
-drive an elevated app from a non-elevated server. To automate administrative
-tasks, run the MCP server at the same privilege level as the target app — and do
-so with appropriate caution. See
-[Known Limitations](features.md#known-limitations) for details and workarounds.
+Leave the mouse and keyboard alone. Avoid having two assistants work on the
+same desktop at once.
 
-## Runs with your privileges
+Check important results. A click being sent does not prove a file was saved or
+a form was submitted. If the assistant is unsure, it should look at the result
+before trying the action again.
 
-The server runs as a local process under your Windows user account. It has
-exactly the permissions your account has — nothing more. Running it elevated
-grants it Administrator rights, so only do that when you specifically need to
-automate elevated windows.
+Stop the task in your AI app if it starts doing something unexpected.
 
-## Responsible use
+## Windows permission limits
 
-- Prefer semantic UI Automation over coordinate-based fallbacks so actions target
-  the intended control.
-- Be cautious with destructive operations (deleting files, confirming dialogs,
-  submitting forms) in autonomous mode.
-- Treat browser automation against signed-in sessions like giving the agent
-  access to those accounts.
+An assistant running without administrator rights cannot control an app
+running as administrator. Prefer running both normally rather than giving the
+assistant more permission.
 
-## Reporting a vulnerability
+Windows permission prompts, the lock screen, and the screen opened by
+Ctrl+Alt+Delete need your input. Windows MCP does not approve these for you.
 
-If you believe you have found a security vulnerability, please report it
-privately through
-[GitHub Security Advisories](https://github.com/sbroenne/mcp-windows/security/advisories/new)
-rather than opening a public issue. We will review and respond as quickly as we
-can.
+## What tool settings do not protect
+
+You can hide selected tools from an MCP connection. For example, you may choose
+not to offer a tool that launches apps.
+
+This does not confine the remaining tools to one app or folder. A tool that can
+click or type may still reach sensitive actions in an open app.
+
+Windows MCP does not create a separate desktop, ask for confirmation before
+every action, or provide a general undo button. Approval prompts come from
+your AI app. Tool restrictions for one MCP connection do not apply to the
+separate `wincli` command-line tool.
+
+[Tool settings for advanced users](https://github.com/sbroenne/mcp-windows/blob/main/FEATURES.md#configuration)
+
+## Report a security problem
+
+Please [report a security problem privately on GitHub](https://github.com/sbroenne/mcp-windows/security/advisories/new).
+Do not put passwords, private documents, or details of an unpatched security
+problem in a public issue.
+
+[Privacy and data sharing](privacy.md) | [Help with problems](troubleshooting.md)

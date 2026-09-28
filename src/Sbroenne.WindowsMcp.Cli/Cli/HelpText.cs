@@ -166,10 +166,12 @@ internal static class HelpText
             save_as sends Ctrl+Shift+S to save under a different path without first overwriting
             the original. --path alone does not change an existing document's destination.
             wait fills an already open owned Save As dialog without another shortcut.
+            Overwrite and error prompts remain open for an explicit decision. Do not blindly repeat a failed save.
 
         file-open --window <h> --path <file> [--trigger-mode shortcut|wait] [--timeout-ms <n>]
             Open an existing file. shortcut sends Ctrl+O; wait handles a native dialog opened by
             a prior semantic click in a browser or desktop app.
+            One path-entry attempt and one submission; inspect remaining dialogs before choosing another action.
 
         clipboard <action> [--text <s>]
             actions: get (read clipboard text), set (write --text), clear

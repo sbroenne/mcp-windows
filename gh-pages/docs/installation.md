@@ -1,75 +1,146 @@
 ---
-title: Installation
-description: Install Windows MCP Server as a VS Code extension, a GitHub Copilot CLI / Claude Code plugin, or a standalone MCP server. Requirements, MCP config and setup.
-keywords: "install Windows MCP Server, VS Code extension, GitHub Copilot CLI plugin, Claude Code, MCP config, standalone MCP server, Windows 10 11, .NET 10"
+title: Get started
+description: Set up Windows MCP with your AI app, then try a small task on your Windows PC.
 ---
 
-# Installation
+# Get started
 
-Windows MCP Server runs on **Windows 10/11** and needs the **.NET 10 runtime**
-(installed automatically by the VS Code extension and the plugin). Pick the entry
-point that matches your MCP client.
+You can use Windows MCP through **MCP or the command line (CLI)**.
+Both routes work with AI agents. MCP connects the Windows tools to your AI app.
+An agent that can run commands on your Windows PC can use the CLI through its
+existing terminal tool. You do not have to write a script.
 
-!!! warning "Caution"
-    This MCP server controls your Windows desktop. Use responsibly — see
-    [Security](security.md).
+Start with your AI app below, or use the
+[CLI setup for coding agents](#command-line-cli).
 
-## VS Code + GitHub Copilot
+## What you need
 
-The easiest way to get started. The extension registers the MCP server with
-GitHub Copilot automatically.
+- A Windows PC with a signed-in, unlocked desktop.
+- An AI app with MCP support, or an agent that can run commands on your Windows PC.
+- Permission to install software and change that app's settings.
 
-[Install from the VS Code Marketplace :material-arrow-right:](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp){ .md-button .md-button--primary }
+Windows MCP is free. Your AI app may need its own subscription.
+Read [how to use it safely](security.md) before allowing it to act.
 
-Once installed, just ask Copilot in natural language, for example *"Click the
-Save button in Notepad"* or *"Move this window to my second monitor."*
+<span id="vs-code-github-copilot"></span>
+## GitHub Copilot in VS Code
 
-## GitHub Copilot CLI / Claude Code (plugin)
+1. Install [Windows MCP Server from the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp).
+2. Install the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). This is Microsoft software needed to run the server included with the extension.
+3. Open Copilot Chat in VS Code and choose **Agent** mode.
+4. Enable the Windows MCP tools in the chat's tool list.
+5. Try the [first task below](#try-your-first-task).
 
-Install the shared plugin bundle — it includes the MCP server **and** the
-[`windows-automation` Agent Skill](skills.md):
+You do not need to add a second copy of the server through a settings file.
 
-```powershell
-copilot plugin install sbroenne/mcp-windows:plugin
-```
+<span id="standalone-any-mcp-client"></span>
+## Claude Desktop, Cursor, and other AI apps
 
-For local Claude Code development, point it at a checkout of the plugin:
+### Download the server
 
-```powershell
-claude --plugin-dir .\plugin
-```
+1. Open [the latest release](https://github.com/sbroenne/mcp-windows/releases/latest).
+2. Download the Windows ZIP file for your PC: **x64** for most PCs, or **ARM64** for an ARM-based PC. Windows **Settings > System > About > System type** shows which you have.
+3. Extract the ZIP into a folder you will keep, for example `C:\Tools\windows-mcp`.
+4. Find `Sbroenne.WindowsMcp.exe` in that folder. You will need its full path.
 
-On first use, the plugin downloads the current standalone release into
-`plugin\bin\`.
+Keep all the extracted files together. This download includes the Microsoft
+software it needs to run; you do not need a separate .NET installation.
 
-## Standalone (any MCP client)
+### Connect your AI app
 
-Download the standalone build from
-[GitHub Releases](https://github.com/sbroenne/mcp-windows/releases) and register
-it in your MCP client configuration:
+Choose the matching instructions. The example path below assumes you extracted
+the files into `C:\Tools\windows-mcp`. Replace it if you chose a different folder.
 
-```json
-{
-  "servers": {
-    "windows": {
-      "command": "path\\to\\Sbroenne.WindowsMcp.exe"
+=== "Claude Desktop"
+
+    Open **Settings > Developer > Edit Config**. This opens
+    `%APPDATA%\Claude\claude_desktop_config.json`.
+
+    Add the `windows` entry under `mcpServers`. If the file already contains
+    other servers, keep them.
+
+    ```json
+    {
+      "mcpServers": {
+        "windows": {
+          "command": "C:\\Tools\\windows-mcp\\Sbroenne.WindowsMcp.exe"
+        }
+      }
     }
-  }
-}
-```
+    ```
 
-This works with any MCP-compatible client, including Claude Desktop and Cursor.
+    Save the file and restart Claude Desktop. Check that Windows MCP appears
+    in its tool settings.
 
-## Requirements
+=== "Cursor"
 
-| Requirement | Notes |
-|-------------|-------|
-| Windows 10 or 11 | The UI Automation and input APIs are Windows-only. |
-| .NET 10 runtime | Installed automatically by the VS Code extension and plugin; bundled in the standalone build. |
+    Open or create `%USERPROFILE%\.cursor\mcp.json` to make the tools available
+    across your projects. Use `.cursor\mcp.json` inside a project if you want
+    the settings to apply only there.
 
-## Configuration
+    Add the `windows` entry under `mcpServers`. Keep any other server entries.
 
-Timing and timeout behavior can be tuned with environment variables (for
-example, keyboard and mouse delays, window and screenshot timeouts). See the
-[environment variables reference](features.md#configuration) on the Features
-page for the full list.
+    ```json
+    {
+      "mcpServers": {
+        "windows": {
+          "command": "C:\\Tools\\windows-mcp\\Sbroenne.WindowsMcp.exe"
+        }
+      }
+    }
+    ```
+
+    Save the file, reload Cursor, and check its MCP settings for Windows MCP.
+
+=== "Other AI apps"
+
+    Open your app's MCP settings and add a server that runs on your computer.
+    Give it the full path to `Sbroenne.WindowsMcp.exe`.
+
+    The settings format varies by app. Use that app's setup instructions
+    rather than copying another app's settings file.
+
+    In GitHub Copilot CLI, start with `/mcp add`.
+    For Claude Code, you can run:
+
+    ```powershell
+    claude mcp add windows -- "C:\Tools\windows-mcp\Sbroenne.WindowsMcp.exe"
+    ```
+
+## Try your first task
+
+Open Notepad with a new, empty document. Ask your assistant:
+
+> Type "Hello from Windows MCP" in Notepad and save it as a new file named
+> windows-mcp-demo.txt on my Desktop.
+
+Read any permission prompt before approving it. Leave the mouse and keyboard
+alone while the task runs. When it finishes, check the file on your Desktop.
+
+[More tasks to try](features.md) | [Help if something does not work](troubleshooting.md)
+
+<span id="cli-for-agents-with-shell-access"></span>
+## Command line (CLI)
+
+The command-line program is named `wincli`. It provides the same Windows tools
+for coding agents, other assistants with command access, and scripts. Once it
+is installed, your agent can discover and run its commands using its existing
+terminal tool. You do not need to register a Windows MCP server for this route.
+
+It is installed by building it from the source code. Follow the
+[CLI installation guide](https://github.com/sbroenne/mcp-windows/blob/main/src/Sbroenne.WindowsMcp.Cli/README.md).
+The server ZIP download above is for MCP, not the CLI.
+
+## Optional instructions for your assistant
+
+Some AI apps can load extra instruction files called **skills**. These can
+help an assistant use the Windows tools, but they do not install the server.
+They are not required for the first task.
+
+[About the optional instruction files](skills.md)
+
+## Advanced settings
+
+If you need to choose which tools are available, see the
+[command and settings reference](https://github.com/sbroenne/mcp-windows/blob/main/FEATURES.md#configuration).
+Hiding tools does not restrict the assistant to a particular app or folder.

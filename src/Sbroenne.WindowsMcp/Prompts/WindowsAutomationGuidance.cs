@@ -32,6 +32,7 @@ public static class WindowsAutomationGuidance
         "ui_read_table(windowHandle='<handle>', elementId='<observed-grid-id>') - extract this grid into structured rows + headers in ONE call (no OCR, no fallback grid)\n" +
         "file_save(windowHandle='<handle>', filePath='C:\\path\\file.txt') - save via Save As dialog\n" +
         "file_open(windowHandle='<handle>', filePath='C:\\path\\file.txt') - open an existing file via the Open dialog (file must exist)\n" +
+        "File helpers do not retry dispatched actions or answer confirmation/error dialogs. On confirmation_required or an unverified result, inspect the existing dialog and choose the next action explicitly; do not blindly repeat the helper.\n" +
         "Works for: buttons, menus, text fields, checkboxes, combo boxes, standard controls.\n\n" +
         "### 2b. WAITING (No blind sleeps)\n" +
         "ui_wait(windowHandle='<handle>', mode='appear', nameContains='...') - wait for an element to appear\n" +

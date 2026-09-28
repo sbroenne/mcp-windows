@@ -151,24 +151,6 @@ public sealed partial class UIAutomationService
                     return new ElementActionOutcome(true, verified.ElementUnavailable, ActionPath: "semantic_select");
                 }
 
-                if (initial.ControlType == UIA3ControlTypeIds.RadioButton)
-                {
-                    var legacyActionDispatched = await _staThread.ExecuteAsync(
-                        () => element.TryLegacyDefaultAction(),
-                        cancellationToken);
-                    if (legacyActionDispatched)
-                    {
-                        verified = await WaitForElementConditionAsync(
-                            element,
-                            () => GetSelectionState(element) == true,
-                            cancellationToken);
-                        if (verified.Observed)
-                        {
-                            return new ElementActionOutcome(true, verified.ElementUnavailable);
-                        }
-                    }
-                }
-
                 return new ElementActionOutcome(
                     false,
                     ErrorMessage: "The semantic selection action was dispatched, but the selected state could not be verified. Physical fallback was not attempted because dispatching the action twice could trigger an unintended second operation.");
@@ -233,20 +215,43 @@ public sealed partial class UIAutomationService
                     : "The semantic action was unavailable, and the physical click produced no observable UI change.");
     }
 
-    private static bool TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType) =>
-        controlType switch
+    private static bool TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType)
+    {
+        // Only an unavailable pattern permits another input method. Provider failures
+        // propagate because the action may already have been dispatched.
+        switch (controlType)
         {
-            UIA3ControlTypeIds.CheckBox => element.TryToggle(),
-            UIA3ControlTypeIds.ListItem or
-            UIA3ControlTypeIds.TreeItem or
-            UIA3ControlTypeIds.RadioButton or
-            UIA3ControlTypeIds.TabItem => element.TrySelect(),
-            UIA3ControlTypeIds.Button or
-            UIA3ControlTypeIds.MenuItem or
-            UIA3ControlTypeIds.Hyperlink or
-            UIA3ControlTypeIds.SplitButton => element.TryInvoke(),
-            _ => element.TryInvoke()
-        };
+            case UIA3ControlTypeIds.CheckBox:
+                var toggle = element.GetPattern<UIA.IUIAutomationTogglePattern>(UIA3PatternIds.Toggle);
+                if (toggle is null)
+                {
+                    return false;
+                }
+                toggle.Toggle();
+                return true;
+
+            case UIA3ControlTypeIds.ListItem:
+            case UIA3ControlTypeIds.TreeItem:
+            case UIA3ControlTypeIds.RadioButton:
+            case UIA3ControlTypeIds.TabItem:
+                var selection = element.GetPattern<UIA.IUIAutomationSelectionItemPattern>(UIA3PatternIds.SelectionItem);
+                if (selection is null)
+                {
+                    return false;
+                }
+                selection.Select();
+                return true;
+
+            default:
+                var invoke = element.GetPattern<UIA.IUIAutomationInvokePattern>(UIA3PatternIds.Invoke);
+                if (invoke is null)
+                {
+                    return false;
+                }
+                invoke.Invoke();
+                return true;
+        }
+    }
 
     private static bool RequiresToggleVerification(int controlType) =>
         controlType == UIA3ControlTypeIds.CheckBox;

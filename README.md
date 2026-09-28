@@ -1,274 +1,232 @@
-# 🪟 Windows MCP Server
+# Windows MCP Server
 
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-10.0-blue)](https://dotnet.microsoft.com/download/dotnet/10.0)
-[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](#known-limitations)
 [![CI](https://github.com/sbroenne/mcp-windows/actions/workflows/ci.yml/badge.svg)](https://github.com/sbroenne/mcp-windows/actions/workflows/ci.yml)
-[![LLM Tests](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml/badge.svg)](https://github.com/sbroenne/mcp-windows/actions/workflows/llm-tests.yml)
 
-**Windows automation that actually works.** Uses the Windows UI Automation API to find buttons by name, not pixels. Tested with real AI models through a dedicated manual workflow.
+**Put your AI to work in Windows.**
 
-## Why This Exists
+Fill forms. Read tables. Save files. Give the AI assistant you already use
+direct access to your Windows apps.
 
-Screenshot-based automation doesn't work reliably. Vision models guess wrong, coordinates break when windows move or DPI changes, and you burn through thousands of tokens on retry loops. We tried it (check the commit history) — it failed too often to be useful.
+Windows MCP works with **GitHub Copilot, Claude, Cursor, and other compatible
+assistants**, through **MCP or the command line (CLI)**. You do not need to
+learn tool names or write automation scripts.
 
-Windows MCP Server asks Windows directly: "What buttons exist in this window?" Windows knows. It's deterministic.
+**Direct control. Fewer tokens. Your choice of AI.** Work with real buttons and
+fields, read only what the task needs, and request changes instead of repeated
+control lists. Screenshots, mouse, and keyboard actions are built in for
+visual tasks.
 
-## How It Works
+[Get started](#get-started) | [See real-task results](#real-tasks-controls-first-versus-screenshots)
 
-```
-# 1. Find the window
-window_management(action='find', title='Notepad') → handle='123456'
+<a id="why-not-just-use-screenshots"></a>
 
-# 2. Click elements by name
-ui_find(windowHandle='123456', nameContains='Save', requireUnique=true)
-ui_click(windowHandle='123456', elementId='<returned-id>')
+## Why Windows MCP?
 
-# 3. Type into fields
-ui_find(windowHandle='123456', controlType='Edit', requireUnique=true)
-ui_type(windowHandle='123456', elementId='<returned-id>', text='Hello World')
+Find the Save button and act on that button. Read a field's value directly.
+Check whether a box is ticked without interpreting its appearance. Windows MCP
+uses the information apps provide about their controls, rather than relying
+only on pictures and screen positions.
 
-# Browser/React field: force normal focus and keyboard events when needed
-ui_find(windowHandle='123456', name='Title', requireUnique=true)
-ui_type(windowHandle='123456', elementId='<returned-id>', text='New title', inputMode='keyboard')
+| Task | Screenshot-only approach | Windows MCP's first choice |
+|------|--------------------------|----------------------------|
+| Click Save | Find the button in an image and choose a screen position | Find the named button and act on it |
+| Read a field or table | Interpret text and layout in the image | Read the field value or table rows directly |
+| Check whether a box is checked | Interpret how the box looks | Read its checked state |
+| Check what changed | Capture and interpret another image | Request just the changed controls when possible |
+| Choose a model | The screenshot route needs image understanding | Tasks with readable controls can use text replies without images |
 
-# Modal with duplicate labels: scope the action and require one match
-ui_find(windowHandle='123456', name='Save', scope='active_dialog', requireUnique=true)
-ui_click(windowHandle='123456', elementId='<returned-id>')
+Screenshots still matter for drawings, games, and apps with missing accessibility
+information. Windows MCP includes screenshots, mouse, keyboard, and text recognition
+for those cases. Both approaches are available through the same tools:
+**controls first, screenshots when needed**.
 
-# 4. Fallback for games/canvas — screenshot + mouse
-screenshot_control(target='window', windowHandle='123456') → element coordinates
-mouse_control(action='click', x=450, y=300)
-```
+Already using built-in computer use? Keep your assistant and add Windows MCP's
+focused Windows tools.
+[Compare the approaches](https://windowsmcpserver.dev/comparison/).
 
-Same command works every time. Any machine. Any DPI. Any theme.
+## MCP or CLI for your agent?
 
-For `ui_click` and `wincli ui click`, `success:true` means the action was sent, not
-that saving, publishing, or navigation finished. Responses include
-`actionDispatched:true`, `outcomeVerified:false`, the pre-action `target`, and a
-separately labeled `postActionElement`. `postActionState:"unavailable"` means the
-target could not be read afterward, not that the click failed. A name change
-(Open to Close), self-disable, or disappearing dialog is not a reason to repeat
-the click. An inert button can also accept a click without doing anything.
-This applies to double-clicks too.
+**Both routes give AI agents the same Windows automation capabilities.**
 
-An unsupported pre-action name may be omitted; the original target ID is retained.
-Provider failures while reading after dispatch, including timeouts and access
-errors, produce `postActionElementWarning` without changing dispatch success.
+| Route | A good fit when... |
+|-------|--------------------|
+| **MCP** | Your assistant already connects to MCP tools. |
+| **CLI (`wincli`)** | Your coding agent can run commands on your Windows PC through its existing terminal tool. |
 
-Use `withSnapshot:true` (`--with-snapshot` in the CLI) to inspect the immediate
-window state. For an expected change that takes time, use `ui_wait` with a bounded
-`timeoutMs` (`wincli ui wait --timeout-ms ...`) or compare snapshots. These checks
-do not replay the click and do not change its `outcomeVerified` field. A snapshot
-is an observation, not proof of an application-specific outcome.
+You describe the task; the agent chooses the tool calls or commands. With the
+CLI, the agent can look up help as needed, without a separate Windows MCP
+connection. You do not have to write a script, though scripts can use it too.
 
-Browsers follow the same semantic flow: launch `msedge.exe` or `chrome.exe`, then inspect `launchStatus` and `window`/`windows`. If the intended handle is missing or ambiguous, inspect candidates or rediscover with `window_management`; do not call handle-based tools until the target is identified. A possible handoff does not confirm URL delivery or loaded content. Verify the intended page, then use `ui_find`, `ui_click`, and `ui_type` on links, buttons, and fields exposed through UIA names and ARIA labels.
-For controls that open a native file picker, click the browser control first, then call
-`file_open(..., triggerMode='wait')`. Use `window_management(action='maximize')` when the page's
-responsive layout hides or replaces the intended control in a small viewport.
+The CLI keeps controls and previous views between commands through its own
+background service. That state is separate from MCP connections.
+[How the two routes work](https://windowsmcpserver.dev/architecture/#mcp-or-cli-for-your-agent).
 
-## Key Features
+## Get started
 
-- **🧠 Semantic UI** — Find elements by name, not coordinates. Works regardless of DPI, theme, or window position.
-- **� Multi-Monitor** — Full support for multiple displays with per-monitor DPI scaling.
-- **🧪 LLM-Tested** — 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot), run intentionally through a dedicated manual workflow.
-- **💻 Broad App Support** — Tested against classic Windows apps, modern Windows 11 apps, and Electron apps (VS Code, Teams, Slack). Chromium browser pages follow the same ARIA-driven pattern, but browser chrome remains best-effort.
-- **🔄 Full Fallback** — Screenshot + mouse + keyboard for games and custom controls.
-- **🪙 Token Optimized** — Short property names, JPEG screenshots, and auto-scaling substantially reduce token usage compared to standard JSON.
+You need an unlocked Windows desktop and either an AI application with MCP
+support or an agent that can run commands on that PC.
 
-## Installation
+### VS Code with GitHub Copilot
 
-**VS Code Extension** — [Install from Marketplace](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp). Works with GitHub Copilot automatically.
+1. Install [Windows MCP Server](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp)
+   from the VS Code Marketplace.
+2. Ensure the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
+   is installed.
+3. Open Copilot Chat in **Agent** mode, enable the Windows MCP tools, and try a task below.
 
-**Plugin (GitHub Copilot CLI / Claude Code)** — Install the shared plugin bundle in [`plugin/`](plugin/README.md):
+### Claude Desktop, Cursor, and other MCP clients
 
-```powershell
-copilot plugin install sbroenne/mcp-windows:plugin
-```
+1. Download the Windows package for your processor from
+   [Releases](https://github.com/sbroenne/mcp-windows/releases) and extract it.
+   The standalone server includes its runtime.
+2. Add the server executable to your client's MCP configuration.
+   Use the [setup guide](https://windowsmcpserver.dev/installation/) for the
+   configuration file and copyable examples for your client.
+3. Restart or reload your client and check that the Windows MCP tools are available.
 
-For local Claude Code development:
+### Coding agents using the CLI
 
-```powershell
-claude --plugin-dir .\plugin
-```
+Let your agent use `wincli` through its existing terminal tool. Follow the
+[command-line (CLI) installation and first steps](src/Sbroenne.WindowsMcp.Cli/README.md).
+No separate Windows MCP connection is required.
 
-On first use, the plugin downloads the current standalone release into `plugin\bin\`.
+## Try your first task
 
-**Standalone** — [Download from Releases](https://github.com/sbroenne/mcp-windows/releases). Add to your MCP config:
+Open Notepad, then ask your agent:
 
-```json
-{ "servers": { "windows": { "command": "path\\to\\Sbroenne.WindowsMcp.exe" } } }
-```
+> Type "Hello from Windows MCP" in Notepad and save it as a new file named
+> `windows-mcp-demo.txt` on my Desktop.
 
-**Limiting the exposed tools (optional)** — for a least-privilege setup, pass an allowlist or denylist on the server command line (or via environment variables). CLI flags take precedence over the env vars.
+Other things to try:
 
-```json
-{ "servers": { "windows": {
-  "command": "path\\to\\Sbroenne.WindowsMcp.exe",
-  "args": ["--tools", "ui_snapshot,ui_find,ui_click,ui_type,ui_read"]
-} } }
-```
+- "Read the error message in this dialog and explain it."
+- "Summarize the article in my current Edge window."
+- "Read this table and list the entries that are missing a value."
+- "Move the Notepad window to my second monitor."
 
-- `--tools <a,b,c>` / `WINDOWS_MCP_TOOLS` — expose only these tools.
-- `--exclude-tools <x,y>` / `WINDOWS_MCP_EXCLUDE_TOOLS` — expose everything except these.
+The agent chooses the tools and asks for approval according to your client's
+settings. Start with a test document rather than important work.
 
-Excluded tools never appear in `tools/list` and cannot be invoked.
-The same restrictions apply to explicitly requested combined actions: every `ui_batch` step
-requires its matching tool (`key` requires `keyboard_control`; `mouse`/`polyline` require
-`mouse_control`). If any step is forbidden, the entire batch is rejected before it starts,
-even with `stopOnError=false`. `withSnapshot=true` on click/type/select/batch requires
-`ui_snapshot` and is checked before the primary action.
+## Real tasks: controls first versus screenshots
 
-All tools are enabled by default. These MCP server filters are not a Windows sandbox or a CLI
-permission system: enabled tools retain their internal input methods, and other enabled tools
-may still achieve similar outcomes or read information.
+**Controls first completed 11 of 16 tasks. Screenshots alone completed 7 of 16.**
+We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
+Notepad and Word documents, change and reorder PowerPoint slides, and submit
+a form in Chrome. We checked the saved files and submitted values independently.
+All original input files stayed unchanged.
 
-## Tools
+For the **seven matching tasks where both approaches succeeded**, controls
+first used **51.1% fewer input tokens** and took **49.3% less time**, at the
+middle of each set of savings. Screenshots remained available to that route.
+One PowerPoint comparison used **21.9% more input tokens with controls**,
+with almost the same time.
 
-**Breaking change: macros retired.** `ui_macro`, `wincli macro`, and `wincli ui-macro`
-have been removed. Use `ui_batch` or project-owned scripts/batch files instead.
-Existing files in `%LOCALAPPDATA%\Sbroenne.WindowsMcp\macros` are left untouched;
-there is no automatic cleanup or replay. To reuse one, extract its `steps` array into a
-separate JSON file for `wincli ui batch --steps-file` (the full saved macro object is not a steps array).
+These are 32 trials, one per app/model/approach, using Windows MCP for both
+approaches. They support **controls first, screenshots when needed**, not
+a claim that screenshots are always worse or a direct comparison with
+Copilot's or Claude's built-in computer use.
 
-| Tool | Purpose |
-|------|---------|
-| `ui_snapshot` | Capture a compact element tree; `mode=auto` returns smaller updates after the first view |
-| `ui_find` | Discover elements in a window (with timeout/retry) |
-| `ui_click` | Click buttons, checkboxes, menu items by observed ID |
-| `ui_type` | Type into a text field by observed ID |
-| `ui_select` | Pick an option value in a combo box, list, or tab identified by observed ID |
-| `ui_read` | Read observed element text, or explicit whole-window text with OCR fallback |
-| `ui_read_table` | Extract a grid/table/list-view identified by observed ID into structured rows + headers |
-| `ui_wait` | Discover appearance/disappearance by selector, or wait for an observed ID to reach a state |
-| `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
-| `file_save` | Save files via Save As dialog |
-| `file_open` | Open an existing file via the Open dialog |
-| `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
-| `process` | List or kill running processes, task-manager style (list/kill) |
-| `screenshot_control` | Get element metadata (image optional) |
-| `window_management` | Find, activate, move, resize windows |
-| `mouse_control` | Coordinate-based clicks (fallback for games) |
-| `keyboard_control` | Hotkeys and key sequences |
-| `app` | Launch applications |
+[Model results, failures, and measurement details](docs/real-app-benchmark.md).
 
-Full reference: [FEATURES.md](FEATURES.md)
+## Save tokens with focused reads
 
-Discover controls with `ui_find` or `ui_snapshot`, then use the returned opaque `elementId` for
-click/double-click, type, select, element read, table read, and state waits. Selectors are accepted
-only for discovery and appear/disappear waits, not targeted actions. For `ui_select`, `value`
-identifies the option text; the control still requires an ID. A whole-window `ui_read` requires
-an explicit window and no element ID. Removed targeting arguments are rejected, not ignored.
-IDs belong to their observing MCP instance or CLI daemon: rediscover after replacement, eviction,
-or owner restart, and never transfer IDs between owners. Batch `$prev` requires an unambiguous
-preceding result; reusable batch files should discover fresh controls instead of storing IDs.
+AI services count the text and images they read in units called **tokens**.
+Windows MCP can reduce what your assistant has to read in two ways.
 
-Use the default `mode=full` for one inspection. For repeated views of the same window or a known
-subtree, use `mode=auto` from the first view; `full` is not
-remembered.
-The first response has `kind=full`; later responses have `kind=diff` when a short change list saves
-space, otherwise they safely fall back to `kind=full`. Use `mode=reset` to start a new comparison,
-and use `parentElementId` only to revisit a subtree returned by an earlier snapshot or find.
-Separate `wincli` commands share the CLI daemon's bounded latest-baseline cache. Pass the previous
-`snapshotToken` with `--since` to request a CLI diff; a missing or mismatched token returns a full
-baseline. For post-action snapshots, combine `--with-snapshot --snapshot-mode auto --since <token>`.
-[The reproducible benchmark](docs/incremental-snapshot-benchmark.md) measured 84-96% median
-byte/token savings in Electron, Word, and Excel. A Playwright-style semantic view improved realistic
-Chrome navigation to 13.1% fewer bytes and 13.4% fewer approximate tokens even though 18 of 20
-responses were complete simplified views. A later strict Chrome run found that conservative display
-cleanup alone removed another 10.6% of bytes and 13.6% of tokens from automatic responses.
+### Read one field instead of the whole window
 
-**Snapshot response compatibility:** complete snapshots still return the compact `tree`, but no
-longer repeat the same hierarchy in the former full-detail `elements` field. Consumers that read
-that undocumented duplicate should migrate to `tree` (or use `ui_find` for a flat result).
+Need a name from a form? Read that field rather than send every button, field,
+and menu in the window. In 300 live reads with **GPT-6 Astra, GPT-6 Luna,
+GPT-5.6 Sol, and GPT-5.6 Luna**, **every answer was correct**.
+Direct reads used **51.4% fewer input tokens than low-detail screenshots**
+and **70.5% fewer than high-detail screenshots**. These are reported model
+usage counts, including the question and instructions. All four models
+showed the same input savings.
 
-## Command-line interface (`wincli`)
+![Direct field reads saved 51.4% of input tokens versus low-detail screenshots with GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna. All 300 answers were correct.](gh-pages/docs/assets/charts/screenshot-form.svg)
 
-The server ships with a **twin command-line entry point**, `wincli`, in
-[`src/Sbroenne.WindowsMcp.Cli`](src/Sbroenne.WindowsMcp.Cli/README.md). It exposes the exact same
-capabilities as the MCP server — every command calls the same underlying tool, so the JSON output is
-byte-for-byte identical to the MCP tools (verified by a parity test).
+**Get the value directly, not from a picture.** Your assistant receives the
+text it needs for the next step, without interpreting the rest of the window.
+Screenshots also worked at both detail settings in this form test.
 
-`wincli` is the **token-efficient path for coding agents**: instead of loading every MCP tool schema
-into context, an agent with shell access discovers the whole surface through `--help` / `tools` /
-`guidance` and issues one command per action. Commands automatically start or connect to a
-persistent, user-owned CLI daemon, which retains observed IDs across invocations. This daemon is
-separate from every MCP server instance; their IDs and snapshot baselines are not interchangeable.
+[Model differences, response times, and the repeatable method](docs/screenshot-ui-automation-benchmark.md).
 
-```powershell
-wincli window find --title Notepad           # -> window handle
-wincli ui snapshot --window 12345 --mode auto # -> tree with IDs + snapshotToken
-wincli ui find --window 12345 --name Submit --control-type Button
-wincli ui click --window 12345 --element-id "<returned-id>" --with-snapshot
-wincli ui snapshot --window 12345 --mode auto --since "<previous-snapshotToken>"
-wincli clipboard set --text "hello"          # write the clipboard
-wincli ui batch --window 12345 --steps-file workflow.json # run a reusable steps array
-wincli guidance                             # full automation guide
-wincli service status                       # inspect the CLI daemon
-wincli service stop                         # stop before rebuilding or upgrading
-```
+### Send changes instead of repeating everything
 
-Exit codes: `0` success, `1` tool error, `2` usage error. See the
-[CLI README](src/Sbroenne.WindowsMcp.Cli/README.md) for the full command reference.
+After a value changes, send just the changes instead of another full
+description of the window. This used **84.0% to 96.6% fewer approximate tokens**
+in our Excel, Word, and desktop test-app workloads.
 
-## ⚠️ Caution
+![Changes-only text updates: Excel 84.0%, Word 86.1%, desktop test app 96.6% fewer approximate tokens than full text. First view excluded.](gh-pages/docs/assets/charts/text-updates.svg)
 
-This MCP server controls your Windows desktop. Use responsibly.
+The first read is not counted. This chart compares text with text, not
+screenshots. Its percentages are not extra savings to add to the first chart.
+These two smaller tests measure information sent, not a complete task or a
+dollar bill. Do not add their savings to the real-task figures above.
+[Results and method](docs/incremental-snapshot-benchmark.md).
 
-## Known Limitations
+## What you can automate
 
-**UAC & Elevated Processes** — Windows security prevents any non-elevated process from interacting with UAC prompts or elevated (Administrator) windows. This is a fundamental Windows security boundary, not an MCP limitation.
+| Task | Capabilities |
+|------|--------------|
+| Work with applications | Launch apps, find and arrange windows |
+| Fill in forms | Find fields, enter text, click buttons, select options |
+| Read information | Read text, tables, window contents, and screenshots |
+| Work with files | Handle supported Open and Save As dialogs |
+| Repeat a workflow | Run a steps array stored in a project file |
 
-| Scenario | What Happens | Workaround |
-|----------|--------------|------------|
-| `winget install` triggers UAC | AI cannot click the UAC prompt | Run terminal as Administrator first |
-| App running as Administrator | UI automation tools return `ElevatedWindowActive` error | Run MCP server elevated, or use the app non-elevated |
-| UAC prompt appears | AI cannot interact with secure desktop | User must manually approve |
+[Complete feature and tool reference](FEATURES.md)
 
-See [FEATURES.md](FEATURES.md#known-limitations) for details.
+## Before you use it
 
-## Testing
+Windows MCP controls your **real desktop**, including any signed-in applications
+you let the agent use. Use a trusted client, review its approval settings, and
+avoid using the mouse and keyboard while the agent is working.
 
-```bash
-dotnet test                                      # All tests
-dotnet test --filter "FullyQualifiedName~Unit"   # Unit only
-```
+Disabled MCP tools cannot be called directly or through a batch. These settings
+are not a Windows sandbox and do not limit CLI commands. Enabled tools can still
+use their own input methods and may achieve similar outcomes.
 
-**Framework coverage**: Tests run against WinForms, WinUI 3, Electron apps, and real Chromium browser app windows by default. The Chromium smoke stack now exercises both Edge and Chrome (when installed) across a deterministic local page and a required public-web slice (`demo.playwright.dev/todomvc`) using the same semantic-first UI Automation model with isolated browser state and browser-window-only cleanup.
+[Security and tool access settings](https://windowsmcpserver.dev/security/) |
+[Privacy](https://windowsmcpserver.dev/privacy/)
 
-```powershell
-dotnet test .\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj --filter "FullyQualifiedName~ChromiumBrowser"
-```
+## Known limitations
 
-**LLM tests**: 130+ tests with a real AI model (GPT-5.5 via GitHub Copilot). They are intentionally manual-only and never run as part of PR, CI, or release workflows. Run them from the dedicated **LLM Integration Tests** workflow in GitHub Actions.
+- Accessibility coverage varies by application. WinForms, WinUI 3, Electron,
+  Edge, and Chrome have integration coverage, not a guarantee for every app.
+- Browser page controls are the stronger path. Support for browser toolbars and
+  browsers other than Edge and Chrome is more limited.
+- Standard file-dialog helpers currently depend on English Windows labels.
+- An agent without administrator rights cannot control an app running as
+  administrator. Windows security prompts need human approval.
+- You and all connected agents share one desktop. Separate connections do not
+  create separate desktops.
 
-```powershell
-cd tests/Sbroenne.WindowsMcp.LLM.Tests
-uv run pytest -v
-```
+[Security](https://windowsmcpserver.dev/security/) |
+[Privacy](https://windowsmcpserver.dev/privacy/) |
+[Detailed limitations](FEATURES.md#known-limitations)
 
-Requires GitHub authentication (`GITHUB_TOKEN` or an existing `gh` login) and a Windows desktop session. See [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md).
+## Related projects
 
-## Related Projects
-
-- **[pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering)** — LLM agent testing framework (powers our integration tests)
-- **[Excel MCP Server](https://excelmcpserver.dev)** — AI-powered Excel automation
-- **[OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs)** — AI-powered streaming control
+- [Excel MCP Server](https://excelmcpserver.dev) and
+  [PowerPoint MCP Server](https://powerpointmcpserver.dev): specialized Office automation.
+- [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering):
+  model-driven agent evaluation.
+- [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs):
+  recording and streaming automation.
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [FEATURES.md](FEATURES.md) | Complete tool reference — all actions, parameters, examples |
-| [Incremental snapshot benchmark](docs/incremental-snapshot-benchmark.md) | Five-run Electron, Chrome, Word, and Excel measurements |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Build instructions, coding guidelines, PR process |
-| [LLM Tests README](tests/Sbroenne.WindowsMcp.LLM.Tests/README.md) | How to run LLM integration tests |
-| [Release Setup](.github/RELEASE_SETUP.md) | Azure OIDC and GitHub Actions configuration |
+[Website](https://windowsmcpserver.dev/) |
+[Feature reference](FEATURES.md) |
+[CLI guide](src/Sbroenne.WindowsMcp.Cli/README.md) |
+[Token benchmarks](https://windowsmcpserver.dev/benchmark/) |
+[Contributing](CONTRIBUTING.md) |
+[Release setup](.github/RELEASE_SETUP.md)
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+[MIT](LICENSE)

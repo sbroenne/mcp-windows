@@ -14,16 +14,15 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIFileTool
 {
     /// <summary>
-    /// 💾 SAVE FILE TO DISK - The ONLY tool for saving documents. Automatically handles: Ctrl+S, Save As dialogs, filename entry, and overwrite prompts.
-    /// ⚠️ DO NOT use keyboard_control(key='s', modifiers='ctrl') for saving - it CANNOT handle Save As dialogs and will get stuck!
+    /// 💾 SAVE FILE TO DISK - Sends the requested save shortcut, fills a supported Save As dialog, and clicks Save once.
+    /// Overwrite prompts and errors are left open for the caller to inspect and answer explicitly. Do not blindly repeat a failed save.
     /// NOTE: English Windows only (detects 'Save As' dialog titles).
     /// Keywords: save, save file, save as, save document, write file, store, persist, export,
     /// ctrl+s, save dialog, overwrite, filename.
     /// </summary>
     /// <remarks>
-    /// WHEN TO USE: Any time you need to save a file in ANY application (Notepad, Word, VS Code, etc.).
-    /// WHAT IT DOES: Sends Ctrl+S, waits for Save As dialog, enters filename, clicks Save, handles overwrite confirmation.
-    /// WHY NOT KEYBOARD: keyboard_control sends Ctrl+S but CANNOT detect or interact with the Save As dialog that appears.
+    /// Use for applications with supported native Save As dialogs. Use ui_find/ui_read to inspect any
+    /// remaining prompt and ui_click or keyboard_control for an explicit response chosen by the caller.
     /// </remarks>
     /// <param name="windowHandle">Window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window handle, not a dialog.</param>
     /// <param name="filePath">Full destination path. Fills a Save As dialog; it does not retarget Ctrl+S for an already named document. To save an existing document under a different path, also set triggerMode='save_as'. Forward/back slashes both work.</param>

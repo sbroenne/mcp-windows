@@ -1,49 +1,60 @@
 ---
-title: Privacy
-description: Windows MCP Server runs locally, does not collect telemetry and does not send your data anywhere. What stays on your machine and the few times it touches the network.
-keywords: "Windows MCP privacy, no telemetry, local automation, data collection, offline MCP server"
+title: Privacy and data sharing
+description: What Windows MCP reads, what your AI app may send online, and what can remain saved on your PC.
 ---
 
-# Privacy
+# Privacy and data sharing
 
-Windows MCP Server is built to run **entirely on your machine**. It is a local
-process that your MCP client starts and talks to over stdio — there is no hosted
-backend and no account to sign up for.
+**Windows MCP runs on your PC, but your AI app may send what it reads to an
+online AI service.** Check the privacy settings and terms of the AI app you use.
 
-## No telemetry
+## What the assistant can receive
 
-The server does not collect analytics or telemetry and does not phone home. It
-contains no analytics SDK and sends no usage data to the author or any third
-party.
+Depending on the task and tools it uses, the assistant can receive:
 
-## Your data stays local
+- Text, field values, and table contents from an app.
+- Window titles and information about buttons and menus.
+- Screenshots.
+- Clipboard contents.
 
-Everything the server reads or acts on — window contents, UI Automation trees,
-text read via OCR, and screenshots — is processed locally and returned only to
-the MCP client that made the request. The server does not persist this data or
-transmit it anywhere itself.
+This may include personal information from signed-in apps. Close unrelated
+private windows and remove sensitive information that the task does not need.
 
-!!! note "Your AI client is separate"
-    The AI assistant you connect to the server (GitHub Copilot, Claude Desktop,
-    Cursor, and similar) has its own privacy policy. When you ask it to automate
-    something, the tool results — which can include on-screen text and
-    screenshots — are sent to that assistant's model so it can decide what to do
-    next. Review your AI client's privacy terms to understand how it handles that
-    data.
+## What Windows MCP collects
 
-## When it touches the network
+Windows MCP does not send usage statistics to the project author. It has no
+separate online service or account.
 
-The core server does not require network access. There are only a couple of
-optional, clearly-scoped cases where components reach the internet:
+It returns information to the AI app or command that asked for it. That app
+may send the information to its AI provider or keep a record of it. The apps
+being controlled can also send data, for example when a browser submits a form.
 
-- **Downloading a release** — the plugin downloads the standalone server build
-  from GitHub Releases the first time you use it.
-- **Development and testing** — the project's LLM test suite calls Azure OpenAI,
-  but that runs only when contributors run the tests. It is not part of using the
-  server.
+## What can stay saved
 
-## Open source
+Remembered controls and previous window views are kept in memory while the
+Windows MCP process or command-line service is running.
 
-The full source is available at
-[github.com/sbroenne/mcp-windows](https://github.com/sbroenne/mcp-windows) under
-the MIT license, so you can verify exactly what the server does.
+Other information can remain after the task:
+
+- Screenshots saved as files.
+- Saved sequences of steps, including text and file paths supplied to them.
+- Documents created or changed in an app.
+- Conversation history or logs kept by your AI app.
+
+Do not put passwords or other secrets in saved steps. Check where files were
+saved and remove copies you no longer need.
+
+## When internet access is used
+
+Downloading and installing the software may use the internet. Your AI app may
+need an online model, and the task itself may involve websites or other online
+services.
+
+Running Windows MCP locally is not a promise that the whole task works offline.
+
+## Read the source
+
+Windows MCP is open source under the MIT license. Its
+[source code is available on GitHub](https://github.com/sbroenne/mcp-windows).
+
+[Use it safely](security.md)

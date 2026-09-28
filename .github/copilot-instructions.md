@@ -1,5 +1,22 @@
 # Copilot Instructions for mcp-windows
 
+## Language and documentation
+
+- Use simple, jargon-free English in replies, README files, website pages, and
+  other documentation written for users.
+- Write for someone who is new to the project. Explain what it does, how to
+  install it, and how to complete a first useful task before giving technical details.
+- Use everyday words and short, direct sentences. Explain any necessary technical
+  term when it first appears. Keep exact command names and options unchanged.
+- Describe the current product, not its development history or rejected experiments.
+  Keep release history in the changelog, not in getting-started guides.
+- Put detailed settings, test methods, and implementation details in the relevant
+  reference pages rather than the README introduction.
+- Say "MCP or the command line (CLI)" in introductory copy. Explain `wincli` as
+  the program's name only where installation steps or exact commands need it.
+- Keep the website's user guides separate from developer manuals, agent instruction
+  files, and release history. Do not paste those references into beginner pages.
+
 ## Code Review
 
 For pull request reviews and re-reviews, use the
@@ -30,6 +47,8 @@ The project follows these NON-NEGOTIABLE principles:
 - **Test-First Development** - Write tests before implementation
 - **MCP Protocol Compliance** - Follow MCP specification strictly
 - **Augmentation, Not Duplication** - Tools are "dumb actuators", no complex logic in tools
+  - General-purpose typing must report unexpected application changes, not silently edit them away. Keep verification read-only and leave recovery decisions to the calling agent.
+  - After an action may have been dispatched, report an unverified result instead of retrying it through another method. Leave overwrite and error dialogs open for an explicit caller decision; only fall back when a capability was unavailable before dispatch.
 - **Microsoft Libraries First** - Prefer official Microsoft libraries over third-party alternatives
 - **Security Best Practices** - No secrets in code, validate inputs, follow security guidelines
 - **Modern .NET & C#** - Use current .NET and C# language features
