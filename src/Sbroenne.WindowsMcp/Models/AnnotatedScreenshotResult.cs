@@ -30,6 +30,9 @@ public sealed record AnnotatedScreenshotResult
     /// </summary>
     public int? Height { get; init; }
 
+    /// <summary>Gets the captured rectangle in physical virtual-screen pixels.</summary>
+    public CaptureRegion? CaptureBounds { get; init; }
+
     /// <summary>
     /// Original width before scaling. Null if not scaled.
     /// </summary>

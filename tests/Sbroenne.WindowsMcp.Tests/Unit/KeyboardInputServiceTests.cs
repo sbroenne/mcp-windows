@@ -28,6 +28,8 @@ public sealed class KeyboardInputServiceTests
     [InlineData("a", "a", "a", "", "a", true)]
     [InlineData("a", "a", "", "", "a", false)]
     [InlineData("a", "a\r", "", "", "\n", true)]
+    [InlineData("Old content\r", "P\r", "Old content\r", "", "P", false)]
+    [InlineData("Old content\r", "P", "Old content\r", "", "P", true)]
     [InlineData("a", "ab", "", "", "c", false)]
     [InlineData("a", "abc", "", "", "b", false)]
     [InlineData("abc", "axc", "", "", "x", false)]

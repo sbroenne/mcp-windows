@@ -295,8 +295,23 @@ class BookingServer:
         self.thread.join(timeout=5)
 
 
+def initialize_dpi(user32=None):
+    import ctypes
+    if user32 is None:
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.SetProcessDpiAwarenessContext.argtypes = [ctypes.c_void_p]
+    user32.SetProcessDpiAwarenessContext.restype = ctypes.c_bool
+    user32.GetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+    user32.AreDpiAwarenessContextsEqual.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    user32.AreDpiAwarenessContextsEqual.restype = ctypes.c_bool
+    user32.SetProcessDpiAwarenessContext(-4)
+    if not user32.AreDpiAwarenessContextsEqual(user32.GetThreadDpiAwarenessContext(), -4):
+        raise RuntimeError("Benchmark setup requires per-monitor physical pixel coordinates before opening apps.")
+
+
 class OwnedApp:
     def __init__(self, app, source, directory, url=None):
+        initialize_dpi()
         import psutil
         import ctypes
         from ctypes.wintypes import RECT

@@ -130,9 +130,12 @@ public sealed class SaveTests : IDisposable
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task Save_LeavesOwnedPromptsOpenWithoutAnswering(bool overwrite)
+    [InlineData(false, false, 0)]
+    [InlineData(true, false, 0)]
+    [InlineData(false, true, 0)]
+    [InlineData(false, true, 250)]
+    public async Task Save_LeavesOwnedPromptsOpenWithoutAnswering(
+        bool overwrite, bool afterDialogCloses, int promptDelayMs)
     {
         var fixtureForm = _fixture.Form!;
         System.Windows.Forms.Form? target = null;
@@ -168,10 +171,13 @@ public sealed class SaveTests : IDisposable
                 save.Click += (_, _) =>
                 {
                     submissions++;
-                    prompt = new System.Windows.Forms.Form { Text = overwrite ? "Confirm Save As" : "Save As" };
+                    prompt = new System.Windows.Forms.Form
+                    {
+                        Text = afterDialogCloses ? "Application confirmation" : overwrite ? "Confirm Save As" : "Save As"
+                    };
                     prompt.Controls.Add(new System.Windows.Forms.Label
                     {
-                        Text = overwrite ? "File already exists." : "Path does not exist.",
+                        Text = afterDialogCloses ? "The file format will change." : overwrite ? "File already exists." : "Path does not exist.",
                         AutoSize = true
                     });
                     var answer = new System.Windows.Forms.Button { Text = overwrite ? "Yes" : "OK", Top = 40 };
@@ -185,9 +191,32 @@ public sealed class SaveTests : IDisposable
                         prompt.Close();
                     };
                     prompt.Controls.Add(answer);
-                    prompt.Show(dialog);
-                    promptHandle = prompt.Handle;
-                    prompt.Activate();
+                    if (afterDialogCloses)
+                    {
+                        dialog.Close();
+                        target.Enabled = false;
+                    }
+                    void ShowPrompt()
+                    {
+                        prompt.Show(afterDialogCloses ? target : dialog);
+                        promptHandle = prompt.Handle;
+                        prompt.Activate();
+                    }
+                    if (promptDelayMs == 0)
+                    {
+                        ShowPrompt();
+                    }
+                    else
+                    {
+                        var timer = new System.Windows.Forms.Timer { Interval = promptDelayMs };
+                        timer.Tick += (_, _) =>
+                        {
+                            timer.Stop();
+                            timer.Dispose();
+                            ShowPrompt();
+                        };
+                        timer.Start();
+                    }
                 };
                 dialog.Controls.Add(save);
                 dialog.Show(target);
@@ -201,7 +230,7 @@ public sealed class SaveTests : IDisposable
         {
             var result = await _automationService.SaveAsync(WindowHandleParser.Format(handle), path);
             Assert.False(result.Success);
-            Assert.Equal(overwrite ? Models.UIAutomationErrorType.ConfirmationRequired : Models.UIAutomationErrorType.PathError,
+            Assert.Equal(overwrite || afterDialogCloses ? Models.UIAutomationErrorType.ConfirmationRequired : Models.UIAutomationErrorType.PathError,
                 result.ErrorType);
             Assert.Equal(1, (int)fixtureForm.Invoke(() => submissions));
             Assert.Equal(0, (int)fixtureForm.Invoke(() => answers));
@@ -214,14 +243,21 @@ public sealed class SaveTests : IDisposable
             });
             Assert.True(remainingPrompt.Success, remainingPrompt.ErrorMessage);
             Assert.Single(remainingPrompt.Items!);
-            var remainingFilename = await _automationService.FindElementsAsync(new Models.ElementQuery
+            if (!afterDialogCloses)
             {
-                WindowHandle = WindowHandleParser.Format(dialogHandle),
-                AutomationId = "FileNameControlHost",
-                RequireUnique = true
-            });
-            Assert.True(remainingFilename.Success, remainingFilename.ErrorMessage);
-            Assert.Single(remainingFilename.Items!);
+                var remainingFilename = await _automationService.FindElementsAsync(new Models.ElementQuery
+                {
+                    WindowHandle = WindowHandleParser.Format(dialogHandle),
+                    AutomationId = "FileNameControlHost",
+                    RequireUnique = true
+                });
+                Assert.True(remainingFilename.Success, remainingFilename.ErrorMessage);
+                Assert.Single(remainingFilename.Items!);
+            }
+            else
+            {
+                Assert.False(NativeMethods.IsWindow(dialogHandle));
+            }
             Assert.Equal("Original file", await File.ReadAllTextAsync(path));
             Assert.Contains("windowHandle=", result.UsageHint, StringComparison.Ordinal);
         }

@@ -166,6 +166,9 @@ public sealed class UIClickToolIntegrationTests : IDisposable
 
         Assert.False(result.Success);
         Assert.Contains("observable", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(UIAutomationErrorType.VerificationFailed, result.ErrorType);
+        Assert.Contains("Inspect", result.RecoverySuggestion, StringComparison.Ordinal);
+        Assert.DoesNotContain("Use clickablePoint", result.RecoverySuggestion, StringComparison.Ordinal);
     }
 
     private async Task SkipWhenPhysicalClickUnavailableAsync()

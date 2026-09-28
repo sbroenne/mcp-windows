@@ -79,6 +79,18 @@ public sealed partial class UIAutomationService
                     }
                 }
 
+                if (mode == TextExtractionMode.Raw && !includeChildren &&
+                    targetElement.GetControlTypeId() is UIA3ControlTypeIds.Edit or UIA3ControlTypeIds.Spinner)
+                {
+                    var fieldValue = ReadEditableValue(targetElement);
+                    return fieldValue is not null
+                        ? UIAutomationResult.CreateSuccessWithText("get_text", fieldValue, CreateDiagnostics(stopwatch))
+                        : UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.PatternNotSupported,
+                            "The field does not expose a readable value. Its label is not its value.",
+                            CreateDiagnostics(stopwatch),
+                            "Inspect this field's child controls with ui_snapshot parentElementId, or use a screenshot to check the value.");
+                }
+
                 var text = mode == TextExtractionMode.Article
                     ? ExtractArticleText(targetElement)
                     : ExtractText(targetElement, includeChildren);
@@ -110,7 +122,7 @@ public sealed partial class UIAutomationService
     {
         // Try TextPattern first
         var text = element.GetText();
-        if (!string.IsNullOrEmpty(text) && !includeChildren)
+        if (text is not null && !includeChildren)
         {
             return text;
         }

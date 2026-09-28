@@ -163,7 +163,7 @@ internal static class HelpText
 
         file-save --window <h> [--path <file>] [--trigger-mode shortcut|save_as|wait]
             shortcut saves the current document with Ctrl+S (default).
-            save_as sends Ctrl+Shift+S to save under a different path without first overwriting
+            save_as sends F12 in Word/PowerPoint, Ctrl+Shift+S elsewhere, without first overwriting
             the original. --path alone does not change an existing document's destination.
             wait fills an already open owned Save As dialog without another shortcut.
             Overwrite and error prompts remain open for an explicit decision. Do not blindly repeat a failed save.

@@ -314,7 +314,7 @@ public sealed partial class UIAutomationService
                     !isDirectlyActionable,
                 IsDirectlyActionable = isDirectlyActionable,
                 HasDeveloperIdentifier = !string.IsNullOrWhiteSpace(automationId),
-                Value = !fromCachedElement || string.Equals(controlType, "Edit", StringComparison.Ordinal)
+                Value = !fromCachedElement || controlType is "Edit" or "Spinner"
                     ? element.TryGetValue()
                     : null,
                 ToggleState = string.Equals(controlType, "RadioButton", StringComparison.Ordinal)

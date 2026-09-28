@@ -44,6 +44,37 @@ person took control of the mouse or keyboard.
 Keep only the needed windows open and avoid using the desktop during the next
 attempt. Ask the assistant to confirm the intended field before entering text.
 
+## Typing stops before the text is complete
+
+The app may have changed the text differently from what was requested. For
+example, replacing all text in Notepad can leave a final line break. The tool
+stops when it observes an unexpected change. It does not remove the extra text
+or start typing again.
+
+Read the current text before deciding how to continue. An error does not mean
+that nothing was typed.
+
+## A browser date field reports the wrong value
+
+Some date fields expose the month, day, and year separately. Their whole-field
+value may stay empty even after those parts change. Inspect the field's child
+controls and read each part, including the full year. Check the value the page
+actually uses before treating the task as complete.
+
+Do not keep typing the same date after an unverified attempt. A date field is
+not necessarily a normal text box.
+
+## Screenshot positions do not match clicks
+
+A screenshot with numbered controls may be smaller than the captured window.
+Do not use positions from that smaller picture as screen positions unchanged.
+
+The screenshot result includes `captureBounds`, the captured rectangle in
+screen pixels, and `scaleX` and `scaleY`, the image-to-screen scale. Numbered
+controls already provide `[x, y, monitorIndex]` in screen pixels relative to
+that monitor. Use those with `monitorIndex`, not with `windowHandle`; window
+positions use a different starting point.
+
 ## The assistant says it clicked, but nothing happened
 
 Ask it to check the result, not immediately repeat the click. The app may be
@@ -61,6 +92,14 @@ Do not keep retrying if an overwrite prompt is open. Decide which file to keep
 before continuing.
 The file helpers leave overwrite and error prompts open. Your agent must inspect
 the message and choose whether to confirm, cancel, or correct the input.
+This also applies to an app's file-format confirmation after the file window
+closes.
+
+For a different destination, use `file_save` with `triggerMode='save_as'`, or
+`wincli file-save` with `--trigger-mode save_as`. This sends F12 in Word and
+PowerPoint, and Ctrl+Shift+S in other apps. It does not first save over the
+original. If an app instead shows a Save As page inside its main window, open
+its file chooser explicitly and use `triggerMode='wait'`.
 
 ## Report a problem
 

@@ -5,7 +5,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 spec = importlib.util.spec_from_file_location(
@@ -16,6 +16,20 @@ spec.loader.exec_module(benchmark)
 
 
 class RealAppBenchmarkTests(unittest.TestCase):
+    def test_setup_requires_physical_pixel_coordinates(self):
+        for configured in (True, False):
+            api = SimpleNamespace(
+                SetProcessDpiAwarenessContext=Mock(return_value=configured),
+                GetThreadDpiAwarenessContext=Mock(return_value=-4),
+                AreDpiAwarenessContextsEqual=Mock(return_value=True),
+            )
+            benchmark.initialize_dpi(api)
+            api.SetProcessDpiAwarenessContext.assert_called_once_with(-4)
+            api.AreDpiAwarenessContextsEqual.assert_called_once_with(-4, -4)
+        api.AreDpiAwarenessContextsEqual.return_value = False
+        with self.assertRaisesRegex(RuntimeError, "physical"):
+            benchmark.initialize_dpi(api)
+
     def guard(self, name, args, route="screenshots", app="notepad"):
         return benchmark.guard_arguments(name, args, route, {"123", "456"}, Path(r"C:\run\completed.txt"), app)
 

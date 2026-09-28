@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Sbroenne.WindowsMcp.Cli;
+using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
@@ -9,6 +10,25 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 
 public sealed class ExplicitRecoveryContractTests
 {
+    [Fact]
+    public void ValueTyping_DispatchesOneReplacementWithoutClearOrFallbackAfterFailure()
+    {
+        var body = ReadMethod("UIAutomationService.Actions.cs", "PerformTypeAsync");
+        Assert.DoesNotContain("TrySetValue(", body, StringComparison.Ordinal);
+        Assert.Equal(1, Regex.Count(body, @"\.SetValue\(text\)"));
+    }
+
+    [Theory]
+    [InlineData("OpusApp", "save_as", "F12", ModifierKey.None)]
+    [InlineData("PPTFrameClass", "save_as", "F12", ModifierKey.None)]
+    [InlineData("Notepad", "save_as", "s", ModifierKey.Ctrl | ModifierKey.Shift)]
+    [InlineData("OpusApp", "shortcut", "s", ModifierKey.Ctrl)]
+    public void SaveShortcut_UsesNativeOfficeDialogBeforeDispatch(
+        string className, string mode, string key, ModifierKey modifiers)
+    {
+        Assert.Equal((key, modifiers), UIAutomationService.GetSaveShortcut(className, mode));
+    }
+
     [Theory]
     [InlineData("ObserveSaveDialogOutcomeAsync")]
     [InlineData("ObserveOverwriteConfirmationAsync")]

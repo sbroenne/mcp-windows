@@ -34,6 +34,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
         { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "value" },
         { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "value" },
         { "Save a copy without changing the original", "save_as" },
+        { "Project: Aurora", "replace_selection" },
     };
 
     [SkippableTheory]
@@ -60,7 +61,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             }
         }, TimeSpan.FromSeconds(10)), "Existing Notepad processes must exit before this test.");
         var path = Path.Combine(Path.GetTempPath(), $"notepad-typing-{Guid.NewGuid():N}.txt");
-        await File.WriteAllTextAsync(path, "");
+        await File.WriteAllTextAsync(path, inputMode == "replace_selection" ? "Old content\r\n" : "");
         Process? owned = null;
         DateTime? created = null;
         using var sta = new UIAutomationThread();
@@ -139,18 +140,32 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                     var failedRead = await automation.GetTextAsync(editor.Id, window, false);
                     output.WriteLine($"Failed typing readback: {System.Text.Json.JsonSerializer.Serialize(failedRead)}");
                 }
-                Assert.False(typed.IsError, System.Text.Json.JsonSerializer.Serialize(typed));
+                if (inputMode == "replace_selection")
+                {
+                    Assert.True(typed.IsError, "Notepad's retained newline must stop further typing.");
+                }
+                else
+                {
+                    Assert.False(typed.IsError, System.Text.Json.JsonSerializer.Serialize(typed));
+                }
             }
+            var expectedText = inputMode == "replace_selection" ? "P\n" : text.ReplaceLineEndings("\n");
             UIAutomationResult? read = null;
             await TestWait.RetryUntilAsync(
                 async () => read = await automation.GetTextAsync(editor.Id, window, false),
                 () => read is { Success: true }
-                    && read.Text?.ReplaceLineEndings("\n") == text.ReplaceLineEndings("\n"),
+                    && read.Text?.ReplaceLineEndings("\n") == expectedText,
                 timeout: TimeSpan.FromSeconds(3));
             output.WriteLine($"Readback: {System.Text.Json.JsonSerializer.Serialize(read)}");
             Assert.NotNull(read);
             Assert.True(read.Success, read.ErrorMessage);
-            Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+            Assert.Equal(expectedText, read.Text?.ReplaceLineEndings("\n"));
+            if (inputMode == "replace_selection")
+            {
+                var saved = await automation.SaveAsync(window, path);
+                Assert.True(saved.Success, saved.ErrorMessage);
+                Assert.Equal(expectedText, (await File.ReadAllTextAsync(path)).ReplaceLineEndings("\n"));
+            }
             if (inputMode == "save_as")
             {
                 var saved = await automation.SaveAsync(window, path + ".copy.txt", "save_as");

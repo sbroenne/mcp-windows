@@ -578,7 +578,7 @@ Save files via a supported Save As dialog: triggers save, waits for the dialog, 
 |-----------|-------------|----------|
 | `windowHandle` | Target window handle (the app window, not a dialog) | Yes |
 | `filePath` | File path to save to (e.g., 'C:\\Users\\User\\file.txt') | No |
-| `triggerMode` | `shortcut` sends Ctrl+S; `save_as` sends Ctrl+Shift+S; `wait` fills an already open owned Save As dialog | No (default: shortcut) |
+| `triggerMode` | `shortcut` sends Ctrl+S; `save_as` sends F12 in Word/PowerPoint and Ctrl+Shift+S elsewhere; `wait` fills an already open owned Save As dialog | No (default: shortcut) |
 
 ### Capabilities
 
@@ -877,20 +877,34 @@ Each `list_monitors` entry includes `displayNumber`, `width`/`height`, `x`/`y`, 
 
 ### Annotated Screenshot Response
 
-When `annotate=true` (default), the response includes structured element data. **Image is omitted by default** (`includeImage=false`) to save ~100K+ tokens:
+When `annotate=true` (default), the response includes control details.
+**The image is omitted by default** (`includeImage=false`) to avoid unnecessary
+image input. Example response fields:
 
 ```json
 {
   "success": true,
-  "annotated_elements": [
-    { "index": 1, "element_id": "...", "name": "File", "control_type": "MenuItem", "clickable_point": { "x": 50, "y": 30 } },
-    { "index": 2, "element_id": "...", "name": "Edit", "control_type": "MenuItem", "clickable_point": { "x": 100, "y": 30 } }
+  "width": 1280,
+  "height": 720,
+  "captureBounds": { "x": 80, "y": 90, "width": 1600, "height": 900 },
+  "scaleX": 1.25,
+  "scaleY": 1.25,
+  "annotatedElements": [
+    { "index": 1, "id": "...", "name": "File", "type": "MenuItem", "click": [130, 120, 0] },
+    { "index": 2, "id": "...", "name": "Edit", "type": "MenuItem", "click": [180, 120, 0] }
   ],
-  "element_count": 25
+  "elementCount": 2
 }
 ```
 
-**Use case**: When you don't know element names, capture an annotated screenshot first. The numbered labels in the image correspond to the structured element data, making it easy to identify what to click.
+Use a control's `id` for `ui_click` or `ui_type`. For a mouse click, `click`
+contains `[x, y, monitorIndex]` in physical pixels relative to that monitor.
+Pass `monitorIndex`, not `windowHandle`, with these coordinates.
+
+The numbered labels match the returned controls. If working from image pixels
+instead, apply `scaleX` and `scaleY` and the origin in `captureBounds` before
+converting to the chosen mouse target's coordinates. This metadata is also
+included in plain captures.
 
 ### Plain Screenshot (No Annotations)
 
@@ -907,7 +921,7 @@ For simple screenshots without element discovery:
 ### Capabilities
 
 - **Annotated by Default** - Screenshots include numbered element overlays and structured data for UI discovery
-- **LLM-Optimized** - JPEG format, auto-scaling to 1568px, quality 60 for minimal token usage
+- **Smaller annotated images** - JPEG quality 60 by default; scaled captures report the image-to-screen scale
 - **Easy targeting** - Use `window_management(action='find', title='...')` to get a handle, then pass to `screenshot_control`
 - **Capture any monitor** - Screenshot any connected display by index
 - **Capture windows** - Screenshot a specific window (even if partially obscured)

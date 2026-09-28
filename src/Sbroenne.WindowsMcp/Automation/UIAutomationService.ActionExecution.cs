@@ -16,7 +16,8 @@ public sealed partial class UIAutomationService
         bool Success,
         bool ElementUnavailable = false,
         string? ErrorMessage = null,
-        string? ActionPath = null);
+        string? ActionPath = null,
+        string ErrorType = UIAutomationErrorType.PatternNotSupported);
 
     private readonly record struct ElementActionState(
         int ControlType,
@@ -137,7 +138,8 @@ public sealed partial class UIAutomationService
 
                 return new ElementActionOutcome(
                     false,
-                    ErrorMessage: "The semantic toggle was dispatched, but its state change could not be verified. Physical fallback was not attempted because toggling twice could revert the action.");
+                    ErrorMessage: "The semantic toggle was dispatched, but its state change could not be verified. Physical fallback was not attempted because toggling twice could revert the action.",
+                    ErrorType: UIAutomationErrorType.VerificationFailed);
             }
 
             if (RequiresSelectionVerification(initial.ControlType))
@@ -153,7 +155,8 @@ public sealed partial class UIAutomationService
 
                 return new ElementActionOutcome(
                     false,
-                    ErrorMessage: "The semantic selection action was dispatched, but the selected state could not be verified. Physical fallback was not attempted because dispatching the action twice could trigger an unintended second operation.");
+                    ErrorMessage: "The semantic selection action was dispatched, but the selected state could not be verified. Physical fallback was not attempted because dispatching the action twice could trigger an unintended second operation.",
+                    ErrorType: UIAutomationErrorType.VerificationFailed);
             }
 
             // Invoke has no universal state postcondition. A successful provider call is the
@@ -184,7 +187,8 @@ public sealed partial class UIAutomationService
             return new ElementActionOutcome(
                 false,
                 ErrorMessage: "The element's window could not be confirmed as foreground, so the physical click was not sent.",
-                ActionPath: "physical_click");
+                ActionPath: "physical_click",
+                ErrorType: UIAutomationErrorType.WrongTargetWindow);
         }
 
         var clickResult = await _mouseService.ClickAsync(
@@ -195,7 +199,8 @@ public sealed partial class UIAutomationService
             cancellationToken: cancellationToken);
         if (!clickResult.Success)
         {
-            return new ElementActionOutcome(false, ErrorMessage: clickResult.Error);
+            return new ElementActionOutcome(false, ErrorMessage: clickResult.Error,
+                ActionPath: "physical_click", ErrorType: UIAutomationErrorType.VerificationFailed);
         }
 
         var physicalOutcome = await WaitForElementConditionAsync(
@@ -210,9 +215,9 @@ public sealed partial class UIAutomationService
             ? new ElementActionOutcome(true, physicalOutcome.ElementUnavailable, ActionPath: "physical_click")
             : new ElementActionOutcome(
                 false,
-                ErrorMessage: semanticAttempted
-                    ? "The semantic action was dispatched but unverified, and the physical fallback produced no observable UI change."
-                    : "The semantic action was unavailable, and the physical click produced no observable UI change.");
+                ErrorMessage: "The semantic action was unavailable, and the physical click produced no observable UI change.",
+                ActionPath: "physical_click",
+                ErrorType: UIAutomationErrorType.VerificationFailed);
     }
 
     private static bool TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType)
