@@ -79,6 +79,7 @@ public sealed partial class UIAutomationService
                     }
                 }
 
+                using var observation = DiscoveryObservation.Create(Uia.Automation, targetElement);
                 if (mode == TextExtractionMode.Raw && !includeChildren &&
                     targetElement.GetControlTypeId() is UIA3ControlTypeIds.Edit or UIA3ControlTypeIds.Spinner)
                 {

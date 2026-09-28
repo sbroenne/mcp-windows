@@ -17,6 +17,7 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
         ArgumentNullException.ThrowIfNull(expected);
         ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
         using var session = ChromiumBrowserSession.LaunchLocalPage(ChromiumBrowserKind.Chrome);
+        output.WriteLine("Browser page readiness passed.");
         using var harness = new ChromiumAutomationHarness();
         var found = await harness.AutomationService.FindElementsAsync(new ElementQuery
         {
@@ -40,6 +41,7 @@ public sealed class ChromiumDateReadTests(ITestOutputHelper output)
         var read = await harness.AutomationService.GetTextAsync(field.Id, session.WindowHandleString, false);
         Assert.True(read.Success, read.ErrorMessage);
         Assert.Equal(expected, read.Text);
+        output.WriteLine("All date-read assertions passed; closing the owned browser.");
     }
 
     [SkippableFact]

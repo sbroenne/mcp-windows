@@ -8,7 +8,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 
 /// <summary>
 /// Implementation of the UI Automation service using Windows UI Automation COM API (UIA3).
-/// All operations are dispatched to a dedicated STA thread.
+/// All operations are dispatched to a dedicated MTA thread.
 /// </summary>
 /// <remarks>
 /// This implementation uses the COM-based IUIAutomation API (UIA3) which provides
@@ -69,7 +69,7 @@ public sealed partial class UIAutomationService : IDisposable
 
     /// <summary>
     /// Intentional no-op. This service does not own any disposable resources:
-    /// the STA thread (<see cref="UIAutomationThread"/>) and the UIA3Automation COM
+    /// the automation thread (<see cref="UIAutomationThread"/>) and the UIA3Automation COM
     /// singleton are owned and disposed by their creators (see WindowsToolsBase for the
     /// process-lifetime singletons, or the caller in tests). The interface is retained so
     /// callers can treat the service uniformly via <see cref="IDisposable"/>.

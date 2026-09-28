@@ -69,6 +69,12 @@ not its current date. Screenshots remained available for checking the value.
 These outcomes identify work to investigate; they do not by themselves prove
 that every failure was caused by the model or by Windows MCP.
 
+The figures above remain the results of that recorded run. PowerPoint discovery
+now exposes slide controls without changing views; see the
+[PowerPoint guidance](../gh-pages/docs/troubleshooting.md#powerpoint-shows-its-buttons-but-not-slide-text).
+The original Chrome discovery failure remains unresolved. No new complete,
+controlled comparison has been published.
+
 ### Complete trial counts
 
 Totals below include failed attempts and must not be read as equal-work

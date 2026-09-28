@@ -181,6 +181,30 @@ is not rewritten and an unverified submission is not repeated. Run these live ca
 an exclusive desktop. Radio-button verification must not dispatch another activation after
 the first selection was sent; an unavailable pattern and a failed provider call are different cases.
 
+### PowerPoint discovery
+
+`scripts\tests\test_powerpoint_discovery.py` runs without a model. It requires an
+exclusive desktop, installed PowerPoint, and no existing PowerPoint process.
+Each case opens a fresh generated presentation. It checks the first snapshot,
+first search, and first whole-window text read. The CLI case finds a title and
+reads its observed ID from a separate command-line process. The edit case checks
+the saved presentation independently and verifies that the original is unchanged.
+
+Build both entry points, then run with the LLM test environment's Python:
+
+```powershell
+$env:MCP_TEST_DESKTOP_INPUT = "1"
+$env:MCP_TEST_POWERPOINT_SERVER = (Resolve-Path "src\Sbroenne.WindowsMcp\bin\Release\net10.0-windows10.0.22621.0\Sbroenne.WindowsMcp.exe").Path
+$env:MCP_TEST_POWERPOINT_CLI = (Resolve-Path "src\Sbroenne.WindowsMcp.Cli\bin\Release\net10.0-windows10.0.22621.0\wincli.exe").Path
+tests\Sbroenne.WindowsMcp.LLM.Tests\.venv\Scripts\python.exe -m unittest discover -s scripts\tests -p test_powerpoint_discovery.py -v
+```
+
+The UI Automation worker uses MTA, the Windows threading mode recommended for
+automation clients and event subscriptions. Add and remove each subscription on
+its owning worker; serialize these calls across workers. Remaining wait
+subscriptions must be removed before the worker exits, since MTA can outlive an
+individual worker thread.
+
 ### Verification Pattern
 
 **Use our own MCP tools for verification, NOT FlaUI or direct property access:**

@@ -13,7 +13,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// whole element when a page exposes no landmark.</item>
 /// <item>Cache the content subtree in a single <c>FindFirstBuildCache</c> call and walk it with
 /// <c>GetCachedChildren</c> so the poll loop makes no additional COM calls (this is what previously
-/// starved the shared UIA STA thread).</item>
+/// starved the shared UI Automation thread).</item>
 /// <item>Skip navigation, search and complementary landmark subtrees (site header, left nav,
 /// breadcrumbs, "in this article" rails, footer).</item>
 /// <item>Collect visible leaf text and headings only, preferring the accessible name (never the

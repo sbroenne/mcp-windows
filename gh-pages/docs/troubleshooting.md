@@ -53,13 +53,16 @@ If it only needs text from a known control, use `ui_read` with that control's
 
 ## PowerPoint shows its buttons but not slide text
 
-PowerPoint may expose the ribbon and status bar without exposing the slide text
-in its current view. A deeper search does not necessarily reveal more. This can
-also happen in Windows' own control reader, not just Windows MCP.
+Windows MCP briefly subscribes to control changes while reading a PowerPoint
+window. This lets PowerPoint expose its slide controls without clicking, typing,
+or changing views. It applies to snapshots, searches, and whole-window text reads
+through MCP or the command line.
 
-Check a screenshot before choosing an action. Available controls can change
-when you change views or open a dialog. Do not assume that a successful click
-or text-entry command proves that the slide was changed; check the saved result.
+Text shapes may be listed as `Image` controls, not `Edit` controls. Inspect the
+returned controls and use `ui_read` with an observed ID to read their text.
+If the slide still is not exposed, check a screenshot before choosing an action.
+Available controls can change with the view or an open dialog. Check the saved
+presentation rather than treating successful input as proof of an edit.
 
 ## Chrome shows the window but not the page
 

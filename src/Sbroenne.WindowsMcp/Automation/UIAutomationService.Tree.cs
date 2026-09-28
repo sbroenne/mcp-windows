@@ -52,6 +52,8 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
+                using var observation = DiscoveryObservation.Create(Uia.Automation, rootElement);
+
                 // Detect framework and get optimal search strategy
                 var strategy = GetFrameworkStrategy(rootElement);
                 var controlTypeSet = ParseControlTypeFilter(controlTypeFilter);

@@ -223,6 +223,10 @@ Find and discover UI elements by name, type, or automation ID.
 - Sort results by prominence (largest first) for disambiguation
 - Returns element IDs for use with other ui_* tools
 - Electron app support (VS Code, Teams, Slack)
+- PowerPoint slide discovery without changing views or sending input. Snapshots,
+  searches, and window text reads briefly observe control changes so PowerPoint
+  exposes its slide controls. A text shape can appear as an `Image` control;
+  read its text with `ui_read` and its observed ID. This works through MCP and CLI.
 
 Each search scan checks at most 2,000 nodes, including nonmatching nodes. If the
 scan limit leaves candidates unchecked, `search_incomplete` is returned instead

@@ -1,11 +1,12 @@
 using Sbroenne.WindowsMcp.Models;
+using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.ChromiumBrowser;
 
 [Collection("ChromiumBrowser")]
 [Trait("Category", "RequiresDesktop")]
 [Trait("Category", "ChromiumBrowser")]
-public sealed class ChromiumFindCandidateTests
+public sealed class ChromiumFindCandidateTests(ITestOutputHelper output)
 {
     [SkippableTheory]
     [InlineData(ChromiumBrowserKind.Chrome, false)]
@@ -17,6 +18,7 @@ public sealed class ChromiumFindCandidateTests
     {
         ChromiumBrowserSession.SkipUnlessSupported(browser);
         using var session = ChromiumBrowserSession.LaunchLocalPage(browser);
+        output.WriteLine("Browser page readiness passed.");
         using var harness = new ChromiumAutomationHarness();
         var click = await harness.AutomationService.ObserveAndClickAsync(new ElementQuery
         {
@@ -46,5 +48,6 @@ public sealed class ChromiumFindCandidateTests
             Assert.True(read.Success, read.ErrorMessage);
             Assert.Equal(ExpectedName, read.Text);
         }
+        output.WriteLine("All discovery and read assertions passed; closing the owned browser.");
     }
 }

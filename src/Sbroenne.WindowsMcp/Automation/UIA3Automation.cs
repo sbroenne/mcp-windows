@@ -16,6 +16,8 @@ namespace Sbroenne.WindowsMcp.Automation;
 [SupportedOSPlatform("windows")]
 public sealed class UIA3Automation : IDisposable
 {
+    internal static Lock EventSubscriptionLock { get; } = new();
+
     private static readonly TimeSpan DefaultConnectionTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan DefaultTransactionTimeout = TimeSpan.FromSeconds(10);
     private static readonly Lazy<UIA3Automation> LazyInstance = new(() => new UIA3Automation(), LazyThreadSafetyMode.ExecutionAndPublication);

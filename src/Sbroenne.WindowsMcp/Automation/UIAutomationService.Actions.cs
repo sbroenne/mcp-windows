@@ -2151,7 +2151,7 @@ public sealed partial class UIAutomationService
         // the address/breadcrumb bar and "SearchEditBox" is the search box, and typing a path into
         // either leaves the dialog open. Keep polling until a positively-identified File name edit
         // appears. All lookups above are cheap FindFirst calls so polling cannot starve the shared
-        // UIA STA thread.
+        // UI Automation thread.
         return null;
     }
 

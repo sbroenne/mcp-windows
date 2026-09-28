@@ -4,8 +4,8 @@ using System.Runtime.Versioning;
 namespace Sbroenne.WindowsMcp.Automation;
 
 /// <summary>
-/// Provides a dedicated STA thread for UI Automation operations.
-/// UI Automation requires operations to run on an STA thread for COM interop.
+/// Provides a dedicated MTA thread for UI Automation operations and event subscriptions.
+/// The worker owns no windows and serializes access to observed element references.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public sealed class UIAutomationThread : IDisposable
@@ -15,6 +15,7 @@ public sealed class UIAutomationThread : IDisposable
     private readonly BlockingCollection<WorkItem> _workQueue;
     private readonly CancellationTokenSource _shutdownCts;
     private readonly Lock _cleanupLock = new();
+    private readonly HashSet<Action> _shutdownCleanups = [];
     private volatile bool _disposed;
     private bool _resourcesDisposed;
 
@@ -37,15 +38,15 @@ public sealed class UIAutomationThread : IDisposable
 
         _staThread = new Thread(ProcessWorkItems)
         {
-            Name = "UIAutomation-STA",
+            Name = "UIAutomation-MTA",
             IsBackground = true
         };
-        _staThread.SetApartmentState(ApartmentState.STA);
+        _staThread.SetApartmentState(ApartmentState.MTA);
         _staThread.Start();
     }
 
     /// <summary>
-    /// Executes a function on the STA thread.
+    /// Executes a function on the dedicated automation thread.
     /// </summary>
     /// <typeparam name="T">The result type.</typeparam>
     /// <param name="func">The function to execute.</param>
@@ -93,7 +94,7 @@ public sealed class UIAutomationThread : IDisposable
     }
 
     /// <summary>
-    /// Executes an action on the STA thread.
+    /// Executes an action on the dedicated automation thread.
     /// </summary>
     /// <param name="action">The action to execute.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -105,6 +106,26 @@ public sealed class UIAutomationThread : IDisposable
             action();
             return null;
         }, cancellationToken);
+    }
+
+    internal void RegisterShutdownCleanup(Action cleanup)
+    {
+        RequireWorkerThread();
+        _shutdownCleanups.Add(cleanup);
+    }
+
+    internal void UnregisterShutdownCleanup(Action cleanup)
+    {
+        RequireWorkerThread();
+        _shutdownCleanups.Remove(cleanup);
+    }
+
+    private void RequireWorkerThread()
+    {
+        if (Environment.CurrentManagedThreadId != _staThread.ManagedThreadId)
+        {
+            throw new InvalidOperationException("Automation cleanup must be registered and removed on its owning thread.");
+        }
     }
 
     private void ProcessWorkItems()
@@ -129,6 +150,11 @@ public sealed class UIAutomationThread : IDisposable
         finally
         {
             CancelPendingWork();
+            foreach (var cleanup in _shutdownCleanups.ToArray())
+            {
+                cleanup();
+            }
+            _shutdownCleanups.Clear();
             ElementIdGenerator.RetireCurrentThread();
             CleanupResources();
         }
