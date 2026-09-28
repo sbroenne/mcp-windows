@@ -113,8 +113,23 @@ On first use, the plugin downloads the current standalone release into `plugin\b
 - `--exclude-tools <x,y>` / `WINDOWS_MCP_EXCLUDE_TOOLS` — expose everything except these.
 
 Excluded tools never appear in `tools/list` and cannot be invoked.
+The same restrictions apply to explicitly requested combined actions: every `ui_batch` step
+requires its matching tool (`key` requires `keyboard_control`; `mouse`/`polyline` require
+`mouse_control`). If any step is forbidden, the entire batch is rejected before it starts,
+even with `stopOnError=false`. `withSnapshot=true` on click/type/select/batch requires
+`ui_snapshot` and is checked before the primary action.
+
+All tools are enabled by default. These MCP server filters are not a Windows sandbox or a CLI
+permission system: enabled tools retain their internal input methods, and other enabled tools
+may still achieve similar outcomes or read information.
 
 ## Tools
+
+**Breaking change: macros retired.** `ui_macro`, `wincli macro`, and `wincli ui-macro`
+have been removed. Use `ui_batch` or project-owned scripts/batch files instead.
+Existing files in `%LOCALAPPDATA%\Sbroenne.WindowsMcp\macros` are left untouched;
+there is no automatic cleanup or replay. To reuse one, extract its `steps` array into a
+separate JSON file for `wincli ui batch --steps-file` (the full saved macro object is not a steps array).
 
 | Tool | Purpose |
 |------|---------|
@@ -127,7 +142,6 @@ Excluded tools never appear in `tools/list` and cannot be invoked.
 | `ui_read_table` | Extract a grid/table/list-view identified by observed ID into structured rows + headers |
 | `ui_wait` | Discover appearance/disappearance by selector, or wait for an observed ID to reach a state |
 | `ui_batch` | Run several UI steps (find/click/type/select/wait/read/snapshot/key/mouse/polyline) in one call |
-| `ui_macro` | Record & replay a `ui_batch` sequence by name (save/run/list/get/delete) |
 | `file_save` | Save files via Save As dialog |
 | `file_open` | Open an existing file via the Open dialog |
 | `clipboard` | Read/write the Windows text clipboard (get/set/clear) |
@@ -147,7 +161,7 @@ identifies the option text; the control still requires an ID. A whole-window `ui
 an explicit window and no element ID. Removed targeting arguments are rejected, not ignored.
 IDs belong to their observing MCP instance or CLI daemon: rediscover after replacement, eviction,
 or owner restart, and never transfer IDs between owners. Batch `$prev` requires an unambiguous
-preceding result; saved macros discover fresh controls instead of storing IDs.
+preceding result; reusable batch files should discover fresh controls instead of storing IDs.
 
 Use the default `mode=full` for one inspection. For repeated views of the same window or a known
 subtree, use `mode=auto` from the first view; `full` is not
@@ -188,7 +202,7 @@ wincli ui find --window 12345 --name Submit --control-type Button
 wincli ui click --window 12345 --element-id "<returned-id>" --with-snapshot
 wincli ui snapshot --window 12345 --mode auto --since "<previous-snapshotToken>"
 wincli clipboard set --text "hello"          # write the clipboard
-wincli macro run --name login --window 12345 # replay a saved workflow
+wincli ui batch --window 12345 --steps-file workflow.json # run a reusable steps array
 wincli guidance                             # full automation guide
 wincli service status                       # inspect the CLI daemon
 wincli service stop                         # stop before rebuilding or upgrading

@@ -46,7 +46,6 @@ public sealed class CliHelpIntegrationTests
     [InlineData("clip", "clipboard")]
     [InlineData("proc", "process")]
     [InlineData("window-management", "window")]
-    [InlineData("ui-macro", "macro")]
     public async Task AliasHelp_UsesCanonicalCommand(string alias, string canonical)
     {
         var (code, stdout, stderr) = await RunAsync(alias, "--help");
@@ -86,6 +85,18 @@ public sealed class CliHelpIntegrationTests
     public async Task UnknownCommandHelp_ReportsUsageError()
     {
         var (code, stdout, stderr) = await RunAsync("not-a-command", "--help");
+
+        Assert.Equal(2, code);
+        Assert.Empty(stdout);
+        Assert.Contains("unknown command", stderr, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("macro")]
+    [InlineData("ui-macro")]
+    public async Task RetiredMacroHelp_ReportsUnknownCommand(string command)
+    {
+        var (code, stdout, stderr) = await RunAsync(command, "--help");
 
         Assert.Equal(2, code);
         Assert.Empty(stdout);

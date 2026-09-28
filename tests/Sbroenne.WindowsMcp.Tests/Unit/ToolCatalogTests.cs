@@ -10,6 +10,12 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class ToolCatalogTests
 {
     [Fact]
+    public void GetTools_DoesNotExposeRetiredMacro()
+    {
+        Assert.DoesNotContain(ToolCatalog.GetTools(), tool => tool.Name == "ui_macro");
+    }
+
+    [Fact]
     public void FindDescription_UsesObservedIdsAndVisitedNodeBudget()
     {
         var find = Assert.Single(ToolCatalog.GetTools(), tool => tool.Name == "ui_find");
@@ -48,14 +54,13 @@ public sealed class ToolCatalogTests
         // Spot-check a representative slice of the surface, including the tools shipped in this PR.
         Assert.Contains("clipboard", tools.Keys);
         Assert.Contains("file_open", tools.Keys);
-        Assert.Contains("ui_macro", tools.Keys);
         Assert.Contains("ui_batch", tools.Keys);
         Assert.Contains("window_management", tools.Keys);
 
         Assert.Contains("filePath", ParameterNames(tools["file_open"]));
         Assert.Contains("windowHandle", ParameterNames(tools["file_open"]));
         Assert.Contains("action", ParameterNames(tools["clipboard"]));
-        Assert.Contains("steps", ParameterNames(tools["ui_macro"]));
+        Assert.Contains("steps", ParameterNames(tools["ui_batch"]));
         Assert.Contains("mode", ParameterNames(tools["ui_snapshot"]));
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_click"]));
         Assert.Contains("snapshotMode", ParameterNames(tools["ui_batch"]));
@@ -127,7 +132,7 @@ public sealed class ToolCatalogTests
     public void PostActionSnapshotDescriptions_ExplainWhenToUseEachMode()
     {
         var tools = ToolCatalog.GetTools().ToDictionary(tool => tool.Name, StringComparer.Ordinal);
-        foreach (var toolName in new[] { "ui_click", "ui_type", "ui_select", "ui_batch", "ui_macro" })
+        foreach (var toolName in new[] { "ui_click", "ui_type", "ui_select", "ui_batch" })
         {
             var mode = Parameter(tools[toolName], "snapshotMode");
 

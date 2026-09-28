@@ -24,7 +24,7 @@ jobs:
     if: vars.WINDOWS_UI_RUNNER_ENABLED == 'true'
     steps:
       - name: Check maintenance age and report failures
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const repo = context.repo;

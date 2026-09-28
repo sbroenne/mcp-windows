@@ -61,7 +61,6 @@ Help runs locally without starting the persistent daemon, including `service --h
 | `mouse` | Mouse input (`move`, `click`, `drag`, `polyline`, `scroll`, …) |
 | `screenshot` | Capture screens/windows/regions (annotated element discovery by default) |
 | `clipboard` | Read/write the Windows clipboard (`get`, `set`, `clear`) |
-| `macro` | Record & replay UI workflows (`save`, `run`, `list`, `get`, `delete`) |
 | `file-save` | Save the active document (handles the Save As dialog) |
 | `file-open` | Open an existing file (handles the Open dialog) |
 | `service` | Start, inspect, or gracefully stop the CLI-only daemon |
@@ -95,14 +94,18 @@ wincli ui batch --window 12345 --steps '[{"action":"find","automationId":"Userna
 # Draw a whole figure in one invocation (polyline = one continuous stroke, no pen lift)
 wincli ui batch --window 12345 --steps '[{"action":"polyline","points":[[300,200],[500,200],[500,400],[300,200]]}]'
 
-# Save that sequence as a macro, then replay it later against any window
-wincli macro save --name login --steps '[{"action":"find","automationId":"UsernameInput"},{"action":"type","elementId":"$prev","text":"me"},{"action":"find","name":"Submit"},{"action":"click","elementId":"$prev"}]'
-wincli macro run --name login --window 12345
+# Keep a reusable steps JSON array in your project
+wincli ui batch --window 12345 --steps-file workflow.json
 ```
 
 ## Output & exit codes
 
-- **stdout** — the tool's JSON payload (parse it directly). On `ui` operations, `macro run`,
+The `macro` and `ui-macro` commands have been retired along with the MCP `ui_macro` tool.
+Existing files in `%LOCALAPPDATA%\Sbroenne.WindowsMcp\macros` remain untouched.
+To reuse a saved workflow, extract its `steps` array into a project JSON file and run
+`wincli ui batch --steps-file`; the old file's containing object is not accepted as a batch.
+
+- **stdout** — the tool's JSON payload (parse it directly). On `ui` operations,
   `file-open`, and `file-save`, use `--include-diagnostics` (alias `--diagnostics`) for available
   diagnostic detail. Command aliases have the same support. These flags are **not global**;
   other command groups reject them.
@@ -136,7 +139,7 @@ processes share this owner's registry. Help, version, tool discovery, and guidan
 Use IDs returned by discovery for click/type/select, element reads, table reads, and state waits.
 Selectors remain for discovery and appear/disappear waits. IDs are opaque observations, not
 names or OS window handles; stale IDs fail instead of searching for a similar control. Rediscover
-after daemon restart, eviction, replacement, or moving to another owner. Saved macros should
+after daemon restart, eviction, replacement, or moving to another owner. Reusable batch files should
 discover fresh controls and use checked `$prev` references, not persisted literal IDs.
 
 ```powershell

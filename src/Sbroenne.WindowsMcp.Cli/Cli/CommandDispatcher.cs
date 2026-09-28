@@ -1,6 +1,5 @@
 using Sbroenne.WindowsMcp.Automation.Tools;
 using Sbroenne.WindowsMcp.Clipboard.Tools;
-using Sbroenne.WindowsMcp.Macros.Tools;
 using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Processes.Tools;
 using Sbroenne.WindowsMcp.Tools;
@@ -54,9 +53,6 @@ internal static class CommandDispatcher
             case "clipboard":
             case "clip":
                 return await ClipboardAsync(args, ct);
-            case "macro":
-            case "ui-macro":
-                return await MacroAsync(args, ct);
             case "file-save":
             case "filesave":
             case "save":
@@ -88,7 +84,6 @@ internal static class CommandDispatcher
             "file-open" or "fileopen" or "open" => $"{WindowOptions} path file-path file {Diagnostics} trigger-mode trigger timeout-ms timeout",
             "process" or "proc" => "name pid sort-by sort limit force",
             "clipboard" or "clip" => "text",
-            "macro" or "ui-macro" => $"{WindowOptions} steps steps-file name continue-on-error no-stop-on-error stop-on-error with-snapshot snapshot snapshot-mode {Diagnostics} since",
             _ => null,
         };
         if (options is null)
@@ -292,39 +287,6 @@ internal static class CommandDispatcher
             action,
             a.GetString("text"),
             ct);
-        return Emit.Result(result);
-    }
-
-    private static async Task<int> MacroAsync(ParsedArgs a, CancellationToken ct)
-    {
-        if (!EnumHelper.TryParse<MacroAction>(a.Action, out var action))
-        {
-            return Emit.Usage(
-                $"macro requires a valid action. One of: {string.Join(", ", EnumHelper.Tokens<MacroAction>())}.");
-        }
-
-        var steps = a.GetString("steps");
-        var stepsFile = a.GetString("steps-file");
-        if (steps is null && stepsFile is not null && File.Exists(stepsFile))
-        {
-            steps = await File.ReadAllTextAsync(stepsFile, ct);
-        }
-
-        var stopOnError = a.Has("continue-on-error") || a.Has("no-stop-on-error")
-            ? false
-            : a.GetBool("stop-on-error", true);
-
-        var result = await UIMacroTool.ExecuteAsync(
-            action,
-            a.GetString("name"),
-            steps,
-            Window(a),
-            stopOnError,
-            a.GetFlag("with-snapshot", "snapshot"),
-            a.GetString("snapshot-mode") ?? "full",
-            a.GetFlag("include-diagnostics", "diagnostics"),
-            ct,
-            a.GetString("since"));
         return Emit.Result(result);
     }
 

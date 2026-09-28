@@ -17,7 +17,7 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
 3. Use `ui_read_table` to extract a grid, table, or details-view list into structured rows + headers in one call instead of scraping cells with repeated `ui_read`.
 4. Use `file_save` for Save / Save As flows and `file_open` for Open flows instead of sending raw keyboard shortcuts.
 5. Use `clipboard` (get/set/clear) for fast bulk text IO — pair it with copy/paste hotkeys.
-6. Use `ui_batch` to run a multi-step sequence in one call, and `ui_macro` to save that sequence by name and replay it later.
+6. Use `ui_batch` to run a multi-step sequence in one call. Keep reusable steps in project files.
 7. Only fall back to `screenshot_control`, `mouse_control`, or `keyboard_control` when the UI Automation tree is missing or the target is a custom canvas.
 
 ## Patterns
@@ -30,7 +30,10 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
 - Selectors are only for discovery and appear/disappear waits. Removed action selectors are errors.
 - Read an element with its ID; omit the ID only for an explicit whole-window read. Element reads never widen to window OCR.
 - Stale IDs require rediscovery. IDs belong to one owner and never transfer between MCP instances or the CLI daemon.
-- Batch `$prev` requires one unambiguous immediately preceding result. Saved macros discover fresh controls on every replay.
+- Batch `$prev` requires one unambiguous immediately preceding result. Reusable batches should discover fresh controls on every run.
+- Each batch step requires its matching enabled tool (`key`: `keyboard_control`; `mouse`/`polyline`: `mouse_control`).
+  Forbidden steps reject the whole batch before it starts, even with `stopOnError=false`.
+  `withSnapshot=true` requires enabled `ui_snapshot` before any action. Never route around disabled tools.
 - Re-check the UI tree after dialogs, page changes, or tab switches.
 - Treat screenshots as discovery or fallback tools, not the primary control surface.
 
