@@ -90,6 +90,8 @@ public sealed class CliCommandValidationTests
     [InlineData("screenshot --action capture --out image.png --no-annotate --cursor --format png")]
     [InlineData("open --handle 123 --file example.txt --trigger none --timeout 500 --diagnostics")]
     [InlineData("save --handle 123 --file-path example.txt --diagnostics")]
+    [InlineData("file-save --window 123 --path copy.txt --trigger-mode save_as")]
+    [InlineData("file-save --window 123 --path copy.txt --trigger-mode wait")]
     [InlineData("proc list --sort memory --limit 5 --force")]
     [InlineData("ui-macro run --name sample --handle 123 --snapshot --since token --no-stop-on-error")]
     [InlineData("clip set --text sample")]

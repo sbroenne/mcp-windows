@@ -6,12 +6,15 @@ namespace Sbroenne.WindowsMcp.Input;
 
 /// <summary>
 /// Implementation of keyboard input operations using Windows SendInput API.
-/// Uses KEYEVENTF_UNICODE for layout-independent text typing.
+/// Uses paced Unicode input, acknowledging characters in supported live-text editors.
 /// </summary>
 public sealed class KeyboardInputService : IDisposable
 {
     /// <summary>Default inter-key delay in milliseconds for sequence operations.</summary>
     private const int DefaultInterKeyDelayMs = 10;
+
+    /// <summary>Delay after each text character so asynchronous editors can consume Unicode input.</summary>
+    private const int TextCharacterDelayMs = 50;
 
     /// <summary>Default delay between text chunks in milliseconds.</summary>
     private const int DefaultChunkDelayMs = 50;
@@ -23,7 +26,12 @@ public sealed class KeyboardInputService : IDisposable
     private readonly int _chunkDelayMs;
     private readonly HeldKeyTracker _heldKeyTracker;
     private readonly ModifierKeyManager _modifierKeyManager;
+    private readonly Lazy<KeyboardTextObserver> _textObserver = new(() => new KeyboardTextObserver());
     private bool _disposed;
+
+    internal static int GetTextTimeoutMs(int textLength, int operationTimeoutMs) =>
+        // Allow for pacing and timer scheduling without consuming the normal operation budget.
+        (int)Math.Min(int.MaxValue, operationTimeoutMs + ((long)textLength * TextCharacterDelayMs * 2));
 
     /// <summary>
     /// Initializes a new instance of the <see cref="KeyboardInputService"/> class.
@@ -55,7 +63,7 @@ public sealed class KeyboardInputService : IDisposable
 
     /// <summary>
     /// Types text only while the specified top-level window remains foreground.
-    /// The guard is checked immediately before every SendInput chunk.
+    /// The guard is checked immediately before every character's SendInput call.
     /// </summary>
     internal Task<KeyboardControlResult> TypeTextAsync(
         string text,
@@ -75,28 +83,39 @@ public sealed class KeyboardInputService : IDisposable
         }
 
         var totalCharacters = 0;
+        var observationWarnings = new HashSet<string>(StringComparer.Ordinal);
 
         // Process text in chunks to prevent overwhelming the input queue
-        for (var offset = 0; offset < text.Length; offset += TextChunkSize)
+        for (var offset = 0; offset < text.Length;)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             // Get the current chunk
             var remainingLength = text.Length - offset;
             var currentChunkSize = Math.Min(TextChunkSize, remainingLength);
+            if (currentChunkSize < remainingLength
+                && char.IsSurrogatePair(text[offset + currentChunkSize - 1], text[offset + currentChunkSize]))
+            {
+                currentChunkSize--;
+            }
             var chunk = text.Substring(offset, currentChunkSize);
 
             // Type the chunk
-            var chunkResult = TypeChunk(chunk, expectedForegroundWindow);
+            var chunkResult = await TypeChunkAsync(chunk, expectedForegroundWindow, cancellationToken).ConfigureAwait(false);
             if (!chunkResult.Success)
             {
                 return chunkResult;
             }
 
             totalCharacters += chunkResult.CharactersTyped ?? 0;
+            if (chunkResult.Message is not null)
+            {
+                observationWarnings.Add(chunkResult.Message);
+            }
+            offset += currentChunkSize;
 
             // Add delay between chunks if there are more chunks to process
-            if (offset + TextChunkSize < text.Length)
+            if (offset < text.Length)
             {
                 await Task.Delay(_chunkDelayMs, cancellationToken).ConfigureAwait(false);
             }
@@ -105,7 +124,10 @@ public sealed class KeyboardInputService : IDisposable
         // Wait for the target process to consume the input queue before returning.
         _ = await WaitForIdleAsync(cancellationToken).ConfigureAwait(false);
 
-        return KeyboardControlResult.CreateTypeSuccess(totalCharacters);
+        return KeyboardControlResult.CreateTypeSuccess(totalCharacters) with
+        {
+            Message = observationWarnings.Count > 0 ? string.Join(" ", observationWarnings) : null
+        };
     }
 
     /// <summary>
@@ -115,15 +137,25 @@ public sealed class KeyboardInputService : IDisposable
     /// <param name="expectedForegroundWindow">
     /// Optional top-level window that must remain foreground.
     /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The result of the operation.</returns>
-    private static KeyboardControlResult TypeChunk(
+    private async Task<KeyboardControlResult> TypeChunkAsync(
         string chunk,
-        nint? expectedForegroundWindow)
+        nint? expectedForegroundWindow,
+        CancellationToken cancellationToken)
     {
-        var inputs = new List<INPUT>();
+        var inputs = new List<INPUT>(4);
+        var sentInput = false;
+        var observationWarnings = new HashSet<string>(StringComparer.Ordinal);
+        var observeText = true;
 
-        foreach (var c in chunk)
+        for (var index = 0; index < chunk.Length; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            inputs.Clear();
+            var c = chunk[index];
+            var characterStart = index;
+
             // Handle special characters
             if (c == '\n' || c == '\r')
             {
@@ -150,50 +182,91 @@ public sealed class KeyboardInputService : IDisposable
                 // This is layout-independent and handles all characters including emoji
                 var scanCode = (ushort)c;
 
-                // For characters outside BMP (emoji), we need to handle surrogate pairs
-                if (char.IsSurrogate(c))
+                inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE));
+                inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE | NativeConstants.KEYEVENTF_KEYUP));
+
+                if (index + 1 < chunk.Length && char.IsSurrogatePair(c, chunk[index + 1]))
                 {
-                    // Just use the UTF-16 code unit directly
-                    inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE));
-                    inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE | NativeConstants.KEYEVENTF_KEYUP));
-                }
-                else
-                {
-                    // Regular BMP character
+                    scanCode = chunk[++index];
                     inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE));
                     inputs.Add(CreateKeyboardInput(0, scanCode, NativeConstants.KEYEVENTF_UNICODE | NativeConstants.KEYEVENTF_KEYUP));
                 }
             }
-        }
 
-        if (inputs.Count == 0)
-        {
-            return KeyboardControlResult.CreateTypeSuccess(0);
-        }
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed before text input was sent.");
+            }
 
-        if (!IsExpectedForegroundWindow(expectedForegroundWindow))
-        {
-            return KeyboardControlResult.CreateFailure(
-                KeyboardControlErrorCode.WrongTargetWindow,
-                "The foreground window changed before text input was sent.");
-        }
+            KeyboardTextObserver.Observation? observation = null;
+            if (observeText)
+            {
+                var capture = await _textObserver.Value.CaptureAsync(cancellationToken).ConfigureAwait(false);
+                observation = capture.Observation;
+                observeText = observation is not null;
+                if (capture.Warning is not null)
+                {
+                    observationWarnings.Add(capture.Warning);
+                }
+            }
+            if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+            {
+                return KeyboardControlResult.CreateFailure(
+                    KeyboardControlErrorCode.WrongTargetWindow,
+                    "The foreground window changed while preparing text input.");
+            }
 
-        // Send all inputs at once
-        var inputArray = inputs.ToArray();
-        var result = NativeMethods.SendInput((uint)inputArray.Length, inputArray, INPUT.Size);
+            // Pace UTF-16 units separately, but acknowledge a complete surrogate pair.
+            // Editors may buffer its first unit without exposing any text yet.
+            for (var inputOffset = 0; inputOffset < inputs.Count; inputOffset += 2)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!IsExpectedForegroundWindow(expectedForegroundWindow))
+                {
+                    return KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.WrongTargetWindow,
+                        "The foreground window changed before text input was sent.");
+                }
+                INPUT[] inputArray = [inputs[inputOffset], inputs[inputOffset + 1]];
+                var result = NativeMethods.SendInput((uint)inputArray.Length, inputArray, INPUT.Size);
+                if (result != inputArray.Length)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    var (errorCode, errorMessage) = MapSendInputError(error);
+                    return KeyboardControlResult.CreateFailure(
+                        errorCode,
+                        $"{errorMessage}. Expected {inputArray.Length} events, sent {result}.");
+                }
+                sentInput = true;
+                await Task.Delay(TextCharacterDelayMs, cancellationToken).ConfigureAwait(false);
+            }
 
-        if (result != inputArray.Length)
-        {
-            var error = Marshal.GetLastWin32Error();
-            var (errorCode, errorMessage) = MapSendInputError(error);
-            return KeyboardControlResult.CreateFailure(
-                errorCode,
-                $"{errorMessage}. Expected {inputArray.Length} events, sent {result}.");
+            if (observation is not null)
+            {
+                var acknowledgement = await _textObserver.Value.WaitForChangeAsync(
+                    observation, chunk.Substring(characterStart, index - characterStart + 1),
+                    cancellationToken).ConfigureAwait(false);
+                if (!acknowledgement.Consumed)
+                {
+                    return KeyboardControlResult.CreateFailure(
+                        KeyboardControlErrorCode.OperationTimeout,
+                        $"The focused control did not show consumption of character {characterStart + 1} in the current text chunk. " +
+                        $"Text length before/after: {observation.Before.Text.Length}/{acknowledgement.LastObserved?.Text.Length}; " +
+                        $"selection length before/after: {observation.Before.Selection?.Length}/{acknowledgement.LastObserved?.Selection?.Length}; " +
+                        $"focused before/after: {observation.Before.Focused}/{acknowledgement.LastObserved?.Focused}. " +
+                        "Typing stopped to avoid corrupting queued text; read the current content before retrying.");
+                }
+            }
         }
 
         // Count actual characters typed (excluding control characters converted to keys)
-        var charactersTyped = chunk.Length;
-        return KeyboardControlResult.CreateTypeSuccess(charactersTyped);
+        var charactersTyped = sentInput ? chunk.Length : 0;
+        return KeyboardControlResult.CreateTypeSuccess(charactersTyped) with
+        {
+            Message = observationWarnings.Count > 0 ? string.Join(" ", observationWarnings) : null
+        };
     }
 
     /// <summary>
@@ -890,6 +963,10 @@ public sealed class KeyboardInputService : IDisposable
         if (!_disposed)
         {
             _heldKeyTracker.Dispose();
+            if (_textObserver.IsValueCreated)
+            {
+                _textObserver.Value.Dispose();
+            }
             _disposed = true;
         }
     }

@@ -4,8 +4,11 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
+
+using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration.WinUI;
 
@@ -21,9 +24,11 @@ public sealed class WinUITypeTests : IDisposable
     private readonly UIAutomationService _automationService;
     private readonly UIAutomationThread _staThread;
     private readonly string _windowHandle;
+    private readonly ITestOutputHelper _output;
 
-    public WinUITypeTests(ModernTestHarnessFixture fixture)
+    public WinUITypeTests(ModernTestHarnessFixture fixture, ITestOutputHelper output)
     {
+        _output = output;
         _fixture = fixture;
         _fixture.BringToFront();
 
@@ -150,5 +155,193 @@ public sealed class WinUITypeTests : IDisposable
 
         // Assert
         Assert.True(result.Success, $"Type with clear failed: {result.ErrorMessage}");
+    }
+
+    [Theory]
+    [InlineData("Project: Aurora")]
+    [InlineData("Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan")]
+    [InlineData("Project: Aurora\nStatus: Draft\nOwner: Taylor")]
+    public async Task KeyboardTyping_PreservesEveryCharacterInModernEditor(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        var typed = await keyboard.TypeTextAsync(text, handle);
+        Assert.True(typed.Success, typed.Error);
+
+        await AssertEditorTextAsync(text);
+    }
+
+    [Fact]
+    public async Task KeyboardTyping_IndividuallySentCharactersArePreserved()
+    {
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        const string text = "Project: Aurora";
+        foreach (var character in text)
+        {
+            var typed = await keyboard.TypeTextAsync(character.ToString(), handle);
+            Assert.True(typed.Success, typed.Error);
+        }
+
+        await AssertEditorTextAsync(text);
+    }
+
+    [Fact]
+    public async Task KeyboardPress_VirtualKeysAreDeliveredToEditor()
+    {
+        var handle = await FocusEditorAsync();
+        using var keyboard = new KeyboardInputService();
+        var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
+        Assert.True(select.Success, select.Error);
+        foreach (var key in new[] { "a", "b", "c" })
+        {
+            var pressed = await keyboard.PressKeyAsync(key, ModifierKey.None, 1, handle);
+            Assert.True(pressed.Success, pressed.Error);
+        }
+
+        await AssertEditorTextAsync("abc");
+    }
+
+    private async Task<nint> FocusEditorAsync()
+    {
+        var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavEditor",
+        });
+        Assert.True(navigate.Success, navigate.ErrorMessage);
+        UIAutomationResult? target = null;
+        var editorFound = await TestWait.RetryUntilAsync(
+            attempt: async () => target = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "EditorTextBox",
+            }),
+            condition: () => target is { Success: true, Items.Length: 1 });
+        Assert.True(editorFound, target?.ErrorMessage);
+        Assert.NotNull(target);
+        Assert.True(target.Success, target.ErrorMessage);
+        var targetEditor = Assert.Single(target.Items!);
+        var focus = await _automationService.FocusElementAsync(targetEditor.Id);
+        Assert.True(focus.Success, focus.ErrorMessage);
+        var handle = nint.Parse(_windowHandle, System.Globalization.CultureInfo.InvariantCulture);
+        var monitors = new MonitorService().GetMonitors();
+        Assert.InRange(targetEditor.Click[2], 0, monitors.Count - 1);
+        var monitor = monitors[targetEditor.Click[2]];
+        var click = await new MouseInputService().ClickAsync(
+            targetEditor.Click[0] + monitor.X,
+            targetEditor.Click[1] + monitor.Y,
+            ModifierKey.None,
+            handle);
+        Assert.True(click.Success, click.Error);
+        UIAutomationResult? focused = null;
+        var editorHasFocus = await TestWait.RetryUntilAsync(
+            attempt: async () => focused = await _automationService.GetFocusedElementAsync(),
+            condition: () => focused is { Success: true, Items.Length: 1 }
+                && focused.Items[0].Id == targetEditor.Id);
+        if (!editorHasFocus)
+        {
+            var underCursor = await _automationService.GetElementAtCursorAsync();
+            _output.WriteLine($"Expected editor: {System.Text.Json.JsonSerializer.Serialize(targetEditor)}");
+            _output.WriteLine($"Actual focus: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+            _output.WriteLine($"Under cursor: {System.Text.Json.JsonSerializer.Serialize(underCursor)}");
+            var screenshot = await new ScreenshotService(
+                new MonitorService(), new SecureDesktopDetector(), new ImageProcessor())
+                .ExecuteAsync(new ScreenshotControlRequest
+                {
+                    Action = ScreenshotAction.Capture,
+                    Target = CaptureTarget.Window,
+                    WindowHandle = _windowHandle,
+                    ImageFormat = ImageFormat.Png,
+                });
+            _output.WriteLine($"Failure screenshot: {screenshot.Success}, {screenshot.Message}");
+            if (screenshot.Success && screenshot.ImageData is not null)
+            {
+                var directory = Path.Combine(AppContext.BaseDirectory, "TestResults");
+                Directory.CreateDirectory(directory);
+                await File.WriteAllBytesAsync(
+                    Path.Combine(directory, $"editor-focus-{Guid.NewGuid():N}.png"),
+                    Convert.FromBase64String(screenshot.ImageData));
+            }
+        }
+        Assert.True(editorHasFocus, $"Editor did not receive keyboard focus: {focused?.ErrorMessage}");
+        _output.WriteLine($"Focus before keyboard calls: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+        LogModifierState("Before keyboard calls");
+
+        return handle;
+    }
+
+    [Fact]
+    public async Task EditorTextReadback_MatchesSemanticTextEntry()
+    {
+        var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavEditor",
+        });
+        Assert.True(navigate.Success, navigate.ErrorMessage);
+        const string text = "Read-back probe 123";
+        var typed = await _automationService.ObserveAndTypeAsync(
+            new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "EditorTextBox",
+            },
+            text,
+            clearFirst: true);
+        Assert.True(typed.Success, typed.ErrorMessage);
+        await AssertEditorTextAsync(text);
+    }
+
+    private async Task AssertEditorTextAsync(string text)
+    {
+        var focusAfterInput = await _automationService.GetFocusedElementAsync();
+        _output.WriteLine($"Focus after input: {System.Text.Json.JsonSerializer.Serialize(focusAfterInput)}");
+        LogModifierState("After input");
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "EditorTextBox",
+        });
+        Assert.True(found.Success, found.ErrorMessage);
+        var editor = Assert.Single(found.Items!);
+        UIAutomationResult? read = null;
+        var matched = await TestWait.RetryUntilAsync(
+            attempt: async () =>
+            {
+                read = await _automationService.GetTextAsync(editor.Id, _windowHandle, false);
+                _output.WriteLine($"Editor read: {System.Text.Json.JsonSerializer.Serialize(read)}");
+            },
+            condition: () => read is { Success: true }
+                && read.Text?.ReplaceLineEndings("\n") == text.ReplaceLineEndings("\n"));
+        if (!matched)
+        {
+            var counts = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "CharacterCountText",
+            });
+            var focused = await _automationService.GetFocusedElementAsync();
+            _output.WriteLine($"Character count: {System.Text.Json.JsonSerializer.Serialize(counts)}");
+            _output.WriteLine($"Focus after typing: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+        }
+
+        Assert.NotNull(read);
+        Assert.True(read.Success, read.ErrorMessage);
+        Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+    }
+
+    private void LogModifierState(string stage)
+    {
+        var modifiers = new ModifierKeyManager();
+        _output.WriteLine($"{stage}: Ctrl={modifiers.IsKeyPressed(NativeConstants.VK_CONTROL)}, "
+            + $"Shift={modifiers.IsKeyPressed(NativeConstants.VK_SHIFT)}, "
+            + $"Alt={modifiers.IsKeyPressed(NativeConstants.VK_MENU)}, "
+            + $"Win={modifiers.IsKeyPressed(NativeConstants.VK_LWIN)}");
     }
 }

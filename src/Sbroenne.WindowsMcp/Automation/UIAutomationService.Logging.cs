@@ -7,6 +7,9 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </summary>
 public sealed partial class UIAutomationService
 {
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Filename input observation failed, but the current owned dialog field contains the exact requested path: {ObservationError}")]
+    private static partial void LogSaveFilenameObservationRecovered(ILogger logger, string observationError);
+
     [LoggerMessage(Level = LogLevel.Debug, Message = "Search {Action}: scanned {ElementsScanned} elements in {DurationMs}ms, found {ResultCount} matches")]
     private static partial void LogSearchPerformance(ILogger logger, string action, int elementsScanned, long durationMs, int resultCount);
 

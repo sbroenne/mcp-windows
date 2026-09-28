@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Sbroenne.WindowsMcp.Cli;
+using Sbroenne.WindowsMcp.Cli.TestFixture;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -108,7 +109,8 @@ public sealed class CliSafetyProcessTests : IAsyncLifetime
                 await Task.Delay(25, timeout.Token);
             }
 
-            var actual = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(output, timeout.Token));
+            await using var recordedStream = FixtureState.OpenRead(output);
+            var actual = await JsonSerializer.DeserializeAsync<string[]>(recordedStream, cancellationToken: timeout.Token);
             Assert.Equal(expected, actual);
         }
         finally

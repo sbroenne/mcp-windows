@@ -512,6 +512,9 @@ public sealed record UIAutomationResult
         UIAutomationErrorType.PatternNotSupported =>
             "This element doesn't support the requested pattern. Use clickablePoint with mouse_control instead.",
 
+        UIAutomationErrorType.VerificationFailed =>
+            "Input may already have changed the document. Read the current text before retrying; do not blindly repeat or append it.",
+
         UIAutomationErrorType.ElementStale =>
             "Element reference expired or belongs to another owner. Rediscover with ui_find or ui_snapshot and use the new ID; do not reuse IDs after a restart.",
 

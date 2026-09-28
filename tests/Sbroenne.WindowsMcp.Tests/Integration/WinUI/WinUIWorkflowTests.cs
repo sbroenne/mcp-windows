@@ -75,16 +75,17 @@ public sealed class WinUIWorkflowTests : IDisposable
                 AutomationId = navItem,
             });
             Assert.True(navResult.Success, $"Failed to click {navItem}: {navResult.ErrorMessage}");
-            await Task.Delay(200);
-
-            // Verify expected control is visible
-            var findResult = await _automationService.FindElementsAsync(new ElementQuery
-            {
-                WindowHandle = _windowHandle,
-                AutomationId = expectedControl,
-            });
-
-            Assert.True(findResult.Success, $"Failed to find {expectedControl} after navigating via {navItem}");
+            UIAutomationResult? findResult = null;
+            var appeared = await TestWait.RetryUntilAsync(
+                attempt: async () => findResult = await _automationService.FindElementsAsync(new ElementQuery
+                {
+                    WindowHandle = _windowHandle,
+                    AutomationId = expectedControl,
+                }),
+                condition: () => findResult is { Success: true, Items.Length: > 0 });
+            Assert.True(appeared,
+                $"Failed to find {expectedControl} after navigating via {navItem}: {findResult?.ErrorMessage}");
+            Assert.NotNull(findResult);
             Assert.NotNull(findResult.Items);
             Assert.NotEmpty(findResult.Items!);
         }
@@ -193,7 +194,7 @@ public sealed class WinUIWorkflowTests : IDisposable
             WindowHandle = _windowHandle,
             AutomationId = "NewButton",
         });
-        Assert.True(newResult.Success);
+        Assert.True(newResult.Success, newResult.ErrorMessage);
         await Task.Delay(100);
 
         // Verify status bar exists
@@ -207,12 +208,22 @@ public sealed class WinUIWorkflowTests : IDisposable
         Assert.NotEmpty(findResult.Items!);
 
         // Click Save button
-        var saveResult = await _automationService.ObserveAndClickAsync(new ElementQuery
+        try
         {
-            WindowHandle = _windowHandle,
-            AutomationId = "SaveButton",
-        });
-        Assert.True(saveResult.Success);
+            var saveResult = await _automationService.ObserveAndClickAsync(new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                AutomationId = "SaveButton",
+            });
+            Assert.True(saveResult.Success, saveResult.ErrorMessage);
+            Assert.True(
+                await TestWait.UntilAsync(() => _fixture.HasOwnedDialog, TimeSpan.FromSeconds(5)),
+                "The Save button did not open the harness dialog.");
+        }
+        finally
+        {
+            _fixture.CloseOwnedDialogs();
+        }
     }
 
     /// <summary>

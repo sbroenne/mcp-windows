@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Cli.Service;
+using Sbroenne.WindowsMcp.Cli.TestFixture;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
@@ -134,7 +135,8 @@ public sealed class CliDaemonLifecycleTests
                     await Task.Delay(25, timeout.Token);
                 }
 
-                var actual = JsonSerializer.Deserialize<string[]>(await File.ReadAllTextAsync(recorded, timeout.Token));
+                await using var recordedStream = FixtureState.OpenRead(recorded);
+                var actual = await JsonSerializer.DeserializeAsync<string[]>(recordedStream, cancellationToken: timeout.Token);
                 Assert.NotNull(actual);
                 Assert.Equal([name], actual);
                 using var status = JsonDocument.Parse((await RunAsync("service", "status")).Output);
