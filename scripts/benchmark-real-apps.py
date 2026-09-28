@@ -309,6 +309,19 @@ def initialize_dpi(user32=None):
         raise RuntimeError("Benchmark setup requires per-monitor physical pixel coordinates before opening apps.")
 
 
+def window_placement(work_area, dpi):
+    left, top, right, bottom = work_area
+    if dpi <= 0:
+        raise ValueError("The benchmark requires a positive display DPI.")
+    scale = dpi / 96
+    margin = round(32 * scale)
+    width = min(round(1280 * scale), right - left - 2 * margin)
+    height = min(round(900 * scale), bottom - top - 2 * margin)
+    if width <= 0 or height <= 0:
+        raise ValueError("The work area is too small for the benchmark window.")
+    return left + margin, top + margin, width, height
+
+
 class OwnedApp:
     def __init__(self, app, source, directory, url=None):
         initialize_dpi()
@@ -379,9 +392,10 @@ class OwnedApp:
                     work = RECT()
                     if not ctypes.windll.user32.SystemParametersInfoW(48, 0, ctypes.byref(work), 0):
                         raise ctypes.WinError()
-                    win32gui.MoveWindow(int(self.root), work.left + 32, work.top + 32,
-                                        min(1280, work.right - work.left - 64),
-                                        min(900, work.bottom - work.top - 64), True)
+                    self.initial_dpi = ctypes.windll.user32.GetDpiForSystem()
+                    placement = window_placement(
+                        (work.left, work.top, work.right, work.bottom), self.initial_dpi)
+                    win32gui.MoveWindow(int(self.root), *placement, True)
                     self.initial_bounds = win32gui.GetWindowRect(int(self.root))
                     _, pid = win32process.GetWindowThreadProcessId(int(self.root))
                     self.executable = psutil.Process(pid).exe()
@@ -776,6 +790,7 @@ async def run(args):
                                     row["app_executable"] = owned.executable
                                     row["app_version"] = owned.version
                                     row["initial_window_bounds"] = owned.initial_bounds
+                                    row["initial_window_dpi"] = owned.initial_dpi
                                     row["window_handle"] = owned.root
                                     mark_model_started(directory, row)
                                     print(f"START {directory.name} {app} {model} {route}", flush=True)

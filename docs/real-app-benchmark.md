@@ -211,6 +211,15 @@ Install Notepad, Word, PowerPoint, and Chrome. Close existing Notepad, Word,
 and PowerPoint instances first; the runner refuses to take over those
 applications. Existing Chrome sessions are left alone.
 
+The runner uses physical screen pixels and records the starting display DPI.
+Its requested window size is 1280 by 900 at 100% display scaling, with a
+32-pixel margin, scaled with Windows and reduced to fit the primary work area.
+At 200% scaling on the recorded 2736 by 1728 work area, that is a 2560 by
+1600 window at position 64,64. This preserves the original on-screen window
+size while fixing coordinate handling. The earlier run recorded logical
+bounds before this correction; those numbers need scaling before comparison.
+The published results above have not been replaced by a new run.
+
 Build the server, install the benchmark's declared Python dependencies, and
 authenticate the GitHub CLI or provide `GITHUB_TOKEN`. Never put a token in
 source files or reports.

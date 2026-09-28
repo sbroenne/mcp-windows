@@ -33,6 +33,31 @@ class RealAppBenchmarkTests(unittest.TestCase):
     def guard(self, name, args, route="screenshots", app="notepad"):
         return benchmark.guard_arguments(name, args, route, {"123", "456"}, Path(r"C:\run\completed.txt"), app)
 
+    def test_window_placement_preserves_scaled_benchmark_size(self):
+        for dpi in (96, 120, 144, 168, 192):
+            with self.subTest(dpi=dpi):
+                scale = dpi / 96
+                work_area = (0, 0, round(1920 * scale), round(1040 * scale))
+                self.assertEqual(
+                    tuple(round(value * scale) for value in (32, 32, 1280, 900)),
+                    benchmark.window_placement(work_area, dpi),
+                )
+
+        self.assertEqual(
+            (64, 64, 2560, 1600),
+            benchmark.window_placement((0, 0, 2736, 1728), 192),
+        )
+        self.assertEqual(
+            (164, 104, 2560, 1600),
+            benchmark.window_placement((100, 40, 2836, 1768), 192),
+        )
+
+    def test_window_placement_rejects_invalid_display_settings(self):
+        for work_area, dpi in (((0, 0, 2736, 1728), 0), ((0, 0, 64, 64), 96)):
+            with self.subTest(work_area=work_area, dpi=dpi):
+                with self.assertRaises(ValueError):
+                    benchmark.window_placement(work_area, dpi)
+
     def test_screenshot_route_cannot_use_controls(self):
         with self.assertRaisesRegex(ValueError, "not available"):
             self.guard("ui_read", {"windowHandle": "123"})
