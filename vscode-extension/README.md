@@ -47,7 +47,7 @@ Short text reads can use fewer tokens than screenshots. Changes-only updates
 avoid repeating the whole window, and combining steps reduces separate requests.
 See the [measured text-update savings](https://windowsmcpserver.dev/benchmark/).
 
-[Compare Windows MCP with built-in computer use](https://windowsmcpserver.dev/comparison/).
+[Compare controls and screenshots](https://windowsmcpserver.dev/comparison/).
 
 ## Requirements
 

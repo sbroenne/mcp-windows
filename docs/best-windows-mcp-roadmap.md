@@ -17,8 +17,8 @@ Lead with three practical benefits:
 
 Explain token efficiency as less repeated information for the model to process.
 Do not call every alternative screenshot-only: some other Windows MCP servers
-also read accessibility information. Do not claim a measured advantage over
-GitHub Copilot app computer use without a direct comparison.
+also read accessibility information. Keep comparisons focused on controls and
+screenshots within Windows MCP rather than assistants' own screen-control features.
 
 Do not compete on raw tool counts, unsupported reliability rankings, or broad
 system-administration features that the host already provides. Dedicated browser

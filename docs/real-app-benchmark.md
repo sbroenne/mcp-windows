@@ -107,8 +107,7 @@ input. It cannot read control names, values, element IDs, or text through the
 control tools. It must handle save dialogs itself.
 
 Both routes use Windows MCP. This is a comparison of these two tool sets,
-not a direct benchmark of the computer-use implementations in the Copilot app
-or Claude. The result includes the benefit of higher-level actions such as
+not a comparison of separate products. The result includes the benefit of higher-level actions such as
 file saving, not just the difference between image and text input.
 
 The controls route exposes `ui_snapshot`, `ui_find`, `ui_read`, `ui_click`,

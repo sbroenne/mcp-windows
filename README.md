@@ -43,9 +43,7 @@ information. Windows MCP includes screenshots, mouse, keyboard, and text recogni
 for those cases. Both approaches are available through the same tools:
 **controls first, screenshots when needed**.
 
-Already using built-in computer use? Keep your assistant and add Windows MCP's
-focused Windows tools.
-[Compare the approaches](https://windowsmcpserver.dev/comparison/).
+[Compare controls and screenshots](https://windowsmcpserver.dev/comparison/).
 
 ## MCP or CLI for your agent?
 
@@ -126,8 +124,8 @@ with almost the same time.
 
 These are 32 trials, one per app/model/approach, using Windows MCP for both
 approaches. They support **controls first, screenshots when needed**, not
-a claim that screenshots are always worse or a direct comparison with
-Copilot's or Claude's built-in computer use.
+a claim that screenshots are always worse. This compares two tool sets in
+Windows MCP, not separate products.
 
 [Model results, failures, and measurement details](docs/real-app-benchmark.md).
 

@@ -16,9 +16,8 @@ application does not expose usable controls.
 
 ### Controls and screenshots
 
-Screenshot-only computer use gives an agent an image and mouse/keyboard tools.
-For example, [Claude's computer-use documentation](https://platform.claude.com/docs/en/agents-and-tools/tool-use/computer-use-tool)
-describes this approach. The model identifies controls and text in the image.
+Screenshot-only automation gives an agent an image and mouse/keyboard tools.
+The model identifies controls and text in the image.
 
 Windows MCP first asks [Windows UI Automation](https://learn.microsoft.com/en-us/windows/win32/winauto/entry-uiauto-win32)
 for the controls an application exposes. The agent receives names, IDs, field

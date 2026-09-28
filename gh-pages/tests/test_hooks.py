@@ -13,6 +13,23 @@ spec.loader.exec_module(hooks)
 
 
 class DocumentationHooksTests(unittest.TestCase):
+    def test_docs_do_not_compare_assistant_screen_control_features(self):
+        paths = [
+            SITE.parent / "README.md",
+            SITE.parent / "FEATURES.md",
+            SITE.parent / "vscode-extension" / "README.md",
+            SITE.parent / ".github" / "documentation.instructions.md",
+            SITE / "README.md",
+            *(SITE / "docs").glob("*.md"),
+            *(SITE.parent / "docs").glob("*benchmark.md"),
+            SITE.parent / "docs" / "best-windows-mcp-roadmap.md",
+        ]
+        for path in paths:
+            with self.subTest(page=str(path)):
+                text = path.read_text(encoding="utf-8").lower()
+                self.assertNotRegex(text, r"computer[\s-]+use")
+                self.assertNotIn("assistant's built-in tools", text)
+
     def test_entry_pages_lead_with_real_task_results(self):
         evidence = json.loads(
             (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").read_text(encoding="utf-8")

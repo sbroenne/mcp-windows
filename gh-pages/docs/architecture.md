@@ -9,8 +9,8 @@ Windows MCP is the connection between your AI assistant and your Windows apps.
 The assistant decides what to do. Windows MCP gives it tools to read a window,
 press a button, type text, and check what happened.
 
-Your assistant may already have built-in computer use. Windows MCP can work
-alongside those tools. [Compare the options](comparison.md).
+Windows MCP provides direct control reads and screenshots.
+[Compare the approaches](comparison.md).
 
 ## From your request to an action
 

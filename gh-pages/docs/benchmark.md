@@ -41,8 +41,7 @@ Two agents claimed success despite a wrong Word heading style or a wrong
 booking year.
 
 These are 32 fresh trials, one per combination, using the same Windows MCP
-server. They compare tool choices, not Copilot's or Claude's built-in
-computer-use products.
+server. They compare two tool sets within Windows MCP, not separate products.
 
 <details markdown="1" id="real-app-details">
 <summary>Real-app results, failures, evidence, and how to repeat the comparison</summary>
@@ -76,8 +75,7 @@ at both image settings. Focused reads returned those same answers with less inpu
 the point: send what the task needs, with a picture available when useful.
 
 The test used five values, captured five times each in one form. It measures
-reading the field, not completing an entire task or comparing Copilot's and
-Claude's built-in tools.
+reading the field, not completing an entire task or comparing separate products.
 
 ## What differed in the single-field test?
 
@@ -156,7 +154,7 @@ An app's speed and the time the AI takes to decide also affect the task.
 For scripts and tool settings, use the
 [command reference](https://github.com/sbroenne/mcp-windows/blob/main/FEATURES.md).
 
-[How Windows MCP compares with built-in computer use](comparison.md)
+[Compare controls and screenshots](comparison.md)
 
 <details markdown="1" id="text-update-details">
 <summary>Changes-only text benchmark: method and individual samples</summary>

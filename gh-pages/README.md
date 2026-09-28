@@ -20,7 +20,7 @@ instructions written for an AI model.
 | Help | `docs/troubleshooting.md`, `security.md`, and `privacy.md` |
 | Downloads and updates | `docs/changelog.md`: current installation routes, not copied development history |
 | How it works | `docs/architecture.md`: a plain-English explanation |
-| Compare your options | `docs/comparison.md`: Windows MCP alongside Copilot app and Claude Code computer use, with primary sources |
+| Compare your options | `docs/comparison.md`: when to use controls or screenshots within Windows MCP |
 | Optional instructions | `docs/skills.md`: explain and link skill files, do not paste their contents |
 | Help improve Windows MCP | `docs/contributing.md`: ways to help, with a link to developer instructions |
 | Measurements | `docs/benchmark.md`: plain explanation with detailed measurements in an expandable section |

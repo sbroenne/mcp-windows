@@ -129,8 +129,8 @@ the reading test, just as deciding where to inspect an image is.
 
 This compares reading a field from an observation. It does not include
 choosing tools, navigating the app, entering values, or completing a whole
-user task. It is not a head-to-head run of Copilot app or Claude's built-in
-computer-use tools. A full-window control list is not a focused field read
+user task. It is not a comparison of separate products.
+A full-window control list is not a focused field read
 and can contain much more information.
 
 ### Run evidence

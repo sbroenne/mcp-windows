@@ -78,8 +78,8 @@ with almost the same time.
 
 This was one trial per app/model/approach, with Windows MCP providing both
 approaches. It supports **controls first, screenshots when needed**, not
-a claim that screenshots are always worse. We did not test Copilot's or
-Claude's built-in computer use directly.
+a claim that screenshots are always worse. We compared two tool sets in
+Windows MCP, not separate products.
 
 [See model results, failures, and the full method](benchmark.md#real-tasks-in-notepad-word-powerpoint-and-chrome)
 
@@ -193,16 +193,16 @@ does not, by itself, prove that a file was saved or a form was submitted.
 
 [More about how it works](architecture.md)
 
-## How does this compare with built-in computer use?
+## When should your assistant use controls or screenshots?
 
-**Keep your assistant. Give it purpose-built Windows tools.** GitHub Copilot app
-and Claude Code have built-in computer use, and both can connect to Windows MCP.
+**Read controls when they provide the answer. Use screenshots when appearance
+matters.** Windows MCP provides both approaches.
 
-Add Windows MCP for focused text reads, changes-only updates, and actions on
-the exact controls it finds. Save tokens without giving up screenshot-based
-use when a task needs it. You are not tied to one AI app's built-in tools.
+Focused text reads and changes-only updates can reduce repeated information.
+Screenshots remain useful when an app does not expose the controls or values
+needed for the task.
 
-[Compare Windows MCP with Copilot app and Claude Code](comparison.md)
+[Compare controls and screenshots](comparison.md)
 
 ## Before you begin
 

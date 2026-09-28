@@ -29,16 +29,9 @@ Make token savings a leading benefit: read just the controls needed instead of
 sending screenshots at every step, then request only changes. Do not weaken this
 to vague copy such as "less to process." Keep the claim tied to focused reads,
 not a guarantee that every text response is smaller than every screenshot.
-Do not call GitHub Copilot app or another product screenshot-only without a
-current primary source for that exact product. Copilot Studio is a different product.
-
-GitHub Copilot app has built-in Computer Use; do not describe it as absent because
-its public documentation is limited. Distinguish Claude Code's built-in computer
-use in Desktop (Windows and macOS) from its CLI version (macOS only). Recheck
-current primary sources whenever changing comparison claims. A missing documented
-capability is not evidence that a product lacks it, and individual bug reports
-do not establish product-wide reliability. Explain that Windows MCP can be added
-to these assistants, not just used instead of their built-in tools.
+Keep comparisons focused on controls and screenshots within Windows MCP.
+Do not discuss or compare assistants' own screen-control features. Mention
+compatible assistants where useful for MCP setup and installation.
 
 Explain the benefits in plain English: discover actual controls before acting,
 send only useful UI changes, and choose MCP or the CLI. Windows MCP is independent
