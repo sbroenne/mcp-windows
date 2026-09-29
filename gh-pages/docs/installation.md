@@ -26,12 +26,12 @@ Read [how to use it safely](security.md) before allowing it to act.
 ## GitHub Copilot in VS Code
 
 1. Install [Windows MCP Server from the VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp).
-2. Install the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0). This is Microsoft software needed to run the server included with the extension.
-3. Open Copilot Chat in VS Code and choose **Agent** mode.
-4. Enable the Windows MCP tools in the chat's tool list.
-5. Try the [first task below](#try-your-first-task).
+2. Open Copilot Chat in VS Code and choose **Agent** mode.
+3. Enable the Windows MCP tools in the chat's tool list.
+4. Try the [first task below](#try-your-first-task).
 
-You do not need to add a second copy of the server through a settings file.
+The extension includes its .NET runtime. You do not need a separate .NET
+installation or a second copy of the server through a settings file.
 
 <span id="standalone-any-mcp-client"></span>
 ## Claude Desktop, Cursor, and other AI apps

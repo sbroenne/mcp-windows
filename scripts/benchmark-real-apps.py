@@ -1,26 +1,25 @@
-"""Run paired, independently checked Windows tasks through the same MCP server."""
+"""Owned-app fixtures and guarded Windows tools for pytest-skill-engineering."""
 
-import argparse
 import asyncio
 import base64
 from copy import deepcopy
 from datetime import UTC, datetime
 import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from importlib.metadata import version
 import json
 import os
 from pathlib import Path
-import platform
-import shutil
 import subprocess
-import tempfile
 import threading
 import time
 from urllib.parse import parse_qs
-import uuid
 
-from real_app_fixtures import APPS, create_fixture, task_prompt, verify_output
+from real_app_fixtures import (
+    APPS as APPS,
+    create_fixture as create_fixture,
+    task_prompt as task_prompt,
+    verify_output as verify_output,
+)
 
 
 MODELS = ("gpt-6-astra", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-luna")
@@ -149,39 +148,6 @@ def digest(path):
 
 def write_json(path, data):
     path.write_text(json.dumps(data, indent=2, ensure_ascii=True), encoding="utf-8")
-
-
-def mark_model_started(directory, row):
-    with (directory / "model-started.json").open("x", encoding="utf-8") as marker:
-        json.dump({"prompt": row["prompt"]}, marker, ensure_ascii=True)
-        marker.flush()
-        os.fsync(marker.fileno())
-
-
-def require_setup_only_resume(directory, interrupted):
-    if ("prompt" in interrupted or interrupted["requests"] or interrupted["usage"]
-            or any((directory / name).exists() for name in
-                   ("model-started.json", "tool-calls.json", "result.json"))):
-        raise ValueError("Cannot retry an unfinished model trial; only pre-task setup can be resumed")
-
-
-def validate_resume(existing, requested, rows):
-    for key in (
-        "apps", "models", "routes", "purpose", "timeout_seconds", "max_tool_calls",
-        "reasoning_effort", "image_detail", "instructions", "server_sha256",
-        "fixtures_sha256", "dependencies", "windows",
-    ):
-        if existing[key] != requested[key]:
-            raise ValueError(f"Cannot resume with different {key}")
-    order = [
-        (app, model, route)
-        for app_index, app in enumerate(existing["apps"])
-        for model_index, model in enumerate(existing["models"])
-        for route in (ROUTES if (app_index + model_index) % 2 == 0 else tuple(reversed(ROUTES)))
-    ]
-    completed = [(row["app"], row["model"], row["route"]) for row in rows]
-    if completed != order[:len(completed)] or len(completed) > len(order):
-        raise ValueError("Completed trials must be an unchanged prefix of the original run order")
 
 
 def flatten_tree(nodes):
@@ -482,25 +448,28 @@ class OwnedApp:
 
 
 class TrialBridge:
-    def __init__(self, mcp, owned, route, output, directory, max_calls):
+    def __init__(self, mcp, owned, route, output, directory):
         self.mcp, self.owned, self.route = mcp, owned, route
         self.output, self.directory = output, directory
         self.calls = []
-        self.max_calls = max_calls
-        self.stop = asyncio.Event()
         self.failure = None
         self.lock = asyncio.Lock()
         self.closed = False
 
     async def invoke(self, invocation):
+        action = asyncio.create_task(self._invoke(invocation))
+        try:
+            return await asyncio.shield(action)
+        except asyncio.CancelledError:
+            # An MCP request can already have dispatched input. Drain it before app cleanup.
+            await asyncio.shield(action)
+            raise
+
+    async def _invoke(self, invocation):
         from copilot import ToolResult, ToolBinaryResult
         async with self.lock:
             if self.closed:
                 return ToolResult(result_type="denied", text_result_for_llm="This trial has ended.")
-            if len(self.calls) >= self.max_calls:
-                self.failure = "tool_budget_exceeded"
-                self.stop.set()
-                return ToolResult(result_type="denied", text_result_for_llm="Trial tool budget reached.")
             entry = {"name": invocation.tool_name, "arguments": invocation.arguments,
                      "started_at": datetime.now(UTC).isoformat()}
             self.calls.append(entry)
@@ -572,331 +541,17 @@ class TrialBridge:
             except Exception as error:
                 entry["error"] = f"{type(error).__name__}: {error}"
                 self.failure = entry["error"]
-                self.stop.set()
                 raise
             finally:
                 entry["seconds"] = time.monotonic() - started
                 write_json(self.directory / "tool-calls.json", self.calls)
 
 
-def format_report(manifest, rows):
-    lines = [
-        "# Real Windows task benchmark", "",
-        "Each row is one independently checked task. Failed tasks remain in the results.",
-        "Input/output totals include every reported model request, not just the final answer.",
-        "Time includes model thinking and tool calls, but excludes fixture setup and independent file checks.",
-        "Both routes use the same Windows MCP server. Images use native high detail.",
-        "The controls route can fall back to images; the screenshots route cannot read or act on controls.",
-        "This initial matrix has one trial per app/model/route, not enough to rank model reliability.", "",
-        "| Model | App | Route | Complete | Input tokens | Output tokens | Seconds | Calls | Failed calls |",
-        "|---|---|---|---|---:|---:|---:|---:|---:|",
-    ]
-    for row in rows:
-        lines.append(
-            f"| {row['model']} | {row['app']} | {row['route']} | {row['success']} | "
-            f"{row['input_tokens']} | {row['output_tokens']} | {row['seconds']:.1f} | "
-            f"{row['tool_calls']} | {row['failed_tool_calls']} |"
-        )
-    return "\n".join(lines) + "\n"
 
 
-async def run(args):
-    import httpx
-    from copilot import CopilotClient, Tool
-    from copilot.copilot_request_handler import CopilotRequestHandler
-    from mcp import ClientSession
-    from mcp.client.stdio import stdio_client, StdioServerParameters
-
-    class RequestAudit(CopilotRequestHandler):
-        active = None
-
-        async def send_request(self, request, ctx):
-            raw = await request.aread()
-            if raw and "json" in request.headers.get("content-type", ""):
-                payload = json.loads(raw)
-                if "model" in payload:
-                    if self.active is None or payload["model"] != self.active["model"]:
-                        raise ValueError("Unexpected model request")
-                    names = [tool.get("name", tool.get("function", {}).get("name")) for tool in payload.get("tools", [])]
-                    if set(names) - allowed_tools(self.active["route"]):
-                        raise ValueError(f"Unexpected model tools: {names}")
-                    image_count = 0
-
-                    def visit(value):
-                        nonlocal image_count
-                        if isinstance(value, dict):
-                            if value.get("type") == "input_image":
-                                value["detail"] = "high"
-                                image_count += 1
-                            for child in value.values():
-                                visit(child)
-                        elif isinstance(value, list):
-                            for child in value:
-                                visit(child)
-                    visit(payload.get("input", []))
-                    self.active["requests"].append({
-                        "model": payload["model"], "tools": names, "images": image_count,
-                        "image_detail": "high", "reasoning": payload.get("reasoning"),
-                        "instruction_sha256": hashlib.sha256(str(payload.get("instructions", "")).encode()).hexdigest(),
-                    })
-                    headers = request.headers.copy()
-                    headers.pop("content-length", None)
-                    request = httpx.Request(request.method, request.url, headers=headers, json=payload,
-                                            extensions=request.extensions)
-            return await super().send_request(request, ctx)
-
-    if args.resume:
-        if not args.output.is_dir() or (args.output / "report.md").exists() or (args.output / "STOP").exists():
-            raise ValueError("Resume requires an interrupted directory without a report or STOP file")
-    else:
-        args.output.mkdir(parents=True, exist_ok=False)
-    models, apps = args.models, args.apps
-    manifest = {
-        "schema_version": 1, "started_at": datetime.now(UTC).isoformat(), "models": models, "apps": apps,
-        "windows": platform.platform(),
-        "purpose": "harness_pilot" if args.pilot else "benchmark",
-        "routes": list(ROUTES), "reasoning_effort": "medium", "image_detail": "high",
-        "timeout_seconds": args.timeout, "max_tool_calls": args.max_calls, "instructions": INSTRUCTIONS,
-        "source_revision": subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True).stdout.strip(),
-        "server_sha256": digest(args.server.with_suffix(".dll")),
-        "runner_sha256": digest(Path(__file__)), "fixtures_sha256": digest(Path(__file__).with_name("real_app_fixtures.py")),
-        "dependencies": {name: version(name) for name in ("github-copilot-sdk", "mcp", "psutil", "python-docx", "python-pptx", "pywin32")},
-    }
-    templates, rows = {}, []
-    if args.resume:
-        existing = json.loads((args.output / "manifest.json").read_text(encoding="utf-8"))
-        rows = json.loads((args.output / "results.json").read_text(encoding="utf-8"))
-        validate_resume(existing, manifest, rows)
-        for index, row in enumerate(rows, 1):
-            if row["directory"] != f"trial-{index:03d}":
-                raise ValueError("Unexpected completed trial directory")
-            trial = args.output / row["directory"]
-            if (json.loads((trial / "result.json").read_text(encoding="utf-8")) != row
-                    or not (trial / "cleanup.json").is_file() or (trial / "incomplete.json").exists()):
-                raise ValueError("Completed evidence or cleanup is inconsistent")
-        for app in apps:
-            candidates = list((args.output / "templates" / app).glob("source.*"))
-            if len(candidates) != 1 or digest(candidates[0]) != existing["input_sha256"][app]:
-                raise ValueError("An input template changed")
-            templates[app] = candidates[0]
-        history = existing.setdefault("resume_history", [])
-        runner_copy = f"runner-resume-{len(history) + 1:03d}.py"
-        shutil.copyfile(__file__, args.output / runner_copy)
-        history.append({
-            "resumed_at": datetime.now(UTC).isoformat(), "completed_trials": len(rows),
-            "runner_sha256": manifest["runner_sha256"], "runner_source": runner_copy,
-        })
-        manifest = existing
-    else:
-        for app in apps:
-            templates[app] = create_fixture(app, args.output / "templates" / app)[0]
-        manifest["input_sha256"] = {app: digest(path) for app, path in templates.items()}
-        shutil.copyfile(__file__, args.output / "runner-initial.py")
-    write_json(args.output / "manifest.json", manifest)
-    token = os.environ.get("GITHUB_TOKEN") or subprocess.run(
-        ["gh", "auth", "token"], check=True, capture_output=True, text=True
-    ).stdout.strip()
-    handler = RequestAudit()
-    completed = {(row["app"], row["model"], row["route"]) for row in rows}
-    with tempfile.TemporaryDirectory(prefix="windows-real-app-model-") as storage, \
-            (args.output / "server.log").open("a" if args.resume else "w", encoding="utf-8") as server_log:
-        async with stdio_client(StdioServerParameters(command=str(args.server), env=dict(os.environ)), errlog=server_log) as streams:
-            async with ClientSession(*streams) as mcp:
-                await mcp.initialize()
-                catalog = (await mcp.list_tools()).tools
-                definitions = [tool.model_dump(mode="json") for tool in catalog]
-                if args.resume and definitions != json.loads((args.output / "tool-catalog.json").read_text(encoding="utf-8")):
-                    raise ValueError("Tool definitions changed since the initial run")
-                write_json(args.output / "tool-catalog.json", definitions)
-                async with CopilotClient(mode="empty", base_directory=storage, working_directory=storage,
-                                         github_token=token, request_handler=handler) as client:
-                    runtime_version = (await client.get_status()).version
-                    if args.resume and runtime_version != manifest["runtime_version"]:
-                        raise ValueError("The Copilot runtime changed since the initial run")
-                    manifest["runtime_version"] = runtime_version
-                    available = {model.id for model in await client.list_models() if model.capabilities.supports.vision}
-                    if set(models) - available:
-                        raise ValueError(f"Unavailable vision models: {set(models) - available}")
-                    write_json(args.output / "manifest.json", manifest)
-                    for app_index, app in enumerate(apps):
-                        for model_index, model in enumerate(models):
-                            routes = ROUTES if (app_index + model_index) % 2 == 0 else tuple(reversed(ROUTES))
-                            for route in routes:
-                                if (app, model, route) in completed:
-                                    continue
-                                directory = args.output / f"trial-{len(rows) + 1:03d}"
-                                if args.resume and directory.exists():
-                                    interrupted = json.loads((directory / "incomplete.json").read_text(encoding="utf-8"))
-                                    require_setup_only_resume(directory, interrupted)
-                                    archived = f"setup-interrupted-{directory.name}-{uuid.uuid4().hex[:8]}"
-                                    directory.rename(args.output / archived)
-                                    manifest["resume_history"][-1]["archived_setup"] = archived
-                                    write_json(args.output / "manifest.json", manifest)
-                                directory.mkdir()
-                                source = directory / f"input-{uuid.uuid4().hex[:12]}{templates[app].suffix}"
-                                shutil.copyfile(templates[app], source)
-                                output = directory / f"completed{source.suffix}"
-                                server = BookingServer(output) if app == "chrome" else None
-                                owned = None
-                                session = None
-                                bridge = None
-                                row = {"app": app, "model": model, "route": route, "directory": directory.name,
-                                       "started_at": datetime.now(UTC).isoformat(), "requests": [], "usage": [],
-                                       "errors": [], "messages": [], "input_sha256": digest(source)}
-                                write_json(directory / "incomplete.json", row)
-                                try:
-                                    owned = OwnedApp(app, source, directory, server.url if server else None)
-                                    activated = await mcp.call_tool("window_management", {"action": "activate", "handle": owned.root})
-                                    if activated.is_error:
-                                        raise RuntimeError(f"Could not activate owned app: {activated.content}")
-                                    if app == "notepad":
-                                        row["setup"] = await isolate_notepad_window(mcp, owned, source)
-                                    bridge = TrialBridge(mcp, owned, route, output, directory, args.max_calls)
-                                    tools = []
-                                    for tool in catalog:
-                                        if tool.name not in allowed_tools(route):
-                                            continue
-                                        description = tool.description or tool.name
-                                        parameters = restricted_schema(tool.name, tool.input_schema)
-                                        if tool.name == "screenshot_control":
-                                            description = "Capture an unannotated image of a trial window. Image coordinates are window-relative. No control metadata is included."
-                                            parameters = {"type": "object", "properties": {"windowHandle": {"type": "string"}},
-                                                          "required": ["windowHandle"], "additionalProperties": False}
-                                        tools.append(Tool(name=tool.name, description=description, parameters=parameters,
-                                                          handler=bridge.invoke, skip_permission=True, defer="never"))
-                                    if {tool.name for tool in tools} != allowed_tools(route):
-                                        raise ValueError("The server did not expose all required tools")
-
-                                    def on_event(event):
-                                        if event.type.value == "assistant.usage":
-                                            data = event.data
-                                            row["usage"].append({key: getattr(data, key, None) for key in (
-                                                "model", "input_tokens", "output_tokens", "cache_read_tokens",
-                                                "cache_write_tokens", "reasoning_tokens", "reasoning_effort")})
-                                        elif event.type.value == "session.error":
-                                            row["errors"].append(str(event.data))
-                                        elif event.type.value == "assistant.message":
-                                            row["messages"].append(event.data.content)
-
-                                    handler.active = row
-                                    session = await client.create_session(
-                                        model=model, tools=tools, available_tools=[tool.name for tool in tools],
-                                        system_message={"mode": "replace", "content": INSTRUCTIONS},
-                                        working_directory=storage, enable_config_discovery=False,
-                                        skip_custom_instructions=True, enable_skills=False, reasoning_effort="medium",
-                                        on_event=on_event,
-                                    )
-                                    row["prompt"] = task_prompt(app, output) + f"\nApplication window handle: {owned.root}."
-                                    row["app_executable"] = owned.executable
-                                    row["app_version"] = owned.version
-                                    row["initial_window_bounds"] = owned.initial_bounds
-                                    row["initial_window_dpi"] = owned.initial_dpi
-                                    row["window_handle"] = owned.root
-                                    mark_model_started(directory, row)
-                                    print(f"START {directory.name} {app} {model} {route}", flush=True)
-                                    started = time.monotonic()
-                                    send = asyncio.create_task(session.send_and_wait(row["prompt"], timeout=args.timeout))
-                                    stop = asyncio.create_task(bridge.stop.wait())
-
-                                    async def watch_interruption():
-                                        while True:
-                                            if (args.output / "STOP").exists():
-                                                bridge.failure = "run_interrupted"
-                                                bridge.stop.set()
-                                                return
-                                            await asyncio.sleep(0.5)
-
-                                    interruption = asyncio.create_task(watch_interruption())
-                                    result = None
-                                    try:
-                                        finished, _ = await asyncio.wait({send, stop}, return_when=asyncio.FIRST_COMPLETED)
-                                        if stop in finished:
-                                            row["stop_reason"] = bridge.failure
-                                            send.cancel()
-                                            await asyncio.gather(send, return_exceptions=True)
-                                            if bridge.failure != "tool_budget_exceeded":
-                                                raise RuntimeError(f"Benchmark tool bridge failed: {bridge.failure}")
-                                        else:
-                                            result = await send
-                                    except TimeoutError:
-                                        row["stop_reason"] = "time_budget_exceeded"
-                                    finally:
-                                        stop.cancel()
-                                        interruption.cancel()
-                                        await asyncio.gather(stop, interruption, return_exceptions=True)
-                                        row["seconds"] = time.monotonic() - started
-                                    if row.get("stop_reason"):
-                                        bridge.closed = True
-                                        await session.abort()
-                                        async with bridge.lock:
-                                            pass
-                                    row["reply"] = result.data.content if result is not None else None
-                                    if row["errors"] or not row["requests"]:
-                                        raise RuntimeError("Model transport failed or no audited requests were recorded")
-                                    row.update(sum_usage(row["usage"], model))
-                                    row["verification"] = verify_output(app, output)
-                                    row["source_unchanged"] = digest(source) == row["input_sha256"]
-                                    row["success"] = bool(
-                                        row["verification"]["success"] and row["source_unchanged"]
-                                        and not row.get("stop_reason")
-                                    )
-                                    row["tool_calls"] = len(bridge.calls)
-                                    row["failed_tool_calls"] = sum(bool(call.get("is_error") or call.get("error")) for call in bridge.calls)
-                                    row["screenshot_calls"] = sum(call["name"] == "screenshot_control" for call in bridge.calls)
-                                    row["output_sha256"] = digest(output) if output.exists() else None
-                                    if server:
-                                        row["submissions"] = server.submissions
-                                    rows.append(row)
-                                    write_json(directory / "result.json", row)
-                                    (directory / "incomplete.json").unlink()
-                                    write_json(args.output / "results.json", rows)
-                                    print(f"END success={row['success']} input={row['input_tokens']} calls={row['tool_calls']} seconds={row['seconds']:.1f}", flush=True)
-                                except BaseException:
-                                    write_json(directory / "incomplete.json", row)
-                                    raise
-                                finally:
-                                    if bridge is not None:
-                                        bridge.closed = True
-                                    try:
-                                        if session is not None:
-                                            await session.abort()
-                                            await session.disconnect()
-                                        if bridge is not None:
-                                            async with bridge.lock:
-                                                pass
-                                    finally:
-                                        handler.active = None
-                                        try:
-                                            if owned is not None:
-                                                owned.close()
-                                                write_json(directory / "cleanup.json", {"terminated_owned_pids": owned.cleanup})
-                                        finally:
-                                            if server is not None:
-                                                server.close()
-    if len(rows) != len(apps) * len(models) * len(ROUTES):
-        raise RuntimeError("Incomplete paired matrix")
-    (args.output / "report.md").write_text(format_report(manifest, rows), encoding="utf-8")
-    print(f"Completed: {args.output / 'report.md'}", flush=True)
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True, help="New evidence directory")
-    parser.add_argument("--server", type=Path, required=True, help="Built Windows MCP executable")
-    parser.add_argument("--apps", nargs="+", choices=APPS, default=list(APPS))
-    parser.add_argument("--models", nargs="+", choices=MODELS, default=list(MODELS))
-    parser.add_argument("--timeout", type=int, default=600, help="Equal wall-clock budget per trial")
-    parser.add_argument("--max-calls", type=int, default=80, help="Equal tool-call budget per trial")
-    parser.add_argument("--pilot", action="store_true", help="Mark a harness check, excluded from published benchmark results")
-    parser.add_argument("--resume", action="store_true", help="Continue after a setup interruption, retaining every completed success and failure")
-    args = parser.parse_args()
-    args.output, args.server = args.output.resolve(), args.server.resolve()
-    if args.timeout < 1 or args.max_calls < 1 or not args.server.is_file():
-        parser.error("Positive limits and an existing server executable are required")
-    if len(set(args.apps)) != len(args.apps) or len(set(args.models)) != len(args.models):
-        parser.error("Apps and models must be unique")
-    asyncio.run(run(args))
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit("Run the comparison with pytest-skill-engineering in tests\\usage_evals; see its README.")

@@ -12,17 +12,6 @@ import * as path from 'path';
 export async function activate(context: vscode.ExtensionContext) {
     console.log('WindowsMcp extension is now active');
 
-    // Ensure .NET runtime is available (still needed for the bundled executable)
-    try {
-        await ensureDotNetRuntime();
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        vscode.window.showErrorMessage(
-            `WindowsMcp: Failed to setup .NET environment: ${errorMessage}. ` +
-            `The extension may not work correctly.`
-        );
-    }
-
     // Register MCP server definition provider
     context.subscriptions.push(
         vscode.lm.registerMcpServerDefinitionProvider('windows-mcp', {
@@ -50,40 +39,6 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!hasShownWelcome) {
         showWelcomeMessage();
         context.globalState.update('windowsmcp.hasShownWelcome', true);
-    }
-}
-
-async function ensureDotNetRuntime(): Promise<void> {
-    try {
-        // Request .NET runtime acquisition via the .NET Install Tool extension
-        const dotnetExtension = vscode.extensions.getExtension('ms-dotnettools.vscode-dotnet-runtime');
-
-        if (!dotnetExtension) {
-            throw new Error('.NET Install Tool extension not found. Please install ms-dotnettools.vscode-dotnet-runtime');
-        }
-
-        if (!dotnetExtension.isActive) {
-            await dotnetExtension.activate();
-        }
-
-        // Request .NET 8 runtime using the command-based API
-        // The extension uses commands, not direct exports
-        const requestingExtensionId = 'sbroenne.windows-mcp';
-
-        await vscode.commands.executeCommand('dotnet.showAcquisitionLog');
-        const result = await vscode.commands.executeCommand<{ dotnetPath: string }>('dotnet.acquire', {
-            version: '8.0',
-            requestingExtensionId
-        });
-
-        if (result?.dotnetPath) {
-            console.log(`WindowsMcp: .NET runtime available at ${result.dotnetPath}`);
-        }
-
-        console.log('WindowsMcp: .NET runtime setup completed (MCP server is bundled with extension)');
-    } catch (error) {
-        console.error('WindowsMcp: Error during .NET runtime setup:', error);
-        throw error;
     }
 }
 

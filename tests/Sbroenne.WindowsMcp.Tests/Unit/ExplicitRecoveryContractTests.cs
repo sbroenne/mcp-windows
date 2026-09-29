@@ -101,6 +101,29 @@ public sealed class ExplicitRecoveryContractTests
         Assert.DoesNotContain("Handles overwrite confirmation dialogs automatically", messages[1].Text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void AllFileGuidance_LeavesPromptsForAnExplicitDecision()
+    {
+        var quickstart = string.Join("\n", WindowsAutomationPrompts.Quickstart("Save a test document", "Notepad").Select(message => message.Text));
+        var bestPractices = SystemResources.GetBestPractices();
+        foreach (var guidance in new[] { quickstart, bestPractices })
+        {
+            Assert.DoesNotContain("handles Save As dialogs automatically", guidance, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("prompts remain open", guidance, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public void PhysicalClickWithoutObservedChange_ReturnsUnverifiedNotCapabilityFailure()
+    {
+        var body = ReadMethod("UIAutomationService.ActionExecution.cs", "ExecuteElementActionAsync");
+        var unverified = body[body.IndexOf("physical click produced no observable UI change", StringComparison.Ordinal)..];
+        Assert.Contains("UIAutomationErrorType.VerificationFailed", unverified, StringComparison.Ordinal);
+        var response = ReadMethod("UIAutomationService.Actions.cs", "PerformClickAsync");
+        Assert.Contains("outcome.ErrorType", response, StringComparison.Ordinal);
+        Assert.Contains("do not blindly repeat the click", response, StringComparison.Ordinal);
+    }
+
     private static string ReadMethod(string fileName, string methodName)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

@@ -60,9 +60,11 @@ task requires.
 
 ## What about tokens?
 
-**Real tasks showed a useful difference.** In 32 trials across Notepad, Word,
-PowerPoint, and Chrome, controls first completed 11 of 16 tasks; screenshots
-completed 7 of 16. Across the seven app/model pairs where both routes finished,
+**Real tasks showed a useful difference, with a scoring limit.** The original
+check marked controls first complete on 11 of 16 tasks, and screenshots on
+7 of 16. It ignored final line breaks. Requiring the final line break changes
+controls first to **9 of 16**; screenshots remain **7 of 16**.
+Across the seven app/model pairs counted as finished by the original check,
 controls first used 51.1% fewer input tokens and took 49.3% less time at the
 middle of each set of savings. One PowerPoint pair used more tokens with
 controls. Both routes used Windows MCP.

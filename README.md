@@ -71,9 +71,9 @@ support or an agent that can run commands on that PC.
 
 1. Install [Windows MCP Server](https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp)
    from the VS Code Marketplace.
-2. Ensure the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-   is installed.
-3. Open Copilot Chat in **Agent** mode, enable the Windows MCP tools, and try a task below.
+2. Open Copilot Chat in **Agent** mode, enable the Windows MCP tools, and try a task below.
+
+The extension includes its .NET runtime; no separate .NET installation is needed.
 
 ### Claude Desktop, Cursor, and other MCP clients
 
@@ -110,7 +110,11 @@ settings. Start with a test document rather than important work.
 
 ## Real tasks: controls first versus screenshots
 
-**Controls first completed 11 of 16 tasks. Screenshots alone completed 7 of 16.**
+**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
+That check ignored final line breaks. Requiring the final line break changes
+controls first to **9 of 16**; screenshots remain **7 of 16**. The savings
+below use the original scoring, not the stricter check or a new run.
+
 We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
 Notepad and Word documents, change and reorder PowerPoint slides, and submit
 a form in Chrome. We checked the saved files and submitted values independently.

@@ -1,6 +1,0 @@
-github-copilot-sdk==1.0.14
-mcp==2.2.0
-psutil==7.0.0
-python-docx==1.2.0
-python-pptx==1.0.2
-pywin32==312

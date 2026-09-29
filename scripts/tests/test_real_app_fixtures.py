@@ -35,6 +35,21 @@ class RealAppFixtureTests(unittest.TestCase):
             document.save(output)
             self.assertFalse(fixtures.verify_output("word", output)["success"])
 
+    def test_notepad_preserves_trailing_newlines_exactly(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "completed.txt"
+            for text, success in (
+                (fixtures.NOTEPAD_EXPECTED, True),
+                (fixtures.NOTEPAD_EXPECTED.replace("\n", "\r\n"), True),
+                (fixtures.NOTEPAD_EXPECTED.rstrip("\n"), False),
+                (fixtures.NOTEPAD_EXPECTED + "\n", False),
+                (fixtures.NOTEPAD_EXPECTED + "\n\n", False),
+            ):
+                for encoding in ("utf-8", "utf-8-sig", "utf-16"):
+                    with self.subTest(text=repr(text), encoding=encoding):
+                        output.write_bytes(text.encode(encoding))
+                        self.assertEqual(success, fixtures.verify_output("notepad", output)["success"])
+
     def test_powerpoint_requires_edit_and_slide_order(self):
         from pptx import Presentation
         with tempfile.TemporaryDirectory() as directory:

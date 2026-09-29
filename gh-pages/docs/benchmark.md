@@ -1,6 +1,6 @@
 ---
 title: Token savings
-description: Compare four models on real Notepad, Word, PowerPoint, and Chrome tasks. Controls first completed 11 of 16 tasks; screenshots completed 7 of 16.
+description: Compare four models on real Notepad, Word, PowerPoint, and Chrome tasks, including scoring corrections and measurement limits.
 hide:
   - toc
 ---
@@ -17,7 +17,11 @@ changes instead of repeating a window's controls.
 
 ## Real tasks in Notepad, Word, PowerPoint, and Chrome
 
-**Controls first completed 11 of 16 tasks. Screenshots completed 7 of 16.**
+**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
+That check ignored final line breaks. Requiring the final line break changes
+controls first to **9 of 16**; screenshots remain **7 of 16**. The table and
+savings below retain the original scoring, not the stricter check or a new run.
+
 We asked four models to edit and save documents, reorder slides, and submit
 a booking form. We checked the actual saved files and submitted values, not
 just whether the AI said it had finished. All original files stayed unchanged.

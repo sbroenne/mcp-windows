@@ -30,6 +30,15 @@ queue policy needs a separate coordinated rollout, not an assumption that work i
 
 ### Fresh CLI/MCP Usage Evaluations
 
+All model-driven tests and benchmarks must use `sbroenne/pytest-skill-engineering`,
+including controls-versus-screenshots comparisons and token/time measurements.
+Do not create separate Copilot SDK runners, model-session loops, or report systems.
+Keep app setup, owned-process cleanup, task fixtures, and independent result checks
+in this repository; use the framework for execution, evidence, usage, and reports.
+Add missing reusable features to the framework and pin the version containing them
+before live execution. Static charts and tables may read saved framework reports
+without repeating model calls.
+
 `tests/usage_evals/` is a separate pytest-skill-engineering consumer for learning whether and how
 Windows MCP should improve, and for finding reusable framework gaps. Do not copy or migrate the
 older LLM scenarios into it. See its README for current framework prerequisites and live-run gates.

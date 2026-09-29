@@ -6,10 +6,19 @@ conversation and its Windows actions, not just reading a saved image.
 
 ## Results
 
-**Controls first completed 11 of 16 tasks; screenshots completed 7 of 16.**
+**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
 The fresh 32-trial comparison finished on 28 September 2026. Saved files and
 submitted values were checked independently. All 32 original input files
 remained unchanged.
+
+**Scoring correction:** the original Notepad check ignored final line breaks.
+The controls-first copies from GPT-6 Luna and GPT-5.6 Luna were missing the
+final line break. Requiring it changes the original completion counts to
+**9 of 16 controls-first tasks and 7 of 16 screenshot tasks**.
+The tables and savings below retain the original recorded scoring. They are
+not stricter scores or results of the later product fixes. The next comparison
+uses exact text after converting Windows line endings, including the final
+line break. The downloadable evidence includes this correction separately.
 
 | Model | Controls first | Screenshots |
 |---|---:|---:|
@@ -228,43 +237,33 @@ size while fixing coordinate handling. The earlier run recorded logical
 bounds before this correction; those numbers need scaling before comparison.
 The published results above have not been replaced by a new run.
 
-Build the server, install the benchmark's declared Python dependencies, and
-authenticate the GitHub CLI or provide `GITHUB_TOKEN`. Never put a token in
-source files or reports.
+The comparison now runs through **pytest-skill-engineering**, using the same
+four apps, models, routes, medium reasoning, high-detail images, and per-task
+limits. The framework manages model sessions, usage, request checks, and
+reports. Windows-specific helpers still own the apps and verify saved files.
+There are no automatic model-session retries.
+
+Framework session time includes model-runtime startup and cleanup. Its timeout
+also includes startup. These boundaries differ from the historical prompt-send-only
+measurement above; do not present old and new timings as a direct speed comparison.
+
+Build the server and authenticate the GitHub CLI or provide `GITHUB_TOKEN`.
+Never put a token in source files or reports. First run the no-model checks:
 
 ```powershell
 dotnet build src\Sbroenne.WindowsMcp -c Release
-uv venv .venv-benchmark --python 3.14
-uv pip install --python .venv-benchmark\Scripts\python.exe -r scripts\requirements-real-app-benchmark.txt
-
-.venv-benchmark\Scripts\python.exe -m unittest discover -s scripts\tests -p 'test_real_app*.py'
-
-$env:MCP_TEST_DESKTOP_INPUT = '1'
-$env:MCP_TEST_NOTEPAD_SERVER = (Resolve-Path 'src\Sbroenne.WindowsMcp\bin\Release\net10.0-windows10.0.22621.0\Sbroenne.WindowsMcp.exe').Path
-.venv-benchmark\Scripts\python.exe -m unittest discover -s scripts\tests -p 'test_notepad_keyboard.py'
-
-.venv-benchmark\Scripts\python.exe scripts\benchmark-real-apps.py `
-  --server src\Sbroenne.WindowsMcp\bin\Release\net10.0-windows10.0.22621.0\Sbroenne.WindowsMcp.exe `
-  --output C:\benchmark-results\real-apps
-
-.venv-benchmark\Scripts\python.exe scripts\summarize-real-apps.py `
-  --run C:\benchmark-results\real-apps `
-  --output C:\benchmark-results\real-apps-public.json
+uv run --project tests\usage_evals pytest tests\usage_evals\tests\unit -q
+uv run --project tests\usage_evals pytest tests\usage_evals\tests\comparison --collect-only -q
 ```
 
-Use `--pilot --apps notepad --models gpt-6-astra` for a separately labelled
-harness check. Keep pilots separate from the complete result matrix.
-Create a file named `STOP` in the run's output directory to interrupt safely.
-An interrupted matrix cannot be exported as a completed benchmark.
-After an interruption during application setup, use the same command with
-`--resume` to continue. Completed trials, including failures, are retained
-without rerunning them. Resuming checks the server, input files, dependencies,
-tool definitions, model settings, limits, and original trial order. It records
-each runner version and preserves the interrupted setup directory. A model
-trial that started but did not finish cannot be retried through this option.
-Before sending a task, the runner now writes a start marker to disk. A hard
-interruption after that marker blocks resuming the trial even if no model
-response or tool call was recorded.
+The live command is in [the evaluation guide](../tests/usage_evals/README.md#controls-versus-screenshots).
+It requires separate approval for 32 model sessions and an exclusive desktop.
+Without that explicit opt-in, the comparison tests are skipped. Keep the
+framework's JSON report, JUnit report, and private app artifacts together in
+a fresh persistent directory. Incomplete runs and setup checks remain separate.
+Do not resume the old standalone runner or mix its interrupted trials with a
+framework run. Optional AI-generated report analysis is an additional paid
+operation and is not part of this command.
 
 The [single-field reading check](screenshot-ui-automation-benchmark.md) remains
 useful as a smaller supporting test. The

@@ -13,6 +13,27 @@ spec.loader.exec_module(hooks)
 
 
 class DocumentationHooksTests(unittest.TestCase):
+    def test_historical_real_app_scoring_correction_is_explicit(self):
+        evidence = json.loads(
+            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").read_text(encoding="utf-8")
+        )
+        correction = evidence["scoring_correction"]
+        affected = {
+            (row["app"], row["model"], row["route"]) for row in correction["affected_trials"]
+        }
+        for route in ("controls", "screenshots"):
+            corrected = sum(
+                row["success"] and (row["app"], row["model"], row["route"]) not in affected
+                for row in evidence["trials"] if row["route"] == route
+            )
+            self.assertEqual(corrected, correction["corrected_successes"][route])
+        for path in (
+            SITE.parent / "README.md", SITE.parent / "docs" / "real-app-benchmark.md",
+            *(SITE / "docs" / name for name in ("index.md", "benchmark.md", "comparison.md")),
+        ):
+            with self.subTest(page=str(path)):
+                self.assertIn("final line break", path.read_text(encoding="utf-8"))
+
     def test_docs_do_not_compare_assistant_screen_control_features(self):
         paths = [
             SITE.parent / "README.md",

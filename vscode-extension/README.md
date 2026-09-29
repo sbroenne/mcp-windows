@@ -28,10 +28,8 @@ Once the server is enabled, ask for an outcome:
 ## Get started
 
 1. Install **Windows MCP Server** from the VS Code Marketplace.
-2. Ensure the [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
-   is installed.
-3. Open Copilot Chat in **Agent** mode and enable the Windows MCP tools.
-4. Open Notepad and ask: "Type Hello from Windows MCP and save it as a new
+2. Open Copilot Chat in **Agent** mode and enable the Windows MCP tools.
+3. Open Notepad and ask: "Type Hello from Windows MCP and save it as a new
    file named windows-mcp-demo.txt on my Desktop."
 
 Review any approval prompts from Copilot. Start with a test document, and avoid
@@ -52,9 +50,9 @@ See the [measured text-update savings](https://windowsmcpserver.dev/benchmark/).
 ## Requirements
 
 - An interactive Windows desktop and a compatible VS Code/Copilot setup.
-- **.NET 10 Desktop Runtime**, installed separately if absent.
 
-The standalone MCP download includes its runtime. See
+The extension and standalone MCP download include the .NET runtime; no separate
+.NET installation is needed. See
 [Installation](https://windowsmcpserver.dev/installation/) for alternatives.
 
 ## Responsible use

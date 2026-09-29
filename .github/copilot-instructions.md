@@ -53,7 +53,7 @@ The project follows these NON-NEGOTIABLE principles:
 - **Security Best Practices** - No secrets in code, validate inputs, follow security guidelines
 - **Modern .NET & C#** - Use current .NET and C# language features
 - **xUnit Testing** - All .NET tests use xUnit framework
-- **LLM Integration Testing** - Use pytest-skill-engineering with GitHub Copilot SDK
+- **LLM Tests and Benchmarks** - Use `sbroenne/pytest-skill-engineering` for all model-driven tests, evaluations, and benchmarks. Do not build separate Copilot SDK test runners.
 - **Token Optimization** - Optimize MCP responses for LLM token efficiency
 - **UI Automation First** - Semantic UI automation is the primary approach
 
@@ -86,12 +86,28 @@ These are the reference implementations for Windows UI automation patterns:
 
 ## Testing
 
-**See [testing.instructions.md](.github/testing.instructions.md) for complete testing guidance.**
+**See [testing.instructions.md](testing.instructions.md) for complete testing guidance.**
 
 Quick reference:
 - **Unit tests**: `dotnet test --filter "FullyQualifiedName~Unit"`
 - **Integration tests**: `dotnet test --filter "FullyQualifiedName~Integration"` (ALL MUST PASS)
 - **LLM tests**: `cd tests/Sbroenne.WindowsMcp.LLM.Tests && uv run pytest -v` (expensive - only when requested)
+
+### Use the shared AI testing framework
+
+- Run model-driven tests and benchmarks through **pytest-skill-engineering**, including
+  controls-versus-screenshots comparisons, model comparisons, and token/time measurements.
+  Start from the existing setup in `tests/usage_evals`.
+- Keep Windows-specific setup, owned-app cleanup, task data, and independent saved-result
+  checks here. Let the shared framework manage model sessions, execution records, usage,
+  and reports. Do not add standalone SDK runners or a second reporting system.
+- If a reusable feature is missing, add it to `sbroenne/pytest-skill-engineering` and
+  pin the version containing that change before running the benchmark. Do not bypass
+  the framework with a local replacement.
+- Charts and comparison tables may read the framework's saved reports without calling
+  a model again. Keep historical runs separate when code or scoring rules change.
+- Model calls, optional AI-generated report analysis, and desktop input require explicit
+  approval of the scope and budget. Collection and ordinary checks must not start them.
 
 ## LLM Test Authoring (CRITICAL)
 

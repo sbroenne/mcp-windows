@@ -32,10 +32,12 @@ at the repository root. It writes the matching reports under
 expandable sections, so reading the details does not depend on files already
 being published to GitHub's main branch.
 
-Real-app results come from `scripts/benchmark-real-apps.py`.
-Use `scripts/summarize-real-apps.py` to check all 32 trials, the saved outputs,
-input and image hashes, model settings, usage totals, and route restrictions
-before exporting public evidence. Pilots and incomplete runs are rejected.
+New real-app results come from `tests/usage_evals/tests/comparison` through
+pytest-skill-engineering's native JSON and JUnit reports. Check all 32 cases,
+independent saved outputs, unchanged inputs, model settings, usage, and route
+restrictions before updating the public figures. Keep historical evidence
+separate; the old standalone model runners are retired. The original Notepad
+scoring ignored final line breaks, so its recorded counts include a correction.
 Do not publish raw desktop screenshots, window text, model messages, or local
 paths from the private run artifacts.
 

@@ -46,7 +46,7 @@ public sealed class WindowsAutomationPrompts
                 "• Read: ui_read(windowHandle='<handle>', elementId='<observed-id>') — get only this element's text\n" +
                 "• Read table: ui_read_table(windowHandle='<handle>', elementId='<observed-grid-id>') — extract structured rows + headers\n" +
 
-                "• Save: file_save(windowHandle='<handle>', filePath='...') — saves files, handles Save As dialogs automatically\n" +
+                "• Save: file_save(windowHandle='<handle>', filePath='...') — fills supported Save As dialogs and clicks Save once; overwrite and error prompts remain open for an explicit decision. Inspect failures before deciding what to do; do not repeat the save blindly.\n" +
                 "• Open: file_open(windowHandle='<handle>', filePath='...') — opens an existing file, handles Open dialogs automatically\n" +
                 "• Clipboard: clipboard(action='get') / clipboard(action='set', text='...') — fastest bulk text IO; pair with copy/paste hotkeys\n" +
                 "• Batch: ui_batch(windowHandle='<handle>', steps='[...]') — combine steps; discover fresh controls for reusable workflows\n" +
@@ -264,7 +264,7 @@ public sealed class WindowsAutomationPrompts
         ];
     }
 
-    /// <summary>Save a file using file_save tool. Handles Save As dialog automatically if filePath provided.</summary>
+    /// <summary>Save a file once using file_save; remaining prompts require an explicit caller decision.</summary>
     /// <param name="windowTitle">Window title to find (partial match). Example: 'Word', 'Notepad', 'Visual Studio Code'.</param>
     /// <param name="filePath">Optional: Full file path for Save As dialog (e.g., 'C:\temp\document.docx'). If omitted and Save As dialog appears, it returns a hint to interact manually.</param>
     /// <returns>A multi-message prompt template.</returns>

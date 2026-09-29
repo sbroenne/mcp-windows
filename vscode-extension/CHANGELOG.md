@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Distinguish actual release assets and runtime requirements from planned packaging; link benchmark evidence with its measurement scope.
 
 ### Fixes in this update
+- Include the .NET Desktop Runtime with the extension instead of requesting .NET 8 for a .NET 10 server.
+- Report semantic action provider failures as unverified outcomes, without sending another action.
 - Report unexpected text changes without deleting autocomplete suggestions or silently correcting application text.
 - Leave overwrite and save-error prompts open for the caller; do not repeat file-dialog submissions or radio-button activation after an unverified action.
 - Wait for the actual Word document in benchmark tests, rather than its temporary startup window.

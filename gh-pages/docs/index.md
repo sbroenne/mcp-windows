@@ -1,7 +1,7 @@
 ---
 template: home.html
 title: Home
-description: Put your AI to work in Windows. In 32 real-app trials, controls first completed 11 of 16 tasks; screenshots alone completed 7 of 16.
+description: Put your AI to work in Windows with direct controls and screenshots. Read the measured results and their limits.
 hide:
   - navigation
   - toc
@@ -62,7 +62,11 @@ an agent with command access can run the CLI for you.
 
 ## Real tasks: controls first versus screenshots
 
-**Controls first completed 11 of 16 tasks. Screenshots alone completed 7 of 16.**
+**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
+That check ignored final line breaks. Requiring the final line break changes
+controls first to **9 of 16**; screenshots remain **7 of 16**. The savings
+below use the original scoring, not the stricter check or a new run.
+
 We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
 documents in Notepad and Word, change and reorder PowerPoint slides, and
 submit a booking form in Chrome.

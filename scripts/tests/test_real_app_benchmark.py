@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 import json
 from pathlib import Path
 import sys
@@ -148,6 +149,35 @@ class RealAppBenchmarkTests(unittest.TestCase):
 
 
 class RealAppBridgeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancellation_waits_for_an_inflight_mcp_action_before_cleanup(self):
+        from mcp.types import CallToolResult, TextContent
+
+        started, finish = asyncio.Event(), asyncio.Event()
+
+        class Client:
+            async def call_tool(self, *args, **kwargs):
+                started.set()
+                await finish.wait()
+                return CallToolResult(content=[TextContent(type="text", text="done")])
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory = Path(directory)
+            owned = SimpleNamespace(app="notepad", windows=lambda: [{"handle": "123"}])
+            bridge = benchmark.TrialBridge(Client(), owned, "screenshots", directory / "out.txt", directory)
+            task = asyncio.create_task(bridge.invoke(SimpleNamespace(
+                tool_name="keyboard_control",
+                arguments={"windowHandle": "123", "action": "press", "key": "enter"},
+            )))
+            await asyncio.wait_for(started.wait(), timeout=2)
+            task.cancel()
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+            self.assertTrue(bridge.lock.locked())
+            finish.set()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
+            self.assertFalse(bridge.lock.locked())
+
     async def test_notepad_detach_observes_new_window_after_focus_change_without_retry(self):
         calls = []
         source = Path("input-test.txt")
@@ -192,7 +222,7 @@ class RealAppBridgeTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             owned = SimpleNamespace(app="notepad", windows=lambda: [{"handle": "123"}])
-            bridge = benchmark.TrialBridge(Client(), owned, "screenshots", directory / "out.txt", directory, 5)
+            bridge = benchmark.TrialBridge(Client(), owned, "screenshots", directory / "out.txt", directory)
             reply = await bridge.invoke(SimpleNamespace(
                 tool_name="keyboard_control",
                 arguments={"windowHandle": "123", "action": "press", "key": "enter"},

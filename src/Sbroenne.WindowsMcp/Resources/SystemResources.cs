@@ -130,9 +130,9 @@ public sealed class SystemResources
             | `ui_type` | Type text into input fields. |
             | `ui_find` | Find elements, get details, inspect properties. |
             | `ui_read` | Read element text; explicit window reads can use OCR fallback. |
-            | `file_save` | 💾 Save files to disk (handles Save As dialogs automatically!). |
+            | `file_save` | Fill a supported Save As dialog and click Save once. Overwrite and error prompts remain open for an explicit decision; inspect failures before acting again. |
             | `keyboard_control` | Send hotkeys (Ctrl+S), navigate (Tab, arrows). |
-            | `mouse_control` | Low-level clicks (fallback when ui_click fails). |
+            | `mouse_control` | Low-level clicks. Use another input method only if no action was dispatched; otherwise inspect the result first. |
 
             ## The Standard Workflow: Launch App, Then Interact
 

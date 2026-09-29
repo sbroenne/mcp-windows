@@ -120,11 +120,16 @@ public sealed partial class UIAutomationService
                 GetObservableFingerprint(rootElement)),
             cancellationToken);
 
-        var semanticAttempted = await _staThread.ExecuteAsync(
+        var semanticOutcome = await _staThread.ExecuteAsync(
             () => TryExecuteSemanticAction(element, initial.ControlType),
             cancellationToken);
-        if (semanticAttempted)
+        if (semanticOutcome is { } attempted)
         {
+            if (!attempted.Success)
+            {
+                return attempted;
+            }
+
             if (RequiresToggleVerification(initial.ControlType))
             {
                 var verified = await WaitForElementConditionAsync(
@@ -220,20 +225,21 @@ public sealed partial class UIAutomationService
                 ErrorType: UIAutomationErrorType.VerificationFailed);
     }
 
-    private static bool TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType)
+    private static ElementActionOutcome? TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType)
     {
-        // Only an unavailable pattern permits another input method. Provider failures
-        // propagate because the action may already have been dispatched.
+        Action dispatch;
+        string actionPath;
         switch (controlType)
         {
             case UIA3ControlTypeIds.CheckBox:
                 var toggle = element.GetPattern<UIA.IUIAutomationTogglePattern>(UIA3PatternIds.Toggle);
                 if (toggle is null)
                 {
-                    return false;
+                    return null;
                 }
-                toggle.Toggle();
-                return true;
+                dispatch = toggle.Toggle;
+                actionPath = "semantic_toggle";
+                break;
 
             case UIA3ControlTypeIds.ListItem:
             case UIA3ControlTypeIds.TreeItem:
@@ -242,19 +248,36 @@ public sealed partial class UIAutomationService
                 var selection = element.GetPattern<UIA.IUIAutomationSelectionItemPattern>(UIA3PatternIds.SelectionItem);
                 if (selection is null)
                 {
-                    return false;
+                    return null;
                 }
-                selection.Select();
-                return true;
+                dispatch = selection.Select;
+                actionPath = "semantic_select";
+                break;
 
             default:
                 var invoke = element.GetPattern<UIA.IUIAutomationInvokePattern>(UIA3PatternIds.Invoke);
                 if (invoke is null)
                 {
-                    return false;
+                    return null;
                 }
-                invoke.Invoke();
-                return true;
+                dispatch = invoke.Invoke;
+                actionPath = "semantic_invoke";
+                break;
+        }
+
+        try
+        {
+            dispatch();
+            return new ElementActionOutcome(true, ActionPath: actionPath);
+        }
+        catch (COMException ex)
+        {
+            return new ElementActionOutcome(
+                false,
+                ErrorMessage: $"The action provider failed (0x{ex.HResult:X8}): {ex.Message}. " +
+                    "The action may already have occurred. Inspect the current state before deciding what to do; no fallback or repeat was sent.",
+                ActionPath: actionPath,
+                ErrorType: UIAutomationErrorType.VerificationFailed);
         }
     }
 

@@ -1,5 +1,17 @@
 {
   "schema_version": 1,
+  "scoring_correction": {
+    "reason": "The original Notepad verifier ignored final line breaks. Exact text verification rejects two controls-first copies that omitted the required final line break.",
+    "corrected_successes": {
+      "controls": 9,
+      "screenshots": 7
+    },
+    "affected_trials": [
+      {"app": "notepad", "model": "gpt-6-luna", "route": "controls"},
+      {"app": "notepad", "model": "gpt-5.6-luna", "route": "controls"}
+    ],
+    "historical_records_preserved": true
+  },
   "manifest": {
     "schema_version": 1,
     "started_at": "2026-09-28T07:18:01.983560+00:00",

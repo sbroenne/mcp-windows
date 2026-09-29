@@ -111,7 +111,7 @@ def verify_output(app, output):
             data = output.read_bytes()
             text = data.decode("utf-16" if data.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-8-sig")
             text = text.replace("\r\n", "\n")
-            return {"success": text.rstrip("\n") == NOTEPAD_EXPECTED.rstrip("\n"), "text": text}
+            return {"success": text == NOTEPAD_EXPECTED, "text": text}
         if app == "word":
             from docx import Document
             document = Document(output)

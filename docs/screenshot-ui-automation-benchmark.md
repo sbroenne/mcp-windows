@@ -182,34 +182,16 @@ response JSON for each observation. Use its uniquely named folder below.
 The live comparison uses actual model usage, not the capture report's size
 estimates.
 
-### Run all four models
+### Model reads
 
-This makes **300 paid model requests**: 75 per model. It reads saved captures,
-does not control the desktop, and does not run the full LLM test suite.
-Authenticate GitHub Copilot with `gh auth login`. Run from the repository root:
+The published 300 reads remain historical evidence. Their standalone SDK runner
+is retired; the retained Python helpers only read and validate saved evidence.
+Do not use that script to start more paid requests.
 
-```powershell
-$captures = "C:\path\to\screenshot-winforms-field-editing-RUN_ID"
-$output = Join-Path $env:TEMP ("windows-mcp-readability-" + [guid]::NewGuid())
-$models = @("gpt-6-astra", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-luna")
-Push-Location tests\Sbroenne.WindowsMcp.LLM.Tests
-try {
-    uv sync
-    if ($LASTEXITCODE -ne 0) { throw "Dependency setup failed" }
-    foreach ($model in $models) {
-        uv run --with github-copilot-sdk==1.0.14 python ..\..\scripts\benchmark-screenshot-readability.py --captures $captures --output (Join-Path $output $model) --model $model
-        if ($LASTEXITCODE -ne 0) { throw "Benchmark failed for $model" }
-    }
-}
-finally {
-    Pop-Location
-}
-$runs = $models | ForEach-Object { Join-Path $output $_ }
-python scripts\summarize-screenshot-readability.py --runs $runs --output (Join-Path $output "comparison.json")
-```
-
-For a three-request setup check on one model, add `--limit 1` and use a
-separate output directory. Do not mix setup checks with complete runs.
+New model-driven comparisons must run through **pytest-skill-engineering**.
+The current live suite measures [complete real-app tasks](real-app-benchmark.md),
+not another set of single-field reads. Reintroducing live single-field reads
+requires a framework-based test and separate approval of its model-call budget.
 The summary command rejects incomplete runs, duplicate cases, mismatched
 inputs/settings, and inconsistent usage or scoring.
 
