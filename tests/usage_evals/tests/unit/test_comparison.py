@@ -228,6 +228,19 @@ def test_unapproved_request_settings_are_not_counted_as_a_valid_comparison():
             require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
 
 
+def test_every_websocket_message_is_checked_even_with_a_shared_request_id():
+    result = captured_result()
+    first = result.request_audit[0]
+    result.request_audit.append(replace(first, image_count=0, image_details=[]))
+    assert (
+        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+        == "same-instructions"
+    )
+    result.request_audit[1] = replace(first, reasoning_effort="high")
+    with pytest.raises(RuntimeError, match="approved comparison settings"):
+        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+
+
 def run_pytest(*arguments):
     return subprocess.run(
         [sys.executable, "-m", "pytest", "tests/comparison", *arguments],

@@ -55,14 +55,17 @@ credentials in this project.
 ## Framework prerequisite
 
 The project pins published framework commit
-`3975dd94ca534d5f034ab5cd89bbe3e0bad79409`, including complete tool evidence,
+`e1ac73af1a0d2b210b74db980fb44daff507efc1`, including complete tool evidence,
 configuration-aware reports, recoverable paid summaries, and benchmark controls.
 It is published in `sbroenne/pytest-skill-engineering#103` (not yet merged).
 The exact commit remains pinned. Benchmark controls include tool-call limits,
 fixed image detail, actual request records, and an isolated runtime.
-Audited runs use the SDK's HTTP connection setting so request checks can inspect
-what is actually sent. Unsupported connections still stop the run rather than
-silently dropping those checks.
+Request checks inspect supported HTTP requests and WebSocket `response.create`
+messages before forwarding them. They do not force a different connection type.
+Unsupported messages or missing required settings stop the run rather than
+silently dropping checks. Each WebSocket message has its own audit record;
+records on the same connection can share a `request_id`. Image counts describe
+images sent in that message, not earlier images referenced by response ID.
 Older versions without `ToolCall.completion_received` and `CopilotResult.evidence_complete`
 are rejected before model execution rather than silently accepting missing evidence.
 
