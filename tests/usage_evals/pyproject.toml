@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "50e1a805474f50e8f230c5d0265de7486de164be" }
+pytest-skill-engineering = { git = "https://github.com/sbroenne/pytest-skill-engineering", rev = "3975dd94ca534d5f034ab5cd89bbe3e0bad79409" }
 
 [dependency-groups]
 dev = ["ruff>=0.15"]

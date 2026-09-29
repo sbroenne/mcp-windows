@@ -1,9 +1,13 @@
+import asyncio
+import importlib.util
 import subprocess
 import sys
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
+import anyio
 import pytest
 from pytest_skill_engineering.copilot import RequestAudit
 
@@ -16,6 +20,71 @@ from usage_evals.comparison import (
 )
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("failure", [None, "startup", "teardown", "cancel"])
+async def test_shared_mcp_lifetime_stays_in_one_task(tmp_path, monkeypatch, failure):
+    spec = importlib.util.spec_from_file_location(
+        "comparison_live_test", ROOT / "tests" / "comparison" / "test_real_apps.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    entries, exits = [], []
+    closing, finish = asyncio.Event(), asyncio.Event()
+
+    @asynccontextmanager
+    async def transport(*args, **kwargs):
+        entries.append(asyncio.current_task())
+        try:
+            async with anyio.create_task_group():
+                yield (None, None)
+        finally:
+            closing.set()
+            if failure == "cancel":
+                await finish.wait()
+            exits.append(asyncio.current_task())
+        if failure == "teardown":
+            raise RuntimeError("transport cleanup failed")
+
+    class Client:
+        async def initialize(self):
+            if failure == "startup":
+                raise RuntimeError("initialization failed")
+
+        async def list_tools(self):
+            return SimpleNamespace(tools=["test-tool"])
+
+    @asynccontextmanager
+    async def session(*args):
+        async with anyio.create_task_group():
+            yield Client()
+
+    monkeypatch.setattr(module, "stdio_client", transport)
+    monkeypatch.setattr(module, "ClientSession", session)
+    request = SimpleNamespace(config=SimpleNamespace(getoption=lambda _: "server.exe"))
+    fixture = module.comparison_server.__wrapped__(request, (tmp_path, {}, {}))
+    if failure == "startup":
+        with pytest.raises(BaseExceptionGroup, match="unhandled errors"):
+            await asyncio.create_task(anext(fixture))
+    else:
+        _, catalog = await asyncio.create_task(anext(fixture))
+        assert catalog == ["test-tool"]
+        if failure == "teardown":
+            with pytest.raises(RuntimeError, match="transport cleanup failed"):
+                await asyncio.create_task(fixture.aclose())
+        elif failure == "cancel":
+            teardown = asyncio.create_task(fixture.aclose())
+            await asyncio.wait_for(closing.wait(), timeout=5)
+            teardown.cancel()
+            await asyncio.sleep(0)
+            assert not exits and not teardown.done()
+            finish.set()
+            with pytest.raises(asyncio.CancelledError):
+                await teardown
+        else:
+            await asyncio.create_task(fixture.aclose())
+    assert len(entries) == 1
+    assert exits == entries
 
 
 def test_published_framework_audit_objects_are_supported():

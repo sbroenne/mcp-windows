@@ -55,11 +55,14 @@ credentials in this project.
 ## Framework prerequisite
 
 The project pins published framework commit
-`50e1a805474f50e8f230c5d0265de7486de164be`, including complete tool evidence,
+`3975dd94ca534d5f034ab5cd89bbe3e0bad79409`, including complete tool evidence,
 configuration-aware reports, recoverable paid summaries, and benchmark controls.
 It is published in `sbroenne/pytest-skill-engineering#103` (not yet merged).
 The exact commit remains pinned. Benchmark controls include tool-call limits,
 fixed image detail, actual request records, and an isolated runtime.
+Audited runs use the SDK's HTTP connection setting so request checks can inspect
+what is actually sent. Unsupported connections still stop the run rather than
+silently dropping those checks.
 Older versions without `ToolCall.completion_received` and `CopilotResult.evidence_complete`
 are rejected before model execution rather than silently accepting missing evidence.
 
@@ -282,6 +285,8 @@ instead of `MCP_USAGE_RESERVED_DESKTOP=1` on an approved disposable account.
 The same desktop gates described above apply. Cases run serially and alternate
 route order. Every case has a fresh model session; one MCP connection stays
 open for the comparison. Reasoning is medium and images use high detail.
+The shared MCP connection opens and closes in the same background task, so
+pytest can finish cleanup safely even when it uses a separate teardown task.
 There are no automatic retries. A setup, transport, evidence, or cleanup failure
 stops subsequent model calls. Ordinary incorrect outputs and exhausted task
 budgets stay as failed cases rather than stopping the matrix.

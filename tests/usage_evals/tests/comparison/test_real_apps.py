@@ -64,18 +64,38 @@ def comparison_inputs(request):
 async def comparison_server(request, comparison_inputs):
     root, _, _ = comparison_inputs
     executable = str(Path(request.config.getoption("--comparison-server")).resolve())
-    with (root / "server.log").open("w", encoding="utf-8") as log:
-        async with (
-            stdio_client(
-                StdioServerParameters(command=executable, cwd=str(root), env=dict(os.environ)),
-                errlog=log,
-            ) as streams,
-            ClientSession(*streams) as client,
-        ):
-            async with asyncio.timeout(30):
-                await client.initialize()
-                catalog = (await client.list_tools()).tools
-            yield client, catalog
+    ready = asyncio.get_running_loop().create_future()
+    stop = asyncio.Event()
+
+    async def own_connection():
+        # AnyIO requires entry and exit in one task, unlike pytest fixture setup/teardown.
+        with (root / "server.log").open("w", encoding="utf-8") as log:
+            async with (
+                stdio_client(
+                    StdioServerParameters(command=executable, cwd=str(root), env=dict(os.environ)),
+                    errlog=log,
+                ) as streams,
+                ClientSession(*streams) as client,
+            ):
+                async with asyncio.timeout(30):
+                    await client.initialize()
+                    catalog = (await client.list_tools()).tools
+                ready.set_result((client, catalog))
+                await stop.wait()
+
+    owner = asyncio.create_task(own_connection())
+    try:
+        await asyncio.wait({owner, ready}, return_when=asyncio.FIRST_COMPLETED)
+        if owner.done():
+            await owner
+        yield ready.result()
+    finally:
+        stop.set()
+        try:
+            await asyncio.shield(owner)
+        except asyncio.CancelledError:
+            await asyncio.shield(owner)
+            raise
 
 
 async def test_real_app(
