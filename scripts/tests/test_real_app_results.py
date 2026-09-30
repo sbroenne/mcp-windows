@@ -172,7 +172,9 @@ class RealAppResultTests(unittest.TestCase):
         self.assertEqual("revision", parsed_manifest["source_revision"])
         self.assertEqual("trial-001", parsed_rows[0]["directory"])
         self.assertEqual("framework-hash", parsed_manifest["runtime"]["framework_source"])
-        self.assertNotIn("private text", str(results.public_evidence(parsed_manifest, parsed_rows, {})))
+        public = results.public_evidence(parsed_manifest, parsed_rows, {})
+        self.assertEqual(1, public["trials"][0]["request_audit"]["count"])
+        self.assertNotIn("private text", str(public))
 
 
 if __name__ == "__main__":

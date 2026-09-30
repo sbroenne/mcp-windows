@@ -235,23 +235,36 @@ def public_evidence(manifest, rows, summary):
     allowed = {
         "app", "model", "route", "started_at", "success", "source_unchanged", "input_sha256",
         "output_sha256", "seconds", "input_tokens", "output_tokens", "cache_read_tokens",
-        "cache_write_tokens", "reasoning_tokens", "usage", "requests", "tool_calls",
+        "cache_write_tokens", "reasoning_tokens", "tool_calls",
         "failed_tool_calls", "screenshot_calls", "stop_reason", "evidence_complete",
         "tool_calls_admitted",
         "app_version", "initial_window_bounds",
         "setup",
     }
-    request_fields = {
-        "model", "tool_names", "reasoning_effort", "image_count", "image_details",
-        "instructions_sha256",
-    }
     public_rows = []
     for row in rows:
         public_row = {key: value for key, value in row.items() if key in allowed}
-        public_row["requests"] = [
-            {key: value for key, value in request.items() if key in request_fields}
-            for request in row["requests"]
-        ]
+        requests = row["requests"]
+        public_row["request_audit"] = {
+            "count": len(requests),
+            "models": sorted({request["model"] for request in requests}),
+            "tool_names": sorted({tuple(request["tool_names"]) for request in requests}),
+            "reasoning_efforts": sorted(
+                {request["reasoning_effort"] for request in requests}
+            ),
+            "image_count": sum(request["image_count"] for request in requests),
+            "image_details": {
+                detail: sum(
+                    request["image_details"].count(detail) for request in requests
+                )
+                for detail in sorted(
+                    {detail for request in requests for detail in request["image_details"]}
+                )
+            },
+            "instructions_sha256": sorted(
+                {request["instructions_sha256"] for request in requests}
+            ),
+        }
         public_rows.append(public_row)
     return {
         "schema_version": 1, "manifest": manifest, "summary": summary,
