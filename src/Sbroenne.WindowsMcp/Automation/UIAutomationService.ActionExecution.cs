@@ -16,7 +16,8 @@ public sealed partial class UIAutomationService
         bool Success,
         bool ElementUnavailable = false,
         string? ErrorMessage = null,
-        string? ActionPath = null);
+        string? ActionPath = null,
+        string ErrorType = UIAutomationErrorType.PatternNotSupported);
 
     private readonly record struct ElementActionState(
         int ControlType,
@@ -119,11 +120,16 @@ public sealed partial class UIAutomationService
                 GetObservableFingerprint(rootElement)),
             cancellationToken);
 
-        var semanticAttempted = await _staThread.ExecuteAsync(
+        var semanticOutcome = await _staThread.ExecuteAsync(
             () => TryExecuteSemanticAction(element, initial.ControlType),
             cancellationToken);
-        if (semanticAttempted)
+        if (semanticOutcome is { } attempted)
         {
+            if (!attempted.Success)
+            {
+                return attempted;
+            }
+
             if (RequiresToggleVerification(initial.ControlType))
             {
                 var verified = await WaitForElementConditionAsync(
@@ -137,7 +143,8 @@ public sealed partial class UIAutomationService
 
                 return new ElementActionOutcome(
                     false,
-                    ErrorMessage: "The semantic toggle was dispatched, but its state change could not be verified. Physical fallback was not attempted because toggling twice could revert the action.");
+                    ErrorMessage: "The semantic toggle was dispatched, but its state change could not be verified. Physical fallback was not attempted because toggling twice could revert the action.",
+                    ErrorType: UIAutomationErrorType.VerificationFailed);
             }
 
             if (RequiresSelectionVerification(initial.ControlType))
@@ -151,27 +158,10 @@ public sealed partial class UIAutomationService
                     return new ElementActionOutcome(true, verified.ElementUnavailable, ActionPath: "semantic_select");
                 }
 
-                if (initial.ControlType == UIA3ControlTypeIds.RadioButton)
-                {
-                    var legacyActionDispatched = await _staThread.ExecuteAsync(
-                        () => element.TryLegacyDefaultAction(),
-                        cancellationToken);
-                    if (legacyActionDispatched)
-                    {
-                        verified = await WaitForElementConditionAsync(
-                            element,
-                            () => GetSelectionState(element) == true,
-                            cancellationToken);
-                        if (verified.Observed)
-                        {
-                            return new ElementActionOutcome(true, verified.ElementUnavailable);
-                        }
-                    }
-                }
-
                 return new ElementActionOutcome(
                     false,
-                    ErrorMessage: "The semantic selection action was dispatched, but the selected state could not be verified. Physical fallback was not attempted because dispatching the action twice could trigger an unintended second operation.");
+                    ErrorMessage: "The semantic selection action was dispatched, but the selected state could not be verified. Physical fallback was not attempted because dispatching the action twice could trigger an unintended second operation.",
+                    ErrorType: UIAutomationErrorType.VerificationFailed);
             }
 
             // Invoke has no universal state postcondition. A successful provider call is the
@@ -202,7 +192,8 @@ public sealed partial class UIAutomationService
             return new ElementActionOutcome(
                 false,
                 ErrorMessage: "The element's window could not be confirmed as foreground, so the physical click was not sent.",
-                ActionPath: "physical_click");
+                ActionPath: "physical_click",
+                ErrorType: UIAutomationErrorType.WrongTargetWindow);
         }
 
         var clickResult = await _mouseService.ClickAsync(
@@ -213,7 +204,8 @@ public sealed partial class UIAutomationService
             cancellationToken: cancellationToken);
         if (!clickResult.Success)
         {
-            return new ElementActionOutcome(false, ErrorMessage: clickResult.Error);
+            return new ElementActionOutcome(false, ErrorMessage: clickResult.Error,
+                ActionPath: "physical_click", ErrorType: UIAutomationErrorType.VerificationFailed);
         }
 
         var physicalOutcome = await WaitForElementConditionAsync(
@@ -228,25 +220,66 @@ public sealed partial class UIAutomationService
             ? new ElementActionOutcome(true, physicalOutcome.ElementUnavailable, ActionPath: "physical_click")
             : new ElementActionOutcome(
                 false,
-                ErrorMessage: semanticAttempted
-                    ? "The semantic action was dispatched but unverified, and the physical fallback produced no observable UI change."
-                    : "The semantic action was unavailable, and the physical click produced no observable UI change.");
+                ErrorMessage: "The semantic action was unavailable, and the physical click produced no observable UI change.",
+                ActionPath: "physical_click",
+                ErrorType: UIAutomationErrorType.VerificationFailed);
     }
 
-    private static bool TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType) =>
-        controlType switch
+    private static ElementActionOutcome? TryExecuteSemanticAction(UIA.IUIAutomationElement element, int controlType)
+    {
+        Action dispatch;
+        string actionPath;
+        switch (controlType)
         {
-            UIA3ControlTypeIds.CheckBox => element.TryToggle(),
-            UIA3ControlTypeIds.ListItem or
-            UIA3ControlTypeIds.TreeItem or
-            UIA3ControlTypeIds.RadioButton or
-            UIA3ControlTypeIds.TabItem => element.TrySelect(),
-            UIA3ControlTypeIds.Button or
-            UIA3ControlTypeIds.MenuItem or
-            UIA3ControlTypeIds.Hyperlink or
-            UIA3ControlTypeIds.SplitButton => element.TryInvoke(),
-            _ => element.TryInvoke()
-        };
+            case UIA3ControlTypeIds.CheckBox:
+                var toggle = element.GetPattern<UIA.IUIAutomationTogglePattern>(UIA3PatternIds.Toggle);
+                if (toggle is null)
+                {
+                    return null;
+                }
+                dispatch = toggle.Toggle;
+                actionPath = "semantic_toggle";
+                break;
+
+            case UIA3ControlTypeIds.ListItem:
+            case UIA3ControlTypeIds.TreeItem:
+            case UIA3ControlTypeIds.RadioButton:
+            case UIA3ControlTypeIds.TabItem:
+                var selection = element.GetPattern<UIA.IUIAutomationSelectionItemPattern>(UIA3PatternIds.SelectionItem);
+                if (selection is null)
+                {
+                    return null;
+                }
+                dispatch = selection.Select;
+                actionPath = "semantic_select";
+                break;
+
+            default:
+                var invoke = element.GetPattern<UIA.IUIAutomationInvokePattern>(UIA3PatternIds.Invoke);
+                if (invoke is null)
+                {
+                    return null;
+                }
+                dispatch = invoke.Invoke;
+                actionPath = "semantic_invoke";
+                break;
+        }
+
+        try
+        {
+            dispatch();
+            return new ElementActionOutcome(true, ActionPath: actionPath);
+        }
+        catch (COMException ex)
+        {
+            return new ElementActionOutcome(
+                false,
+                ErrorMessage: $"The action provider failed (0x{ex.HResult:X8}): {ex.Message}. " +
+                    "The action may already have occurred. Inspect the current state before deciding what to do; no fallback or repeat was sent.",
+                ActionPath: actionPath,
+                ErrorType: UIAutomationErrorType.VerificationFailed);
+        }
+    }
 
     private static bool RequiresToggleVerification(int controlType) =>
         controlType == UIA3ControlTypeIds.CheckBox;

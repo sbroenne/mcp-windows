@@ -7,6 +7,8 @@ on:
     paths:
       - 'gh-pages/**'
       - 'FEATURES.md'
+      - 'docs/incremental-snapshot-benchmark.md'
+      - 'docs/screenshot-ui-automation-benchmark.md'
       - 'CONTRIBUTING.md'
       - 'vscode-extension/CHANGELOG.md'
       - 'plugin/skills/windows-automation/SKILL.md'
@@ -137,7 +139,9 @@ jobs:
 
       - name: Build with MkDocs
         working-directory: gh-pages
-        run: mkdocs build --strict --clean
+        run: |
+          python -m unittest discover -s tests -v
+          mkdocs build --strict --clean
 
       - name: Collect IndexNow URLs
         id: indexnow-urls

@@ -21,7 +21,7 @@
 
     <RootNamespace>Sbroenne.WindowsMcp.Cli</RootNamespace>
     <AssemblyName>wincli</AssemblyName>
-    <Description>Command-line interface for Windows automation (UI automation, mouse, keyboard, windows, screenshots) - the token-efficient entry point for coding agents.</Description>
+    <Description>Windows controls, not just screenshots, for agents and scripts - named buttons, field values, table rows, and changes-only views through shell commands.</Description>
 
     <!-- Transitively pulls in Windows Forms via the server reference. -->
     <UseWindowsForms>true</UseWindowsForms>

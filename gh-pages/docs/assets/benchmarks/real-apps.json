@@ -1,0 +1,1034 @@
+{
+  "schema_version": 1,
+  "manifest": {
+    "purpose": "benchmark",
+    "timestamp": "2026-09-30T15:30:40.079613",
+    "models": [
+      "gpt-6.1-sol",
+      "gpt-6-luna"
+    ],
+    "apps": [
+      "notepad",
+      "word",
+      "powerpoint",
+      "chrome"
+    ],
+    "routes": [
+      "controls",
+      "screenshots"
+    ],
+    "input_sha256": {
+      "notepad": "627d081b8eb9787638025e3e5e7417a2a3b903067fd8e80d53db83ac507d96d2",
+      "word": "2a7275a78610a8d8ce6402ab126df61b91db0516e2fd43b863868b044e31a0ee",
+      "powerpoint": "b2c2a9ea6c0846d3b159f7b3165242f3ad92f9aae5a23a744f3be59657f0d13a",
+      "chrome": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    "source_revision": "4491fea5c56663ca9e4b4948f2d1d8eda552783f",
+    "server_sha256": "ec80a595a825cbeb015ba5e1b2480bbfb8b6acf66ccc801a86b8ad08df047dcf",
+    "runtime": {
+      "framework": "0.6.23",
+      "framework_source": "4ed15ebc777a796884ae49e57ca0de8a37c9e4a95a760d31f03a96e6a065755a",
+      "sdk": "1.0.15",
+      "python": "3.14.6",
+      "platform": "Windows-11-10.0.26220-SP0"
+    }
+  },
+  "summary": {
+    "trial_count": 16,
+    "routes": {
+      "controls": {
+        "successes": 8,
+        "trials": 8,
+        "reported_input_tokens": 3521398,
+        "reported_output_tokens": 14823,
+        "seconds": 618.4433886000188,
+        "tool_calls": 186
+      },
+      "screenshots": {
+        "successes": 7,
+        "trials": 8,
+        "reported_input_tokens": 8710493,
+        "reported_output_tokens": 27354,
+        "seconds": 1009.9512987000053,
+        "tool_calls": 306
+      }
+    },
+    "successful_pairs": 7,
+    "pairs": [
+      {
+        "app": "notepad",
+        "model": "gpt-6.1-sol",
+        "input_saving_percent": 70.442672659983,
+        "time_saving_percent": 51.47109616803035
+      },
+      {
+        "app": "notepad",
+        "model": "gpt-6-luna",
+        "input_saving_percent": 56.809415035179775,
+        "time_saving_percent": 42.349021785690546
+      },
+      {
+        "app": "word",
+        "model": "gpt-6.1-sol",
+        "input_saving_percent": 30.813776183280396,
+        "time_saving_percent": 9.377098131094296
+      },
+      {
+        "app": "word",
+        "model": "gpt-6-luna",
+        "input_saving_percent": 21.54262062155987,
+        "time_saving_percent": 5.904236325263879
+      },
+      {
+        "app": "powerpoint",
+        "model": "gpt-6.1-sol",
+        "input_saving_percent": -58.11619439607409,
+        "time_saving_percent": -35.0306929655168
+      },
+      {
+        "app": "chrome",
+        "model": "gpt-6.1-sol",
+        "input_saving_percent": 34.8779182311726,
+        "time_saving_percent": 34.32166364410059
+      },
+      {
+        "app": "chrome",
+        "model": "gpt-6-luna",
+        "input_saving_percent": 88.02990728305241,
+        "time_saving_percent": 78.98886076628625
+      }
+    ],
+    "median_paired_input_saving_percent": 34.8779182311726,
+    "median_paired_time_saving_percent": 34.32166364410059
+  },
+  "trials": [
+    {
+      "app": "notepad",
+      "model": "gpt-6.1-sol",
+      "route": "controls",
+      "input_sha256": "627d081b8eb9787638025e3e5e7417a2a3b903067fd8e80d53db83ac507d96d2",
+      "source_unchanged": true,
+      "output_sha256": "d253177607a94dbcda8f197c7f0294d0b66140b54b83b065964f0e33296d181c",
+      "success": true,
+      "input_tokens": 63652,
+      "output_tokens": 373,
+      "cache_read_tokens": 60500,
+      "cache_write_tokens": 3131,
+      "reasoning_tokens": 0,
+      "seconds": 33.84940269999788,
+      "tool_calls": 6,
+      "tool_calls_admitted": 6,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 0,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "11.2607.14.0",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": {
+        "single_document_verified": true,
+        "detached_generated_tab": false,
+        "detach_reported_error": false
+      },
+      "request_audit": {
+        "count": 7,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 0,
+        "image_details": {},
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "notepad",
+      "model": "gpt-6.1-sol",
+      "route": "screenshots",
+      "input_sha256": "627d081b8eb9787638025e3e5e7417a2a3b903067fd8e80d53db83ac507d96d2",
+      "source_unchanged": true,
+      "output_sha256": "d253177607a94dbcda8f197c7f0294d0b66140b54b83b065964f0e33296d181c",
+      "success": true,
+      "input_tokens": 215351,
+      "output_tokens": 885,
+      "cache_read_tokens": 195387,
+      "cache_write_tokens": 19910,
+      "reasoning_tokens": 151,
+      "seconds": 69.75101439999708,
+      "tool_calls": 17,
+      "tool_calls_admitted": 17,
+      "failed_tool_calls": 1,
+      "screenshot_calls": 6,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "11.2607.14.0",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": {
+        "single_document_verified": true,
+        "detached_generated_tab": true,
+        "detach_reported_error": false
+      },
+      "request_audit": {
+        "count": 18,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 6,
+        "image_details": {
+          "high": 6
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "notepad",
+      "model": "gpt-6-luna",
+      "route": "screenshots",
+      "input_sha256": "627d081b8eb9787638025e3e5e7417a2a3b903067fd8e80d53db83ac507d96d2",
+      "source_unchanged": true,
+      "output_sha256": "d253177607a94dbcda8f197c7f0294d0b66140b54b83b065964f0e33296d181c",
+      "success": true,
+      "input_tokens": 371236,
+      "output_tokens": 1617,
+      "cache_read_tokens": 341551,
+      "cache_write_tokens": 29616,
+      "reasoning_tokens": 764,
+      "seconds": 90.44646979999379,
+      "tool_calls": 22,
+      "tool_calls_admitted": 22,
+      "failed_tool_calls": 3,
+      "screenshot_calls": 8,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "11.2607.14.0",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": {
+        "single_document_verified": true,
+        "detached_generated_tab": true,
+        "detach_reported_error": false
+      },
+      "request_audit": {
+        "count": 23,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 8,
+        "image_details": {
+          "high": 8
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "notepad",
+      "model": "gpt-6-luna",
+      "route": "controls",
+      "input_sha256": "627d081b8eb9787638025e3e5e7417a2a3b903067fd8e80d53db83ac507d96d2",
+      "source_unchanged": true,
+      "output_sha256": "d253177607a94dbcda8f197c7f0294d0b66140b54b83b065964f0e33296d181c",
+      "success": true,
+      "input_tokens": 160339,
+      "output_tokens": 1306,
+      "cache_read_tokens": 144946,
+      "cache_write_tokens": 15348,
+      "reasoning_tokens": 550,
+      "seconds": 52.14327460000641,
+      "tool_calls": 14,
+      "tool_calls_admitted": 14,
+      "failed_tool_calls": 3,
+      "screenshot_calls": 0,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "11.2607.14.0",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": {
+        "single_document_verified": true,
+        "detached_generated_tab": true,
+        "detach_reported_error": false
+      },
+      "request_audit": {
+        "count": 15,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 0,
+        "image_details": {},
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "word",
+      "model": "gpt-6.1-sol",
+      "route": "screenshots",
+      "input_sha256": "2a7275a78610a8d8ce6402ab126df61b91db0516e2fd43b863868b044e31a0ee",
+      "source_unchanged": true,
+      "output_sha256": "849e4372bdd8d761c66e8f609be84235fe42048dbf59848aa64bace0f6fd89a4",
+      "success": true,
+      "input_tokens": 291837,
+      "output_tokens": 902,
+      "cache_read_tokens": 273915,
+      "cache_write_tokens": 17850,
+      "reasoning_tokens": 121,
+      "seconds": 71.77727059999597,
+      "tool_calls": 23,
+      "tool_calls_admitted": 23,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 7,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 24,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 7,
+        "image_details": {
+          "high": 7
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "word",
+      "model": "gpt-6.1-sol",
+      "route": "controls",
+      "input_sha256": "2a7275a78610a8d8ce6402ab126df61b91db0516e2fd43b863868b044e31a0ee",
+      "source_unchanged": true,
+      "output_sha256": "0007ed8aefef26d30556916451419e644a72ed5dae8a6ced1191422771956c52",
+      "success": true,
+      "input_tokens": 201911,
+      "output_tokens": 974,
+      "cache_read_tokens": 193631,
+      "cache_write_tokens": 8229,
+      "reasoning_tokens": 98,
+      "seconds": 65.04664550001326,
+      "tool_calls": 16,
+      "tool_calls_admitted": 16,
+      "failed_tool_calls": 1,
+      "screenshot_calls": 1,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 17,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 1,
+        "image_details": {
+          "high": 1
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "word",
+      "model": "gpt-6-luna",
+      "route": "controls",
+      "input_sha256": "2a7275a78610a8d8ce6402ab126df61b91db0516e2fd43b863868b044e31a0ee",
+      "source_unchanged": true,
+      "output_sha256": "d6b2d92160f181722ed1783beae73d3d600405075265992f991b21b067558982",
+      "success": true,
+      "input_tokens": 1055229,
+      "output_tokens": 3626,
+      "cache_read_tokens": 1027233,
+      "cache_write_tokens": 27852,
+      "reasoning_tokens": 1816,
+      "seconds": 139.17137130000629,
+      "tool_calls": 47,
+      "tool_calls_admitted": 47,
+      "failed_tool_calls": 6,
+      "screenshot_calls": 6,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 48,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 6,
+        "image_details": {
+          "high": 6
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "word",
+      "model": "gpt-6-luna",
+      "route": "screenshots",
+      "input_sha256": "2a7275a78610a8d8ce6402ab126df61b91db0516e2fd43b863868b044e31a0ee",
+      "source_unchanged": true,
+      "output_sha256": "5af7434be72107e9e2521e86da635d05ac4e88f5d97aa7c0c8938174ced0527f",
+      "success": true,
+      "input_tokens": 1344971,
+      "output_tokens": 4468,
+      "cache_read_tokens": 1300781,
+      "cache_write_tokens": 44043,
+      "reasoning_tokens": 2954,
+      "seconds": 147.9039713000093,
+      "tool_calls": 50,
+      "tool_calls_admitted": 50,
+      "failed_tool_calls": 1,
+      "screenshot_calls": 20,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 49,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 19,
+        "image_details": {
+          "high": 19
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "powerpoint",
+      "model": "gpt-6.1-sol",
+      "route": "controls",
+      "input_sha256": "b2c2a9ea6c0846d3b159f7b3165242f3ad92f9aae5a23a744f3be59657f0d13a",
+      "source_unchanged": true,
+      "output_sha256": "a6100b7e982589a9aaae34445b30f8b6bffbf120e2dbf39a0c44ccbc36594d7b",
+      "success": true,
+      "input_tokens": 399528,
+      "output_tokens": 1288,
+      "cache_read_tokens": 387712,
+      "cache_write_tokens": 11726,
+      "reasoning_tokens": 198,
+      "seconds": 91.84061769999971,
+      "tool_calls": 29,
+      "tool_calls_admitted": 29,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 1,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 30,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 1,
+        "image_details": {
+          "high": 1
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "powerpoint",
+      "model": "gpt-6.1-sol",
+      "route": "screenshots",
+      "input_sha256": "b2c2a9ea6c0846d3b159f7b3165242f3ad92f9aae5a23a744f3be59657f0d13a",
+      "source_unchanged": true,
+      "output_sha256": "6d053914cf4a714b17c562f5c373eb68686f25ff15624d1e2af877881cc8609c",
+      "success": true,
+      "input_tokens": 252680,
+      "output_tokens": 837,
+      "cache_read_tokens": 239553,
+      "cache_write_tokens": 13052,
+      "reasoning_tokens": 65,
+      "seconds": 68.01462370000081,
+      "tool_calls": 24,
+      "tool_calls_admitted": 24,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 8,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 25,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 8,
+        "image_details": {
+          "high": 8
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "powerpoint",
+      "model": "gpt-6-luna",
+      "route": "screenshots",
+      "input_sha256": "b2c2a9ea6c0846d3b159f7b3165242f3ad92f9aae5a23a744f3be59657f0d13a",
+      "source_unchanged": true,
+      "output_sha256": null,
+      "success": false,
+      "input_tokens": 4704510,
+      "output_tokens": 11416,
+      "cache_read_tokens": 4594932,
+      "cache_write_tokens": 109335,
+      "reasoning_tokens": 9011,
+      "seconds": 323.4902479000011,
+      "tool_calls": 80,
+      "tool_calls_admitted": 80,
+      "failed_tool_calls": 2,
+      "screenshot_calls": 31,
+      "evidence_complete": true,
+      "stop_reason": "tool_budget_exceeded",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 81,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 31,
+        "image_details": {
+          "high": 31
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "powerpoint",
+      "model": "gpt-6-luna",
+      "route": "controls",
+      "input_sha256": "b2c2a9ea6c0846d3b159f7b3165242f3ad92f9aae5a23a744f3be59657f0d13a",
+      "source_unchanged": true,
+      "output_sha256": "10dfd99b3a40e1549624c7ca64ae788ceacb4b73fcf85edcbbaf4a2ffc637973",
+      "success": true,
+      "input_tokens": 1325535,
+      "output_tokens": 5557,
+      "cache_read_tokens": 1280937,
+      "cache_write_tokens": 44457,
+      "reasoning_tokens": 3408,
+      "seconds": 156.03306229998998,
+      "tool_calls": 46,
+      "tool_calls_admitted": 46,
+      "failed_tool_calls": 3,
+      "screenshot_calls": 8,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "16.0.20326.20158",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 47,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 8,
+        "image_details": {
+          "high": 8
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "chrome",
+      "model": "gpt-6.1-sol",
+      "route": "screenshots",
+      "input_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "source_unchanged": true,
+      "output_sha256": "d23eab197fdb30f82a95e89aa28b26ee3298a7597e85f0db703d81fa4b4c76db",
+      "success": true,
+      "input_tokens": 248481,
+      "output_tokens": 970,
+      "cache_read_tokens": 233754,
+      "cache_write_tokens": 14640,
+      "reasoning_tokens": 90,
+      "seconds": 67.68551560000924,
+      "tool_calls": 28,
+      "tool_calls_admitted": 28,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 4,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "154.0.8037.58",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 29,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 4,
+        "image_details": {
+          "high": 4
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "chrome",
+      "model": "gpt-6.1-sol",
+      "route": "controls",
+      "input_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "source_unchanged": true,
+      "output_sha256": "d23eab197fdb30f82a95e89aa28b26ee3298a7597e85f0db703d81fa4b4c76db",
+      "success": true,
+      "input_tokens": 161816,
+      "output_tokens": 711,
+      "cache_read_tokens": 155793,
+      "cache_write_tokens": 5975,
+      "reasoning_tokens": 0,
+      "seconds": 44.454720599998836,
+      "tool_calls": 15,
+      "tool_calls_admitted": 15,
+      "failed_tool_calls": 1,
+      "screenshot_calls": 0,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "154.0.8037.58",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 16,
+        "models": [
+          "gpt-6.1-sol"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 0,
+        "image_details": {},
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "chrome",
+      "model": "gpt-6-luna",
+      "route": "controls",
+      "input_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "source_unchanged": true,
+      "output_sha256": "d23eab197fdb30f82a95e89aa28b26ee3298a7597e85f0db703d81fa4b4c76db",
+      "success": true,
+      "input_tokens": 153388,
+      "output_tokens": 988,
+      "cache_read_tokens": 145612,
+      "cache_write_tokens": 7734,
+      "reasoning_tokens": 406,
+      "seconds": 35.90429390000645,
+      "tool_calls": 13,
+      "tool_calls_admitted": 13,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 0,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "154.0.8037.58",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 14,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "ui_snapshot",
+            "ui_wait",
+            "ui_read_table",
+            "screenshot_control",
+            "mouse_control",
+            "ui_select",
+            "file_save",
+            "keyboard_control",
+            "ui_type",
+            "ui_click",
+            "ui_read",
+            "ui_find",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 0,
+        "image_details": {},
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    },
+    {
+      "app": "chrome",
+      "model": "gpt-6-luna",
+      "route": "screenshots",
+      "input_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+      "source_unchanged": true,
+      "output_sha256": "d23eab197fdb30f82a95e89aa28b26ee3298a7597e85f0db703d81fa4b4c76db",
+      "success": true,
+      "input_tokens": 1281427,
+      "output_tokens": 6259,
+      "cache_read_tokens": 1235277,
+      "cache_write_tokens": 45961,
+      "reasoning_tokens": 4301,
+      "seconds": 170.88218539999798,
+      "tool_calls": 62,
+      "tool_calls_admitted": 62,
+      "failed_tool_calls": 0,
+      "screenshot_calls": 12,
+      "evidence_complete": true,
+      "stop_reason": "completed",
+      "app_version": "154.0.8037.58",
+      "initial_window_bounds": [
+        64,
+        64,
+        2624,
+        1664
+      ],
+      "setup": null,
+      "request_audit": {
+        "count": 63,
+        "models": [
+          "gpt-6-luna"
+        ],
+        "tool_names": [
+          [
+            "screenshot_control",
+            "mouse_control",
+            "keyboard_control",
+            "window_management"
+          ]
+        ],
+        "reasoning_efforts": [
+          "medium"
+        ],
+        "image_count": 12,
+        "image_details": {
+          "high": 12
+        },
+        "instructions_sha256": [
+          "088362d097b3abad893b727b25374f229abeee8660de89883a17f14f66012cb2"
+        ]
+      }
+    }
+  ]
+}

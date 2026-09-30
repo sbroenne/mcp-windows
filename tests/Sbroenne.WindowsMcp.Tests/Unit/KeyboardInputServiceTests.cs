@@ -28,6 +28,8 @@ public sealed class KeyboardInputServiceTests
     [InlineData("a", "a", "a", "", "a", true)]
     [InlineData("a", "a", "", "", "a", false)]
     [InlineData("a", "a\r", "", "", "\n", true)]
+    [InlineData("Old content\r", "P\r", "Old content\r", "", "P", false)]
+    [InlineData("Old content\r", "P", "Old content\r", "", "P", true)]
     [InlineData("a", "ab", "", "", "c", false)]
     [InlineData("a", "abc", "", "", "b", false)]
     [InlineData("abc", "axc", "", "", "x", false)]
@@ -57,6 +59,17 @@ public sealed class KeyboardInputServiceTests
         cancellationSource.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
             service.TypeTextAsync("must-not-be-typed", new nint(-1), cancellationSource.Token));
+    }
+
+    [Fact]
+    public async Task TypeTextAsync_WithCancelledToken_DoesNotInjectInput()
+    {
+        using var service = new KeyboardInputService();
+        using var cancellationSource = new CancellationTokenSource();
+        cancellationSource.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.TypeTextAsync("must-not-be-typed", cancellationSource.Token));
     }
 
     [Fact]

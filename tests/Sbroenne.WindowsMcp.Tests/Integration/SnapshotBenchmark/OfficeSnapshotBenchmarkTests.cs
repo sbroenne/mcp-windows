@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
@@ -20,6 +20,7 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
 {
     private readonly UIAutomationThread _staThread = new();
     private readonly KeyboardInputService _keyboard = new();
+    private readonly ILoggerFactory _loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
     private readonly UIAutomationService _automationService;
     private readonly ITestOutputHelper _output;
 
@@ -33,7 +34,26 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
             _keyboard,
             new WindowActivator(),
             new ElevationDetector(),
-            NullLogger<UIAutomationService>.Instance);
+            _loggerFactory.CreateLogger<UIAutomationService>());
+    }
+
+    [SkippableTheory]
+    [InlineData(OfficeApplication.Word)]
+    [InlineData(OfficeApplication.Excel)]
+    public async Task Snapshot_AfterOfficeEdit_KeepsDocumentAvailable(OfficeApplication application)
+    {
+        var executable = FindOfficeExecutable(application);
+        Skip.If(executable is null, $"{application} desktop is not installed.");
+        await using var scenario = await CreateScenarioAsync(
+            application, executable!, SnapshotBenchmarkArm.Full, 1);
+        foreach (var action in scenario.Actions)
+        {
+            await action(CancellationToken.None);
+            var snapshot = await _automationService.GetTreeAsync(
+                scenario.CurrentWindowHandle!(), null, scenario.MaxDepth, null);
+            Assert.True(snapshot.Success, snapshot.ErrorMessage);
+            Assert.NotEmpty(snapshot.Tree!);
+        }
     }
 
     [SkippableTheory]
@@ -56,6 +76,7 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
         _automationService.Dispose();
         _keyboard.Dispose();
         _staThread.Dispose();
+        _loggerFactory.Dispose();
     }
 
     private async Task<SnapshotBenchmarkScenario> CreateScenarioAsync(
@@ -85,28 +106,28 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
                 UseShellExecute = false
             }) ?? throw new InvalidOperationException($"Could not launch Microsoft {application}.");
 
-            windowHandle = WaitForMainWindow(process, TimeSpan.FromSeconds(30));
+            windowHandle = WaitForMainWindow(
+                process, Path.GetFileNameWithoutExtension(tempPath), TimeSpan.FromSeconds(30));
             var handle = WindowHandleParser.Format(windowHandle);
             var version = FileVersionInfo.GetVersionInfo(executable).FileVersion ?? "unknown";
             var activated = await new WindowActivator().ActivateWindowAsync(windowHandle);
             Assert.True(activated, $"Could not activate Microsoft {application}.");
-            await Task.Delay(3000);
 
             IReadOnlyList<Func<CancellationToken, Task>> actions = application switch
             {
                 OfficeApplication.Word =>
                 [
-                    token => TypeInWordAsync(handle, "Incremental snapshot benchmark", token),
-                    token => TypeInWordAsync(handle, "\nMeasured against a real Word document.", token),
-                    token => UndoAsync(handle, token),
-                    token => TypeInWordAsync(handle, "\nFinal benchmark paragraph.", token)
+                    token => TypeInWordAsync(windowHandle, "Incremental snapshot benchmark", token),
+                    token => TypeInWordAsync(windowHandle, "\nMeasured against a real Word document.", token),
+                    token => UndoAsync(windowHandle, token),
+                    token => TypeInWordAsync(windowHandle, "\nFinal benchmark paragraph.", token)
                 ],
                 OfficeApplication.Excel =>
                 [
-                    token => TypeInExcelAsync("Revenue", token),
-                    token => TypeInExcelAsync("125000", token),
-                    token => TypeInExcelAsync("Expenses", token),
-                    token => TypeInExcelAsync("75000", token)
+                    token => TypeInExcelAsync(windowHandle, "Revenue", token),
+                    token => TypeInExcelAsync(windowHandle, "125000", token),
+                    token => TypeInExcelAsync(windowHandle, "Expenses", token),
+                    token => TypeInExcelAsync(windowHandle, "75000", token)
                 ],
                 _ => throw new ArgumentOutOfRangeException(nameof(application), application, null)
             };
@@ -127,6 +148,8 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
                 CurrentWindowHandle: () =>
                 {
                     process.Refresh();
+                    _output.WriteLine(
+                        $"{application} PID {process.Id}, HWND {process.MainWindowHandle}, title '{process.MainWindowTitle}'");
                     return WindowHandleParser.Format(process.MainWindowHandle);
                 });
         }
@@ -143,39 +166,41 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
     }
 
     private async Task TypeInWordAsync(
-        string windowHandle,
+        nint windowHandle,
         string text,
         CancellationToken cancellationToken)
     {
-        var result = await _keyboard.TypeTextAsync(text, cancellationToken);
+        var result = await _keyboard.TypeTextAsync(text, windowHandle, cancellationToken);
         Assert.True(result.Success, $"Typing in Word failed: {result.Error}");
     }
 
-    private async Task TypeInExcelAsync(string text, CancellationToken cancellationToken)
+    private async Task TypeInExcelAsync(nint windowHandle, string text, CancellationToken cancellationToken)
     {
-        var typeResult = await _keyboard.TypeTextAsync(text, cancellationToken);
+        var typeResult = await _keyboard.TypeTextAsync(text, windowHandle, cancellationToken);
         Assert.True(typeResult.Success, $"Typing in Excel failed: {typeResult.Error}");
         var enterResult = await _keyboard.PressKeyAsync(
             "enter",
             ModifierKey.None,
             repeat: 1,
+            windowHandle,
             cancellationToken);
         Assert.True(enterResult.Success, $"Committing the Excel cell failed: {enterResult.Error}");
     }
 
     private async Task UndoAsync(
-        string windowHandle,
+        nint windowHandle,
         CancellationToken cancellationToken)
     {
         var result = await _keyboard.PressKeyAsync(
             "z",
             ModifierKey.Ctrl,
             repeat: 1,
+            windowHandle,
             cancellationToken);
         Assert.True(result.Success, $"Undo in Word failed: {result.Error}");
     }
 
-    private static nint WaitForMainWindow(Process process, TimeSpan timeout)
+    private static nint WaitForMainWindow(Process process, string documentName, TimeSpan timeout)
     {
         var deadline = Stopwatch.StartNew();
         while (deadline.Elapsed < timeout)
@@ -188,7 +213,8 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
 
             process.Refresh();
             if (process.MainWindowHandle != nint.Zero &&
-                NativeMethods.IsWindowVisible(process.MainWindowHandle))
+                NativeMethods.IsWindowVisible(process.MainWindowHandle) &&
+                process.MainWindowTitle.Contains(documentName, StringComparison.OrdinalIgnoreCase))
             {
                 return process.MainWindowHandle;
             }
@@ -197,7 +223,8 @@ public sealed class OfficeSnapshotBenchmarkTests : IDisposable
         }
 
         throw new TimeoutException(
-            $"Office process {process.Id} did not create a visible window within {timeout.TotalSeconds:F0}s.");
+            $"Office process {process.Id} did not open '{documentName}' within {timeout.TotalSeconds:F0}s. " +
+            $"Current title: '{process.MainWindowTitle}'.");
     }
 
     private static string? FindOfficeExecutable(OfficeApplication application)

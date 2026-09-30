@@ -6,6 +6,13 @@ import pytest
 from pytest_skill_engineering.copilot.result import CopilotResult, ToolCall
 
 from usage_evals.cases import CASE_NAMES
+from usage_evals.comparison import (
+    APPS,
+    MODELS,
+    ROUTES,
+    comparison_matrix,
+    require_comparison_budget,
+)
 from usage_evals.policy import validate_budget, validate_desktop
 from usage_evals.runtime import require_capture_api
 
@@ -37,9 +44,33 @@ def pytest_addoption(parser):
     group.addoption("--usage-server", default="", help="Candidate MCP server executable.")
     group.addoption("--usage-baseline-cli", default="", help="Optional baseline wincli.exe.")
     group.addoption("--usage-baseline-server", default="", help="Optional baseline MCP executable.")
+    comparison = parser.getgroup("windows-comparison")
+    comparison.addoption("--run-comparison", action="store_true")
+    comparison.addoption("--comparison-model", action="append", choices=MODELS)
+    comparison.addoption("--comparison-app", action="append", choices=APPS)
+    comparison.addoption("--comparison-route", action="append", choices=ROUTES)
+    comparison.addoption("--comparison-max-runs", type=int, default=0)
+    comparison.addoption("--comparison-timeout", type=int, default=0)
+    comparison.addoption("--comparison-max-calls", type=int, default=0)
+    comparison.addoption("--comparison-server", default="")
+    comparison.addoption(
+        "--comparison-output", default="", help="New persistent evidence directory."
+    )
 
 
 def pytest_generate_tests(metafunc):
+    if "comparison_case" in metafunc.fixturenames:
+        config = metafunc.config
+        try:
+            parameters = comparison_matrix(
+                config.getoption("--comparison-model"),
+                config.getoption("--comparison-app"),
+                config.getoption("--comparison-route"),
+            )
+        except ValueError as error:
+            raise pytest.UsageError(str(error)) from error
+        metafunc.parametrize("comparison_case", parameters, ids=["-".join(p) for p in parameters])
+        return
     if "usage_case" not in metafunc.fixturenames:
         return
     config = metafunc.config
@@ -71,6 +102,10 @@ def pytest_generate_tests(metafunc):
 
 
 def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--run-comparison"):
+        for item in items:
+            if item.get_closest_marker("comparison_live"):
+                item.add_marker(pytest.mark.skip(reason="Live comparison was not requested."))
     if not config.getoption("--run-usage-evals"):
         for item in items:
             if item.get_closest_marker("usage_live"):
@@ -79,6 +114,8 @@ def pytest_collection_modifyitems(config, items):
 
 def pytest_collection_finish(session):
     config = session.config
+    if not config.option.collectonly and config.getoption("--run-comparison"):
+        validate_comparison_collection(config, session.items)
     if config.option.collectonly or not config.getoption("--run-usage-evals"):
         return
     selected = sum(item.get_closest_marker("usage_live") is not None for item in session.items)
@@ -101,3 +138,55 @@ def pytest_collection_finish(session):
         value = config.getoption(option)
         if not value or not Path(value).is_file() or Path(value).suffix.lower() != ".exe":
             raise pytest.UsageError(f"{option} must name an existing built executable.")
+
+
+def validate_comparison_collection(config, items):
+    selected = sum(item.get_closest_marker("comparison_live") is not None for item in items)
+    try:
+        require_comparison_budget(
+            selected,
+            config.getoption("--comparison-max-runs"),
+            config.getoption("--comparison-model"),
+            config.getoption("--comparison-timeout"),
+            config.getoption("--comparison-max-calls"),
+        )
+    except ValueError as error:
+        raise pytest.UsageError(str(error)) from error
+    output = config.getoption("--comparison-output")
+    if not output or Path(output).exists():
+        raise pytest.UsageError("--comparison-output must name a new persistent directory.")
+    for option in ("--aitest-json", "--junitxml"):
+        destination = config.getoption(option)
+        if not destination or not Path(destination).resolve().is_relative_to(
+            Path(output).resolve()
+        ):
+            raise pytest.UsageError(f"{option} must be inside --comparison-output.")
+    if config.getoption("--run-usage-evals"):
+        raise pytest.UsageError("Run the comparison separately from usage evaluations.")
+    from pytest_skill_engineering.copilot import CopilotEval
+
+    required = {"max_tool_calls", "image_detail", "audit_requests", "client_mode"}
+    if not required <= CopilotEval.__dataclass_fields__.keys():
+        raise pytest.UsageError("The pinned framework lacks required benchmark controls.")
+    try:
+        validate_desktop(os.environ)
+        require_capture_api(ToolCall, CopilotResult)
+    except (ValueError, RuntimeError) as error:
+        raise pytest.UsageError(str(error)) from error
+    server = Path(config.getoption("--comparison-server"))
+    if server.suffix.lower() != ".exe" or not server.is_file():
+        raise pytest.UsageError("--comparison-server must name an existing built MCP executable.")
+    if getattr(config.option, "numprocesses", None):
+        raise pytest.UsageError("Comparison cases must run serially on the reserved desktop.")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if item.get_closest_marker("comparison_live") and report.failed:
+        recorded = {name for name, _ in report.user_properties}
+        if report.when != "call" or not {"verification", "cleanup"} <= recorded:
+            item.session.shouldstop = (
+                "Comparison setup or cleanup is incomplete; no more model calls."
+            )

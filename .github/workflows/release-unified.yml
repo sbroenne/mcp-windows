@@ -434,9 +434,15 @@ jobs:
 
         ### Installation Options
 
-        **VS Code Extension (Recommended)**
+        **Windows controls, not just screenshots**
+
+        Use the standalone MCP server with GitHub Copilot, Claude, Cursor, or another
+        compatible host, or install the VS Code extension for Copilot.
+
+        **VS Code Extension**
         - Search 'Windows MCP' in VS Code Extensions, or
         - Download windows-mcp-$version.vsix below and install manually
+        - Install the .NET 10 Desktop Runtime
 
         **Standalone Binaries** (no .NET required)
         - windows-mcp-server-$version-win-x64.zip - x64 (most PCs)
@@ -444,12 +450,17 @@ jobs:
 
         ### What's Included
 
-        - ui_find, ui_click, ui_type: Semantic UI automation by name
-        - screenshot_control: Annotated screenshots with element data
-        - mouse_control, keyboard_control: Fallback for games/custom UIs
-        - window_management: Find, activate, move, resize windows
+        - Discover controls, then click, type, and select using their observed IDs
+        - Send changes instead of repeated full views, read text and tables, and combine steps
+        - Arrange windows, work with supported file dialogs, and use screenshots when needed
+        - Click results tell you whether input was sent; the agent must still check the result
 
-        See README for full documentation.
+        The current archives contain the MCP server, not wincli. Build the CLI from
+        source using its guide. Agent skills are available in the repository;
+        there is not yet a one-step plugin installer.
+
+        See https://windowsmcpserver.dev/installation/ for setup and
+        https://windowsmcpserver.dev/benchmark/ for measured results and limitations.
 
         ### Verifying Downloads
 

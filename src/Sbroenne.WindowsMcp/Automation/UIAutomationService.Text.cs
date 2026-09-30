@@ -79,6 +79,19 @@ public sealed partial class UIAutomationService
                     }
                 }
 
+                using var observation = DiscoveryObservation.Create(Uia.Automation, targetElement);
+                if (mode == TextExtractionMode.Raw && !includeChildren &&
+                    targetElement.GetControlTypeId() is UIA3ControlTypeIds.Edit or UIA3ControlTypeIds.Spinner)
+                {
+                    var fieldValue = ReadEditableValue(targetElement);
+                    return fieldValue is not null
+                        ? UIAutomationResult.CreateSuccessWithText("get_text", fieldValue, CreateDiagnostics(stopwatch))
+                        : UIAutomationResult.CreateFailure("get_text", UIAutomationErrorType.PatternNotSupported,
+                            "The field does not expose a trustworthy single value. Read segmented fields through their child controls; the parent value may be out of date. A label is not a value.",
+                            CreateDiagnostics(stopwatch),
+                            "Inspect this field's child controls with ui_snapshot parentElementId, or use a screenshot to check the value.");
+                }
+
                 var text = mode == TextExtractionMode.Article
                     ? ExtractArticleText(targetElement)
                     : ExtractText(targetElement, includeChildren);
@@ -106,17 +119,42 @@ public sealed partial class UIAutomationService
         }
     }
 
+    private static bool CanReadDirectFieldValue(UIA.IUIAutomationElement element)
+    {
+        if (element.CurrentControlType != UIA3ControlTypeIds.Edit ||
+            !string.Equals(element.CurrentFrameworkId, "Chrome", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        // Chromium can retain an old parent value after date segments and the submitted value change.
+        // Do not reconstruct a date from localized names or trust that parent's ValuePattern.
+        var walker = UIA3Automation.Instance.Automation.RawViewWalker;
+        var segmented = false;
+        var outcome = BoundedSearchTraversal.Walk(
+            element,
+            walker.GetFirstChildElement,
+            walker.GetNextSiblingElement,
+            child => child.CurrentIsControlElement != 0,
+            (child, _) => segmented = child.CurrentControlType == UIA3ControlTypeIds.Spinner,
+            maxNodes: 16,
+            maxDepth: 1,
+            CancellationToken.None);
+        return !segmented && !outcome.LimitReached;
+    }
+
     private static string ExtractText(UIA.IUIAutomationElement element, bool includeChildren)
     {
         // Try TextPattern first
-        var text = element.GetText();
-        if (!string.IsNullOrEmpty(text) && !includeChildren)
+        var canReadDirectValue = CanReadDirectFieldValue(element);
+        var text = canReadDirectValue ? element.GetText() : null;
+        if (text is not null && !includeChildren)
         {
             return text;
         }
 
         // Try ValuePattern
-        var value = element.TryGetValue();
+        var value = canReadDirectValue ? element.TryGetValue() : null;
         if (!string.IsNullOrEmpty(value) && !includeChildren)
         {
             return value;
@@ -194,7 +232,7 @@ public sealed partial class UIAutomationService
     {
         try
         {
-            var value = element.TryGetValue();
+            var value = CanReadDirectFieldValue(element) ? element.TryGetValue() : null;
             if (!string.IsNullOrEmpty(value))
             {
                 return value;

@@ -34,6 +34,14 @@ public sealed class ElectronSnapshotBenchmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task Benchmark_ScreenshotVersusControls_Electron()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+        _output.WriteLine(await ScreenshotComparisonBenchmark.RunAsync(
+            "Electron navigation", CreateScenarioAsync, timeout.Token));
+    }
+
+    [Fact]
     public async Task Benchmark_RealElectronStructuralWorkflow()
     {
         var result = await SnapshotBenchmarkRunner.RunAsync(

@@ -1,30 +1,59 @@
 # wincli — Windows automation CLI
 
-`wincli` is the **command-line entry point** for the Windows MCP server. It exposes the same
-Windows UI-automation capabilities (UI Automation, mouse, keyboard, window management, screenshots)
-as a single, compact command surface.
+`wincli` brings **reliable, token-efficient Windows automation** to agents with shell
+access. It exposes the same desktop capabilities as the MCP server without requiring
+a particular agent, model, or MCP host.
 
-It is the **token-efficient path for coding agents**: instead of loading ~14 MCP tool schemas into
-context, an agent with shell access discovers everything through `wincli --help`, `wincli tools`,
-and `wincli guidance`, then issues one command per action.
+Use it to find windows, fill in forms, read text and tables, or save files.
+Commands return JSON that an agent or script can read.
 
-## Two equal entry points, one implementation
+## Build from source
 
-The CLI and the MCP server share tool implementations. Accepted `wincli` commands call the same
-`ExecuteAsync` methods the MCP server registers, so:
+Install the .NET SDK version listed in `global.json`. Open PowerShell in a
+checkout of this repository and run:
 
-- CLI invocations share one persistent **CLI-only daemon**, including its element registry,
-- MCP owns an independent in-process runtime; its IDs are not CLI IDs,
-- the JSON written to stdout is byte-for-byte the same payload the MCP tool returns,
-- there is a single source of truth — no duplicated business logic to drift.
+```powershell
+dotnet publish .\src\Sbroenne.WindowsMcp.Cli\Sbroenne.WindowsMcp.Cli.csproj -c Release -r win-x64 --self-contained true -o .\artifacts\wincli
+.\artifacts\wincli\wincli.exe --help
+```
 
-The in-process integration test `Cli_UiFind_MatchesMcpServerOutputExactly` verifies equal payloads
-in the same process. The CLI lifecycle/process tests exercise the persistent transport separately.
+Use `win-arm64` on Windows ARM64. Keep the entire publish directory together;
+use the executable's full path or add that directory to your command search path.
+Stop an existing service from this installation before rebuilding it.
 
-The tool surface itself also has a single source of truth: `wincli tools --json` reports the exact
-same tool names, descriptions, and JSON input schemas the MCP server advertises via `tools/list`
-(both read from the shared `ToolCatalog`). A contract test (`CliToolCoverageTests`) fails the build
-if any MCP tool lacks a matching `wincli` command, so the two entry points can never drift.
+## First steps
+
+The examples below use `wincli` after adding its folder to your command search
+path. You can use `.\artifacts\wincli\wincli.exe` instead.
+
+Open Notepad and find its window:
+
+```powershell
+wincli window find --title Notepad
+```
+
+Copy the returned window handle and use it in place of `12345`:
+
+```powershell
+wincli ui snapshot --window 12345 --mode auto
+```
+
+The result lists the controls in that window and their IDs. Use a returned ID
+when you want to click a button or type into a field. Do not invent IDs or reuse
+them after restarting the CLI service.
+
+For an agent with shell access, start with `wincli guidance`. For the full
+command list, run `wincli tools`.
+
+## Smaller responses
+
+Automatic snapshots can return just the changes since the last view. Pass the
+returned `snapshotToken` as `--since` on the next request. If the token no longer
+matches the stored view, the command returns a complete view instead.
+
+The CLI offers the same Windows tools as the MCP server. A small background
+service remembers controls between commands. CLI IDs and snapshot tokens work
+only with that service, not with a separate MCP connection.
 
 ## Usage
 
@@ -82,14 +111,17 @@ Observed nonzero exits fail even when another instance is open.
 wincli window find --title Notepad
 
 # 2. Inspect the accessible element tree
-wincli ui snapshot --window 12345 --mode full
+wincli ui snapshot --window 12345 --mode auto
 
 # 3. Act on controls semantically; --with-snapshot returns the updated tree in the same call
 wincli ui type  --window 12345 --element-id "<input ID from snapshot>" --text "me" --clear-first
 wincli ui click --window 12345 --element-id "<button ID from snapshot>" --with-snapshot
 
+# 4. Request only changes since the previous automatic snapshot
+wincli ui snapshot --window 12345 --mode auto --since "<previous-snapshotToken>"
+
 # Run an ordered sequence in one invocation
-wincli ui batch --window 12345 --steps '[{"action":"find","automationId":"UsernameInput"},{"action":"type","elementId":"$prev","text":"me"},{"action":"find","name":"Submit"},{"action":"click","elementId":"$prev"}]'
+wincli ui batch --window 12345 --steps '[{"action":"find","automationId":"UsernameInput","requireUnique":true},{"action":"type","elementId":"$prev","text":"me"},{"action":"find","name":"Submit","requireUnique":true},{"action":"click","elementId":"$prev"}]'
 
 # Draw a whole figure in one invocation (polyline = one continuous stroke, no pen lift)
 wincli ui batch --window 12345 --steps '[{"action":"polyline","points":[[300,200],[500,200],[500,400],[300,200]]}]'
@@ -111,6 +143,11 @@ To reuse a saved workflow, extract its `steps` array into a project JSON file an
   other command groups reject them.
 - **exit code** — `0` success, `1` tool error (see the JSON `error` field), `2` usage error.
 - **stderr** — usage errors and actionable guidance; invalid CLI arguments do not invoke the tool.
+
+A successful click reports dispatch, not a verified save, submission, or navigation.
+Use reads, snapshots, or bounded waits to check the intended result, without
+automatically replaying the action. See the
+[click-result contract](../../FEATURES.md#dispatch-is-not-outcome-verification).
 
 ## Application arguments
 
@@ -212,3 +249,5 @@ are not written to lifecycle logs. State remains in memory only.
 For a different destination, use `file-save --window <h> --path <file> --trigger-mode save_as`.
 The default `shortcut` sends Ctrl+S; a path alone does not retarget an already named document.
 Use `--trigger-mode wait` to fill an already open owned Save As dialog without another shortcut.
+Overwrite and error prompts remain open for the agent to inspect and answer explicitly.
+The file helpers do not repeat path entry or submit again after an unverified attempt.

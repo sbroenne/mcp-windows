@@ -34,6 +34,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
         { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "value" },
         { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "value" },
         { "Save a copy without changing the original", "save_as" },
+        { "Project: Aurora", "replace_selection" },
     };
 
     [SkippableTheory]
@@ -60,7 +61,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             }
         }, TimeSpan.FromSeconds(10)), "Existing Notepad processes must exit before this test.");
         var path = Path.Combine(Path.GetTempPath(), $"notepad-typing-{Guid.NewGuid():N}.txt");
-        await File.WriteAllTextAsync(path, "");
+        await File.WriteAllTextAsync(path, inputMode == "replace_selection" ? "Old content\r\n" : "");
         Process? owned = null;
         DateTime? created = null;
         using var sta = new UIAutomationThread();
@@ -99,14 +100,17 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                 "Could not activate the owned Notepad document.");
             UIAutomationResult? found = null;
             Assert.True(await TestWait.RetryUntilAsync(
-                async () => found = await automation.FindElementsAsync(new ElementQuery
+                async () =>
                 {
-                    WindowHandle = window,
-                    ControlType = "Document",
-                }),
-                () => found is { Success: true, Items.Length: 1 },
+                    _ = await new WindowActivator().ActivateWindowAsync(handle);
+                    found = await automation.GetFocusedElementAsync();
+                },
+                () => found is { Success: true, Items.Length: 1 }
+                    && found.Items[0].Type == "Document"
+                    && ElementIdGenerator.TryResolveWindowHandle(found.Items[0].Id, out var focusedWindow)
+                    && focusedWindow == handle,
                 timeout: TimeSpan.FromSeconds(10)),
-                $"Expected one Notepad editor: {System.Text.Json.JsonSerializer.Serialize(found)}");
+                $"Expected the owned Notepad editor to have focus: {System.Text.Json.JsonSerializer.Serialize(found)}");
             var editor = Assert.Single(found!.Items!);
             var editorClass = await sta.ExecuteAsync(
                 () => ElementIdGenerator.ResolveToAutomationElement(editor.Id)?.CurrentClassName);
@@ -139,18 +143,32 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                     var failedRead = await automation.GetTextAsync(editor.Id, window, false);
                     output.WriteLine($"Failed typing readback: {System.Text.Json.JsonSerializer.Serialize(failedRead)}");
                 }
-                Assert.False(typed.IsError, System.Text.Json.JsonSerializer.Serialize(typed));
+                if (inputMode == "replace_selection")
+                {
+                    Assert.True(typed.IsError, "Notepad's retained newline must stop further typing.");
+                }
+                else
+                {
+                    Assert.False(typed.IsError, System.Text.Json.JsonSerializer.Serialize(typed));
+                }
             }
+            var expectedText = inputMode == "replace_selection" ? "P\n" : text.ReplaceLineEndings("\n");
             UIAutomationResult? read = null;
             await TestWait.RetryUntilAsync(
                 async () => read = await automation.GetTextAsync(editor.Id, window, false),
                 () => read is { Success: true }
-                    && read.Text?.ReplaceLineEndings("\n") == text.ReplaceLineEndings("\n"),
+                    && read.Text?.ReplaceLineEndings("\n") == expectedText,
                 timeout: TimeSpan.FromSeconds(3));
             output.WriteLine($"Readback: {System.Text.Json.JsonSerializer.Serialize(read)}");
             Assert.NotNull(read);
             Assert.True(read.Success, read.ErrorMessage);
-            Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+            Assert.Equal(expectedText, read.Text?.ReplaceLineEndings("\n"));
+            if (inputMode == "replace_selection")
+            {
+                var saved = await automation.SaveAsync(window, path);
+                Assert.True(saved.Success, saved.ErrorMessage);
+                Assert.Equal(expectedText, (await File.ReadAllTextAsync(path)).ReplaceLineEndings("\n"));
+            }
             if (inputMode == "save_as")
             {
                 var saved = await automation.SaveAsync(window, path + ".copy.txt", "save_as");

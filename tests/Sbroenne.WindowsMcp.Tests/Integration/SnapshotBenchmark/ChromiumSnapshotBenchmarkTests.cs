@@ -11,7 +11,6 @@ namespace Sbroenne.WindowsMcp.Tests.Integration.SnapshotBenchmark;
 [Collection("ChromiumBrowser")]
 [Trait("Category", "RequiresDesktop")]
 [Trait("Category", "RequiresInternet")]
-[Trait("Category", "SnapshotBenchmark")]
 public sealed class ChromiumSnapshotBenchmarkTests
 {
     private readonly ITestOutputHelper _output;
@@ -22,6 +21,88 @@ public sealed class ChromiumSnapshotBenchmarkTests
     }
 
     [SkippableFact]
+    public async Task ChromeStartup_ExposesPageControls()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+        using var session = ChromiumBrowserSession.LaunchPublicSite(
+            ChromiumBrowserKind.Chrome, ChromiumPublicSite.GitHubVisualStudioCode);
+        using var harness = new ChromiumAutomationHarness();
+        await ChromiumPageWaiter.WaitForControlAsync(
+            harness, session.WindowHandleString, "Code", TimeSpan.FromSeconds(10), "Button");
+    }
+
+    [SkippableFact]
+    public async Task ChromeRestart_ExposesPageControls()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+        for (var launch = 1; launch <= 3; launch++)
+        {
+            _output.WriteLine($"Chrome launch {launch}");
+            using var session = ChromiumBrowserSession.LaunchPublicSite(
+                ChromiumBrowserKind.Chrome, ChromiumPublicSite.GitHubVisualStudioCode);
+            using var harness = new ChromiumAutomationHarness();
+            await ChromiumPageWaiter.WaitForControlAsync(
+                harness, session.WindowHandleString, "Code", TimeSpan.FromSeconds(10), "Button");
+        }
+    }
+
+    [SkippableFact]
+    public async Task ChromeNormalWindow_ExposesLocalPageControlsWithoutNavigation()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+        using var session = ChromiumBrowserSession.LaunchAddressBar(ChromiumBrowserKind.Chrome);
+        using var harness = new ChromiumAutomationHarness();
+        await ChromiumPageWaiter.WaitForControlAsync(
+            harness, session.WindowHandleString, "Docs Search", TimeSpan.FromSeconds(10), "Edit");
+        var snapshot = await harness.AutomationService.GetTreeAsync(
+            session.WindowHandleString, null, 20, null);
+        Assert.True(snapshot.Success, snapshot.ErrorMessage);
+        Assert.Contains(ChromiumAutomationHarness.Flatten(snapshot.Tree),
+            element => element.Name == "Docs Search" && element.Type == "Edit");
+    }
+
+    [SkippableFact]
+    public async Task Type_ChromeAddressBar_ReportsMismatchesWithoutCorrectingThem()
+    {
+        ChromiumBrowserSession.SkipUnlessSupported(ChromiumBrowserKind.Chrome);
+        using var session = ChromiumBrowserSession.LaunchAddressBar(ChromiumBrowserKind.Chrome);
+        using var harness = new ChromiumAutomationHarness();
+        using var keyboard = new KeyboardInputService();
+        var addressId = await harness.ObserveAddressBarAsync(session.WindowHandleString);
+        foreach (var (url, title, mayAutocomplete) in new[]
+        {
+            ("https://github.com/microsoft/vscode/issues", "Issues", false),
+            ("https://github.com/microsoft/vscode/pulls", "Pull requests", false),
+            ("https://github.com/microsoft/vscode/actions", "Workflow runs", false),
+            ("https://github.com/microsoft/vscode", "microsoft/vscode", true)
+        })
+        {
+            var typed = await harness.AutomationService.TypeIntoElementAsync(
+                addressId, url, clearFirst: true, session.WindowHandleString, inputMode: "auto");
+            var diagnostic = await harness.DescribeObservedElementAsync(addressId);
+            _output.WriteLine(diagnostic);
+            var read = await harness.AutomationService.GetTextAsync(
+                addressId, session.WindowHandleString, includeChildren: false);
+            Assert.True(read.Success, read.ErrorMessage);
+            if (!typed.Success)
+            {
+                Assert.True(mayAutocomplete, $"{typed.ErrorMessage} {diagnostic}");
+                Assert.Equal(UIAutomationErrorType.VerificationFailed, typed.ErrorType);
+                Assert.StartsWith(url, read.Text, StringComparison.Ordinal);
+                Assert.NotEqual(url, read.Text);
+                Assert.Contains("no automatic correction", typed.ErrorMessage, StringComparison.Ordinal);
+                continue;
+            }
+            Assert.Equal(url, read.Text);
+            var enter = await keyboard.PressKeyAsync("enter", ModifierKey.None, 1, session.WindowHandle);
+            Assert.True(enter.Success, enter.Error);
+            Assert.True(await WaitForWindowTitleAsync(
+                session.WindowHandle, title, TimeSpan.FromSeconds(30), CancellationToken.None));
+        }
+    }
+
+    [SkippableFact]
+    [Trait("Category", "SnapshotBenchmark")]
     public async Task Benchmark_PublicGitHubRepositoryWorkflow_Chrome()
     {
         const ChromiumBrowserKind browser = ChromiumBrowserKind.Chrome;
@@ -102,7 +183,7 @@ public sealed class ChromiumSnapshotBenchmarkTests
                       string.Equals(value as string, "incremental snapshot", StringComparison.Ordinal));
     }
 
-    private static Task<SnapshotBenchmarkScenario> CreateScenarioAsync(
+    private static async Task<SnapshotBenchmarkScenario> CreateScenarioAsync(
         ChromiumBrowserKind browser,
         SnapshotBenchmarkArm arm,
         int sample)
@@ -113,74 +194,101 @@ public sealed class ChromiumSnapshotBenchmarkTests
         var harness = new ChromiumAutomationHarness();
         var keyboard = new KeyboardInputService();
 
-        IReadOnlyList<Func<CancellationToken, Task>> actions =
-        [
-            token => NavigateAsync(harness, keyboard, session, "https://github.com/microsoft/vscode/issues", "Issues", token),
-            token => NavigateAsync(harness, keyboard, session, "https://github.com/microsoft/vscode/pulls", "Pull requests", token),
-            token => NavigateAsync(harness, keyboard, session, "https://github.com/microsoft/vscode/actions", "Workflow runs", token),
-            token => NavigateAsync(harness, keyboard, session, "https://github.com/microsoft/vscode", "microsoft/vscode", token)
-        ];
+        try
+        {
+            var addressId = await harness.ObserveAddressBarAsync(session.WindowHandleString);
+            IReadOnlyList<Func<CancellationToken, Task>> actions =
+            [
+                token => NavigateAsync(harness, keyboard, session, addressId, "https://github.com/microsoft/vscode/issues", "Issues", token),
+                token => NavigateAsync(harness, keyboard, session, addressId, "https://github.com/microsoft/vscode/pulls", "Pull requests", token),
+                token => NavigateAsync(harness, keyboard, session, addressId, "https://github.com/microsoft/vscode/actions", "Workflow runs", token),
+                token => NavigateAsync(harness, keyboard, session, addressId, "https://github.com/microsoft/vscode", "microsoft/vscode", token)
+            ];
 
-        var environment =
-            $"{GetBrowserVersion(session.WindowHandle, browser)}; Windows {Environment.OSVersion.Version}";
+            var environment =
+                $"{GetBrowserVersion(session.WindowHandle, browser)}; Windows {Environment.OSVersion.Version}";
 
-        return Task.FromResult(new SnapshotBenchmarkScenario(
-            $"GitHub microsoft/vscode in {browser}",
-            session.WindowHandleString,
-            harness.AutomationService,
-            actions,
-            environment,
-            () =>
-            {
-                keyboard.Dispose();
-                harness.Dispose();
-                session.Dispose();
-                return ValueTask.CompletedTask;
-            },
-            MaxDepth: 20));
+            return new SnapshotBenchmarkScenario(
+                $"GitHub microsoft/vscode in {browser}",
+                session.WindowHandleString,
+                harness.AutomationService,
+                actions,
+                environment,
+                () =>
+                {
+                    keyboard.Dispose();
+                    harness.Dispose();
+                    session.Dispose();
+                    return ValueTask.CompletedTask;
+                },
+                MaxDepth: 20);
+        }
+        catch
+        {
+            keyboard.Dispose();
+            harness.Dispose();
+            session.Dispose();
+            throw;
+        }
     }
 
     private static async Task NavigateAsync(
         ChromiumAutomationHarness harness,
         KeyboardInputService keyboard,
         ChromiumBrowserSession session,
+        string addressId,
         string url,
         string expectedTitle,
         CancellationToken cancellationToken)
     {
-        var ready = false;
-        for (var attempt = 1; attempt <= 2 && !ready; attempt++)
+        var typeResult = await harness.AutomationService.TypeIntoElementAsync(
+            addressId,
+            url,
+            clearFirst: true,
+            session.WindowHandleString,
+            inputMode: "auto",
+            cancellationToken);
+        if (!typeResult.Success)
         {
-            var typeResult = await harness.AutomationService.ObserveAndTypeAsync(
-                new ElementQuery
-                {
-                    WindowHandle = session.WindowHandleString,
-                    Name = "Address and search bar",
-                    ControlType = "Edit",
-                    ContentViewOnly = false,
-                    TimeoutMs = 10000
-                },
-                url,
-                clearFirst: true,
-                cancellationToken);
-            Assert.True(
-                typeResult.Success || IsChromeValueReadBackFailure(typeResult.ErrorMessage),
-                $"Typing browser URL failed: {typeResult.ErrorMessage}");
+            var diagnostic = await harness.DescribeObservedElementAsync(addressId);
+            Assert.True(typeResult.ErrorType == UIAutomationErrorType.VerificationFailed,
+                $"Typing browser URL '{url}' failed: {typeResult.ErrorMessage} {diagnostic}");
+            var read = await harness.AutomationService.GetTextAsync(
+                addressId, session.WindowHandleString, includeChildren: false, cancellationToken);
+            Assert.True(read.Success, read.ErrorMessage);
+            Assert.NotNull(read.Text);
+            Assert.StartsWith(url, read.Text, StringComparison.Ordinal);
+            Assert.NotEqual(url, read.Text);
+            Assert.Equal(read.Text[url.Length..], await harness.ReadSelectedTextAsync(addressId));
 
-            var enterResult = await keyboard.PressKeyAsync(
-                "enter",
+            // The benchmark caller explicitly rejects a verified selected suggestion.
+            // General-purpose typing reports the mismatch without correcting it.
+            var delete = await keyboard.PressKeyAsync(
+                "Delete",
                 ModifierKey.None,
                 repeat: 1,
-                cancellationToken);
-            Assert.True(enterResult.Success, $"Navigating browser failed: {enterResult.Error}");
-
-            ready = await WaitForWindowTitleAsync(
                 session.WindowHandle,
-                expectedTitle,
-                TimeSpan.FromSeconds(30),
                 cancellationToken);
+            Assert.True(delete.Success, delete.Error);
+            var corrected = await harness.AutomationService.GetTextAsync(
+                addressId, session.WindowHandleString, includeChildren: false, cancellationToken);
+            Assert.True(corrected.Success, corrected.ErrorMessage);
+            Assert.Equal(url, corrected.Text);
         }
 
+        var enterResult = await keyboard.PressKeyAsync(
+            "enter",
+            ModifierKey.None,
+            repeat: 1,
+            session.WindowHandle,
+            cancellationToken);
+        Assert.True(enterResult.Success, $"Navigating browser failed: {enterResult.Error}");
+
+        var ready = await WaitForWindowTitleAsync(
+            session.WindowHandle,
+            expectedTitle,
+            TimeSpan.FromSeconds(30),
+            cancellationToken);
         Assert.True(
             ready,
             $"GitHub page title did not contain '{expectedTitle}' after navigating to {url}. " +
@@ -193,11 +301,6 @@ public sealed class ChromiumSnapshotBenchmarkTests
             TimeSpan.FromSeconds(30),
             cancellationToken);
     }
-
-    private static bool IsChromeValueReadBackFailure(string? errorMessage) =>
-        errorMessage?.Contains(
-            "ValuePattern accepted the text, but the requested value was not observable",
-            StringComparison.Ordinal) == true;
 
     private static async Task<bool> WaitForWindowTitleAsync(
         nint windowHandle,

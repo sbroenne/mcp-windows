@@ -64,6 +64,24 @@ public sealed class WinFormsEventWaitBenchmarkTests : IDisposable
     }
 
     [Fact]
+    public async Task WorkerShutdown_DisposesItsWaitSubscription()
+    {
+        var root = await _staThread.ExecuteAsync(() =>
+            UIA3Automation.Instance.ElementFromHandle(_fixture.TestWindowHandle));
+        Assert.NotNull(root);
+        await using var signal = await StructureChangeSignal.CreateAsync(_staThread, root, CancellationToken.None);
+        Assert.NotNull(signal);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            signal.WaitForChangeAsync(TimeSpan.Zero, cancellation.Token));
+
+        _staThread.Dispose();
+
+        Assert.False(await signal.WaitForChangeAsync(TimeSpan.Zero, cancellation.Token));
+    }
+
+    [Fact]
     public async Task EventAssistedWait_DoesNotRegressLatency_WhenElementAppearsMidWait()
     {
         var polling = new List<WaitLatencySample>(Samples);

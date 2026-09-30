@@ -501,8 +501,10 @@ public sealed record UIAutomationResult
             "Element not found. Run ui_snapshot or ui_find in the same CLI daemon or MCP connection, then act with a newly returned element ID.",
 
         UIAutomationErrorType.SearchIncomplete =>
-            "Search stopped at its scan limit; the target may still exist. Narrow the search with exact name, " +
-            "automationId, controlType or className, or parentElementId within the same MCP session or CLI daemon. " +
+            "Search was incomplete; the target may still exist. Use ui_find exactDepth=1 to discover immediate " +
+            "children, then search inside an observed container with parentElementId (CLI: --exact-depth 1, " +
+            "--parent-element-id). Name/type/automationId filters choose matches; unmatched nodes still count. " +
+            "Use IDs within the same MCP session or CLI daemon. " +
             "MCP sessions and the CLI daemon are separate owners; their element IDs are not interchangeable. " +
             "A longer timeout does not increase the scan limit.",
 
@@ -514,6 +516,9 @@ public sealed record UIAutomationResult
 
         UIAutomationErrorType.VerificationFailed =>
             "Input may already have changed the document. Read the current text before retrying; do not blindly repeat or append it.",
+
+        UIAutomationErrorType.ConfirmationRequired =>
+            "Inspect the open confirmation dialog and decide whether to proceed or cancel. No answer was selected automatically.",
 
         UIAutomationErrorType.ElementStale =>
             "Element reference expired or belongs to another owner. Rediscover with ui_find or ui_snapshot and use the new ID; do not reuse IDs after a restart.",

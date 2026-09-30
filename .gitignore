@@ -109,4 +109,5 @@ __pycache__/
 *.pyc
 aitest-reports/
 .venv/
+.venv-benchmark/
 uv.lock

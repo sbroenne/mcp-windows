@@ -52,6 +52,8 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch));
                 }
 
+                using var observation = DiscoveryObservation.Create(Uia.Automation, rootElement);
+
                 // Detect framework and get optimal search strategy
                 var strategy = GetFrameworkStrategy(rootElement);
                 var controlTypeSet = ParseControlTypeFilter(controlTypeFilter);
@@ -107,8 +109,8 @@ public sealed partial class UIAutomationService
                         Warnings =
                         [
                             $"Tree truncated at {MaxElementsToScan} elements (scanned {elementsScanned}). " +
-                            "Results are incomplete — scope to a smaller parentElementId/windowHandle, add a controlTypeFilter, " +
-                            "or scroll content into view and retry."
+                            "Results are incomplete — scope to a known parentElementId. If none is known, use ui_find " +
+                            "exactDepth=1 to discover immediate children, then inspect an observed container."
                         ]
                     };
                 }

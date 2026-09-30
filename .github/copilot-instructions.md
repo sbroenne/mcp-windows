@@ -1,5 +1,22 @@
 # Copilot Instructions for mcp-windows
 
+## Language and documentation
+
+- Use simple, jargon-free English in replies, README files, website pages, and
+  other documentation written for users.
+- Write for someone who is new to the project. Explain what it does, how to
+  install it, and how to complete a first useful task before giving technical details.
+- Use everyday words and short, direct sentences. Explain any necessary technical
+  term when it first appears. Keep exact command names and options unchanged.
+- Describe the current product, not its development history or rejected experiments.
+  Keep release history in the changelog, not in getting-started guides.
+- Put detailed settings, test methods, and implementation details in the relevant
+  reference pages rather than the README introduction.
+- Say "MCP or the command line (CLI)" in introductory copy. Explain `wincli` as
+  the program's name only where installation steps or exact commands need it.
+- Keep the website's user guides separate from developer manuals, agent instruction
+  files, and release history. Do not paste those references into beginner pages.
+
 ## Code Review
 
 For pull request reviews and re-reviews, use the
@@ -30,11 +47,13 @@ The project follows these NON-NEGOTIABLE principles:
 - **Test-First Development** - Write tests before implementation
 - **MCP Protocol Compliance** - Follow MCP specification strictly
 - **Augmentation, Not Duplication** - Tools are "dumb actuators", no complex logic in tools
+  - General-purpose typing must report unexpected application changes, not silently edit them away. Keep verification read-only and leave recovery decisions to the calling agent.
+  - After an action may have been dispatched, report an unverified result instead of retrying it through another method. Leave overwrite and error dialogs open for an explicit caller decision; only fall back when a capability was unavailable before dispatch.
 - **Microsoft Libraries First** - Prefer official Microsoft libraries over third-party alternatives
 - **Security Best Practices** - No secrets in code, validate inputs, follow security guidelines
 - **Modern .NET & C#** - Use current .NET and C# language features
 - **xUnit Testing** - All .NET tests use xUnit framework
-- **LLM Integration Testing** - Use pytest-skill-engineering with GitHub Copilot SDK
+- **LLM Tests and Benchmarks** - Use `sbroenne/pytest-skill-engineering` for all model-driven tests, evaluations, and benchmarks. Do not build separate Copilot SDK test runners.
 - **Token Optimization** - Optimize MCP responses for LLM token efficiency
 - **UI Automation First** - Semantic UI automation is the primary approach
 
@@ -67,12 +86,28 @@ These are the reference implementations for Windows UI automation patterns:
 
 ## Testing
 
-**See [testing.instructions.md](.github/testing.instructions.md) for complete testing guidance.**
+**See [testing.instructions.md](testing.instructions.md) for complete testing guidance.**
 
 Quick reference:
 - **Unit tests**: `dotnet test --filter "FullyQualifiedName~Unit"`
 - **Integration tests**: `dotnet test --filter "FullyQualifiedName~Integration"` (ALL MUST PASS)
 - **LLM tests**: `cd tests/Sbroenne.WindowsMcp.LLM.Tests && uv run pytest -v` (expensive - only when requested)
+
+### Use the shared AI testing framework
+
+- Run model-driven tests and benchmarks through **pytest-skill-engineering**, including
+  controls-versus-screenshots comparisons, model comparisons, and token/time measurements.
+  Start from the existing setup in `tests/usage_evals`.
+- Keep Windows-specific setup, owned-app cleanup, task data, and independent saved-result
+  checks here. Let the shared framework manage model sessions, execution records, usage,
+  and reports. Do not add standalone SDK runners or a second reporting system.
+- If a reusable feature is missing, add it to `sbroenne/pytest-skill-engineering` and
+  pin the version containing that change before running the benchmark. Do not bypass
+  the framework with a local replacement.
+- Charts and comparison tables may read the framework's saved reports without calling
+  a model again. Keep historical runs separate when code or scoring rules change.
+- Model calls, optional AI-generated report analysis, and desktop input require explicit
+  approval of the scope and budget. Collection and ordinary checks must not start them.
 
 ## LLM Test Authoring (CRITICAL)
 

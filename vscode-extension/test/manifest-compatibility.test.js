@@ -25,3 +25,11 @@ test('@types/vscode does not exceed the minimum supported VS Code version', () =
         `@types/vscode ${manifest.devDependencies['@types/vscode']} exceeds engines.vscode ${manifest.engines.vscode}`
     );
 });
+
+test('the extension bundles its runtime rather than acquiring an incompatible runtime', () => {
+    assert.match(manifest.scripts['build:mcp-server'], /--self-contained true\b/);
+    assert.doesNotMatch(manifest.scripts['build:mcp-server'], /--no-self-contained\b/);
+    assert.ok(!manifest.extensionDependencies?.includes('ms-dotnettools.vscode-dotnet-runtime'));
+    const source = readFileSync(join(__dirname, '..', 'src', 'extension.ts'), 'utf8');
+    assert.doesNotMatch(source, /dotnet\.acquire/);
+});

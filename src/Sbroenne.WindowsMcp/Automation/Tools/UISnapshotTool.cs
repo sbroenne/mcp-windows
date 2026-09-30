@@ -21,6 +21,9 @@ public static partial class UISnapshotTool
     /// selectors first. Returns a hierarchy of elements (id, name, type, click coordinates, enabled)
     /// so you can see what's on screen, then act with ui_click/ui_type/ui_select using an element's
     /// returned id.
+    /// For large windows, inspect a known parentElementId instead of repeating whole-window snapshots.
+    /// If no parent is known, ui_find exactDepth=1 discovers immediate children without visiting deeper controls.
+    /// Use ui_read with an observed elementId when only that element's text is needed.
     /// Keywords: snapshot, element tree, structure, overview, inspect window, list elements,
     /// what's on screen, accessibility tree, orient, discover UI, dump window.
     /// </summary>
@@ -38,11 +41,13 @@ public static partial class UISnapshotTool
     /// retained; missing or mismatched tokens return a complete simplified view, not an unsafe diff.
     /// To drill into a large window, pass parentElementId (from a prior snapshot/find) to scope the scan,
     /// or controlTypeFilter to retain matching controls and the ancestors needed to reach them.
+    /// maxDepth and controlTypeFilter reduce the reply, not necessarily the work done by the app's
+    /// accessibility provider. Prefer parentElementId to reduce the area read.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). If omitted, the foreground window is used.</param>
     /// <param name="parentElementId">Revisit a known subtree using an element id from an earlier snapshot or find. Use only after discovering that id; omit it to inspect the whole window.</param>
-    /// <param name="maxDepth">Maximum tree depth to traverse. Default (5) uses a framework-aware recommendation; explicit values are capped at 20.</param>
-    /// <param name="controlTypeFilter">Comma-separated control types to keep (e.g. 'Button,Edit,MenuItem'). Others are pruned. Omit to keep all.</param>
+    /// <param name="maxDepth">Maximum returned tree depth. Default (5) uses a framework-aware recommendation; explicit values are capped at 20. Limits the reply, not necessarily provider work.</param>
+    /// <param name="controlTypeFilter">Comma-separated control types to keep in the reply (e.g. 'Button,Edit,MenuItem'), with their ancestors. Does not narrow the area read. Omit to keep all.</param>
     /// <param name="mode">REQUIRED for before/after or other repeated checks: explicitly use auto on BOTH the first and later snapshots of the same window or subtree. Never omit mode or use full for repeated checks. Use reset first only when replacing an older comparison, then auto. Use full only for a one-time complete inspection (default); full is not remembered.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, elements scanned, detected framework) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>

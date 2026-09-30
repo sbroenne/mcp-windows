@@ -30,6 +30,15 @@ queue policy needs a separate coordinated rollout, not an assumption that work i
 
 ### Fresh CLI/MCP Usage Evaluations
 
+All model-driven tests and benchmarks must use `sbroenne/pytest-skill-engineering`,
+including controls-versus-screenshots comparisons and token/time measurements.
+Do not create separate Copilot SDK runners, model-session loops, or report systems.
+Keep app setup, owned-process cleanup, task fixtures, and independent result checks
+in this repository; use the framework for execution, evidence, usage, and reports.
+Add missing reusable features to the framework and pin the version containing them
+before live execution. Static charts and tables may read saved framework reports
+without repeating model calls.
+
 `tests/usage_evals/` is a separate pytest-skill-engineering consumer for learning whether and how
 Windows MCP should improve, and for finding reusable framework gaps. Do not copy or migrate the
 older LLM scenarios into it. See its README for current framework prerequisites and live-run gates.
@@ -124,6 +133,17 @@ Children must still exit if the parent exits first or closing the window throws.
 are reported, not swallowed. Regression checks record process IDs and creation times before
 shutdown, and verify that an unrelated process is left alone.
 
+### Chromium date values
+
+`ChromiumDateReadTests` checks empty and populated dates through their individual
+month/day/year controls. Chromium can expose an empty or older parent value even
+when the page submits the edited date. Direct parent reads must report
+`pattern_not_supported`, and snapshots must omit that unverified parent value.
+The entry check reads every typed part and checks the page's own date output.
+Ordinary text fields must still return their empty or entered value.
+The guard inspects at most 16 raw descendants and one control-view level; it
+does not guess date order from translated labels or send corrective input.
+
 ### Real Notepad typing
 
 `NotepadTypingTests` checks exact text in an owned, uniquely named Notepad document, including
@@ -166,12 +186,44 @@ It must not trim extra lines, spaces, or altered characters. A failed post-input
 
 Save tests cover `shortcut`, `save_as`, and `wait`. The default still sends Ctrl+S; a supplied
 path fills a dialog but does not retarget an already named document. Explicit `save_as` sends
-Ctrl+Shift+S without first saving over the source. `wait` handles an already open owned dialog.
+F12 in Word/PowerPoint and Ctrl+Shift+S elsewhere without first saving over the source.
+`wait` handles an already open owned dialog.
 The real Notepad copy test checks both destination content and the unchanged original.
 If filename input loses its observation because the dialog replaces the field, Save must still
 read the current field in the same owned dialog and require the entire requested path before
 confirming. A partial path or a changed directory must never be accepted; recovered observation
 failures are logged.
+
+`ExplicitRecoveryContractTests` guards the single-dispatch boundary without desktop access.
+The owned-dialog cases in `SaveTests` check that overwrite/error prompts remain open, receive
+no answer, and leave the original file unchanged. `OpenFileTests` checks that a changed filename
+is not rewritten and an unverified submission is not repeated. Run these live cases only on
+an exclusive desktop. Radio-button verification must not dispatch another activation after
+the first selection was sent; an unavailable pattern and a failed provider call are different cases.
+
+### PowerPoint discovery
+
+`scripts\tests\test_powerpoint_discovery.py` runs without a model. It requires an
+exclusive desktop, installed PowerPoint, and no existing PowerPoint process.
+Each case opens a fresh generated presentation. It checks the first snapshot,
+first search, and first whole-window text read. The CLI case finds a title and
+reads its observed ID from a separate command-line process. The edit case checks
+the saved presentation independently and verifies that the original is unchanged.
+
+Build both entry points, then run with the LLM test environment's Python:
+
+```powershell
+$env:MCP_TEST_DESKTOP_INPUT = "1"
+$env:MCP_TEST_POWERPOINT_SERVER = (Resolve-Path "src\Sbroenne.WindowsMcp\bin\Release\net10.0-windows10.0.22621.0\Sbroenne.WindowsMcp.exe").Path
+$env:MCP_TEST_POWERPOINT_CLI = (Resolve-Path "src\Sbroenne.WindowsMcp.Cli\bin\Release\net10.0-windows10.0.22621.0\wincli.exe").Path
+tests\Sbroenne.WindowsMcp.LLM.Tests\.venv\Scripts\python.exe -m unittest discover -s scripts\tests -p test_powerpoint_discovery.py -v
+```
+
+The UI Automation worker uses MTA, the Windows threading mode recommended for
+automation clients and event subscriptions. Add and remove each subscription on
+its owning worker; serialize these calls across workers. Remaining wait
+subscriptions must be removed before the worker exits, since MTA can outlive an
+individual worker thread.
 
 ### Verification Pattern
 

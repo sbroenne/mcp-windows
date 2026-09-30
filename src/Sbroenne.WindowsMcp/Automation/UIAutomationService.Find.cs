@@ -221,6 +221,7 @@ public sealed partial class UIAutomationService
                         CreateDiagnostics(stopwatch, query));
                 }
 
+                using var observation = DiscoveryObservation.Create(Uia.Automation, rootElement);
                 var condition = BuildCondition(query);
 
                 // Parse inRegion if specified

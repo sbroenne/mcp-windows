@@ -54,11 +54,17 @@ credentials in this project.
 
 ## Framework prerequisite
 
-The project pins published framework commit
-`5a533dcd149c3e27f60b0a296a047ba1d3f255ff`, including complete tool evidence,
-configuration-aware reports, recoverable paid summaries, and SDK 1.0.13 support.
-It is published in merged `sbroenne/pytest-skill-engineering#95`, which included
-SDK upgrade `sbroenne/pytest-skill-engineering#94`. The exact commit remains pinned.
+The project uses the public `pytest-skill-engineering==0.6.23` release, including
+complete tool evidence, configuration-aware reports, recoverable paid summaries,
+and benchmark controls. The release contains the work merged in
+`sbroenne/pytest-skill-engineering#103`. Benchmark controls include tool-call limits,
+fixed image detail, actual request records, and an isolated runtime.
+Request checks inspect supported HTTP requests and WebSocket `response.create`
+messages before forwarding them. They do not force a different connection type.
+Unsupported messages or missing required settings stop the run rather than
+silently dropping checks. Each WebSocket message has its own audit record;
+records on the same connection can share a `request_id`. Image counts describe
+images sent in that message, not earlier images referenced by response ID.
 Older versions without `ToolCall.completion_received` and `CopilotResult.evidence_complete`
 are rejected before model execution rather than silently accepting missing evidence.
 
@@ -241,3 +247,66 @@ environment failures, and weak scenarios. Do not treat the model's interpretatio
 Implement only evidence-backed product changes, add conventional regression tests where practical,
 and request approval before follow-up model runs. Report "no justified change" or "inconclusive"
 when that is what the evidence supports. Do not retire the old suite merely because this one exists.
+
+## Controls versus screenshots
+
+`tests/comparison` runs the four-app benchmark through the same shared framework.
+It is separate from the Notepad CLI/MCP usage scenarios above. App setup and
+saved-file checks stay in Windows MCP; model sessions, tool limits, image detail,
+request checks, usage, and reports belong to pytest-skill-engineering.
+The required framework features are checked before any application or model starts.
+
+Without `--run-comparison`, all 16 cases are skipped. Collection is also safe:
+
+```powershell
+uv run pytest tests\comparison --collect-only -q
+```
+
+After approving all **16 model sessions**, reserve an exclusive Windows desktop
+and confirm there is no Notepad work to preserve. Close existing Notepad, Word,
+and PowerPoint instances yourself; the suite will not take them over. Chrome
+uses a separate test profile. Build the server from the repository root, then
+run from this directory:
+
+```powershell
+$server = (Resolve-Path ..\..\src\Sbroenne.WindowsMcp\bin\Release\net10.0-windows10.0.22621.0\Sbroenne.WindowsMcp.exe).Path
+$output = 'C:\benchmark-results\real-apps-framework-new-run'
+$env:MCP_TEST_DESKTOP_INPUT = '1'
+$env:MCP_USAGE_RESERVED_DESKTOP = '1'
+uv run pytest tests\comparison -v -o addopts= `
+  --run-comparison `
+  --comparison-model gpt-6.1-sol --comparison-model gpt-6-luna `
+  --comparison-max-runs 16 --comparison-timeout 600 --comparison-max-calls 80 `
+  --comparison-server "$server" --comparison-output "$output" `
+  --aitest-json="$output\framework.json" --junitxml="$output\junit.xml"
+```
+
+The output directory must not exist yet. Use `MCP_USAGE_DISPOSABLE_DESKTOP=1`
+instead of `MCP_USAGE_RESERVED_DESKTOP=1` on an approved disposable account.
+The same desktop gates described above apply. Cases run serially and alternate
+route order. Every case has a fresh model session; one MCP connection stays
+open for the comparison. Reasoning is medium and images use high detail.
+The shared MCP connection opens and closes in the same background task, so
+pytest can finish cleanup safely even when it uses a separate teardown task.
+There are no automatic retries. A setup, transport, evidence, or cleanup failure
+stops subsequent model calls. Ordinary incorrect outputs and exhausted task
+budgets stay as failed cases rather than stopping the matrix.
+
+Use `eval_result.duration_ms` for framework session time. It includes runtime
+startup, session creation, execution, and cleanup, but not Windows app setup or
+saved-file checks. The 600-second limit covers framework startup and execution;
+safety cleanup can take additional time. This differs from the historical
+prompt-send-only timing. Compare the two routes within the same new run.
+
+Use `--comparison-app` and `--comparison-route` to narrow an explicitly approved
+setup check. Keep its output separate from the full comparison. Do not resume
+the retired standalone SDK scripts or combine their results with these records.
+The Notepad check preserves the final line break.
+
+Keep both framework JSON and JUnit reports. Per-case properties contain
+`comparison`, `runtime`, `application`, `verification`, and `cleanup`; Notepad adds
+`notepad_setup` and Chrome adds `submitted_values`. Request and token records
+come from the framework, not a second local collector. Tool images and Windows
+adapter diagnostics remain private artifacts. Do not publish raw reports:
+they can contain local paths, screenshots, and unrelated text visible in dialogs.
+Do not add paid summary or report-analysis options without separate approval.

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="364" viewBox="0 0 480 364" role="img" aria-labelledby="title description">
+<title id="title">Token savings from sending only changes</title>
+<desc id="description">Longer bars mean greater savings. Compared with repeating the whole window as text. First read not counted. Excel worksheet editing: 84.0%; Word document editing: 86.1%; Desktop test app navigation: 96.6%</desc>
+<rect width="480" height="364" rx="8" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" fill="#24292f">
+<text x="20" y="30" font-size="18" text-anchor="start" font-weight="bold">Token savings from sending only</text>
+<text x="20" y="54" font-size="18" text-anchor="start" font-weight="bold">changes</text>
+<text x="20" y="82" font-size="18" text-anchor="start" font-weight="normal">Excel worksheet editing</text>
+<text x="460" y="82" font-size="18" text-anchor="end" font-weight="bold">84.0%</text>
+<rect x="20" y="94" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="94" width="369.60" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="144" font-size="18" text-anchor="start" font-weight="normal">Word document editing</text>
+<text x="460" y="144" font-size="18" text-anchor="end" font-weight="bold">86.1%</text>
+<rect x="20" y="156" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="156" width="378.84" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="206" font-size="18" text-anchor="start" font-weight="normal">Desktop test app navigation</text>
+<text x="460" y="206" font-size="18" text-anchor="end" font-weight="bold">96.6%</text>
+<rect x="20" y="218" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="218" width="425.04" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="268" font-size="14" text-anchor="start" font-weight="normal">0%</text>
+<text x="460" y="268" font-size="14" text-anchor="end" font-weight="normal">100% fewer tokens</text>
+<text x="20" y="298" font-size="16" text-anchor="start" font-weight="normal">Longer bars mean greater savings. Compared with</text>
+<text x="20" y="318" font-size="16" text-anchor="start" font-weight="normal">repeating the whole window as text. First read not</text>
+<text x="20" y="338" font-size="16" text-anchor="start" font-weight="normal">counted.</text>
+</g>
+</svg>

@@ -57,6 +57,48 @@ public sealed class WinUITypeTests : IDisposable
         _automationService.Dispose();
     }
 
+    [Theory]
+    [InlineData("VISIBLE FRAME FRESHNESS MARKER 123456789")]
+    [InlineData("Project Cedar\r\nReview date: 21 October 2026\r\nReady for review")]
+    [InlineData("Accents: \u00e9\u00f6\u00fc; CJK: \u4e2d\u6587; emoji: \ud83d\ude80")]
+    public async Task KeyboardType_PreservesEveryCharacterInModernEditor(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        var navigate = await _automationService.ObserveAndClickAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "NavEditor",
+        });
+        Assert.True(navigate.Success, navigate.ErrorMessage);
+        var found = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            AutomationId = "EditorTextBox",
+            RequireUnique = true,
+            TimeoutMs = 5000,
+        });
+        Assert.True(found.Success, found.ErrorMessage);
+        var editor = Assert.Single(found.Items!);
+        var prepared = await _automationService.TypeIntoElementAsync(
+            editor.Id, "seed", clearFirst: true, _windowHandle, inputMode: "value");
+        Assert.True(prepared.Success, prepared.ErrorMessage);
+
+        using var keyboard = new KeyboardInputService();
+        var selected = await keyboard.PressKeyAsync(
+            "a", ModifierKey.Ctrl, 1, _fixture.TestWindowHandle);
+        Assert.True(selected.Success, selected.Error);
+        var typed = await keyboard.TypeTextAsync(text, _fixture.TestWindowHandle);
+        Assert.True(typed.Success, typed.Error);
+        var read = await _automationService.GetTextAsync(editor.Id, _windowHandle, includeChildren: false);
+        for (var attempt = 0; attempt < 40 && read.Text?.ReplaceLineEndings("\n") != text.ReplaceLineEndings("\n"); attempt++)
+        {
+            await Task.Delay(50);
+            read = await _automationService.GetTextAsync(editor.Id, _windowHandle, includeChildren: false);
+        }
+        Assert.True(read.Success, read.ErrorMessage);
+        Assert.Equal(text.ReplaceLineEndings("\n"), read.Text?.ReplaceLineEndings("\n"));
+    }
+
     [Fact]
     public async Task FindAndType_InUsernameTextBox_Succeeds()
     {

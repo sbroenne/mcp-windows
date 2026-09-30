@@ -1,6 +1,6 @@
 ---
 name: "windows-automation"
-description: "Guidance for semantic-first Windows automation with the bundled windows-mcp server. Use when automating desktop apps, choosing UI Automation vs screenshots, or handling DPI and multi-monitor issues."
+description: "Guidance for reliable, token-efficient Windows automation through MCP. Use when automating desktop apps, choosing UI Automation vs screenshots, or handling DPI and multi-monitor issues."
 domain: "windows-automation"
 confidence: "high"
 source: "plugin"
@@ -8,14 +8,18 @@ source: "plugin"
 
 ## Context
 
-This plugin bundles the Windows MCP Server for Windows-only desktop automation. The server is strongest when you let Windows expose semantic UI information instead of guessing from screenshots.
+Use this skill with a configured Windows MCP Server in any compatible host.
+Let Windows expose control names, state, and IDs instead of guessing from screenshots.
+The skill itself does not install or configure the server.
 
 ## Preferred workflow
 
 1. Use `window_management` to find or activate the target window.
-2. Use `ui_find`, `ui_read`, `ui_click`, and `ui_type` for normal controls.
+2. Discover with `ui_find` or `ui_snapshot`; pass the returned IDs to `ui_read`, `ui_click`, and `ui_type`.
 3. Use `ui_read_table` to extract a grid, table, or details-view list into structured rows + headers in one call instead of scraping cells with repeated `ui_read`.
-4. Use `file_save` for Save / Save As flows and `file_open` for Open flows instead of sending raw keyboard shortcuts.
+4. Use `file_save` for supported Save / Save As dialogs and `file_open` for Open flows.
+   After failure or `confirmation_required`, inspect the existing dialog and choose the next action explicitly.
+   These helpers do not approve overwrites, dismiss errors, or retry dispatched actions.
 5. Use `clipboard` (get/set/clear) for fast bulk text IO — pair it with copy/paste hotkeys.
 6. Use `ui_batch` to run a multi-step sequence in one call. Keep reusable steps in project files.
 7. Only fall back to `screenshot_control`, `mouse_control`, or `keyboard_control` when the UI Automation tree is missing or the target is a custom canvas.
@@ -36,6 +40,24 @@ This plugin bundles the Windows MCP Server for Windows-only desktop automation. 
   `withSnapshot=true` requires enabled `ui_snapshot` before any action. Never route around disabled tools.
 - Re-check the UI tree after dialogs, page changes, or tab switches.
 - Treat screenshots as discovery or fallback tools, not the primary control surface.
+
+### Token-efficient observations
+
+- For repeated checks, use `ui_snapshot(mode='auto')` on the first and later views.
+  A default `full` view does not establish the remembered comparison.
+- Use `mode='reset'` to replace an older comparison. Scope to a known subtree
+  when only that part of the window matters.
+- Use `withSnapshot=true` and `snapshotMode='auto'` on supported actions to
+  combine action and observation. A full response is expected when a diff is unsafe or too large.
+- Prefer a table read or article read when that is the information needed;
+  do not repeatedly request whole-window trees or images.
+
+### Outcome verification
+
+- Click success reports dispatch, not a verified application-specific outcome.
+- Read the result or use a bounded wait for the expected state.
+- Do not repeat a click just because its target disappeared, became disabled,
+  or changed its label. It may already have completed.
 
 ### Screenshot fallback
 

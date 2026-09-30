@@ -1,156 +1,172 @@
-# Documentation Guidelines
+# Documentation guidelines
 
-This document defines the purpose and content rules for each documentation file to avoid duplication and ensure each serves its intended audience.
+## Writing style
 
-## Core Message (All Documents)
+Use simple, jargon-free English throughout user documentation, including feature
+and benchmark pages. Write for a new user: what the product does, how to install it,
+and a first useful task. Use short sentences and explain necessary technical terms.
+Keep command names, option names, and code examples exact.
 
-> Screenshot-based Windows automation doesn't work reliably. Vision models guess wrong, coordinates break when anything changes, and you burn through thousands of tokens on retry loops.
->
-> Windows MCP Server uses the Windows UI Automation API — the same API screen readers use. It asks Windows directly: "What buttons exist?" Deterministic. Same command works every time.
->
-> Tested with GPT-5.5 through a dedicated manual workflow. 130+ tests, isolated from PR, CI, and release workflows.
+Describe the current product. Do not fill guides with development history,
+rejected experiments, migration notes, or internal test details. Keep release
+history in the changelog and detailed test methods in the benchmark reference.
 
-## Three Entry Points
+## Core message
 
-Each document is indexed by search engines and must work standalone.
+> Put your AI to work in Windows.
 
-| Document | Audience | Discovery Path | Length |
-|----------|----------|----------------|--------|
-| `README.md` | Developers | GitHub search, repo browsing | ~80 lines |
-| `gh-pages/index.md` | General users | Google, windowsmcpserver.dev | ~130 lines |
-| `vscode-extension/README.md` | VS Code users | VS Code Marketplace | ~60 lines |
+Lead the homepage with what people can get done: fill forms, read tables, and
+save files with the assistant they already use. Support that promise with
+direct control, token savings, assistant choice, and screenshots for visual
+tasks. "Windows controls, not just screenshots" explains an approach; do not
+use it as the main homepage promise.
+Explain that the agent can read named buttons, field values, table rows, and
+checked states instead of interpreting these only from an image. Describe
+changes-only snapshots as a way to avoid sending repeated information.
+Keep screenshots available for apps that need them. Compare approaches, not
+brands: some other Windows MCP servers also use accessibility information.
+Make token savings a leading benefit: read just the controls needed instead of
+sending screenshots at every step, then request only changes. Do not weaken this
+to vague copy such as "less to process." Keep the claim tied to focused reads,
+not a guarantee that every text response is smaller than every screenshot.
+Keep comparisons focused on controls and screenshots within Windows MCP.
+Do not discuss or compare assistants' own screen-control features. Mention
+compatible assistants where useful for MCP setup and installation.
 
-## Content Rules
+Explain the benefits in plain English: discover actual controls before acting,
+send only useful UI changes, and choose MCP or the CLI. Windows MCP is independent
+of the agent provider. Copilot, Claude, Cursor, and other compatible clients are
+host choices, not the product boundary.
 
-### GitHub README (`README.md`)
+Lead with token savings, precise control targeting, assistant choice, and
+screenshot fallback. Put concrete benefits and scoped measured proof before
+implementation details. Do not lead marketing pages with reasons not to use
+the product or repeat defensive disclaimers after every benefit. Keep meaningful
+measurement limits beside the figures and operating limits in the relevant
+help or reference section.
+Screenshots, mouse, keyboard, and OCR remain useful fallbacks.
+Do not dismiss vision-based automation or promise that every application works.
 
-**Audience**: Developers evaluating the project
+## Audiences and source files
 
-**Tone**: Technical, concise, honest
+| Surface | Audience and purpose | Source |
+|---------|----------------------|--------|
+| GitHub README | Developers evaluating the project; short benefits, example, setup links, tools and limitations | `README.md` |
+| Website homepage | People discovering Windows automation; plain-language examples and clear setup choices | `gh-pages/docs/index.md` and `gh-pages/overrides/home.html` |
+| Search and social previews | Consistent, factual descriptions | `gh-pages/mkdocs.yml`, page front matter, `gh-pages/overrides/main.html` |
+| Feature reference | Exact parameters, behavior, errors and examples | `FEATURES.md` |
+| CLI guide | Command discovery, syntax, ownership and service lifecycle | `src/Sbroenne.WindowsMcp.Cli/README.md` |
+| VS Code listing | Copilot users installing the extension; retain the relevant Copilot focus | `vscode-extension/README.md` and `package.json` |
+| Agent skills | Concise operational guidance, not marketing copy | `plugin/skills/*/SKILL.md` |
+| Benchmarks | Reproducible measurements with scope and limitations | `docs/incremental-snapshot-benchmark.md` and `docs/screenshot-ui-automation-benchmark.md` |
 
-**Structure**:
-1. Hero: "Windows automation that actually works"
-2. Why This Exists: 3 sentences on why screenshot approach fails
-3. Quick Example: `window_management` → `ui_click` workflow
-4. Install: VS Code (1 line) + Download (1 line)
-5. Tools: 2-column table (tool, purpose)
-6. Caution
-7. Testing: LLM tests + framework coverage
-8. Related Projects: pytest-skill-engineering, Excel MCP, OBS MCP
-9. License / Contributing (one line each)
+Keep the README opening short. Detailed click-result and state-management
+contracts belong in the feature and CLI references. Use at most four benefit
+cards on the website homepage. Preserve useful page URLs and anchors.
 
-**Must include**:
-- Code examples using correct tool names (`ui_click`, `ui_type`, etc.)
-- Tools table
-- Framework coverage (WinForms, WinUI 3, Electron)
-- Link to pytest-skill-engineering
-- Links to FEATURES.md for details
+Use **MCP or the command line (CLI)** in introductory copy. Introduce `wincli`
+as the command-line program's name only when explaining installation or commands.
+Do not assume a new reader knows names of executables, protocols, or libraries.
 
-**Must NOT include**:
-- Comparison tables (move to gh-pages for SEO)
-- Feature bullet lists (link to FEATURES.md)
-- Natural language examples ("Ask your AI to...")
+MCP and CLI are both first-class routes for AI agents. Explain that a coding
+agent can run `wincli` through its existing terminal tool on the Windows PC;
+the user does not have to write scripts. Do not frame MCP as "for AI" and CLI
+as "for scripts." Both use the same automation code but keep separate state.
+Describe command-help discovery without importing Excel's CLI token-saving
+percentage: Windows MCP has no measured CLI-versus-MCP saving yet.
 
-### Website (`gh-pages/index.md`)
+Explain homepage token savings as two everyday choices: read one field rather
+than the whole window, and send changes rather than repeat everything. Use the
+shared charts, not competing percentage headlines. Keep their different
+baselines clear and link to the measurement page for detailed methods.
 
-**Audience**: Users discovering via search
+GitHub Pages uses MkDocs. User guides in `gh-pages/docs/` are written for people
+using an assistant. Do not populate them with tool parameter tables, instructions
+written for models, developer test notes, or copied release history. Link to
+technical references on GitHub instead. Preserve useful URLs when renaming pages.
 
-**Tone**: Persuasive, clear, SEO-focused
+`gh-pages/hooks.py` generates only the two canonical benchmark includes. The
+benchmark page explains the benefit first and keeps each full report in its own
+expandable section. Readers must be able to open the results on the site rather
+than depend on new documents already being published to GitHub's main branch.
+The homepage and benchmark page share chart snippets in `docs/assets/charts/`.
+The GitHub README uses SVGs generated from those snippets with
+`scripts/generate-benchmark-charts.py`; regenerate them after chart edits.
+Never edit or commit `gh-pages/docs/_generated/` or `_site/`.
+Update the source and check the rendered page. Include new canonical sources in
+the Pages workflow's path filters when needed.
 
-**Structure**:
-1. Hero + badges
-2. The Problem: Why screenshot automation fails (expanded)
-3. How It Works: UI Automation API + comparison table
-4. Tested with Real AI: Prominent, link to pytest-skill-engineering
-5. What You Can Do: Natural language examples
-6. Quick Start: Both install options
-7. Tools: Full table
-8. Feature Cards: 4 max (Semantic UI, LLM-Tested, Framework Coverage, Fallback)
-9. Caution
-10. Related Projects: pytest-skill-engineering, Excel MCP, OBS MCP
-11. Footer
+## Evidence and claims
 
-**Must include**:
-- Comparison table (reliability focus, "thousands of tokens")
-- Natural language examples
-- Feature cards (max 4)
-- Link to pytest-skill-engineering
-- SEO keywords in frontmatter
+- Link numerical claims to measured workloads, source revision, environment,
+  sample count, and comparison baseline.
+- Distinguish response bytes, approximate snapshot tokens, capture duration,
+  and whole-agent cost. They are not interchangeable.
+- Explain both token benefits: short direct reads can use fewer tokens than
+  screenshots, and changes-only replies avoid repeating text. Do not apply
+  measured full-versus-changes-only savings to image comparisons. A long control
+  list is not always smaller than an image; image token counts depend on the model
+  and image settings. Keep screenshot support clear.
+- Do not add percentages from different optimizations or experiments together.
+- Screenshot comparisons must name the model and image detail, count the first
+  view and discovery replies, and retain cases where text loses. A focused field
+  read is not equivalent to a whole-window view. Do not turn observation-size
+  estimates into claims about competing assistants' task success or total bills.
+- Publish current benchmark results only. Replace outdated measurements rather
+  than keeping historical comparisons on user-facing pages.
+- No "works every time," "any app," "100% reliable," unsupported competitor
+  rankings, or assumed end-to-end cost/speed savings.
+- Describe framework coverage accurately. A harness is not proof that every
+  third-party application built on that framework works.
+- LLM tests run through a separate manual workflow, not automatically before
+  every release. Link the suite instead of copying unmaintained counts or pass rates.
+- Check actual release assets and installation files. Do not promise plugin
+  bootstrap, automatic runtime setup, or bundled CLI downloads without evidence.
+- Use client-specific MCP configuration examples: clients do not all use the
+  same JSON root key or installation command.
 
-**Must NOT include**:
-- Code examples (tool call syntax)
-- "Who Uses This" section (generic, no value)
-- More than 4 feature cards
+## Correct interaction model
 
-### VS Code Extension README (`vscode-extension/README.md`)
+Discover by name, type, automation ID, or scope, then target the returned opaque
+element ID. Confirm syntax against the current tool definitions and CLI help.
 
-**Audience**: VS Code users ready to install
+```text
+ui_find(windowHandle='12345', name='Save', requireUnique=true)
+ui_click(windowHandle='12345', elementId='<returned-id>')
+```
 
-**Tone**: Copilot-focused, simple, practical
+Selectors are for discovery and appear/disappear waits, not targeted actions.
+Stale IDs fail rather than silently choosing a similar control.
+IDs belong to their observing MCP process or CLI service; never transfer them
+between owners. Macros discover fresh controls instead of storing IDs.
 
-**Structure**:
-1. Hero: "Let GitHub Copilot control Windows"
-2. What Can Copilot Do: 5 example commands
-3. How It Works: 2 sentences
-4. Requirements: Windows 10/11, .NET 10 (auto-installed)
-5. Caution
-6. Links: docs, GitHub, issues
+For repeated snapshots, use `mode=auto` from the first observation. A full
+fallback is normal when a diff would be unsafe or too large. Separate CLI
+commands use the persistent CLI service; pass the previous `snapshotToken`
+with `--since` to request a checked diff. The CLI is not stateless.
 
-**Must include**:
-- Copilot-specific language
-- Natural language examples
-- Requirements
+A successful click dispatch is not proof of saving, submitting, or navigation.
+Observe the outcome with snapshots, reads, or bounded waits. Do not recommend
+blindly replaying a click after losing its response.
 
-**Must NOT include**:
-- Comparison tables
-- Feature bullet lists
-- Code examples
-- pytest-skill-engineering link (not relevant to end users)
+## Safety and privacy
 
-## Key Differentiators
+The tools control the real desktop with the process's Windows privileges.
+Tool filters limit exposure; they are not an app sandbox or a confirmation system.
+Approval behavior depends on the connected host and its configuration.
+Local UI processing does not mean the connected AI model receives no data.
+Distinguish in-memory state from saved macros and requested screenshot files.
 
-Ordered by importance:
+## Related projects
 
-1. **Reliability over speed** — Screenshot approach doesn't work, UI Automation does
-2. **LLM-tested** — 130+ tests with a real AI model (GPT-5.5), 100% pass required
-3. **Framework coverage** — Tested against WinForms, WinUI 3, and Electron
-4. **Token efficiency** — Text responses, not images (thousands of tokens saved)
-5. **Full fallback** — Screenshots + mouse/keyboard when accessibility unavailable
-6. **Focused** — No duplicate terminal/file tools
+Link Excel MCP Server, PowerPoint MCP Server, and pytest-skill-engineering where
+relevant. Describe the shared purpose without assuming identical architectures.
+Keep specialized Office automation distinct from Windows desktop UI automation.
 
-## Correct Tool Names
+## Validation
 
-Always use the actual tool names:
-
-| ✅ Correct | ❌ Wrong |
-|-----------|----------|
-| `ui_click(windowHandle='...', nameContains='Save')` | `ui_automation(action='click'...)` |
-| `ui_type(windowHandle='...', text='...')` | `ui_automation(action='type'...)` |
-| `ui_read(windowHandle='...', ...)` | `ui_automation(action='ocr'...)` |
-| `ui_find`, `file_save` | `ui_automation(action='...')` |
-
-## Related Projects
-
-**README.md and gh-pages only:**
-- [pytest-skill-engineering](https://github.com/sbroenne/pytest-skill-engineering) — LLM testing framework
-- [Excel MCP Server](https://excelmcpserver.dev) — Excel automation
-- [OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) — Streaming control
-
-## Factual Accuracy
-
-| Claim | Correct Value |
-|-------|---------------|
-| Screenshot tokens | "thousands of tokens" (not 1500) |
-| JPEG quality default | 60 (not 85) |
-| Annotated screenshot image | Omitted by default (`includeImage=false`) |
-| Toggle state checking | `ui_click` returns state; no `ensure_state` action |
-| Copyright | 2024-2026 |
-
-## File References
-
-| Detail | Location |
-|--------|----------|
-| Complete tool reference | `FEATURES.md` |
-| Changelog | `gh-pages/changelog.md` |
-| Contributing guide | `CONTRIBUTING.md` |
-| Release setup | `.github/RELEASE_SETUP.md` |
+Build with `python -m mkdocs build --strict --clean` from `gh-pages`.
+Review the homepage template, generated references, navigation, links, metadata,
+and narrow-screen layout. Do not weaken build checks to accommodate new errors.
+Use existing manifest tests when changing extension metadata. Documentation-only
+work does not require running model-driven tests.
