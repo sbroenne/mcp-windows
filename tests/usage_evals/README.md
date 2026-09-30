@@ -54,7 +54,7 @@ credentials in this project.
 
 ## Framework prerequisite
 
-The project uses the public `pytest-skill-engineering==0.6.22` release, including
+The project uses the public `pytest-skill-engineering==0.6.23` release, including
 complete tool evidence, configuration-aware reports, recoverable paid summaries,
 and benchmark controls. The release contains the work merged in
 `sbroenne/pytest-skill-engineering#103`. Benchmark controls include tool-call limits,
