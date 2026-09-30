@@ -100,14 +100,17 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                 "Could not activate the owned Notepad document.");
             UIAutomationResult? found = null;
             Assert.True(await TestWait.RetryUntilAsync(
-                async () => found = await automation.FindElementsAsync(new ElementQuery
+                async () =>
                 {
-                    WindowHandle = window,
-                    ControlType = "Document",
-                }),
-                () => found is { Success: true, Items.Length: 1 },
+                    _ = await new WindowActivator().ActivateWindowAsync(handle);
+                    found = await automation.GetFocusedElementAsync();
+                },
+                () => found is { Success: true, Items.Length: 1 }
+                    && found.Items[0].Type == "Document"
+                    && ElementIdGenerator.TryResolveWindowHandle(found.Items[0].Id, out var focusedWindow)
+                    && focusedWindow == handle,
                 timeout: TimeSpan.FromSeconds(10)),
-                $"Expected one Notepad editor: {System.Text.Json.JsonSerializer.Serialize(found)}");
+                $"Expected the owned Notepad editor to have focus: {System.Text.Json.JsonSerializer.Serialize(found)}");
             var editor = Assert.Single(found!.Items!);
             var editorClass = await sta.ExecuteAsync(
                 () => ElementIdGenerator.ResolveToAutomationElement(editor.Id)?.CurrentClassName);
