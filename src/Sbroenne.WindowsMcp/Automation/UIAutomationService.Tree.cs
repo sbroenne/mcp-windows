@@ -210,6 +210,7 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
+        var checkDeadline = CreateSearchDeadlineCheck(stopwatch, timeoutMs, cancellationToken);
         // Subscribe before the first probe, so a change that lands between probing and sleeping
         // still wakes us instead of being lost.
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
@@ -219,7 +220,7 @@ public sealed partial class UIAutomationService
             return await WaitForFindResultAsync(
                 query,
                 timeoutMs,
-                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                () => FindElementsOnceAsync(query with { TimeoutMs = 0 }, cancellationToken, checkDeadline),
                 (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
                 () => stopwatch.ElapsedMilliseconds,
                 cancellationToken).ConfigureAwait(false);
@@ -241,6 +242,7 @@ public sealed partial class UIAutomationService
         ArgumentNullException.ThrowIfNull(query);
 
         var stopwatch = Stopwatch.StartNew();
+        var checkDeadline = CreateSearchDeadlineCheck(stopwatch, timeoutMs, cancellationToken);
         var signal = await TrySubscribeToStructureChangesAsync(query, cancellationToken).ConfigureAwait(false);
 
         try
@@ -248,7 +250,7 @@ public sealed partial class UIAutomationService
             return await WaitForDisappearResultAsync(
                 query,
                 timeoutMs,
-                () => FindElementsAsync(query with { TimeoutMs = 0 }, cancellationToken),
+                () => FindElementsOnceAsync(query with { TimeoutMs = 0 }, cancellationToken, checkDeadline),
                 (delay, token) => DelayOrUntilStructureChangedAsync(signal, delay, token),
                 () => stopwatch.ElapsedMilliseconds,
                 cancellationToken).ConfigureAwait(false);

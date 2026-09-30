@@ -32,6 +32,9 @@ public static partial class UIFindTool
     /// If unvisited nodes remain at the scan limit, search_incomplete means absence or uniqueness could not be established.
     /// Narrow the visited area with a known parentElementId or exactDepth=1, not just more match filters.
     /// Increasing timeoutMs does not increase this limit. Use ui_read with a discovered elementId when only its text is needed.
+    /// Positive timeoutMs limits both retries and scanning. No new scan starts at or after the deadline;
+    /// an in-progress Windows accessibility call can still overrun it. An interrupted scan reports timeout,
+    /// not absence or uniqueness. timeoutMs=0 performs one node-bounded scan without a time deadline.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find' or 'list'). REQUIRED.</param>
     /// <param name="name">Element name (exact match, case-insensitive). For Electron apps and Chromium browsers, this is often the visible label or ARIA label.</param>
@@ -52,7 +55,7 @@ public static partial class UIFindTool
     /// <param name="scope">Search root: window (default) or active_dialog. Use active_dialog after opening a modal or native file dialog.</param>
     /// <param name="requireUnique">Fail with ambiguity details when more than one element matches. Default: false.</param>
     /// <param name="enabledOnly">Exclude disabled elements when true.</param>
-    /// <param name="timeoutMs">Timeout in milliseconds (default: 5000).</param>
+    /// <param name="timeoutMs">Search time budget in milliseconds (default: 5000). Stops between Windows accessibility calls; an in-progress call can overrun the budget. Zero performs one scan without a time deadline.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, query, elements scanned) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A call result containing a text content block with the JSON payload listing found elements and their properties (including element IDs). <c>IsError</c> reflects operation success.</returns>

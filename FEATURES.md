@@ -246,6 +246,14 @@ For smaller replies, use `ui_snapshot` with a known `parentElementId`, or use
 Snapshot `maxDepth` and `controlTypeFilter` reduce the returned content, but do
 not necessarily reduce the work done by the app to provide its controls.
 
+With a positive `timeoutMs` (default: 5,000), retries and scans share one time
+budget. No new scan starts at or after the deadline, and scanning stops between
+Windows accessibility calls when time runs out. A Windows call already in
+progress can still take longer to return. An interrupted scan reports `timeout`
+without claiming the target is absent or unique. Set `includeDiagnostics=true`
+to see elapsed time and the last scan's element count. `timeoutMs=0` performs
+one node-bounded scan without a time deadline.
+
 ---
 
 ## 🖱️ UI Click (`ui_click`)
@@ -515,6 +523,10 @@ Wait until a UI condition is met before continuing - no blind sleeps or screensh
 - Wait for spinners/progress dialogs to disappear
 - Wait for a specific element to become enabled/visible/toggled
 - State mode rejects selectors; appear/disappear reject `elementId` and `desiredState`
+
+Appear/disappear waits use the same shared retry-and-scan time budget as
+`ui_find`. An interrupted scan reports `timeout`, not a successful disappearance.
+Windows accessibility calls already in progress can still overrun the time budget.
 
 ---
 

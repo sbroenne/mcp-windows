@@ -119,10 +119,10 @@ public sealed partial class UIAutomationService
         }
     }
 
-    private static bool CanReadDirectFieldValue(UIA.IUIAutomationElement element)
+    private static bool CanReadDirectFieldValue(UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
-        if (element.CurrentControlType != UIA3ControlTypeIds.Edit ||
-            !string.Equals(element.CurrentFrameworkId, "Chrome", StringComparison.Ordinal))
+        if (ExecuteSearchProviderCall(() => element.CurrentControlType, checkDeadline) != UIA3ControlTypeIds.Edit ||
+            !string.Equals(ExecuteSearchProviderCall(() => element.CurrentFrameworkId, checkDeadline), "Chrome", StringComparison.Ordinal))
         {
             return true;
         }
@@ -135,11 +135,12 @@ public sealed partial class UIAutomationService
             element,
             walker.GetFirstChildElement,
             walker.GetNextSiblingElement,
-            child => child.CurrentIsControlElement != 0,
-            (child, _) => segmented = child.CurrentControlType == UIA3ControlTypeIds.Spinner,
+            child => ExecuteSearchProviderCall(() => child.CurrentIsControlElement != 0, checkDeadline),
+            (child, _) => segmented = ExecuteSearchProviderCall(() => child.CurrentControlType == UIA3ControlTypeIds.Spinner, checkDeadline),
             maxNodes: 16,
             maxDepth: 1,
-            CancellationToken.None);
+            CancellationToken.None,
+            checkDeadline);
         return !segmented && !outcome.LimitReached;
     }
 

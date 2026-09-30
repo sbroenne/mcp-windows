@@ -27,6 +27,9 @@ public static partial class UIWaitTool
     /// - 'state': wait until the element with the given elementId reaches desiredState. Provide elementId + desiredState.
     /// Uses efficient exponential backoff polling internally. Returns success as soon as the condition holds,
     /// or a timeout failure with diagnostics.
+    /// Appear/disappear waits share one time budget across retries and scanning; no new scan starts
+    /// at or after the deadline. An in-progress Windows accessibility call can overrun the budget.
+    /// An interrupted scan cannot establish absence, uniqueness, or disappearance.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). Used to scope 'appear'/'disappear'.</param>
     /// <param name="mode">Condition to wait for: 'appear', 'disappear', or 'state'. Default: 'appear'.</param>

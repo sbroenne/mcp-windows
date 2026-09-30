@@ -167,7 +167,8 @@ public sealed record ElementQuery
     public bool IncludeChildren { get; init; }
 
     /// <summary>
-    /// Timeout in milliseconds for implicit wait (0 = no wait).
+    /// Shared scan/retry time budget in milliseconds, checked between Windows accessibility calls.
+    /// Zero performs one node-bounded scan without a time deadline.
     /// </summary>
     public int TimeoutMs { get; init; }
 

@@ -83,6 +83,53 @@ public sealed class UIFindToolIntegrationTests : IDisposable
         Assert.Contains("Submit", result.Items![0].Name ?? string.Empty);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Find_DeadlineExpiresWhileQueued_ReturnsUnfinishedSearch(bool disappear)
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var release = new ManualResetEventSlim();
+        var blocker = _staThread.ExecuteAsync(() =>
+        {
+            started.SetResult();
+            if (!release.Wait(TimeSpan.FromSeconds(10)))
+            {
+                throw new TimeoutException("Test did not release the automation queue.");
+            }
+        });
+        await started.Task;
+        Task<UIAutomationResult> search;
+        try
+        {
+            var query = new ElementQuery
+            {
+                WindowHandle = _windowHandle,
+                Name = "Submit",
+                ControlType = "Button",
+                RequireUnique = true,
+                TimeoutMs = 25
+            };
+            search = disappear
+                ? _automationService.WaitForElementDisappearAsync(query, query.TimeoutMs)
+                : _automationService.FindElementsAsync(query);
+            await Task.Delay(100);
+        }
+        finally
+        {
+            release.Set();
+            await blocker;
+        }
+
+        var result = await search;
+        Assert.False(result.Success);
+        Assert.Equal(disappear ? "wait_for_disappear" : "find", result.Action);
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Contains("before it completed", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Equal(0, result.Diagnostics?.ElementsScanned);
+        Assert.Null(result.Items);
+    }
+
     [Fact]
     public async Task Find_ButtonByName_PartialMatch_ReturnsButton()
     {
@@ -99,6 +146,24 @@ public sealed class UIFindToolIntegrationTests : IDisposable
         Assert.NotNull(result.Items);
         Assert.Single(result.Items);
         Assert.Contains("Cancel", result.Items![0].Name ?? string.Empty);
+    }
+
+    [Fact]
+    public async Task Find_WhitespacePaddedDialogScope_PreservesMissingDialogExplanation()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Install",
+            ControlType = "Button",
+            Scope = " active_dialog ",
+            TimeoutMs = 500
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Contains("No visible enabled dialog", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Null(result.Items);
     }
 
     [Fact]
