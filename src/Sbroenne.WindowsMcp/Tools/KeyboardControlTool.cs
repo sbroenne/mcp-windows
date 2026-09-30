@@ -15,7 +15,7 @@ namespace Sbroenne.WindowsMcp.Tools;
 public static partial class KeyboardControlTool
 {
     /// <summary>
-    /// ⚠️ TO SAVE FILES: STOP! Use file_save(windowHandle, filePath) instead - keyboard_control CANNOT handle Save As dialogs!
+    /// For supported Save As dialogs, file_save can fill the filename and click Save. Inspect and answer remaining prompts explicitly.
     /// Sends keyboard input to a specific window. The window is activated before input is sent.
     /// Best for: typing text, hotkeys (key='s', modifiers='ctrl'), special keys.
     /// For typing into a specific UI element by name/automationId, use ui_type instead.
@@ -291,7 +291,7 @@ public static partial class KeyboardControlTool
         {
             return result with
             {
-                Hint = "⚠️ WARNING: keyboard_control CANNOT handle Save As dialogs! Use file_save(windowHandle, filePath) instead - it handles the entire save workflow automatically."
+                Hint = "Inspect the current save state before sending more input. file_save(triggerMode='wait') can fill an open Save As dialog; overwrite and error prompts require an explicit decision."
             };
         }
 
@@ -299,7 +299,7 @@ public static partial class KeyboardControlTool
         {
             return result with
             {
-                Hint = "⚠️ For save operations, use file_save(windowHandle, filePath) - it handles Save As dialogs automatically!"
+                Hint = "Inspect the open menu or dialog before choosing the next action."
             };
         }
 
@@ -431,7 +431,7 @@ public static partial class KeyboardControlTool
         {
             return result with
             {
-                Hint = "⚠️ WARNING: For file saving, use file_save(windowHandle, filePath) - it handles Save As dialogs automatically!"
+                Hint = "Inspect the current save state before sending more input. Use file_save(triggerMode='wait') for an open Save As dialog, and answer any remaining prompt explicitly."
             };
         }
 
@@ -439,7 +439,7 @@ public static partial class KeyboardControlTool
         {
             return result with
             {
-                Hint = "⚠️ For save operations, use file_save(windowHandle, filePath) instead of menu navigation!"
+                Hint = "Inspect the open menu or dialog before choosing the next action."
             };
         }
 

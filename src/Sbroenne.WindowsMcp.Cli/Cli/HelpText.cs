@@ -123,7 +123,12 @@ internal static class HelpText
                      [--sort-by-prominence] [--in-region x,y,w,h]
                      [--visible-only] [--enabled-only] [--content-view-only]
                      [--scope window|active_dialog] [--require-unique]
+                     [--exact-depth <n>] [--parent-element-id <id>]
                      [--timeout-ms <n>]
+            For large/incomplete searches, discover containers with --exact-depth 1, then search
+            inside an observed container with --parent-element-id <id>. Repeat at that parent if needed.
+            Name/type/automation-id filters choose matches; unmatched nodes still count toward the limit.
+            Use ui read --element-id <id> when only that control's text is needed.
         ui click    --window <h> --element-id <id>
                      [--double-click] [--with-snapshot] [--snapshot-mode full|auto|reset]
         ui type     --window <h> --text <s> --element-id <id> [--clear-first]
@@ -163,13 +168,15 @@ internal static class HelpText
 
         file-save --window <h> [--path <file>] [--trigger-mode shortcut|save_as|wait]
             shortcut saves the current document with Ctrl+S (default).
-            save_as sends Ctrl+Shift+S to save under a different path without first overwriting
+            save_as sends F12 in Word/PowerPoint, Ctrl+Shift+S elsewhere, without first overwriting
             the original. --path alone does not change an existing document's destination.
             wait fills an already open owned Save As dialog without another shortcut.
+            Overwrite and error prompts remain open for an explicit decision. Do not blindly repeat a failed save.
 
         file-open --window <h> --path <file> [--trigger-mode shortcut|wait] [--timeout-ms <n>]
             Open an existing file. shortcut sends Ctrl+O; wait handles a native dialog opened by
             a prior semantic click in a browser or desktop app.
+            One path-entry attempt and one submission; inspect remaining dialogs before choosing another action.
 
         clipboard <action> [--text <s>]
             actions: get (read clipboard text), set (write --text), clear

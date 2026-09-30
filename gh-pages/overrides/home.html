@@ -3,29 +3,28 @@
 <!-- Marketing landing page: custom hero above the standard page content. -->
 
 {% block htmltitle %}
-  <title>Windows MCP Server — Windows Automation That Actually Works</title>
+  <title>Windows MCP Server — Put Your AI to Work in Windows</title>
 {% endblock %}
 
 {% block content %}
 <section class="mcp-hero">
-  <h1 class="mcp-hero__title">Windows automation that actually works</h1>
+  <h1 class="mcp-hero__title">Put your AI to work in Windows</h1>
   <p class="mcp-hero__subtitle">
-    Let your AI assistant control any Windows app, browser or website by name —
-    not pixels. Works with GitHub Copilot, Claude Desktop, Cursor and any MCP client.
+    Fill forms. Read tables. Save files.
+    Give the AI assistant you already use direct access to your Windows apps.
+  </p>
+  <p class="mcp-hero__subtitle">
+    Work with real buttons and fields. Save tokens with focused reads.
+    Use screenshots for visual tasks.
   </p>
   <div class="mcp-hero__actions">
-    <a class="md-button md-button--primary" href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp">
-      Install for VS Code
+    <a class="md-button md-button--primary" href="{{ 'installation/' | url }}">
+      Get started
     </a>
-    <a class="md-button" href="https://github.com/sbroenne/mcp-windows/releases">
-      Other MCP clients
+    <a class="md-button" href="{{ 'features/' | url }}">
+      See what you can do
     </a>
   </div>
-  <p class="mcp-hero__badges">
-    <a href="https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"><img src="https://vsmarketplacebadges.dev/installs-short/sbroenne.windows-mcp.svg?label=VS%20Code%20Installs" alt="VS Code Marketplace installs"></a>
-    <a href="https://github.com/sbroenne/mcp-windows"><img src="https://img.shields.io/github/stars/sbroenne/mcp-windows?style=flat&label=GitHub%20Stars" alt="GitHub stars"></a>
-    <a href="https://github.com/sbroenne/mcp-windows/releases"><img src="https://img.shields.io/github/downloads/sbroenne/mcp-windows/total?label=GitHub%20Downloads" alt="GitHub downloads"></a>
-  </p>
 </section>
 
 <!-- Render the page body directly instead of the parent content block, so

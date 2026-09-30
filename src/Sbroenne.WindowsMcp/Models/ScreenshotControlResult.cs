@@ -47,6 +47,21 @@ public sealed record ScreenshotControlResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? Height { get; init; }
 
+    /// <summary>Gets the captured rectangle in physical virtual-screen pixels.</summary>
+    [JsonPropertyName("captureBounds")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public CaptureRegion? CaptureBounds { get; init; }
+
+    /// <summary>Gets physical screen pixels per output image pixel horizontally.</summary>
+    [JsonPropertyName("scaleX")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? ScaleX => CaptureBounds is not null && Width > 0 ? (double)CaptureBounds.Width / Width.Value : null;
+
+    /// <summary>Gets physical screen pixels per output image pixel vertically.</summary>
+    [JsonPropertyName("scaleY")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? ScaleY => CaptureBounds is not null && Height > 0 ? (double)CaptureBounds.Height / Height.Value : null;
+
     /// <summary>
     /// Gets the original capture width before scaling. Present on capture success.
     /// </summary>
@@ -278,7 +293,8 @@ public sealed record ScreenshotControlResult
             ? $"{originalWidth}x{originalHeight} (scaled to {width}x{height})"
             : $"{width}x{height}";
         var usageHint = $"Screenshot with {elementCount} numbered elements. Reference elements by index (1-{elementCount}). " +
-                        "Use each element's 'click' coordinates with mouse_control, or its name/type with ui_click and ui_type.";
+                        "Each 'click' is [x,y,monitorIndex] in monitor-relative physical pixels: pass all three to mouse_control without windowHandle. " +
+                        "These are not image pixel coordinates. Use element IDs with ui_click and ui_type where available.";
         if (filePath != null)
         {
             usageHint = $"Image saved to '{filePath}'. " + usageHint;

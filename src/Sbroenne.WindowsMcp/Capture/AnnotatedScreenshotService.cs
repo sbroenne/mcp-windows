@@ -115,18 +115,25 @@ public sealed class AnnotatedScreenshotService
             }
 
             // Step 3: Get window bounds for coordinate translation
-            var windowRect = GetWindowRect(targetWindowHandle);
-            if (windowRect == null)
+            var captureBounds = screenshotResult.CaptureBounds;
+            if (captureBounds == null)
             {
-                return AnnotatedScreenshotResult.CreateFailure("Failed to get window bounds");
+                return AnnotatedScreenshotResult.CreateFailure("Screenshot did not provide capture bounds.");
             }
 
+            var windowRect = new RECT
+            {
+                Left = captureBounds.X,
+                Top = captureBounds.Y,
+                Right = captureBounds.X + captureBounds.Width,
+                Bottom = captureBounds.Y + captureBounds.Height
+            };
             // Step 4: Draw annotations on the screenshot
             // Scale annotated images to reduce LLM tokens (coordinates remain in screen space)
             var (annotatedImageData, annotatedElements, width, height, originalWidth, originalHeight) = DrawAnnotations(
                 screenshotResult.ImageData,
                 elementsResult.Elements,
-                windowRect.Value,
+                windowRect,
                 format,
                 quality,
                 DefaultMaxDimensionForAnnotated);
@@ -138,7 +145,8 @@ public sealed class AnnotatedScreenshotService
                 height,
                 annotatedElements,
                 originalWidth,
-                originalHeight);
+                originalHeight) with
+            { CaptureBounds = captureBounds };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -294,18 +302,6 @@ public sealed class AnnotatedScreenshotService
         };
 
         return await _screenshotService.ExecuteAsync(request, cancellationToken);
-    }
-
-    /// <summary>
-    /// Gets the window rectangle in screen coordinates.
-    /// </summary>
-    private static RECT? GetWindowRect(nint windowHandle)
-    {
-        if (NativeMethods.GetWindowRect(windowHandle, out var rect))
-        {
-            return rect;
-        }
-        return null;
     }
 
     /// <summary>

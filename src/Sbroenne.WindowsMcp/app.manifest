@@ -19,7 +19,7 @@
     </application>
   </compatibility>
 
-  <!-- Note: Per-Monitor V2 DPI Awareness is configured via ApplicationHighDpiMode
-       project property in the .csproj file when UseWindowsForms is enabled -->
+  <!-- Both entry points explicitly enable PerMonitorV2 before initializing services.
+       This also covers dotnet DLL launches, which do not load this executable manifest. -->
 
 </assembly>

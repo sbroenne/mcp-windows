@@ -124,14 +124,13 @@ public sealed class ScreenshotService
 
     /// <summary>
     /// Captures the primary screen.
-    /// Uses logical dimensions so screenshot pixels match mouse coordinates.
+    /// Uses physical pixel dimensions established by per-monitor-aware startup.
     /// </summary>
     private Task<ScreenshotControlResult> CapturePrimaryScreenAsync(
         ScreenshotControlRequest request,
         CancellationToken cancellationToken)
     {
         var primary = _monitorService.GetPrimaryMonitor();
-        // Width/Height are the logical dimensions that match mouse coordinates
         var region = new CaptureRegion(primary.X, primary.Y, primary.Width, primary.Height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
@@ -170,7 +169,6 @@ public sealed class ScreenshotService
                 "Secondary monitor not found."));
         }
 
-        // Width/Height are the logical dimensions that match mouse coordinates
         var region = new CaptureRegion(secondary.X, secondary.Y, secondary.Width, secondary.Height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
@@ -194,7 +192,6 @@ public sealed class ScreenshotService
                 availableMonitors));
         }
 
-        // Width/Height are the logical dimensions that match mouse coordinates
         var region = new CaptureRegion(monitor.X, monitor.Y, monitor.Width, monitor.Height);
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
@@ -310,7 +307,8 @@ public sealed class ScreenshotService
                 bitmap,
                 request.ImageFormat,
                 request.Quality);// Handle output mode
-            return BuildCaptureResult(processed, request, $"Captured window: {processed.Width}x{processed.Height} {processed.Format}");
+            return BuildCaptureResult(processed, request, $"Captured window: {processed.Width}x{processed.Height} {processed.Format}",
+                new CaptureRegion(windowRect.Left, windowRect.Top, width, height));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -491,7 +489,7 @@ public sealed class ScreenshotService
             request.ImageFormat,
             request.Quality);// Handle output mode
         return Task.FromResult(BuildCaptureResult(processed, request,
-            $"Captured {processed.Width}x{processed.Height} {processed.Format}"));
+            $"Captured {processed.Width}x{processed.Height} {processed.Format}", region));
     }
 
     /// <summary>
@@ -500,7 +498,8 @@ public sealed class ScreenshotService
     private static ScreenshotControlResult BuildCaptureResult(
         ProcessedImage processed,
         ScreenshotControlRequest request,
-        string message)
+        string message,
+        CaptureRegion captureBounds)
     {
         string? filePath = null;
 
@@ -510,7 +509,7 @@ public sealed class ScreenshotService
             File.WriteAllBytes(filePath, processed.Data);
         }
 
-        return ScreenshotControlResult.CaptureSuccess(processed, message, filePath);
+        return ScreenshotControlResult.CaptureSuccess(processed, message, filePath) with { CaptureBounds = captureBounds };
     }
 
     /// <summary>
@@ -530,7 +529,11 @@ public sealed class ScreenshotService
             File.WriteAllBytes(filePath, processed.Data);
         }
 
-        return ScreenshotControlResult.CompositeSuccess(processed, metadata, message, filePath);
+        return ScreenshotControlResult.CompositeSuccess(processed, metadata, message, filePath) with
+        {
+            CaptureBounds = new CaptureRegion(metadata.VirtualScreen.X, metadata.VirtualScreen.Y,
+                metadata.VirtualScreen.Width, metadata.VirtualScreen.Height)
+        };
     }
 
     /// <summary>

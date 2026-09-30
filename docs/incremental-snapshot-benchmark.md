@@ -1,332 +1,242 @@
 # Incremental UI snapshot benchmark
 
-Incremental snapshots exist to reduce the repeated UI context sent to an agent. A complete
-accessibility tree is still captured on every request, but `mode=auto` compares it with the
-remembered semantic tree and returns `kind=diff` only when the change list is safe and less than 80%
-of the complete semantic response. Otherwise it returns `kind=full` with a complete simplified view.
-Explicit `mode=full` calls remain unchanged. This preserves correctness while making payload savings
-workload-dependent rather than guaranteed.
+A snapshot describes the controls in a window. Automatic snapshots can send just
+the changes since the last view, rather than repeating the whole window.
 
-The full response contains the documented compact `tree` and no longer serializes the former
-redundant full-detail `elements` copy. Consumers that relied on that duplicate should migrate to
-`tree`, or call `ui_find` for a flat result.
+The server still reads the complete window before comparing it. It sends changes
+only when they are safe to apply and take less than 80% of a complete automatic
+response. Otherwise it sends a complete view. Explicit `mode=full` requests
+always return the full tree of controls.
 
-## Reference safety and CLI baselines
+## Recorded measurements: 27 September 2026
 
-Element IDs now belong to the process that observed the controls: the persistent CLI daemon,
-or a separate MCP process. They are opaque references, not names or positions. A replacement
-control gets a new reference; snapshots never redirect an old reference to that replacement.
-Diffs include changed `id` fields, or return a complete view when the change list is too large.
+These runs used source revision
+[`67ba78d6b3a99bdabee27898dab64b38aafb55ed`](https://github.com/sbroenne/mcp-windows/commit/67ba78d6b3a99bdabee27898dab64b38aafb55ed),
+Release mode, .NET SDK 10.0.401, and Windows `10.0.26220.0`.
+The Word run includes the document-startup fix in this change: wait for the
+document window, not the temporary "Opening" window.
+The Chrome run used an earlier implementation that removed a selected
+address-completion suggestion inside the typing tool. Current typing reports
+that mismatch without changing it. The benchmark caller now explicitly checks
+the selected suggestion before rejecting it and verifies the final URL.
+The Chrome figures below are retained as earlier snapshot measurements, not
+validation or timing measurements of the current typing workflow.
+The tests ran one at a time on a Windows desktop, using temporary test content.
 
-CLI automatic snapshots return `snapshotToken`. Supply it as `--since <token>` on the next
-`--mode auto` request for the same target and settings. The daemon keeps only the latest
-snapshot for each target/settings combination. A missing, expired, or superseded token returns
-a full view. This needs no separate CLI sessions. For a diff, `baseSnapshotToken` identifies
-the view to update and `snapshotToken` identifies the resulting view.
+| Workload | Environment | Fewer bytes | Fewer approximate tokens | Full views / changes-only views |
+|----------|-------------|------------:|-------------------------:|-------------------------------:|
+| Electron test app navigation | Electron 44.2.0 | 95.6% | 96.6% | 0/20 |
+| Excel worksheet editing | Excel 16.0.20326.20158 | 81.0% | 84.0% | 0/20 |
+| GitHub repository navigation | Chrome 154.0.8037.57 | 10.6% | 11.3% | 20/0 |
+| Word document editing | Word 16.0.20326.20158 | 82.7% | 86.1% | 0/20 |
 
-`CliSnapshotContinuityTests` exercises real separate CLI processes, checks the payload threshold,
-and prints full/diff byte sizes and call durations. These local fixture results are separate
-from the historical multi-application measurements below. Longer references, token metadata,
-and explicit replacement updates can change both payload sizes and full/diff frequency.
+Chrome completed all 15 runs: five samples in each of the three modes, covering
+60 page changes. All 20 measured automatic replies were complete views, not
+changes-only replies. Their 11.3% token saving came from the more compact
+automatic output. This page-to-page workload behaves differently from small
+edits within the same window.
 
-The before/after display-cleanup comparison uses the same snapshot-token values for each
-paired capture. Both responses still include their token metadata. This prevents random
-token spelling from appearing as a cleanup saving or regression, while preserving each
-response's full/diff decision and actual screen content.
+### What the percentages mean
 
-### Local CLI continuity check
+Each workload runs five times in each of three modes:
 
-One Release-mode comparison against the owned WinForms fixture returned:
+1. **Action-only:** perform four actions without taking snapshots. This measures
+   action time, not information savings.
+2. **Full:** request a complete snapshot after each action.
+3. **Auto:** take one initial snapshot, then request changes after each action.
+   The initial snapshot is not included in the measured totals.
 
-| Response | UTF-8 bytes | End-to-end CLI call |
-|---|---:|---:|
-| Automatic full baseline | 5,866 | 313.2 ms |
-| Next snapshot with matching token | 251 | 233.3 ms |
+For each auto run, the test also saves the same captured controls as full
+responses. The savings compare those two versions of the same captures.
+The reported percentage is the median of the five run-level percentages.
+This avoids treating differences between separate live webpages as savings.
 
-That unchanged-window diff was **95.7% smaller**. Interleaved and missing tokens
-returned full snapshots as required. These are single-check measurements, not a
-multi-application performance benchmark or token-cost estimate. The first call includes
-startup only if the daemon was not already running; no cold-start speed claim is made.
+**Tokens** are the small pieces of text an AI model processes. Counts here use
+SharpToken's `cl100k_base` tokenizer as an approximation. They do not measure
+the cost of a whole agent conversation, and other models may count differently.
 
-## Historical result (before immutable references and CLI daemon)
+### Timing and response sizes
 
-Four representative workflows were run five times per comparison arm on Windows
-`10.0.26220.0`. The browser pages were the public `microsoft/vscode` GitHub repository, not a
-synthetic TodoMVC page.
+These are median totals for four actions or snapshots, not per-call times.
 
-| Workload | Environment | Byte savings | Token savings | Auto full/diff |
-|---|---|---:|---:|---:|
-| Electron form navigation | Electron 44.0.0 | 95.2% | 95.7% | 0/20 |
-| GitHub repository navigation | Chrome 151.0.7922.174 | 13.1% | 13.4% | 18/2 |
-| Word document editing | Word 16.0.20326.20100 | 84.4% | 85.7% | 0/20 |
-| Excel worksheet editing | Excel 16.0.20326.20100 | 89.8% | 90.8% | 0/20 |
-| **Equal-workload average** | | **70.6%** | **71.4%** | **18/62** |
+| Workload | Mode | Action ms | Snapshot ms | Bytes | Approximate tokens |
+|----------|------|----------:|------------:|------:|-------------------:|
+| Electron | action-only | 2663.7 | 0.0 | 0 | 0 |
+| Electron | full | 3341.1 | 7909.3 | 80385 | 30928 |
+| Electron | auto | 2912.8 | 6879.2 | 3543 | 1054 |
+| Excel | action-only | 8.8 | 0.0 | 0 | 0 |
+| Excel | full | 23.0 | 6465.8 | 15996 | 6261 |
+| Excel | auto | 7.9 | 4296.9 | 3032 | 1005 |
+| Chrome | action-only | 25165.4 | 0.0 | 0 | 0 |
+| Chrome | full | 20494.1 | 34256.9 | 312581 | 124179 |
+| Chrome | auto | 22791.2 | 37659.0 | 289265 | 113903 |
+| Word | action-only | 21.0 | 0.0 | 0 | 0 |
+| Word | full | 15.3 | 3715.7 | 10765 | 4198 |
+| Word | auto | 15.6 | 3101.3 | 1864 | 586 |
 
-Chrome uses the median of five paired run-level reductions: every automatic run is compared with the
-complete trees captured by those same requests. This prevents live GitHub variation between
-separately launched arms from becoming fake savings. The deterministic Electron and Office rows use
-their full-arm medians, whose payloads vary negligibly. The final row averages the four workload
-percentages so each workflow has equal weight. Tokens are a SharpToken `cl100k_base` approximation,
-not universal model billing tokens.
+Smaller responses do not necessarily mean faster capture. Timing depends on the
+application, its startup state, and the machine's other work.
 
-The measured benefit is strong but not universal. Electron, Word, and Excel produced a diff after
-every action, reducing median payloads by 84-96%. Chrome returned two diffs and 18 complete simplified
-responses. Removing layout-only containers from those complete automatic responses improved Chrome
-from the previous 3.9% byte reduction to 13.1%, and from 3.6% to 13.4% for approximate tokens. Across
-the four equally weighted workloads, the average reductions were 70.6% and 71.4%. A separate
-regression confirms that a same-page GitHub search-field edit returns a scoped diff in both Edge and
-Chrome; it is not included as another benchmark workload.
+## Workloads
 
-## Further Chromium cleanup
+- **Electron:** move through Forms, Data, Settings, and Home in the project's
+  test application. This does not measure all Electron applications.
+- **Chrome:** visit Issues, Pull requests, Actions, and Code in the public
+  `microsoft/vscode` GitHub repository, using a separate browser profile.
+  The address bar is discovered during setup and its exact ID is reused.
+  The current benchmark caller handles a verified selected URL suggestion
+  explicitly; it does not repeat a failed navigation.
+  Setup observations are outside the measured actions. Measured snapshots
+  include the webpage, not just the browser's toolbar.
+- **Word:** edit, append text, undo, and edit a temporary RTF document.
+- **Excel:** enter four values in a temporary CSV file. This does not test
+  formulas, ribbon commands, or every Excel feature.
 
-A second five-run Chrome experiment measured conservative display cleanup separately from the
-semantic wrapper removal above. Readiness now requires an exact page control returned by Windows UI
-Automation; a partial match against the browser tab title no longer counts as a ready webpage. The
-run used Chrome for Testing `151.0.7922.174` and the same four GitHub destinations.
+The order of the three modes rotates between samples. Each starts with equivalent
+test content. Response sizes use the server's normal JSON output.
 
-| Comparison | Byte savings | Token savings | Auto full/diff |
-|---|---:|---:|---:|
-| Display cleanup versus the same automatic semantic responses before cleanup | 10.6% | 13.6% | 20/0 |
-| Cleaned automatic responses versus the same raw full captures | 16.5% | 19.3% | 20/0 |
-
-The first row is the decision metric: cleanup alone exceeded the 5% keep threshold. It removes click
-coordinates from leaf items that Windows says cannot be acted on. It also removes a child label that
-exactly repeats its parent's label, and blank leaf images, but only when they have no action, state,
-developer identifier, or children. Readable text, values, toggle state, controls, and element IDs
-remain. Explicit `mode=full` output is unchanged.
-
-All 20 responses were complete automatic views because each action navigated to a different page.
-That makes this a useful worst case: the savings do not depend on a navigation being mistaken for a
-small update. Each automatic capture was also serialized before display cleanup, so live page
-variation cannot become fake savings.
-
-| Sample | Before-cleanup bytes | Cleaned bytes | Before-cleanup tokens | Cleaned tokens |
-|---:|---:|---:|---:|---:|
-| 1 | 203,733 | 181,985 | 64,092 | 55,398 |
-| 2 | 205,271 | 183,416 | 64,547 | 55,806 |
-| 3 | 207,081 | 185,179 | 64,504 | 55,764 |
-| 4 | 204,782 | 183,025 | 63,892 | 55,191 |
-| 5 | 187,203 | 167,313 | 58,206 | 50,304 |
-
-Two other Chromium experiments were rejected:
-
-- **Page-only snapshots:** Chrome 152 exposed the address-bar popup as a webpage root in one run,
-  while Edge 152 exposed no dependable webpage root. A screen-position fallback could select another
-  application covering the page. Because this could return the wrong content, page-only scope is not
-  shipped and whole-window snapshots remain the default.
-- **Cache-only Windows elements:** asking Windows to return cached properties without live automation
-  objects made the Electron safety test fail with `0x80004005`. The speed comparison was stopped
-  because correctness had already failed; normal cached tree capture remains in use.
-
-## Chromium noise spike
-
-We tested whether Windows UI Automation's smaller "content view" could remove Chromium layout noise
-before snapshots were compared. The same GitHub navigation workflow was run five times per arm with
-that view enabled.
-
-| Browser | Full bytes | Auto bytes | Full tokens | Auto tokens | Auto full/diff |
-|---|---:|---:|---:|---:|---:|
-| Edge | 78,233 | 78,618 | 24,366 | 24,485 | 20/0 |
-| Chrome | 162,258 | 162,349 | 51,213 | 51,244 | 20/0 |
-
-This did not produce a single diff. More importantly, a safety check found that the content-view
-tree contained the browser frame but omitted GitHub's page controls, including the Code link, in
-both Edge and Chrome. Chrome's median full payload was about 6% smaller than the original control
-view, but the missing page made that reduction unusable. The experiment was therefore rejected and
-is not enabled in production. Edge's live tree differed too much between runs to make a reliable
-size comparison.
-
-Playwright's [ARIA snapshot implementation][playwright-aria] suggested the safer direction now used.
-It creates
-a small role, name, text, and state tree rather than comparing raw browser nodes. Its
-[distiller][playwright-distiller] joins adjacent text, normalizes whitespace, removes empty text, and
-unwraps low-information layout containers with one child. Action references are handled separately
-and are renewed after navigation. Playwright's loose role-and-name matching is suitable for test
-assertions, but not for carrying an action ID across duplicate controls.
-
-We first tested post-capture cleanup rather than Windows content-view filtering. That experiment
-unwrapped only unnamed one-child `Pane` and `Group` containers when the
-wrapper and child had the same bounds, visibility, and enabled state, the wrapper had no developer
-ID, and Windows reported no supported action pattern. It preserved GitHub's Code and Issues controls
-in both browsers, but still produced 40 complete responses and no diffs. Checking action patterns
-also added provider calls to each candidate wrapper. The cleanup was rejected because it added work
-without improving incremental responses.
-
-The production approach instead keeps an internal comparison view and a smaller response view from
-the same capture. Explicit full mode retains the complete Windows accessibility tree and all IDs.
-Automatic mode removes unnamed `Pane` and `Group` containers only when they have no developer ID and
-no direct Invoke, Expand/Collapse, Selection, Toggle, or Value action. It then applies the conservative
-display cleanup measured above. Chromium's widely reported `ScrollItem` capability merely brings a
-node into view, so it does not make an otherwise anonymous wrapper a user-facing action. Named
-controls and direct action references remain in the tree, and uncertain duplicate controls still
-force a complete response. A live Chrome test checks that GitHub page controls survive this
-projection.
-
-This experiment also exposed a benchmark problem. Chromium's recommended depth of 15 reached the
-browser frame but not GitHub's page controls. The browser scenarios now explicitly use depth 20 and
-wait until a real page control appears before each measured snapshot. An integration test verifies
-that GitHub's Code control is present. The browser and aggregate results in this document are the
-corrected page-content measurements.
-
-[playwright-aria]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshot.ts
-[playwright-distiller]: https://github.com/microsoft/playwright/blob/32095eac6a944a6d9eb38198f68a4cee9562b3b9/packages/injected/src/ariaSnapshotDistiller.ts
-
-## Method
-
-Each scenario executes the same four state changes under three arms:
-
-1. **Action-only control** performs the actions without a snapshot. It is a latency floor only and
-   is never the payload-savings denominator.
-2. **Full baseline** requests `mode=full` after every action.
-3. **Automatic treatment** establishes an unmeasured baseline with `mode=reset`, then requests
-   `mode=auto` after every action. Production logic decides whether each response is a diff or a
-   safe full fallback.
-
-Every arm starts from equivalent application content. Browser and Office scenarios launch isolated
-processes and temporary state; Electron resets its dedicated test harness. Arm order rotates between
-samples to limit warm-cache sequence bias. Measurements serialize the actual `UIAutomationResult`
-with the production JSON options. Action and snapshot elapsed time are recorded separately.
-
-The workflows are:
-
-- **Electron:** navigate the real Electron harness through Forms, Data, Settings, and Home.
-- **Chrome:** navigate the public `microsoft/vscode` GitHub repository through Issues, Pull requests,
-  Actions, and Code in an isolated browser profile. The scenario uses depth 20 so the snapshot
-  includes the webpage, not only the browser frame. Edge and Chrome share Chromium, so the expensive
-  benchmark uses Chrome only; short live regressions still cover both because their Windows
-  accessibility output is not identical.
-- **Word:** edit, append to, undo in, and edit a dedicated temporary RTF document.
-- **Excel:** enter four values into a dedicated temporary CSV workbook.
-
-| Workload | Action-only ms | Full snapshot ms | Auto snapshot ms |
-|---|---:|---:|---:|
-| Electron | 956.3 | 5,045.4 | 4,932.6 |
-| Chrome | 6,786.2 | 3,206.9 | 15,104.0 |
-| Word | 10.4 | 1,771.0 | 1,730.1 |
-| Excel | 7.8 | 2,630.4 | 2,503.2 |
-
-These are median totals for four actions or snapshots, not per-call values. Automatic mode still
-captures a complete accessibility tree before comparing it, so it is designed to reduce response
-payload and agent context, not capture time.
+Chrome startup checks read the window once per attempt and require the webpage
+controls to appear. Popup handling uses buttons already found in that view,
+rather than searching repeatedly for popups that may not exist. Those searches
+could previously consume the entire startup waiting time. Startup failures now
+record the timing of each attempt and the last window view.
 
 ## Raw samples
 
-Each row is one complete four-action run. `Full/diff` counts the response kinds returned during
-that run.
+Each row covers four actions. The "Same-capture full" columns are the complete
+versions used to calculate auto savings.
 
-### Electron
+### Electron 44.2.0
 
-| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
-|---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 1,237.6 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 972.5 | 4,983.1 | 64,441 | 19,152 | 4/0 |
-| 1 | auto | 928.2 | 5,118.5 | 3,087 | 831 | 0/4 |
-| 2 | full | 984.3 | 4,973.7 | 64,441 | 19,152 | 4/0 |
-| 2 | auto | 1,003.7 | 4,919.9 | 3,087 | 831 | 0/4 |
-| 2 | action-only | 935.7 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 890.6 | 4,838.0 | 3,087 | 831 | 0/4 |
-| 3 | action-only | 896.9 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 909.2 | 5,045.4 | 64,441 | 19,152 | 4/0 |
-| 4 | action-only | 956.3 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 961.3 | 5,326.6 | 64,441 | 19,152 | 4/0 |
-| 4 | auto | 967.3 | 4,942.1 | 2,627 | 696 | 0/4 |
-| 5 | full | 939.2 | 5,163.6 | 64,441 | 19,152 | 4/0 |
-| 5 | auto | 1,009.3 | 4,932.6 | 3,087 | 831 | 0/4 |
-| 5 | action-only | 1,058.3 | 0.0 | 0 | 0 | 0/0 |
+| Sample | Mode | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full/diff |
+|-------:|------|----------:|------------:|------:|-------:|-----------------------:|------------------------:|----------:|
+| 1 | action-only | 7017.9 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 1 | full | 3015.7 | 7909.3 | 80385 | 30927 | 80385 | 30927 | 4/0 |
+| 1 | auto | 2912.8 | 6879.2 | 3543 | 1054 | 80385 | 30927 | 0/4 |
+| 2 | full | 2726.3 | 6724.5 | 80385 | 30928 | 80385 | 30928 | 4/0 |
+| 2 | auto | 2669.9 | 6786.5 | 3543 | 1055 | 80385 | 30927 | 0/4 |
+| 2 | action-only | 2663.7 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | auto | 4099.0 | 8825.2 | 3543 | 1043 | 80385 | 30925 | 0/4 |
+| 3 | action-only | 2369.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | full | 3763.8 | 10510.2 | 80385 | 30928 | 80385 | 30928 | 4/0 |
+| 4 | action-only | 4146.8 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 4 | full | 4791.7 | 10409.4 | 80385 | 30928 | 80385 | 30928 | 4/0 |
+| 4 | auto | 5419.0 | 12897.9 | 3543 | 1050 | 80385 | 30926 | 0/4 |
+| 5 | full | 3341.1 | 7725.3 | 80385 | 30924 | 80385 | 30924 | 4/0 |
+| 5 | auto | 2455.7 | 5933.1 | 3543 | 1054 | 80385 | 30928 | 0/4 |
+| 5 | action-only | 2299.8 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
 
-### Chrome
+### Excel 16.0.20326.20158
 
-| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full/diff |
-|---:|---|---:|---:|---:|---:|---:|---:|---:|
-| 1 | action-only | 9,632.7 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
-| 1 | full | 5,785.1 | 2,944.6 | 15,660 | 4,720 | 15,660 | 4,720 | 4/0 |
-| 1 | auto | 6,563.6 | 15,104.0 | 54,696 | 16,717 | 62,954 | 19,294 | 4/0 |
-| 2 | full | 5,772.3 | 3,206.9 | 15,761 | 4,690 | 15,761 | 4,690 | 4/0 |
-| 2 | auto | 7,455.2 | 6,597.3 | 59,055 | 17,869 | 65,880 | 19,968 | 4/0 |
-| 2 | action-only | 10,031.3 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
-| 3 | auto | 6,322.9 | 3,256.8 | 8,340 | 2,462 | 16,900 | 5,143 | 3/1 |
-| 3 | action-only | 6,447.9 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
-| 3 | full | 5,852.7 | 15,541.8 | 64,888 | 20,339 | 64,888 | 20,339 | 4/0 |
-| 4 | action-only | 5,565.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
-| 4 | full | 6,328.0 | 2,868.6 | 15,865 | 4,829 | 15,865 | 4,829 | 4/0 |
-| 4 | auto | 6,384.0 | 24,418.9 | 103,799 | 32,665 | 114,207 | 35,924 | 3/1 |
-| 5 | full | 6,316.8 | 23,509.7 | 112,702 | 35,470 | 112,702 | 35,470 | 4/0 |
-| 5 | auto | 6,486.5 | 15,353.4 | 55,431 | 17,313 | 63,864 | 19,989 | 4/0 |
-| 5 | action-only | 6,786.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| Sample | Mode | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full/diff |
+|-------:|------|----------:|------------:|------:|-------:|-----------------------:|------------------------:|----------:|
+| 1 | action-only | 110.6 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 1 | full | 70.9 | 7289.2 | 16015 | 6286 | 16015 | 6286 | 4/0 |
+| 1 | auto | 19.7 | 6466.3 | 3032 | 1005 | 15980 | 6300 | 0/4 |
+| 2 | full | 8.9 | 6465.8 | 15980 | 6261 | 15980 | 6261 | 4/0 |
+| 2 | auto | 8.1 | 4832.0 | 3030 | 1002 | 15978 | 6274 | 0/4 |
+| 2 | action-only | 29.5 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | auto | 5.6 | 3572.8 | 3029 | 988 | 15977 | 6252 | 0/4 |
+| 3 | action-only | 4.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | full | 23.0 | 6271.8 | 15980 | 6226 | 15980 | 6226 | 4/0 |
+| 4 | action-only | 8.8 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 4 | full | 41.3 | 6526.9 | 15996 | 6213 | 15996 | 6213 | 4/0 |
+| 4 | auto | 5.6 | 3673.7 | 3037 | 1005 | 16101 | 6299 | 0/4 |
+| 5 | full | 5.3 | 3330.6 | 16101 | 6287 | 16101 | 6287 | 4/0 |
+| 5 | auto | 7.9 | 4296.9 | 3038 | 1010 | 16102 | 6314 | 0/4 |
+| 5 | action-only | 3.6 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
 
-### Word
+### Chrome 154.0.8037.57
 
-| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
-|---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 22.4 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 8.0 | 1,638.6 | 9,236 | 2,856 | 4/0 |
-| 1 | auto | 7.5 | 1,787.7 | 1,440 | 392 | 0/4 |
-| 2 | full | 8.5 | 1,877.0 | 9,236 | 2,792 | 4/0 |
-| 2 | auto | 7.8 | 1,691.8 | 1,440 | 400 | 0/4 |
-| 2 | action-only | 9.9 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 7.0 | 1,730.1 | 1,440 | 404 | 0/4 |
-| 3 | action-only | 10.4 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 7.8 | 1,802.8 | 9,236 | 2,792 | 4/0 |
-| 4 | action-only | 8.0 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 10.3 | 1,719.2 | 9,236 | 2,792 | 4/0 |
-| 4 | auto | 7.0 | 1,671.0 | 1,440 | 400 | 0/4 |
-| 5 | full | 6.7 | 1,771.0 | 9,196 | 2,784 | 4/0 |
-| 5 | auto | 8.9 | 1,742.1 | 1,440 | 392 | 0/4 |
-| 5 | action-only | 11.2 | 0.0 | 0 | 0 | 0/0 |
+| Sample | Mode | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full/diff |
+|-------:|------|----------:|------------:|------:|-------:|-----------------------:|------------------------:|----------:|
+| 1 | action-only | 28199.4 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 1 | full | 19267.0 | 28588.1 | 303946 | 119809 | 303946 | 119809 | 4/0 |
+| 1 | auto | 16727.7 | 24395.0 | 289519 | 113903 | 323753 | 128347 | 4/0 |
+| 2 | full | 16909.0 | 31351.3 | 309501 | 123353 | 309501 | 123353 | 4/0 |
+| 2 | auto | 22791.2 | 37659.0 | 289544 | 114786 | 323778 | 129252 | 4/0 |
+| 2 | action-only | 26388.5 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | auto | 19097.5 | 23316.1 | 283677 | 112239 | 317911 | 126654 | 4/0 |
+| 3 | action-only | 16792.4 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | full | 20494.1 | 34571.7 | 312581 | 124179 | 312581 | 124179 | 4/0 |
+| 4 | action-only | 25165.4 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 4 | full | 23491.2 | 34256.9 | 323779 | 127923 | 323779 | 127923 | 4/0 |
+| 4 | auto | 24840.9 | 37936.3 | 283702 | 111546 | 317936 | 126034 | 4/0 |
+| 5 | full | 25194.7 | 43828.0 | 323782 | 128628 | 323782 | 128628 | 4/0 |
+| 5 | auto | 23463.7 | 38803.8 | 289265 | 114123 | 323436 | 128529 | 4/0 |
+| 5 | action-only | 22832.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
 
-### Excel
+### Word 16.0.20326.20158
 
-| Sample | Arm | Action ms | Snapshot ms | Bytes | Tokens | Full/diff |
-|---:|---|---:|---:|---:|---:|---:|
-| 1 | action-only | 29.7 | 0.0 | 0 | 0 | 0/0 |
-| 1 | full | 6.0 | 3,290.4 | 13,088 | 4,100 | 4/0 |
-| 1 | auto | 4.8 | 2,480.4 | 1,356 | 368 | 0/4 |
-| 2 | full | 5.5 | 2,487.3 | 13,128 | 4,080 | 4/0 |
-| 2 | auto | 4.1 | 2,485.7 | 1,356 | 376 | 0/4 |
-| 2 | action-only | 7.3 | 0.0 | 0 | 0 | 0/0 |
-| 3 | auto | 4.1 | 2,522.5 | 1,352 | 380 | 0/4 |
-| 3 | action-only | 8.5 | 0.0 | 0 | 0 | 0/0 |
-| 3 | full | 5.0 | 2,687.1 | 13,252 | 4,080 | 4/0 |
-| 4 | action-only | 7.8 | 0.0 | 0 | 0 | 0/0 |
-| 4 | full | 4.0 | 2,630.4 | 13,252 | 4,036 | 4/0 |
-| 4 | auto | 4.4 | 2,525.6 | 1,356 | 392 | 0/4 |
-| 5 | full | 5.2 | 2,501.1 | 13,252 | 4,060 | 4/0 |
-| 5 | auto | 3.8 | 2,503.2 | 1,356 | 372 | 0/4 |
-| 5 | action-only | 3.9 | 0.0 | 0 | 0 | 0/0 |
+| Sample | Mode | Action ms | Snapshot ms | Bytes | Tokens | Same-capture full bytes | Same-capture full tokens | Full/diff |
+|-------:|------|----------:|------------:|------:|-------:|-----------------------:|------------------------:|----------:|
+| 1 | action-only | 41.9 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 1 | full | 12.6 | 3471.2 | 10746 | 4198 | 10746 | 4198 | 4/0 |
+| 1 | auto | 31.3 | 4110.3 | 1866 | 589 | 10766 | 4238 | 0/4 |
+| 2 | full | 13.5 | 3720.7 | 10766 | 4154 | 10766 | 4154 | 4/0 |
+| 2 | auto | 15.6 | 3435.4 | 1861 | 589 | 10761 | 4213 | 0/4 |
+| 2 | action-only | 39.5 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | auto | 13.6 | 2560.9 | 1864 | 556 | 10764 | 4132 | 0/4 |
+| 3 | action-only | 14.2 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 3 | full | 15.4 | 3611.0 | 10765 | 4213 | 10765 | 4213 | 4/0 |
+| 4 | action-only | 21.0 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+| 4 | full | 24.6 | 3715.7 | 10762 | 4198 | 10762 | 4198 | 4/0 |
+| 4 | auto | 20.8 | 3078.7 | 1866 | 586 | 10766 | 4186 | 0/4 |
+| 5 | full | 15.3 | 3979.0 | 10766 | 4218 | 10766 | 4218 | 4/0 |
+| 5 | auto | 13.3 | 3101.3 | 1864 | 564 | 10764 | 4096 | 0/4 |
+| 5 | action-only | 14.5 | 0.0 | 0 | 0 | 0 | 0 | 0/0 |
+
+## CLI continuity check
+
+Separate `wincli` commands can share the same remembered view. Pass the returned
+`snapshotToken` as `--since` on the next automatic snapshot. A missing or outdated
+token returns a complete view.
+
+On 27 September 2026, a Release-mode check against the project's Windows test app
+returned:
+
+| Response | UTF-8 bytes | End-to-end CLI call |
+|----------|------------:|-------------------:|
+| First automatic snapshot | 5,861 | 5,266.7 ms |
+| Next snapshot with matching token | 251 | 460.6 ms |
+
+That unchanged-window response was **95.7% smaller**. Missing and interleaved
+tokens returned complete views as required. Both continuity tests passed,
+including rejecting an old ID when a control with the same label replaced it.
+The test's CLI service was stopped afterward.
+
+These are single-check measurements, not a multi-application benchmark or a
+cost estimate. The first call includes startup only if the service was not
+already running.
 
 ## Reproduce
 
-The benchmarks require an interactive Windows desktop. Chrome is opt-in, and Word or Excel tests
-skip explicitly when the corresponding desktop application is unavailable. Run the workloads
-sequentially because they share the foreground desktop:
+Run on a Windows desktop that the tests can use without interruption. They take
+control of the mouse and keyboard. Chrome, Word, and Excel must be installed for
+their workloads. Tests explicitly skip an unavailable application.
+
+Run the workloads one at a time:
 
 ```powershell
 $project = '.\tests\Sbroenne.WindowsMcp.Tests\Sbroenne.WindowsMcp.Tests.csproj'
 $env:MCP_TEST_CHROME = '1'
-# Optional: pin an official build when the installed Chromium version does not expose page controls.
-# $env:MCP_TEST_CHROME_PATH = 'C:\path\to\chrome.exe'
 $env:MCP_SNAPSHOT_BENCHMARK_OUTPUT = "$env:TEMP\mcp-windows-snapshot-benchmark"
 
-dotnet build $project
-dotnet test $project --no-build --filter 'FullyQualifiedName~ElectronSnapshotBenchmarkTests'
-dotnet test $project --no-build --filter 'FullyQualifiedName~Benchmark_PublicGitHubRepositoryWorkflow_Chrome'
-dotnet test $project --no-build --filter 'FullyQualifiedName~OfficeSnapshotBenchmarkTests&DisplayName~Word'
-dotnet test $project --no-build --filter 'FullyQualifiedName~OfficeSnapshotBenchmarkTests&DisplayName~Excel'
+dotnet build $project -c Release
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~SnapshotBenchmarkRunnerTests'
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~ElectronSnapshotBenchmarkTests'
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~Benchmark_PublicGitHubRepositoryWorkflow_Chrome'
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~Benchmark_RealOfficeWorkflow&DisplayName~Word'
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~Benchmark_RealOfficeWorkflow&DisplayName~Excel'
+dotnet test $project -c Release --no-build --filter 'FullyQualifiedName~CliSnapshotContinuityTests'
 ```
 
-Each test writes a Markdown report containing medians and raw samples to
+Each benchmark writes a Markdown report with medians and raw samples to
 `MCP_SNAPSHOT_BENCHMARK_OUTPUT`.
 
-## Limitations
+## Limits
 
-- Live GitHub content, network conditions, application builds, accessibility trees, and machine
-  load vary. This benchmark characterizes these runs; it is not a fixed performance promise.
-- Chrome's live accessibility tree varied substantially between runs. The safe fallback prevented an
-  oversized or structurally unsafe diff from being returned; the semantic projection reduces these
-  complete automatic responses without pretending that a full-page navigation was a small change.
-- Office actions edit temporary local files through keyboard input. They do not exercise every
-  ribbon, dialog, formula, or workbook feature.
-- Electron uses the repository's deterministic harness rather than a large third-party Electron
-  application, but its navigation changes real renderer accessibility state.
-- Payload savings do not imply snapshot-latency savings because automatic mode must still capture
-  the current full tree before computing the response.
+Live webpages, application versions, network conditions, and machine load vary.
+These results describe the listed runs, not a guaranteed saving for every task.
+Large changes may need a complete view. Smaller responses do not necessarily
+mean faster capture or lower total agent costs.

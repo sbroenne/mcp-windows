@@ -1,74 +1,27 @@
 ---
-title: Related projects
-description: >-
-  More open-source projects by Stefan Broenner — AI automation, testing and
-  cloud tooling that complement Windows MCP Server.
-keywords: "Stefan Broenner projects, Excel MCP Server, PowerPoint MCP Server, OBS MCP Server, pytest-skill-engineering, RVToolsMerge"
+title: Tools for other tasks
+description: Related tools for working with Excel, PowerPoint, and OBS Studio.
 ---
 
-# Related projects
+# Tools for other tasks
 
-Other open-source projects by the author that pair well with Windows MCP Server:
+Windows MCP works through the desktop. For detailed work inside a particular
+app, a tool made for that app may be a better fit.
 
-<div class="grid cards" markdown>
+## Excel
 
--   :material-microsoft-excel:{ .lg .middle } __Excel MCP Server__
+[Excel MCP Server](https://excelmcpserver.dev/) provides tools for spreadsheets,
+formulas, tables, and charts without having to click through each step.
 
-    ---
+## PowerPoint
 
-    AI-powered Excel automation via MCP — the sister project to Windows
-    MCP Server, built the same way.
+[PowerPoint MCP Server](https://powerpointmcpserver.dev/) provides tools
+specifically for creating and editing presentations.
 
-    [:octicons-arrow-right-24: excelmcpserver.dev](https://excelmcpserver.dev/)
+## Recording and streaming
 
--   :material-microsoft-powerpoint:{ .lg .middle } __PowerPoint MCP Server__
+[OBS Studio MCP Server](https://github.com/sbroenne/mcp-server-obs) lets an AI
+assistant work with OBS Studio for recording and streaming.
 
-    ---
-
-    AI-powered PowerPoint automation via MCP — another sister project in the
-    same family.
-
-    [:octicons-arrow-right-24: powerpointmcpserver.dev](https://powerpointmcpserver.dev/)
-
--   :material-test-tube:{ .lg .middle } __pytest-skill-engineering__
-
-    ---
-
-    LLM agent testing framework — the same framework used to validate this
-    project's tools with real AI models.
-
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/pytest-skill-engineering)
-
--   :material-video:{ .lg .middle } __OBS Studio MCP Server__
-
-    ---
-
-    AI-powered OBS Studio automation for recording and streaming.
-
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/mcp-server-obs)
-
--   :material-server:{ .lg .middle } __RVToolsMerge__
-
-    ---
-
-    Merge and anonymize VMware RVTools exports.
-
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/RvToolsMerge)
-
--   :material-currency-usd:{ .lg .middle } __Azure Retail Prices Exporter__
-
-    ---
-
-    Daily automated Azure pricing exports with FX rates.
-
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/azureretailprices-exporter)
-
--   :material-shield-account:{ .lg .middle } __AWS CUR Anonymize__
-
-    ---
-
-    Anonymize AWS Cost &amp; Usage Reports for secure sharing.
-
-    [:octicons-arrow-right-24: View on GitHub](https://github.com/sbroenne/aws-cur-anonymize)
-
-</div>
+These are separate projects with their own setup instructions. Installing
+Windows MCP does not install them.

@@ -23,6 +23,9 @@ public static class UIAutomationErrorType
     /// <summary>Input was dispatched, but the resulting content could not be verified.</summary>
     public const string VerificationFailed = "verification_failed";
 
+    /// <summary>An application confirmation requires an explicit caller decision.</summary>
+    public const string ConfirmationRequired = "confirmation_required";
+
     /// <summary>The cached element reference is no longer valid.</summary>
     public const string ElementStale = "element_stale";
 

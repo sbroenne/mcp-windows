@@ -3,6 +3,7 @@ using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
 using Sbroenne.WindowsMcp.Models;
+using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Tests.Integration.TestHarness;
 using Sbroenne.WindowsMcp.Window;
 
@@ -121,6 +122,117 @@ public sealed class OpenFileTests : IDisposable
                 _fixture.Form!.Invoke(new Func<string?>(() => _fixture.Form.LastOpenPath)),
                 StringComparison.OrdinalIgnoreCase),
             TimeSpan.FromSeconds(5)));
+    }
+
+    [Fact]
+    public async Task Open_StopsAfterAnUnverifiedSubmission()
+    {
+        await AssertSingleOpenAttemptAsync(changePath: false);
+    }
+
+    [Fact]
+    public async Task Open_DoesNotCorrectAnApplicationChangedPath()
+    {
+        await AssertSingleOpenAttemptAsync(changePath: true);
+    }
+
+    private async Task AssertSingleOpenAttemptAsync(bool changePath)
+    {
+        var fixtureForm = _fixture.Form!;
+        System.Windows.Forms.Form? target = null;
+        System.Windows.Forms.Form? dialog = null;
+        PathEntryTextBox? filename = null;
+        nint dialogHandle = nint.Zero;
+        var submissions = 0;
+        var path = Path.Combine(_testOutputDir, $"single-attempt-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(path, "Input file");
+        var handle = (nint)fixtureForm.Invoke(() =>
+        {
+            target = new System.Windows.Forms.Form { Text = "Single Open owner", KeyPreview = true };
+            target.Controls.Add(new System.Windows.Forms.TextBox());
+            target.KeyDown += (_, e) =>
+            {
+                if (!e.Control || e.KeyCode != System.Windows.Forms.Keys.O)
+                {
+                    return;
+                }
+
+                e.SuppressKeyPress = true;
+                dialog = new System.Windows.Forms.Form { Text = "Open" };
+                filename = new PathEntryTextBox(path)
+                {
+                    Name = "FileNameControlHost",
+                    AccessibleName = "File name:",
+                    Width = 260
+                };
+                filename.TextChanged += (_, _) =>
+                {
+                    if (changePath && filename.Text == path)
+                    {
+                        filename.AppendText(".changed");
+                    }
+                };
+                var open = new System.Windows.Forms.Button { Text = "Open", Top = 40 };
+                open.Click += (_, _) => submissions++;
+                dialog.Controls.Add(filename);
+                dialog.Controls.Add(open);
+                dialog.Show(target);
+                dialogHandle = dialog.Handle;
+            };
+            target.Show(fixtureForm);
+            return target.Handle;
+        });
+
+        try
+        {
+            var result = await _automationService.OpenFileAsync(WindowHandleParser.Format(handle), path);
+            Assert.False(result.Success);
+            Assert.Equal(UIAutomationErrorType.VerificationFailed, result.ErrorType);
+            Assert.Equal(1, (int)fixtureForm.Invoke(() => filename!.PathAssignments));
+            Assert.Equal(changePath ? 0 : 1, (int)fixtureForm.Invoke(() => submissions));
+            var remainingFilename = await _automationService.FindElementsAsync(new ElementQuery
+            {
+                WindowHandle = WindowHandleParser.Format(dialogHandle),
+                AutomationId = "FileNameControlHost",
+                RequireUnique = true
+            });
+            Assert.True(remainingFilename.Success, remainingFilename.ErrorMessage);
+            var read = await _automationService.GetTextAsync(
+                Assert.Single(remainingFilename.Items!).Id,
+                WindowHandleParser.Format(dialogHandle),
+                includeChildren: false);
+            Assert.True(read.Success, read.ErrorMessage);
+            Assert.Equal(changePath ? path + ".changed" : path, read.Text);
+        }
+        finally
+        {
+            fixtureForm.Invoke(() =>
+            {
+                dialog?.Dispose();
+                target?.Dispose();
+            });
+        }
+    }
+
+    private sealed class PathEntryTextBox(string requestedPath) : System.Windows.Forms.TextBox
+    {
+        public int PathAssignments { get; private set; }
+
+        [System.Diagnostics.CodeAnalysis.AllowNull]
+        public override string Text
+        {
+            get => base.Text;
+            set
+            {
+                // One UIA assignment can raise TextChanged more than once.
+                if (value == requestedPath)
+                {
+                    PathAssignments++;
+                }
+
+                base.Text = value;
+            }
+        }
     }
 
     [Fact]

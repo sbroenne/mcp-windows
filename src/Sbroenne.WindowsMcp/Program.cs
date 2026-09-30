@@ -7,6 +7,13 @@ using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
 
+if (!Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) &&
+    Application.HighDpiMode != HighDpiMode.PerMonitorV2)
+{
+    Console.Error.WriteLine("Cannot initialize per-monitor display scaling. No automation was started.");
+    return 1;
+}
+
 // Single source of truth for the server version: read it from the assembly so it always
 // matches the <Version> the release workflow stamps into the .csproj (never a hardcoded literal).
 var serverVersion =

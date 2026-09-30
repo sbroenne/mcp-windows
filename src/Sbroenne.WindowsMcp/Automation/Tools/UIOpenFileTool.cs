@@ -16,14 +16,15 @@ public static partial class UIOpenFileTool
     /// <summary>
     /// 📂 OPEN A FILE via the app's Open dialog - the counterpart to file_save. Sends Ctrl+O,
     /// waits for the Open dialog, types the path into the File name field, and clicks Open.
+    /// Makes one path-entry attempt and one submission. Reports mismatches or remaining dialogs without retrying.
     /// NOTE: English Windows only; the file must already exist.
     /// Keywords: open, open file, load, load file, open document, browse, import, ctrl+o,
     /// open dialog, file picker, choose file.
     /// </summary>
     /// <remarks>
     /// WHEN TO USE: To load an existing document into an app that uses the standard Windows Open
-    /// dialog (Notepad, WordPad, most editors). WHY NOT KEYBOARD: like file_save, this drives the
-    /// dialog reliably instead of leaving keyboard_control stuck on a dialog it cannot see.
+    /// dialog (Notepad, WordPad, most editors). If it reports a failure, inspect the current dialog
+    /// before choosing another action; input may already have been sent.
     /// </remarks>
     /// <param name="windowHandle">Application window handle (from app or window_management 'find'). REQUIRED. Pass the APPLICATION window, not a dialog.</param>
     /// <param name="filePath">Absolute path of an existing file to open (e.g., C:/Users/User/doc.txt). Forward/back slashes both work. REQUIRED.</param>

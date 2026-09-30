@@ -25,7 +25,7 @@ namespace Sbroenne.WindowsMcp.Automation;
 /// </para>
 /// <para>
 /// UIA delivers event callbacks on its own threads. Registration and unregistration are both
-/// marshalled to the automation STA thread, and unregistration is mandatory - a handler that is
+/// marshalled to the automation MTA thread, and unregistration is mandatory - a handler that is
 /// never removed leaks a COM callback into the target process.
 /// </para>
 /// </remarks>
@@ -69,11 +69,15 @@ internal sealed class StructureChangeSignal : UIA.IUIAutomationStructureChangedE
             {
                 try
                 {
-                    UIA3Automation.Instance.Automation.AddStructureChangedEventHandler(
-                        root,
-                        UIA.TreeScope.TreeScope_Subtree,
-                        null,
-                        signal);
+                    lock (UIA3Automation.EventSubscriptionLock)
+                    {
+                        UIA3Automation.Instance.Automation.AddStructureChangedEventHandler(
+                            root,
+                            UIA.TreeScope.TreeScope_Subtree,
+                            null,
+                            signal);
+                    }
+                    staThread.RegisterShutdownCleanup(signal.DisposeOnAutomationThread);
                     return true;
                 }
                 catch (COMException)
@@ -131,40 +135,41 @@ internal sealed class StructureChangeSignal : UIA.IUIAutomationStructureChangedE
 
     public async ValueTask DisposeAsync()
     {
-        if (_disposed)
-        {
-            return;
-        }
-
-        _disposed = true;
-
         try
         {
-            _ = await _staThread.ExecuteAsync(
-                () =>
-                {
-                    try
-                    {
-                        UIA3Automation.Instance.Automation.RemoveStructureChangedEventHandler(_root, this);
-                    }
-                    catch (COMException)
-                    {
-                        // The provider or its process is already gone, which unregisters us anyway.
-                    }
-
-                    return true;
-                },
+            await _staThread.ExecuteAsync(
+                DisposeOnAutomationThread,
                 CancellationToken.None).ConfigureAwait(false);
         }
         catch (ObjectDisposedException)
         {
-            // The STA thread was torn down first; the handler dies with it.
+            // The worker's shutdown cleanup owns unregistration once its queue is closed.
         }
-        catch (InvalidOperationException)
-        {
-            // The STA thread stopped accepting work during shutdown.
-        }
+    }
 
-        _changed.Dispose();
+    private void DisposeOnAutomationThread()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
+        try
+        {
+            lock (UIA3Automation.EventSubscriptionLock)
+            {
+                UIA3Automation.Instance.Automation.RemoveStructureChangedEventHandler(_root, this);
+            }
+        }
+        catch (COMException ex)
+        {
+            System.Diagnostics.Trace.TraceWarning(
+                "UI Automation event subscription removal failed: {0}", ex);
+        }
+        finally
+        {
+            _staThread.UnregisterShutdownCleanup(DisposeOnAutomationThread);
+            _changed.Dispose();
+        }
     }
 }

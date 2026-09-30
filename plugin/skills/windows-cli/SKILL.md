@@ -9,9 +9,10 @@ source: "plugin"
 ## Context
 
 `wincli` is the command-line twin of the Windows MCP server. Every command calls the exact same
-underlying tool through a persistent user-owned CLI daemon. Prefer `wincli` when
-you already have a shell: one small command vocabulary costs far fewer tokens than loading every
-MCP tool schema. IDs from CLI discovery can be reused across commands against that daemon.
+underlying tool through a persistent user-owned CLI daemon. When you already have
+a shell, discover only the commands you need instead of loading every MCP tool schema.
+The context saving depends on the host's tool-loading behavior.
+IDs from CLI discovery can be reused across commands against that daemon.
 MCP instances have separate owners; never transfer their IDs to the CLI.
 
 ## Discovery (do this first)
@@ -30,12 +31,14 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
    Inspect candidates or rediscover with `window find`; do not continue with handle-based commands
    until the intended target is identified. `possibleHandoff` does not confirm delivery or loaded
    content; verify the intended page/document before acting.
-2. `wincli ui snapshot --window <handle>` to see the accessible element tree.
+2. `wincli ui snapshot --window <handle> --mode auto` to see controls and establish a baseline for repeated observations.
 3. `wincli ui find|click|type|select|read --window <handle> ...` for normal controls.
 4. `wincli ui read-table --window <handle> --element-id <grid-id>` to pull an observed grid/table into structured rows + headers.
    For a web page, add `--format article` to `wincli ui read` to get clean main-content text (nav/breadcrumb chrome and inline link URLs stripped, headings/lists as markdown).
-5. `wincli file-save --window <handle> --path <file>` for Save / Save As - never raw Ctrl+S.
+5. `wincli file-save --window <handle> --path <file>` for supported Save / Save As dialogs.
    Use `wincli file-open --window <handle> --path <file>` for Open flows.
+   Inspect remaining dialogs after failure or `confirmation_required`. Choose any confirmation,
+   cancellation, or correction explicitly; do not automatically repeat the helper.
 6. `wincli clipboard get|set|clear` for fast bulk text IO; keep reusable `ui batch` steps
    in project JSON files and run them with `--steps-file`.
 7. Fall back to `wincli screenshot`, `wincli mouse`, or `wincli keyboard` only for custom-drawn UI.
@@ -54,7 +57,7 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 
 ### Waiting
 - Use `ui wait --window <h> --name <x>` (or `--mode disappear`) instead of sleeping, so automation
-  stays fast and deterministic after dialogs, navigation, or tab switches.
+  checks an observable condition within a bounded timeout after dialogs, navigation, or tab switches.
 - Use `ui wait --mode state --element-id <id> --desired-state enabled`, or a batch discovery then
   `{"action":"wait","mode":"state","elementId":"$prev","desiredState":"enabled"}`,
   `$prev` must refer to one unambiguous immediately preceding result.
@@ -66,6 +69,14 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 - Reusable batches should discover controls afresh and consume same-run `$prev`, never persisted literal IDs.
 - CLI `ui snapshot --mode auto` returns a full baseline without `--since <snapshotToken>`.
   Supply that token for checked diffs; interleaved callers may safely receive a full snapshot.
+- Combine `--with-snapshot --snapshot-mode auto --since <snapshotToken>` for a
+  post-action comparison. A full fallback is normal when a diff is unsafe or too large.
+
+### Outcome verification
+- A successful click means input was dispatched, not that the requested application outcome completed.
+- Use a read, snapshot, or bounded wait to check the expected result.
+- Do not repeat a click solely because its target disappeared or its label changed.
+- If the response is lost after sending an action, inspect the current state before deciding what to do.
 
 ### Application arguments
 - `--args` and `--arguments` are aliases. For child arguments beginning with `--`, use equals:

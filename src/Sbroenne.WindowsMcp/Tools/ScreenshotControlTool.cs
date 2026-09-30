@@ -21,11 +21,14 @@ public static partial class ScreenshotControlTool
     /// annotate, monitors, displays, list monitors, region capture, window capture.
     /// </summary>
     /// <remarks>
-    /// **COORDINATE SYSTEM**: Screenshot pixel coordinates = mouse coordinates. No conversion needed!
-    /// If you see a button at pixel (450, 300) in the screenshot, use mouse_control(x=450, y=300, monitorIndex=N).
+    /// **COORDINATES**: captureBounds is the image's physical virtual-screen rectangle.
+    /// Convert image pixels to screen pixels: screenX=captureBounds.x+imageX*scaleX (same for y).
+    /// For mouse_control, subtract the target monitor origin, or the current window origin when using windowHandle.
+    /// Annotation 'click' arrays already contain [x,y,monitorIndex] in monitor-relative physical pixels:
+    /// pass those values directly without windowHandle. Annotated images may be resized; their pixels are not click coordinates.
     ///
     /// Returns base64-encoded image data (JPEG by default, configurable via imageFormat parameter).
-    /// Default: JPEG format at quality 60 (LLM-optimized), at logical resolution (matching mouse coordinate space).
+    /// Default: JPEG format at quality 60 (LLM-optimized). Plain captures retain physical pixel dimensions.
     ///
     /// **ANNOTATION MODE** (annotate=true, default):
     /// - Returns element list with index, name, controlType, boundingRect, and elementId
@@ -354,7 +357,8 @@ public static partial class ScreenshotControlTool
                 result.Elements ?? [],
                 savedFilePath,
                 result.OriginalWidth,
-                result.OriginalHeight));
+                result.OriginalHeight) with
+            { CaptureBounds = result.CaptureBounds });
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Sbroenne.WindowsMcp.Automation;
 using Sbroenne.WindowsMcp.Capture;
 using Sbroenne.WindowsMcp.Input;
+using Sbroenne.WindowsMcp.Models;
 using Sbroenne.WindowsMcp.Native;
 using Sbroenne.WindowsMcp.Window;
 using UIA = Interop.UIAutomationClient;
@@ -36,6 +37,35 @@ internal sealed class ChromiumAutomationHarness : IDisposable
 
     public UIAutomationService AutomationService { get; }
 
+    public Task<string?> ReadSelectedTextAsync(string elementId) =>
+        _staThread.ExecuteAsync(() =>
+        {
+            var element = ElementIdGenerator.ResolveToAutomationElement(elementId);
+            Assert.NotNull(element);
+            return ReadSelection(element);
+        });
+
+    public async Task<string> ObserveAddressBarAsync(string windowHandle)
+    {
+        var snapshot = await AutomationService.GetTreeAsync(windowHandle, null, 20, null);
+        Assert.True(snapshot.Success, snapshot.ErrorMessage);
+        var address = Assert.Single(Flatten(snapshot.Tree),
+            element => element.Name == "Address and search bar" && element.Type == "Edit");
+        return address.Id;
+    }
+
+    internal static IEnumerable<UIElementCompactTree> Flatten(IEnumerable<UIElementCompactTree>? roots)
+    {
+        foreach (var root in roots ?? [])
+        {
+            yield return root;
+            foreach (var child in Flatten(root.Children))
+            {
+                yield return child;
+            }
+        }
+    }
+
     public Task<string> DescribeObservedElementAsync(string elementId) =>
         _staThread.ExecuteAsync(() =>
         {
@@ -51,8 +81,15 @@ internal sealed class ChromiumAutomationHarness : IDisposable
                 $"currentName={ReadDiagnostic(() => element.CurrentName)}; " +
                 $"offscreen={ReadDiagnostic(() => element.CurrentIsOffscreen)}; " +
                 $"value={ReadDiagnostic(() => element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value)?.CurrentValue)}; " +
-                $"text={ReadDiagnostic(() => element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text)?.DocumentRange?.GetText(int.MaxValue))}";
+                $"text={ReadDiagnostic(() => element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text)?.DocumentRange?.GetText(int.MaxValue))}; " +
+                $"selection={ReadDiagnostic(() => ReadSelection(element))}";
         });
+
+    private static string? ReadSelection(UIA.IUIAutomationElement element)
+    {
+        var selection = element.GetPattern<UIA.IUIAutomationTextPattern>(UIA3PatternIds.Text)?.GetSelection();
+        return selection is { Length: 1 } ? selection.GetElement(0).GetText(int.MaxValue) : null;
+    }
 
     private static string ReadDiagnostic(Func<object?> read)
     {

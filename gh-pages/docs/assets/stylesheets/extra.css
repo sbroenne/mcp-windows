@@ -1,7 +1,6 @@
 /* ---------------------------------------------------------------------------
    Windows MCP Server — custom styling on top of the Material theme.
-   Only the marketing homepage hero needs bespoke rules; everything else uses
-   Material's built-in components (grid cards, admonitions, tables, nav).
+   Custom hero, charts, and overview diagram complement Material components.
    --------------------------------------------------------------------------- */
 
 :root {
@@ -104,6 +103,109 @@
 
 .md-typeset .grid {
   gap: 0.6rem;
+}
+
+.md-typeset .benchmark-chart {
+  margin: 1.2rem 0;
+  padding: 1rem;
+  max-width: none;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.4rem;
+  text-align: left;
+}
+
+.md-typeset .benchmark-chart figcaption {
+  margin: 0 0 0.9rem;
+  max-width: none;
+  font-style: normal;
+  font-weight: 700;
+  text-align: left;
+}
+
+.md-typeset .benchmark-chart ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-typeset .benchmark-chart ul > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.3rem 0.6rem;
+  margin: 0 0 0.9rem;
+}
+
+.benchmark-chart__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.benchmark-chart__track {
+  display: block;
+  grid-column: 1 / -1;
+  height: 0.65rem;
+  overflow: hidden;
+  border-radius: 0.2rem;
+  background: var(--md-default-fg-color--lightest);
+}
+
+.benchmark-chart__bar {
+  display: block;
+  width: calc(100% * var(--chart-value) / var(--chart-max));
+  height: 100%;
+  background: var(--md-primary-fg-color);
+}
+
+.benchmark-chart__scale {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+
+.md-typeset .benchmark-chart__note {
+  margin: 0.7rem 0 0;
+  font-size: 0.75rem;
+}
+
+.md-typeset .mcp-flow {
+  margin: 1.2rem 0;
+  max-width: none;
+  text-align: center;
+}
+
+.mcp-flow__node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.7rem;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.35rem;
+  background: var(--md-code-bg-color);
+}
+
+.mcp-flow__node span {
+  font-size: 0.75rem;
+}
+
+.mcp-flow__branches {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.mcp-flow__arrow {
+  margin: 0.3rem 0;
+  color: var(--md-primary-fg-color);
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.md-typeset .mcp-flow figcaption {
+  margin: 0.7rem 0 0;
+  max-width: none;
+  font-style: normal;
 }
 
 @media screen and (max-width: 44.9375em) {

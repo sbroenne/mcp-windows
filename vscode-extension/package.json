@@ -1,7 +1,7 @@
 {
   "name": "windows-mcp",
   "displayName": "Windows MCP Server",
-  "description": "AI-powered Windows automation — UI Automation, mouse, keyboard, window management, and screenshots for computer use, QA, and RPA",
+  "description": "Give AI agents Windows controls, not just screenshots — named buttons, field values, table rows, and changes-only views.",
   "version": "1.0.0",
   "publisher": "sbroenne",
   "icon": "icon.png",
@@ -31,6 +31,8 @@
     "windows",
     "automation",
     "ui automation",
+    "token efficiency",
+    "incremental snapshots",
     "mouse",
     "keyboard",
     "screenshot",
@@ -42,9 +44,6 @@
   ],
   "activationEvents": [
     "onStartupFinished"
-  ],
-  "extensionDependencies": [
-    "ms-dotnettools.vscode-dotnet-runtime"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -58,7 +57,7 @@
   "scripts": {
     "clean": "cd .. && dotnet clean src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release",
     "clean:bin": "pwsh -NoProfile -Command \"Get-ChildItem -Path bin -Recurse -Include *.pdb,*.xml | Remove-Item -Force; if (Test-Path bin/runtimes/browser) { Remove-Item -Path bin/runtimes/browser -Recurse -Force }\"",
-    "build:mcp-server": "npm run clean && cd .. && dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release --no-self-contained -o vscode-extension/bin --verbosity minimal && cd vscode-extension && npm run clean:bin",
+    "build:mcp-server": "npm run clean && cd .. && dotnet publish src/Sbroenne.WindowsMcp/Sbroenne.WindowsMcp.csproj -c Release -r win-x64 --self-contained true -o vscode-extension/bin --verbosity minimal && cd vscode-extension && npm run clean:bin",
     "vscode:prepublish": "npm run build:mcp-server && npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",

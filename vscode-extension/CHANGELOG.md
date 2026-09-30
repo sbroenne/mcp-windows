@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Lead with "Windows controls, not just screenshots" and explain setup and benefits in simple English.
+- Align website, installation guidance, and examples with observed-ID targeting, CLI state ownership, and click outcome verification.
+- Distinguish actual release assets and runtime requirements from planned packaging; link benchmark evidence with its measurement scope.
+
+### Fixes in this update
+- Include the .NET Desktop Runtime with the extension instead of requesting .NET 8 for a .NET 10 server.
+- Report semantic action provider failures as unverified outcomes, without sending another action.
+- Report unexpected text changes without deleting autocomplete suggestions or silently correcting application text.
+- Leave overwrite and save-error prompts open for the caller; do not repeat file-dialog submissions or radio-button activation after an unverified action.
+- Wait for the actual Word document in benchmark tests, rather than its temporary startup window.
+
+The earlier development notes below retain historical API examples. They are not
+the current command reference: targeted actions now require observed element IDs.
+Use [FEATURES.md](../FEATURES.md) for current syntax and behavior.
+
 ### Added
 - **5 Focused UI Tools** - Split `ui_automation` into specialized tools for better LLM understanding:
   - `ui_find` — Find elements by name, type, or ID (with timeout/retry via `timeoutMs`)

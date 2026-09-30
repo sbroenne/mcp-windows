@@ -16,10 +16,10 @@
   <!-- Social preview image -->
   {% set og_image = "https://windowsmcpserver.dev/assets/images/icon.png" %}
   <meta property="og:image" content="{{ og_image }}">
-  <meta property="og:image:alt" content="Windows MCP Server — automate Windows apps and browsers with AI">
+  <meta property="og:image:alt" content="Windows MCP Server — Put your AI to work in Windows">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:image" content="{{ og_image }}">
-  <meta name="twitter:image:alt" content="Windows MCP Server — automate Windows apps and browsers with AI">
+  <meta name="twitter:image:alt" content="Windows MCP Server — Put your AI to work in Windows">
 
   <!-- Structured data: SoftwareApplication -->
   <script type="application/ld+json">
@@ -34,7 +34,7 @@
       "price": "0",
       "priceCurrency": "USD"
     },
-    "description": "Windows computer use for AI agents. Automate any Windows app, browser or website by name — not pixels — through the Windows UI Automation API. Works with GitHub Copilot, Claude Desktop and Cursor.",
+    "description": {{ config.site_description | trim | tojson }},
     "url": "https://windowsmcpserver.dev/",
     "image": "https://windowsmcpserver.dev/assets/images/icon.png",
     "programmingLanguage": "C#",
@@ -46,18 +46,22 @@
       "https://www.youtube.com/@sbroenne",
       "https://marketplace.visualstudio.com/items?itemName=sbroenne.windows-mcp"
     ],
-    "keywords": "Windows, automation, MCP, AI, UI Automation, browser automation, GitHub Copilot, Claude, Cursor",
+    "keywords": "Windows, automation, MCP, CLI, wincli, token efficiency, UI Automation, GitHub Copilot, Claude, Cursor",
     "author": {
       "@type": "Person",
       "name": "Stefan Broenner"
     },
     "featureList": [
-      "Semantic UI automation",
-      "Browser automation (Edge, Chrome)",
-      "Window management",
-      "Multi-monitor support",
-      "Mouse and keyboard control",
-      "Screenshot capture with element metadata"
+      "Find buttons and fields",
+      "Read values as text without an unnecessary screenshot",
+      "Send changes instead of repeating the whole window",
+      "Connect through MCP or the command line (CLI)",
+      "Fill in forms and read tables",
+      "Work with pages in Edge and Chrome",
+      "Move and resize windows",
+      "Work across monitors",
+      "Use the mouse and keyboard",
+      "Take screenshots"
     ]
   }
   </script>
@@ -72,7 +76,7 @@
         "@id": "https://windowsmcpserver.dev/#website",
         "name": "Windows MCP Server",
         "url": "https://windowsmcpserver.dev/",
-        "description": "Windows computer use for AI agents. Automate any Windows app, browser or website by name — not pixels.",
+        "description": {{ config.site_description | trim | tojson }},
         "inLanguage": "en",
         "publisher": { "@id": "https://windowsmcpserver.dev/#author" }
       },

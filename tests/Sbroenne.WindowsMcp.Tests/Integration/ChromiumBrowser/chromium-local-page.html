@@ -47,6 +47,14 @@
         <aside aria-label="On this page">
             <a href="#getting-started">Complementary rail link</a>
         </aside>
+        <section class="card" aria-label="Date fields">
+            <label for="empty-date">Empty workshop date</label>
+            <input id="empty-date" type="date">
+            <button type="button" onclick="document.getElementById('date-result').textContent = document.getElementById('empty-date').value || '(empty date)'">Check workshop date</button>
+            <p id="date-result" role="status">Date not checked</p>
+            <label for="populated-date">Populated workshop date</label>
+            <input id="populated-date" type="date" value="2026-10-21">
+        </section>
     </main>
 </body>
 </html>

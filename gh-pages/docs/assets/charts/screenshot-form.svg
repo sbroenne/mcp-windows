@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="426" viewBox="0 0 480 426" role="img" aria-labelledby="title description">
+<title id="title">Input tokens saved with direct field reads</title>
+<desc id="description">Compared with low-detail screenshots of the same form. All 300 answers across four models and three input types were correct. GPT-6 Astra: 51.4%; GPT-6 Luna: 51.4%; GPT-5.6 Sol: 51.4%; GPT-5.6 Luna: 51.4%</desc>
+<rect width="480" height="426" rx="8" fill="#ffffff"/>
+<g font-family="Arial, sans-serif" fill="#24292f">
+<text x="20" y="30" font-size="18" text-anchor="start" font-weight="bold">Input tokens saved with direct field</text>
+<text x="20" y="54" font-size="18" text-anchor="start" font-weight="bold">reads</text>
+<text x="20" y="82" font-size="18" text-anchor="start" font-weight="normal">GPT-6 Astra</text>
+<text x="460" y="82" font-size="18" text-anchor="end" font-weight="bold">51.4%</text>
+<rect x="20" y="94" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="94" width="226.16" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="144" font-size="18" text-anchor="start" font-weight="normal">GPT-6 Luna</text>
+<text x="460" y="144" font-size="18" text-anchor="end" font-weight="bold">51.4%</text>
+<rect x="20" y="156" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="156" width="226.16" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="206" font-size="18" text-anchor="start" font-weight="normal">GPT-5.6 Sol</text>
+<text x="460" y="206" font-size="18" text-anchor="end" font-weight="bold">51.4%</text>
+<rect x="20" y="218" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="218" width="226.16" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="268" font-size="18" text-anchor="start" font-weight="normal">GPT-5.6 Luna</text>
+<text x="460" y="268" font-size="18" text-anchor="end" font-weight="bold">51.4%</text>
+<rect x="20" y="280" width="440" height="12" rx="3" fill="#eaeef2"/>
+<rect x="20" y="280" width="226.16" height="12" rx="3" fill="#0078d4"/>
+<text x="20" y="330" font-size="14" text-anchor="start" font-weight="normal">0%</text>
+<text x="460" y="330" font-size="14" text-anchor="end" font-weight="normal">100% saved</text>
+<text x="20" y="360" font-size="16" text-anchor="start" font-weight="normal">Compared with low-detail screenshots of the same</text>
+<text x="20" y="380" font-size="16" text-anchor="start" font-weight="normal">form. All 300 answers across four models and three</text>
+<text x="20" y="400" font-size="16" text-anchor="start" font-weight="normal">input types were correct.</text>
+</g>
+</svg>

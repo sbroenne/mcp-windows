@@ -40,6 +40,18 @@ This project adheres to the Contributor Covenant. By participating, you are expe
 
 ## Development Workflow
 
+### Documentation
+
+Follow [.github/documentation.instructions.md](.github/documentation.instructions.md)
+for public messaging, evidence requirements, and source ownership.
+GitHub Pages has plain-English user guides separate from the developer references.
+Only the detailed benchmark measurements are included from a canonical repository
+file; do not edit that generated copy. Link to developer manuals and skill files
+instead of pasting them into the user guides.
+See [the website guide](gh-pages/README.md) for a strict build and local preview.
+Benchmark numbers must identify their source revision, workload, and measurement
+unit rather than imply universal speed or model-cost savings.
+
 ### Portable npm Lockfiles
 
 Each npm project with a tracked lockfile must have its own `.npmrc` containing:

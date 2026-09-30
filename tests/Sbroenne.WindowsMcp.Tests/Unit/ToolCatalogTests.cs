@@ -22,6 +22,9 @@ public sealed class ToolCatalogTests
 
         Assert.Contains("elementId", find.Description, StringComparison.Ordinal);
         Assert.Contains("2000 visited UIA nodes", find.Description, StringComparison.Ordinal);
+        Assert.Contains("exactDepth=1", find.Description, StringComparison.Ordinal);
+        Assert.Contains("parentElementId", find.Description, StringComparison.Ordinal);
+        Assert.Contains("still count", find.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("pass its name/automationId/controlType", find.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("2000 candidates", find.Description, StringComparison.Ordinal);
     }

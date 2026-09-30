@@ -18,7 +18,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <RootNamespace>Sbroenne.WindowsMcp</RootNamespace>
     <AssemblyName>Sbroenne.WindowsMcp</AssemblyName>
-    <Description>MCP Server for Windows automation - UI automation, mouse, keyboard, window management, and screenshots</Description>
+    <Description>Give AI agents Windows controls, not just screenshots - named buttons, field values, table rows, and changes-only views through MCP.</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <InvariantGlobalization>true</InvariantGlobalization>

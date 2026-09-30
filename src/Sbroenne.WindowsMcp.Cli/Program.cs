@@ -3,6 +3,13 @@ using Sbroenne.WindowsMcp.Cli;
 using Sbroenne.WindowsMcp.Cli.Service;
 using Sbroenne.WindowsMcp.Prompts;
 
+if (!Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) &&
+    Application.HighDpiMode != HighDpiMode.PerMonitorV2)
+{
+    Console.Error.WriteLine("Cannot initialize per-monitor display scaling. No automation was started.");
+    return ExitCodes.ToolError;
+}
+
 // wincli - the token-efficient CLI entry point for the Windows automation MCP server.
 // It shares one implementation with the MCP server: every command calls the same tool
 // ExecuteAsync method. CLI operations run in a persistent CLI-only owner; MCP stays in process.

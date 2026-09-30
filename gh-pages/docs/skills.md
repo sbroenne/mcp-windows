@@ -1,34 +1,37 @@
 ---
-title: Agent Skills
-description: The bundled Agent Skills — windows-automation and windows-cli — that teach AI agents how to drive Windows apps semantically, via the MCP server or the token-efficient wincli command line.
-keywords: "Windows MCP agent skill, windows-automation skill, windows-cli skill, wincli, GitHub Copilot CLI plugin, Claude Code skill, semantic UI automation guidance"
+title: Optional assistant instructions
+description: Extra instruction files that can help your assistant use Windows MCP. These are optional and do not install the tools.
 ---
 
-# Agent Skills
+# Optional assistant instructions
 
-Windows MCP Server ships **two Agent Skills**, bundled in the plugin. Agent Skills
-give the AI concise, task-focused guidance on *how* to use the tools well: when to
-prefer semantic UI Automation over screenshots, how to handle DPI and multi-monitor
-layouts, how to work with browsers and Windows security boundaries, and how to drive
-the same tools from the command line.
+Some AI apps can read extra instruction files called **skills**. The files tell
+the assistant how to approach a task, such as finding the right window before
+typing and checking the result afterward.
 
-Both skills are installed automatically with the
-[plugin](installation.md#github-copilot-cli-claude-code-plugin) for GitHub Copilot
-CLI and Claude Code.
+**You do not need these files to get started.** Set up the tools first using the
+[installation guide](installation.md).
 
-## windows-automation
+## Choose the file for your setup
 
-Semantic-first guidance for driving Windows apps through the MCP server. Full
-definition at
-[`plugin/skills/windows-automation/SKILL.md`](https://github.com/sbroenne/mcp-windows/blob/main/plugin/skills/windows-automation/SKILL.md).
+### windows-automation
 
---8<-- "_generated/skills.md"
+For an assistant connected through MCP. It explains how to find controls,
+work with browser pages, and use screenshots when needed.
 
-## windows-cli
+[Read or download the MCP instructions](https://github.com/sbroenne/mcp-windows/blob/main/plugin/skills/windows-automation/SKILL.md)
 
-Guidance for the **token-efficient `wincli` command line** — the twin entry point
-that mirrors the MCP tools as shell commands (identical JSON output), ideal for
-coding agents with terminal access. Full definition at
-[`plugin/skills/windows-cli/SKILL.md`](https://github.com/sbroenne/mcp-windows/blob/main/plugin/skills/windows-cli/SKILL.md).
+### windows-cli
 
---8<-- "_generated/skills-cli.md"
+For an assistant using the command line (CLI). It explains how to look up
+commands and use them for Windows tasks.
+
+[Read or download the CLI instructions](https://github.com/sbroenne/mcp-windows/blob/main/plugin/skills/windows-cli/SKILL.md)
+
+## Use the instructions
+
+Check whether your AI app supports skill files and follow its instructions for
+adding one. Setup differs between apps.
+
+Adding a skill does not install Windows MCP, connect the tools, or change what
+your assistant is allowed to do. Keep using your AI app's permission settings.
