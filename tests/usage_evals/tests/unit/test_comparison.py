@@ -91,7 +91,7 @@ def test_published_framework_audit_objects_are_supported():
     result = captured_result()
     assert isinstance(result.request_audit[0], RequestAudit)
     assert (
-        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+        require_execution_evidence(result, "gpt-6.1-sol", ["screenshot_control"])
         == "same-instructions"
     )
 
@@ -103,7 +103,7 @@ def test_actual_framework_configuration_owns_session_limits_and_auditing(tmp_pat
         return ToolResult(text_result_for_llm="Unit test only.")
 
     tools = [Tool(name="unit_tool", description="Unit test", parameters={}, handler=handler)]
-    agent = build_comparison_agent("gpt-6-astra", 600, 80, tmp_path, tools)
+    agent = build_comparison_agent("gpt-6.1-sol", 600, 80, tmp_path, tools)
     assert agent.client_mode == "empty"
     assert agent.max_tool_calls == 80
     assert agent.max_retries == 0
@@ -133,12 +133,12 @@ def test_retired_helpers_cannot_start_model_sessions():
             assert prohibited not in source
 
 
-def test_matrix_contains_all_32_pairs_and_alternates_routes():
+def test_matrix_contains_all_16_pairs_and_alternates_routes():
     rows = comparison_matrix()
-    assert len(rows) == len(set(rows)) == 32
+    assert len(rows) == len(set(rows)) == 16
     assert rows[:4] == [
-        ("notepad", "gpt-6-astra", "controls"),
-        ("notepad", "gpt-6-astra", "screenshots"),
+        ("notepad", "gpt-6.1-sol", "controls"),
+        ("notepad", "gpt-6.1-sol", "screenshots"),
         ("notepad", "gpt-6-luna", "screenshots"),
         ("notepad", "gpt-6-luna", "controls"),
     ]
@@ -147,11 +147,11 @@ def test_matrix_contains_all_32_pairs_and_alternates_routes():
 @pytest.mark.parametrize(
     ("selected", "cap", "models", "timeout", "calls"),
     [
-        (32, 31, ["gpt-6-astra"], 600, 80),
-        (0, 32, ["gpt-6-astra"], 600, 80),
-        (32, 32, [], 600, 80),
-        (32, 32, ["gpt-6-astra"], 0, 80),
-        (32, 32, ["gpt-6-astra"], 600, 0),
+        (16, 15, ["gpt-6.1-sol"], 600, 80),
+        (0, 16, ["gpt-6.1-sol"], 600, 80),
+        (16, 16, [], 600, 80),
+        (16, 16, ["gpt-6.1-sol"], 0, 80),
+        (16, 16, ["gpt-6.1-sol"], 600, 0),
     ],
 )
 def test_explicit_budget_is_required_before_model_or_desktop_access(
@@ -162,20 +162,20 @@ def test_explicit_budget_is_required_before_model_or_desktop_access(
 
 
 def test_approved_budget_is_accepted():
-    require_comparison_budget(32, 32, ["gpt-6-astra"], 600, 80)
+    require_comparison_budget(16, 16, ["gpt-6.1-sol"], 600, 80)
 
 
 def captured_result(**changes):
     return SimpleNamespace(
         **{
-            "model_used": "gpt-6-astra",
+            "model_used": "gpt-6.1-sol",
             "evidence_complete": True,
             "stop_reason": "completed",
             "error": None,
             "request_audit": [
                 RequestAudit(
                     request_id="unit",
-                    model="gpt-6-astra",
+                    model="gpt-6.1-sol",
                     tool_names=["screenshot_control"],
                     reasoning_effort="medium",
                     image_count=1,
@@ -192,7 +192,7 @@ def captured_result(**changes):
 def test_complete_evidence_keeps_expected_budget_failures(reason):
     result = captured_result(stop_reason=reason)
     assert (
-        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+        require_execution_evidence(result, "gpt-6.1-sol", ["screenshot_control"])
         == "same-instructions"
     )
 
@@ -211,7 +211,7 @@ def test_complete_evidence_keeps_expected_budget_failures(reason):
 def test_missing_or_untrustworthy_evidence_stops_the_matrix(changes):
     with pytest.raises(RuntimeError):
         require_execution_evidence(
-            captured_result(**changes), "gpt-6-astra", ["screenshot_control"]
+            captured_result(**changes), "gpt-6.1-sol", ["screenshot_control"]
         )
 
 
@@ -225,7 +225,7 @@ def test_unapproved_request_settings_are_not_counted_as_a_valid_comparison():
         result = captured_result()
         result.request_audit[0] = replace(result.request_audit[0], **changes)
         with pytest.raises(RuntimeError):
-            require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+            require_execution_evidence(result, "gpt-6.1-sol", ["screenshot_control"])
 
 
 def test_every_websocket_message_is_checked_even_with_a_shared_request_id():
@@ -233,12 +233,12 @@ def test_every_websocket_message_is_checked_even_with_a_shared_request_id():
     first = result.request_audit[0]
     result.request_audit.append(replace(first, image_count=0, image_details=[]))
     assert (
-        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+        require_execution_evidence(result, "gpt-6.1-sol", ["screenshot_control"])
         == "same-instructions"
     )
     result.request_audit[1] = replace(first, reasoning_effort="high")
     with pytest.raises(RuntimeError, match="approved comparison settings"):
-        require_execution_evidence(result, "gpt-6-astra", ["screenshot_control"])
+        require_execution_evidence(result, "gpt-6.1-sol", ["screenshot_control"])
 
 
 def run_pytest(*arguments):
@@ -254,20 +254,20 @@ def run_pytest(*arguments):
 def test_collection_needs_no_desktop_build_or_model_access():
     result = run_pytest("--collect-only", "-q")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "32 tests collected" in result.stdout
+    assert "16 tests collected" in result.stdout
 
 
 def test_comparison_is_skipped_without_explicit_opt_in():
     result = run_pytest("-q")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "32 skipped" in result.stdout
+    assert "16 skipped" in result.stdout
 
 
 def test_insufficient_approved_budget_rejects_whole_selected_matrix():
     result = run_pytest(
         "--run-comparison",
         "--comparison-model",
-        "gpt-6-astra",
+        "gpt-6.1-sol",
         "--comparison-max-runs",
         "7",
         "--comparison-timeout",
@@ -284,7 +284,7 @@ def test_live_comparison_requires_a_fresh_persistent_report():
     result = run_pytest(
         "--run-comparison",
         "--comparison-model",
-        "gpt-6-astra",
+        "gpt-6.1-sol",
         "--comparison-max-runs",
         "8",
         "--comparison-timeout",

@@ -1,54 +1,33 @@
 ---
-title: Token savings
-description: Compare four models on real Notepad, Word, PowerPoint, and Chrome tasks, including scoring corrections and measurement limits.
+title: Token measurements
+description: See the method for comparing controls and screenshots, plus measured single-field and changes-only results.
 hide:
   - toc
 ---
 
-# Token savings: measured results
+# Token measurements
 
 **Read just what you need. Send only what changed.** Windows MCP gives your
 assistant both ways to save tokens, with screenshots available when it needs
 a picture.
 
 Tokens are the units AI services count when processing text and images.
-We measured complete Windows tasks, reading a single field, and sending only
-changes instead of repeating a window's controls.
+The real-task comparison is ready to run. Smaller published measurements cover
+reading a single field and sending only changes instead of repeating a
+window's controls.
 
 ## Real tasks in Notepad, Word, PowerPoint, and Chrome
 
-**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
-That check ignored final line breaks. Requiring the final line break changes
-controls first to **9 of 16**; screenshots remain **7 of 16**. The table and
-savings below retain the original scoring, not the stricter check or a new run.
+**No current real-task results are published.** The next run compares GPT-6.1
+Sol and GPT-6 Luna on Notepad, Word, PowerPoint, and Chrome. Both models use a
+controls-first route and a screenshot-only route, for 16 trials.
 
-We asked four models to edit and save documents, reorder slides, and submit
-a booking form. We checked the actual saved files and submitted values, not
-just whether the AI said it had finished. All original files stayed unchanged.
-
-| Model | Controls first | Screenshots |
-|---|---:|---:|
-| GPT-6 Astra | 4/4 | 4/4 |
-| GPT-6 Luna | 3/4 | 2/4 |
-| GPT-5.6 Sol | 3/4 | 1/4 |
-| GPT-5.6 Luna | 1/4 | 0/4 |
-
-For the **seven app/model pairs where both routes succeeded**, the middle
-saving was **51.1% fewer input tokens and 49.3% less time** with controls
-first. This route could use screenshots too. The screenshot-only route
-could not read or act on controls directly.
-
-Screenshots were better for input-token use in one successful pair:
-GPT-6 Astra's PowerPoint task used **21.9% more input tokens with controls**,
-with almost the same time. Twelve failed trials ran out of tool calls.
-Two agents claimed success despite a wrong Word heading style or a wrong
-booking year.
-
-These are 32 fresh trials, one per combination, using the same Windows MCP
-server. They compare two tool sets within Windows MCP, not separate products.
+Saved files and submitted values are checked independently. The framework
+also checks actual model requests, tools, reasoning, image detail, usage, and
+stop reasons before a result can be published.
 
 <details markdown="1" id="real-app-details">
-<summary>Real-app results, failures, evidence, and how to repeat the comparison</summary>
+<summary>Real-app tasks, safeguards, and how to run the comparison</summary>
 
 --8<-- "_generated/real-app-benchmark.md"
 
@@ -148,9 +127,8 @@ which view to request.
 
 ## Does it make tasks faster?
 
-In the seven successful real-task pairs above, controls first was faster in
-every pair, with a middle saving of 49.3%. The PowerPoint difference was small.
-The single-field test did not show the same consistent speed advantage.
+The pending real-task comparison will measure full framework session time for
+both routes. The single-field test did not show a consistent speed advantage.
 An app's speed and the time the AI takes to decide also affect the task.
 
 <span id="do-i-need-to-configure-this"></span>

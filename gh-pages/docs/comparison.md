@@ -60,14 +60,10 @@ task requires.
 
 ## What about tokens?
 
-**Real tasks showed a useful difference, with a scoring limit.** The original
-check marked controls first complete on 11 of 16 tasks, and screenshots on
-7 of 16. It ignored final line breaks. Requiring the final line break changes
-controls first to **9 of 16**; screenshots remain **7 of 16**.
-Across the seven app/model pairs counted as finished by the original check,
-controls first used 51.1% fewer input tokens and took 49.3% less time at the
-middle of each set of savings. One PowerPoint pair used more tokens with
-controls. Both routes used Windows MCP.
+**No current real-task results are published.** The next comparison will use
+controls-first and screenshot-only routes within Windows MCP with GPT-6.1 Sol
+and GPT-6 Luna. The 16 trials cover Notepad, Word, PowerPoint, and Chrome.
+Saved files and submitted values are checked independently.
 
 **A short text reply can use fewer tokens than a screenshot.** If your assistant
 only needs to know whether a checkbox is ticked, Windows MCP can return that
@@ -89,10 +85,10 @@ high-detail images**, including the question and instructions. Screenshots
 worked at both detail settings; focused text returned the same answers with
 less input.
 
-The advantage is choosing the information the task needs. The real-task
-comparison includes tool definitions, repeated conversation history, and
-actions. The single-field comparison measures only a read. Neither is a
-price comparison or a direct test against separate products.
+The advantage is choosing the information the task needs. The pending
+real-task comparison includes tool definitions, repeated conversation
+history, and actions. The single-field comparison measures only a read.
+Neither is a price comparison or a direct test against separate products.
 
 [See what we measure](benchmark.md)
 

@@ -62,30 +62,15 @@ an agent with command access can run the CLI for you.
 
 ## Real tasks: controls first versus screenshots
 
-**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
-That check ignored final line breaks. Requiring the final line break changes
-controls first to **9 of 16**; screenshots remain **7 of 16**. The savings
-below use the original scoring, not the stricter check or a new run.
+**No current real-task results are published.** The next comparison uses
+GPT-6.1 Sol and GPT-6 Luna across Notepad, Word, PowerPoint, and Chrome. Each
+model uses both a controls-first route and a screenshot-only route, for 16
+trials in total.
 
-We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
-documents in Notepad and Word, change and reorder PowerPoint slides, and
-submit a booking form in Chrome.
+We check saved files and submitted values independently. The original input
+must remain unchanged, and incomplete request evidence stops the run.
 
-We checked the actual files and submitted values, not just whether the AI
-said it had finished. All original input files stayed unchanged.
-
-For the **seven matching tasks where both approaches succeeded**, controls
-first used **51.1% fewer input tokens** and took **49.3% less time**, at the
-middle of each set of savings. This route could still use screenshots.
-One PowerPoint comparison used **21.9% more input tokens with controls**,
-with almost the same time.
-
-This was one trial per app/model/approach, with Windows MCP providing both
-approaches. It supports **controls first, screenshots when needed**, not
-a claim that screenshots are always worse. We compared two tool sets in
-Windows MCP, not separate products.
-
-[See model results, failures, and the full method](benchmark.md#real-tasks-in-notepad-word-powerpoint-and-chrome)
+[See the tasks, safeguards, and full method](benchmark.md#real-tasks-in-notepad-word-powerpoint-and-chrome)
 
 ## How Windows MCP saves tokens
 
@@ -120,7 +105,7 @@ This second chart compares text with text, not screenshots. The percentages
 are not extra savings to add to the first chart.
 
 These two smaller tests measure information sent, not a complete task or a
-dollar bill. Do not add their savings to the real-task figures above.
+dollar bill.
 
 [See all results and how we measured them](benchmark.md)
 

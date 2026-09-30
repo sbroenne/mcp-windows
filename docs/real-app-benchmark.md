@@ -6,112 +6,25 @@ conversation and its Windows actions, not just reading a saved image.
 
 ## Results
 
-**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
-The fresh 32-trial comparison finished on 28 September 2026. Saved files and
-submitted values were checked independently. All 32 original input files
-remained unchanged.
+**No current real-task results are published.** The next comparison will use
+the released pytest-skill-engineering framework and the two approved models:
+`gpt-6.1-sol` and `gpt-6-luna`.
 
-**Scoring correction:** the original Notepad check ignored final line breaks.
-The controls-first copies from GPT-6 Luna and GPT-5.6 Luna were missing the
-final line break. Requiring it changes the original completion counts to
-**9 of 16 controls-first tasks and 7 of 16 screenshot tasks**.
-The tables and savings below retain the original recorded scoring. They are
-not stricter scores or results of the later product fixes. The next comparison
-uses exact text after converting Windows line endings, including the final
-line break. The downloadable evidence includes this correction separately.
-
-| Model | Controls first | Screenshots |
-|---|---:|---:|
-| GPT-6 Astra | 4/4 | 4/4 |
-| GPT-6 Luna | 3/4 | 2/4 |
-| GPT-5.6 Sol | 3/4 | 1/4 |
-| GPT-5.6 Luna | 1/4 | 0/4 |
-| **Total** | **11/16** | **7/16** |
-
-GPT-6 Astra completed every task by both routes. The other models differed
-substantially on these tasks, even though all four had read the simpler
-single-field images correctly.
-
-| App | Controls first | Screenshots |
-|---|---:|---:|
-| Notepad | 4/4 | 3/4 |
-| Word | 3/4 | 2/4 |
-| PowerPoint | 2/4 | 1/4 |
-| Chrome | 2/4 | 1/4 |
-
-### Tokens and time when both routes finished
-
-Seven app/model pairs succeeded by both routes. Across those pairs, controls
-first used **51.1% fewer input tokens** and took **49.3% less time** at the
-middle of each set of savings. These are medians of seven separate comparisons,
-not percentages calculated from all attempted tasks.
-
-| App | Model | Controls input tokens | Screenshot input tokens | Controls seconds | Screenshot seconds |
-|---|---|---:|---:|---:|---:|
-| Notepad | GPT-6 Astra | 62,034 | 136,411 | 40.1 | 79.1 |
-| Notepad | GPT-6 Luna | 106,468 | 824,867 | 56.8 | 220.7 |
-| Notepad | GPT-5.6 Sol | 73,070 | 130,146 | 33.1 | 82.1 |
-| Word | GPT-6 Astra | 238,674 | 348,135 | 131.3 | 142.1 |
-| Word | GPT-6 Luna | 524,164 | 1,072,063 | 156.0 | 280.6 |
-| PowerPoint | GPT-6 Astra | 447,658 | 367,153 | 146.4 | 148.5 |
-| Chrome | GPT-6 Astra | 209,711 | 779,469 | 91.8 | 212.0 |
-
-Controls first saved input tokens in six of the seven pairs. **PowerPoint was
-the exception:** GPT-6 Astra used 21.9% more input tokens with controls, with
-almost the same elapsed time. Controls first was faster in all seven pairs,
-but not always by much.
-
-### What failed
-
-Twelve trials reached the 80-call limit without a verified saved or submitted
-result. Two more finished with incorrect output:
-
-- GPT-5.6 Luna's controls-first Word copy had the correct text, but its title
-  still used Normal rather than Heading 1.
-- GPT-5.6 Sol's controls-first Chrome submission used year **212026**, not
-  2026. The server reported that direct date-field entry could not be verified;
-  the agent then used the keyboard and submitted the wrong date.
-
-Both agents claimed success, so the independent checks mattered. The Chrome
-date control also exposed a useful limitation: a text read returned its label,
-not its current date. Screenshots remained available for checking the value.
-These outcomes identify work to investigate; they do not by themselves prove
-that every failure was caused by the model or by Windows MCP.
-
-The figures above remain the results of that recorded run. PowerPoint discovery
-now exposes slide controls without changing views; see the
-[PowerPoint guidance](../gh-pages/docs/troubleshooting.md#powerpoint-shows-its-buttons-but-not-slide-text).
-Segmented Chrome date fields now reject an unverified parent value; read and
-enter their month, day, and year through the observed child controls.
-The original Chrome discovery failure remains unresolved. No new complete,
-controlled comparison has been published.
-
-### Complete trial counts
-
-Totals below include failed attempts and must not be read as equal-work
-efficiency savings.
-
-| Route | Completed | Reported input tokens | Reported output tokens | Total minutes | Tool calls |
-|---|---:|---:|---:|---:|---:|
-| Controls first | 11/16 | 12,116,508 | 49,407 | 49.0 | 543 |
-| Screenshots | 7/16 | 20,401,136 | 81,066 | 77.0 | 983 |
-
-[Download all 32 trials, request checks, settings, and result hashes](../gh-pages/docs/assets/benchmarks/real-apps.json).
-This is one trial per app/model/route: useful evidence about these tasks, not
-a general model ranking.
+Old results and evidence have been removed. Do not combine incomplete runs or
+results produced by the retired standalone runner with the new comparison.
 
 ## Tasks
 
 | App | Requested work | Independent check |
 |-----|----------------|-------------------|
-| Notepad | Change a review date and status, add an action, and save a copy | Exact saved text, with the original unchanged |
+| Notepad | Change a review date and status, add an action, and save a copy | Exact saved text, including the final line break, with the original unchanged |
 | Word | Apply Heading 1, change a date, preserve the other paragraphs and styles, and save a copy | Text and paragraph styles in the saved Word file |
 | PowerPoint | Change a title and a bullet, reorder two slides, and save a copy | Saved slide order and text on every slide |
 | Chrome | Complete and submit a workshop booking with seven fields, including a department, date, and projector checkbox | Values received by the local booking server |
 
 The agent does not get the complete source document text in its task prompt.
-It must inspect the open application, make the changes, and save or submit them.
-A claim that the task is finished does not count as success.
+It must inspect the open application, make the changes, and save or submit
+them. A claim that the task is finished does not count as success.
 
 ## Two routes through the same server
 
@@ -123,132 +36,61 @@ file-saving helper. Screenshots, mouse, and keyboard input remain available.
 input. It cannot read control names, values, element IDs, or text through the
 control tools. It must handle save dialogs itself.
 
-Both routes use Windows MCP. This is a comparison of these two tool sets,
-not a comparison of separate products. The result includes the benefit of higher-level actions such as
-file saving, not just the difference between image and text input.
+Both routes use Windows MCP. This compares two tool sets within the same
+product, not separate products.
 
-The controls route exposes `ui_snapshot`, `ui_find`, `ui_read`, `ui_click`,
-`ui_type`, `ui_select`, `ui_read_table`, `ui_wait`, and `file_save`. Both routes
-have `window_management`, `screenshot_control`, `mouse_control`, and
-`keyboard_control`. Batch operations, macros, the clipboard, launching other
-apps, shell commands, Office APIs, browser page source, and developer tools
-are not available to the agent.
-
-The benchmark adapter restricts actions and window listings to the test-owned
-application. It restricts screenshots to that window and returns no control
-annotations. The agent can resize or maximize its test window. Only permitted
-actions are advertised; held-key operations and global window searches are
-excluded. Other Windows MCP tool descriptions and results are retained.
-Every supplied tool definition counts toward the measured model input.
-
-Both routes use the same text-entry implementation from `main`. It sends
-Unicode keystrokes with a short pause between characters. In supported
-Notepad text controls, the server also checks that each character appeared
-before continuing, stopping if that check fails. These internal checks do
-not return document text to the screenshot-only agent. Neither route uses
-the clipboard for typing.
+The benchmark adapter restricts actions, window listings, and screenshots to
+the test-owned application. Batch operations, macros, the clipboard, launching
+other apps, shell commands, Office APIs, browser page source, and developer
+tools are unavailable to the agent.
 
 ## Models and run order
 
-The matrix has **32 trials**: four apps, four models, and two routes.
-The requested model IDs are `gpt-6-astra`, `gpt-6-luna`, `gpt-5.6-sol`, and
-`gpt-5.6-luna`. Every trial starts a fresh, tool-restricted Copilot SDK session,
-with medium reasoning effort and the same task instructions.
+The matrix has **16 trials**: four apps, two models, and two routes. The model
+IDs are `gpt-6.1-sol` and `gpt-6-luna`. Every trial starts a fresh,
+tool-restricted model session with medium reasoning, high-detail images, a
+ten-minute limit, and an 80-tool-call limit.
 
-Route order alternates across app/model pairs. The apps run one at a time
-on the same desktop. Each pair starts with copies of the same input file.
-Windows start fully inside the desktop work area; the agent can change their
-size afterward. Application versions and initial bounds are recorded.
-Notepad's generated tab is moved into its own window if earlier tabs were
-restored. Setup verifies that this window has exactly one document, and
-restored windows are hidden from the agent's tool access. User settings and
-saved tabs are not deleted to achieve isolation.
-If moving the tab changes focus before the drag finishes, setup checks for
-the new window without sending another drag. This run resumed three times
-after setup stopped before a model trial began. No completed trial was
-repeated or removed; the measured server binary and task settings stayed the
-same, and each setup-script version was recorded.
-Other restored Word and PowerPoint document windows are excluded from the
-agent's tools, without deleting recovery files or changing application settings.
-Chrome uses a fresh private profile and a local booking page, avoiding
-changing public websites or real bookings.
-
-The completed run used Notepad 11.2607.14.0, Word and PowerPoint
-16.0.20326.20158, and Chrome 154.0.8037.57. Each application's version stayed
-the same throughout its trials.
-
-Screenshots use JPEG quality 60 and native **high** image detail in both
-routes. The runner checks the actual outgoing model ID and available tool
-names, and records image-detail settings and instruction hashes.
-
-Each trial has the same ten-minute limit and an 80-tool-call limit. A task
-that does not finish stays in the results. A broken connection or benchmark
-adapter error stops the run instead of being counted as a model failure.
-Harness pilots are recorded separately and excluded from the published matrix.
+Route order alternates across app/model pairs. The apps run one at a time on
+the same reserved desktop. Each pair starts with copies of the same input
+file. Notepad, Word, and PowerPoint must not already be open. Chrome uses a
+separate test profile and local booking page.
 
 ## What is counted
 
-**Completion comes first.** The saved files and submitted form values are
-checked outside the model session. The original document must remain unchanged.
+**Completion comes first.** Saved files and submitted form values are checked
+outside the model session. The original input must remain unchanged.
 
-**Input tokens** are the sum reported for every model request, including tool
-definitions, task text, returned observations, and conversation history sent
-again on later requests. **Output tokens** include the model's reported output
-across the conversation, not just its final answer. Reported cache and reasoning
-counts are stored separately. These are token measurements, not a dollar bill.
+The framework records the actual model requests, tools, reasoning setting,
+image detail, usage, stop reason, and admitted tool calls. Unsupported or
+incomplete request formats stop the run rather than producing incomplete
+evidence.
 
-**Elapsed time** starts when the task is sent to the model and includes its
-decisions, screenshots, control reads, and Windows actions. It excludes
-creating the fixtures, opening the app, creating the model session, and
-checking the saved result afterward.
+Token and time comparisons are calculated only for matching app/model pairs
+where both routes complete within their limits. Failed attempts remain in the
+run and are not credited as efficiency wins. One trial per combination is an
+initial comparison, not a general model ranking.
 
-**Tool calls, failed calls, and screenshot calls** are recorded separately.
-Timeout rows show reported usage; an interrupted request may not report all
-of its final usage.
-
-Token and time savings are calculated only for matching app/model pairs
-where **both routes completed** within their limits. Failed attempts are
-still shown, but a cheap failed attempt is not credited as an efficiency win.
-One trial per combination is a useful first comparison, not a reliable
-ranking of model speed or success rates across arbitrary Windows work.
+Framework session time includes model-runtime startup and cleanup. It excludes
+Windows app setup and the independent saved-result check.
 
 ## Evidence and privacy
 
-The local run preserves the task prompts, model messages, tool arguments and
-replies, screenshots, usage events, checks, and hashes. The public export
-includes the settings, counts, request audits, and result hashes, but excludes
-desktop images, raw window text, model messages, and local file paths.
-Office account details or unrelated file names visible in a save dialog
-should not become public benchmark data.
+Keep the framework JSON, JUnit report, task artifacts, and app checks together
+in a fresh private directory. Raw reports may contain local paths, screenshots,
+model messages, or unrelated text visible in dialogs, so do not publish them.
+
+Any future public export must contain only settings, counts, request-audit
+metadata, and result hashes. It must exclude desktop images, raw window text,
+model messages, authentication, and local file paths.
 
 ## Reproduce the real-app comparison
 
-Use a Windows desktop that the benchmark can control without interruption.
-Install Notepad, Word, PowerPoint, and Chrome. Close existing Notepad, Word,
-and PowerPoint instances first; the runner refuses to take over those
-applications. Existing Chrome sessions are left alone.
+Use an unlocked Windows desktop reserved for the benchmark. Install Notepad,
+Word, PowerPoint, and Chrome. Build the server and authenticate the GitHub CLI
+or provide `GITHUB_TOKEN`; never put a token in source files or reports.
 
-The runner uses physical screen pixels and records the starting display DPI.
-Its requested window size is 1280 by 900 at 100% display scaling, with a
-32-pixel margin, scaled with Windows and reduced to fit the primary work area.
-At 200% scaling on the recorded 2736 by 1728 work area, that is a 2560 by
-1600 window at position 64,64. This preserves the original on-screen window
-size while fixing coordinate handling. The earlier run recorded logical
-bounds before this correction; those numbers need scaling before comparison.
-The published results above have not been replaced by a new run.
-
-The comparison now runs through **pytest-skill-engineering**, using the same
-four apps, models, routes, medium reasoning, high-detail images, and per-task
-limits. The framework manages model sessions, usage, request checks, and
-reports. Windows-specific helpers still own the apps and verify saved files.
-There are no automatic model-session retries.
-
-Framework session time includes model-runtime startup and cleanup. Its timeout
-also includes startup. These boundaries differ from the historical prompt-send-only
-measurement above; do not present old and new timings as a direct speed comparison.
-
-Build the server and authenticate the GitHub CLI or provide `GITHUB_TOKEN`.
-Never put a token in source files or reports. First run the no-model checks:
+Run the no-model checks first:
 
 ```powershell
 dotnet build src\Sbroenne.WindowsMcp -c Release
@@ -256,16 +98,11 @@ uv run --project tests\usage_evals pytest tests\usage_evals\tests\unit -q
 uv run --project tests\usage_evals pytest tests\usage_evals\tests\comparison --collect-only -q
 ```
 
-The live command is in [the evaluation guide](../tests/usage_evals/README.md#controls-versus-screenshots).
-It requires separate approval for 32 model sessions and an exclusive desktop.
-Without that explicit opt-in, the comparison tests are skipped. Keep the
-framework's JSON report, JUnit report, and private app artifacts together in
-a fresh persistent directory. Incomplete runs and setup checks remain separate.
-Do not resume the old standalone runner or mix its interrupted trials with a
-framework run. Optional AI-generated report analysis is an additional paid
-operation and is not part of this command.
+The live command is in
+[the evaluation guide](../tests/usage_evals/README.md#controls-versus-screenshots).
+It requires approval for 16 model sessions and an exclusive desktop. Without
+that opt-in, the comparison is skipped.
 
-The [single-field reading check](screenshot-ui-automation-benchmark.md) remains
-useful as a smaller supporting test. The
-[automatic snapshot measurement](incremental-snapshot-benchmark.md) separately
-measures repeated control replies without an AI carrying out the task.
+Do not resume retired standalone runners or combine interrupted runs. Optional
+AI-generated report analysis is a separate paid operation and is not part of
+the comparison.

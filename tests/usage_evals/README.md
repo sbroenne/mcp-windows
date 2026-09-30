@@ -256,13 +256,13 @@ saved-file checks stay in Windows MCP; model sessions, tool limits, image detail
 request checks, usage, and reports belong to pytest-skill-engineering.
 The required framework features are checked before any application or model starts.
 
-Without `--run-comparison`, all 32 cases are skipped. Collection is also safe:
+Without `--run-comparison`, all 16 cases are skipped. Collection is also safe:
 
 ```powershell
 uv run pytest tests\comparison --collect-only -q
 ```
 
-After approving all **32 model sessions**, reserve an exclusive Windows desktop
+After approving all **16 model sessions**, reserve an exclusive Windows desktop
 and confirm there is no Notepad work to preserve. Close existing Notepad, Word,
 and PowerPoint instances yourself; the suite will not take them over. Chrome
 uses a separate test profile. Build the server from the repository root, then
@@ -275,9 +275,8 @@ $env:MCP_TEST_DESKTOP_INPUT = '1'
 $env:MCP_USAGE_RESERVED_DESKTOP = '1'
 uv run pytest tests\comparison -v -o addopts= `
   --run-comparison `
-  --comparison-model gpt-6-astra --comparison-model gpt-6-luna `
-  --comparison-model gpt-5.6-sol --comparison-model gpt-5.6-luna `
-  --comparison-max-runs 32 --comparison-timeout 600 --comparison-max-calls 80 `
+  --comparison-model gpt-6.1-sol --comparison-model gpt-6-luna `
+  --comparison-max-runs 16 --comparison-timeout 600 --comparison-max-calls 80 `
   --comparison-server "$server" --comparison-output "$output" `
   --aitest-json="$output\framework.json" --junitxml="$output\junit.xml"
 ```
@@ -297,14 +296,12 @@ Use `eval_result.duration_ms` for framework session time. It includes runtime
 startup, session creation, execution, and cleanup, but not Windows app setup or
 saved-file checks. The 600-second limit covers framework startup and execution;
 safety cleanup can take additional time. This differs from the historical
-prompt-send-only timing. Compare the two routes within the new run, not old and
-new elapsed times as though they measured the same span.
+prompt-send-only timing. Compare the two routes within the same new run.
 
 Use `--comparison-app` and `--comparison-route` to narrow an explicitly approved
 setup check. Keep its output separate from the full comparison. Do not resume
 the retired standalone SDK scripts or combine their results with these records.
-The stricter Notepad check preserves the final line break; historical results
-retain their original scoring plus a separately stated correction.
+The Notepad check preserves the final line break.
 
 Keep both framework JSON and JUnit reports. Per-case properties contain
 `comparison`, `runtime`, `application`, `verification`, and `cleanup`; Notepad adds

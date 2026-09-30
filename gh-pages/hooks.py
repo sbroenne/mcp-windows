@@ -23,7 +23,6 @@ SITE_PAGE_MAP = {
     "docs/screenshot-ui-automation-benchmark.md": "/benchmark/",
     "docs/real-app-benchmark.md": "/benchmark/",
     "gh-pages/docs/assets/benchmarks/screenshot-readability.json": "/assets/benchmarks/screenshot-readability.json",
-    "gh-pages/docs/assets/benchmarks/real-apps.json": "/assets/benchmarks/real-apps.json",
 }
 
 _MD_LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)\s]+)\)")

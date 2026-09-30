@@ -1,5 +1,4 @@
 import importlib.util
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,26 +12,20 @@ spec.loader.exec_module(hooks)
 
 
 class DocumentationHooksTests(unittest.TestCase):
-    def test_historical_real_app_scoring_correction_is_explicit(self):
-        evidence = json.loads(
-            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").read_text(encoding="utf-8")
+    def test_old_real_app_results_and_evidence_are_removed(self):
+        self.assertFalse(
+            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").exists()
         )
-        correction = evidence["scoring_correction"]
-        affected = {
-            (row["app"], row["model"], row["route"]) for row in correction["affected_trials"]
-        }
-        for route in ("controls", "screenshots"):
-            corrected = sum(
-                row["success"] and (row["app"], row["model"], row["route"]) not in affected
-                for row in evidence["trials"] if row["route"] == route
-            )
-            self.assertEqual(corrected, correction["corrected_successes"][route])
         for path in (
-            SITE.parent / "README.md", SITE.parent / "docs" / "real-app-benchmark.md",
+            SITE.parent / "README.md",
+            SITE.parent / "docs" / "real-app-benchmark.md",
             *(SITE / "docs" / name for name in ("index.md", "benchmark.md", "comparison.md")),
         ):
             with self.subTest(page=str(path)):
-                self.assertIn("final line break", path.read_text(encoding="utf-8"))
+                text = path.read_text(encoding="utf-8")
+                self.assertNotIn("11 of 16", text)
+                self.assertNotIn("51.1%", text)
+                self.assertIn("No current real-task results are published", text)
 
     def test_docs_do_not_compare_assistant_screen_control_features(self):
         paths = [
@@ -51,22 +44,14 @@ class DocumentationHooksTests(unittest.TestCase):
                 self.assertNotRegex(text, r"computer[\s-]+use")
                 self.assertNotIn("assistant's built-in tools", text)
 
-    def test_entry_pages_lead_with_real_task_results(self):
-        evidence = json.loads(
-            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").read_text(encoding="utf-8")
-        )
-        routes = evidence["summary"]["routes"]
+    def test_entry_pages_lead_with_the_real_task_method(self):
         for path in (SITE.parent / "README.md", SITE / "docs" / "index.md"):
             with self.subTest(page=path.name):
                 page = path.read_text(encoding="utf-8")
                 self.assertLess(page.index("## Real tasks"), page.index("### Read one field"))
-                for route in ("controls", "screenshots"):
-                    self.assertIn(f'{routes[route]["successes"]} of {routes[route]["trials"]}', page)
-                self.assertIn("seven", page)
-                self.assertIn("both", page)
-                self.assertIn("51.1%", page)
-                self.assertIn("49.3%", page)
-                self.assertIn("21.9%", page)
+                self.assertIn("GPT-6.1 Sol", page)
+                self.assertIn("GPT-6 Luna", page)
+                self.assertIn("16", page)
 
     def test_user_guides_do_not_embed_developer_manuals(self):
         for page in (SITE / "docs").glob("*.md"):
@@ -124,24 +109,13 @@ class DocumentationHooksTests(unittest.TestCase):
             f"{hooks.GITHUB_BLOB}docs/screenshot-ui-automation-benchmark.md", page
         )
 
-    def test_real_app_results_include_complete_evidence_and_method(self):
+    def test_real_app_method_is_included_without_old_evidence(self):
         page = (SITE / "docs" / "benchmark.md").read_text(encoding="utf-8")
         self.assertIn('--8<-- "_generated/real-app-benchmark.md"', page)
         self.assertIn('id="real-app-details"', page)
-        evidence = json.loads(
-            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").read_text(encoding="utf-8")
+        self.assertFalse(
+            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").exists()
         )
-        self.assertEqual(32, len(evidence["trials"]))
-        self.assertEqual(
-            32, len({(row["app"], row["model"], row["route"]) for row in evidence["trials"]})
-        )
-        for route in ("controls", "screenshots"):
-            trials = [row for row in evidence["trials"] if row["route"] == route]
-            self.assertEqual(16, len(trials))
-            self.assertEqual(
-                sum(row["success"] for row in trials),
-                evidence["summary"]["routes"][route]["successes"],
-            )
 
     def test_only_measurements_are_included_in_user_pages(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -33,11 +33,10 @@ expandable sections, so reading the details does not depend on files already
 being published to GitHub's main branch.
 
 New real-app results come from `tests/usage_evals/tests/comparison` through
-pytest-skill-engineering's native JSON and JUnit reports. Check all 32 cases,
+pytest-skill-engineering's native JSON and JUnit reports. Check all 16 cases,
 independent saved outputs, unchanged inputs, model settings, usage, and route
-restrictions before updating the public figures. Keep historical evidence
-separate; the old standalone model runners are retired. The original Notepad
-scoring ignored final line breaks, so its recorded counts include a correction.
+restrictions before publishing figures. The old standalone model runners are
+retired and their results are not public evidence.
 Do not publish raw desktop screenshots, window text, model messages, or local
 paths from the private run artifacts.
 

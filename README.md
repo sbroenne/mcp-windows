@@ -19,7 +19,7 @@ fields, read only what the task needs, and request changes instead of repeated
 control lists. Screenshots, mouse, and keyboard actions are built in for
 visual tasks.
 
-[Get started](#get-started) | [See real-task results](#real-tasks-controls-first-versus-screenshots)
+[Get started](#get-started) | [See the real-task benchmark](#real-tasks-controls-first-versus-screenshots)
 
 <a id="why-not-just-use-screenshots"></a>
 
@@ -110,28 +110,16 @@ settings. Start with a test document rather than important work.
 
 ## Real tasks: controls first versus screenshots
 
-**The original check marked controls first complete on 11 of 16 tasks, and screenshots on 7 of 16.**
-That check ignored final line breaks. Requiring the final line break changes
-controls first to **9 of 16**; screenshots remain **7 of 16**. The savings
-below use the original scoring, not the stricter check or a new run.
+**No current real-task results are published.** The next comparison has 16
+trials: GPT-6.1 Sol and GPT-6 Luna use both controls-first and screenshot-only
+routes in Notepad, Word, PowerPoint, and Chrome.
 
-We asked GPT-6 Astra, GPT-6 Luna, GPT-5.6 Sol, and GPT-5.6 Luna to edit and save
-Notepad and Word documents, change and reorder PowerPoint slides, and submit
-a form in Chrome. We checked the saved files and submitted values independently.
-All original input files stayed unchanged.
+Saved files and submitted values are checked independently, and original
+inputs must remain unchanged. The framework records actual model requests,
+tools, image detail, usage, and stop reasons. Unsupported evidence stops the
+run instead of producing a partial comparison.
 
-For the **seven matching tasks where both approaches succeeded**, controls
-first used **51.1% fewer input tokens** and took **49.3% less time**, at the
-middle of each set of savings. Screenshots remained available to that route.
-One PowerPoint comparison used **21.9% more input tokens with controls**,
-with almost the same time.
-
-These are 32 trials, one per app/model/approach, using Windows MCP for both
-approaches. They support **controls first, screenshots when needed**, not
-a claim that screenshots are always worse. This compares two tool sets in
-Windows MCP, not separate products.
-
-[Model results, failures, and measurement details](docs/real-app-benchmark.md).
+[Tasks, safeguards, and reproduction steps](docs/real-app-benchmark.md).
 
 ## Save tokens with focused reads
 
