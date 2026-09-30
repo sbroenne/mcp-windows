@@ -149,6 +149,24 @@ public sealed class UIFindToolIntegrationTests : IDisposable
     }
 
     [Fact]
+    public async Task Find_WhitespacePaddedDialogScope_PreservesMissingDialogExplanation()
+    {
+        var result = await _automationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = _windowHandle,
+            Name = "Install",
+            ControlType = "Button",
+            Scope = " active_dialog ",
+            TimeoutMs = 500
+        });
+
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Contains("No visible enabled dialog", result.ErrorMessage, StringComparison.Ordinal);
+        Assert.Null(result.Items);
+    }
+
+    [Fact]
     public async Task Find_TextBox_ReturnsEdit()
     {
         // Act - Search for Edit controls in the window

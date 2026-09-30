@@ -370,7 +370,7 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         string? name = null, string? contains = null, string? pattern = null, string? parent = null) =>
         UIFindTool.ExecuteAsync(
             fixture.WindowHandle, name, contains, pattern, "Text", null, null, null, 1, false,
-            false, null, null, false, false, parent, "window", false, null, 5000, false, CancellationToken.None);
+            false, null, null, false, false, parent, "window", false, null, 0, false, CancellationToken.None);
 
     private static JsonDocument Parse(CallToolResult result) =>
         JsonDocument.Parse(Assert.IsType<TextContentBlock>(Assert.Single(result.Content)).Text);

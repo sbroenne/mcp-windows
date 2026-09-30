@@ -951,7 +951,15 @@ public sealed class UIAutomationWinFormsTests : IDisposable
             500);
 
         Assert.False(result.Success);
-        Assert.Contains("still present", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.NotNull(result.Diagnostics);
+        Assert.True(result.Diagnostics.DurationMs >= 500);
+        Assert.Null(result.Items);
+        Assert.True(
+            result.ErrorMessage?.Contains("still present", StringComparison.OrdinalIgnoreCase) == true ||
+            result.ErrorMessage?.Contains("before it completed", StringComparison.OrdinalIgnoreCase) == true ||
+            result.ErrorMessage?.Contains("before it could start", StringComparison.OrdinalIgnoreCase) == true,
+            $"Unexpected timeout explanation: {result.ErrorMessage}");
     }
 
     #endregion

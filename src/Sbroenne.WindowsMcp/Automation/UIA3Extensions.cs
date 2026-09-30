@@ -410,7 +410,7 @@ public static class UIA3Extensions
     /// <summary>
     /// Gets all supported pattern IDs by checking each known pattern.
     /// </summary>
-    public static int[] GetSupportedPatternIds(this UIA.IUIAutomationElement element)
+    public static int[] GetSupportedPatternIds(this UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         var supportedPatterns = new List<int>();
@@ -456,7 +456,10 @@ public static class UIA3Extensions
 
         foreach (var patternId in allPatternIds)
         {
-            if (element.SupportsPattern(patternId))
+            checkDeadline?.Invoke();
+            var supported = element.SupportsPattern(patternId);
+            checkDeadline?.Invoke();
+            if (supported)
             {
                 supportedPatterns.Add(patternId);
             }
@@ -468,10 +471,10 @@ public static class UIA3Extensions
     /// <summary>
     /// Gets all supported pattern names.
     /// </summary>
-    public static string[] GetSupportedPatternNames(this UIA.IUIAutomationElement element)
+    public static string[] GetSupportedPatternNames(this UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
-        var ids = element.GetSupportedPatternIds();
+        var ids = element.GetSupportedPatternIds(checkDeadline);
         return ids.Select(UIA3PatternIds.ToName).ToArray();
     }
 
@@ -590,13 +593,17 @@ public static class UIA3Extensions
     /// <summary>
     /// Tries to get the Value pattern's current value.
     /// </summary>
-    public static string? TryGetValue(this UIA.IUIAutomationElement element)
+    public static string? TryGetValue(this UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         try
         {
+            checkDeadline?.Invoke();
             var pattern = element.GetPattern<UIA.IUIAutomationValuePattern>(UIA3PatternIds.Value);
-            return pattern?.CurrentValue;
+            checkDeadline?.Invoke();
+            var value = pattern?.CurrentValue;
+            checkDeadline?.Invoke();
+            return value;
         }
 
         catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
@@ -677,18 +684,22 @@ public static class UIA3Extensions
     /// <summary>
     /// Gets the toggle state.
     /// </summary>
-    public static string? GetToggleState(this UIA.IUIAutomationElement element)
+    public static string? GetToggleState(this UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         try
         {
+            checkDeadline?.Invoke();
             var pattern = element.GetPattern<UIA.IUIAutomationTogglePattern>(UIA3PatternIds.Toggle);
+            checkDeadline?.Invoke();
             if (pattern == null)
             {
                 return null;
             }
 
-            return pattern.CurrentToggleState switch
+            var state = pattern.CurrentToggleState;
+            checkDeadline?.Invoke();
+            return state switch
             {
                 UIA.ToggleState.ToggleState_Off => "Off",
                 UIA.ToggleState.ToggleState_On => "On",
@@ -705,13 +716,17 @@ public static class UIA3Extensions
     /// <summary>
     /// Gets selection state using the SelectionItem pattern.
     /// </summary>
-    public static string? GetSelectionStateName(this UIA.IUIAutomationElement element)
+    public static string? GetSelectionStateName(this UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         try
         {
+            checkDeadline?.Invoke();
             var pattern = element.GetPattern<UIA.IUIAutomationSelectionItemPattern>(UIA3PatternIds.SelectionItem);
-            return pattern is null ? null : pattern.CurrentIsSelected != 0 ? "On" : "Off";
+            checkDeadline?.Invoke();
+            var state = pattern is null ? null : pattern.CurrentIsSelected != 0 ? "On" : "Off";
+            checkDeadline?.Invoke();
+            return state;
         }
         catch (COMException ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
         {
@@ -850,7 +865,10 @@ public static class UIA3Extensions
     /// <summary>
     /// Compares two elements by runtime ID.
     /// </summary>
-    public static bool IsSameElement(this UIA.IUIAutomationElement element, UIA.IUIAutomationElement? other)
+    public static bool IsSameElement(
+        this UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement? other,
+        Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         if (other == null)
@@ -860,8 +878,11 @@ public static class UIA3Extensions
 
         try
         {
+            checkDeadline?.Invoke();
             var id1 = element.GetRuntimeId();
+            checkDeadline?.Invoke();
             var id2 = other.GetRuntimeId();
+            checkDeadline?.Invoke();
 
             if (id1 == null || id2 == null)
             {

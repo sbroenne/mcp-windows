@@ -148,6 +148,9 @@ public sealed partial class UIAutomationService
     {
         var stopwatch = Stopwatch.StartNew();
         var elementsScanned = 0;
+        var normalizedScope = string.IsNullOrWhiteSpace(query.Scope)
+            ? "window"
+            : query.Scope.Trim().ToLowerInvariant();
 
         if (query.RequireUnique && query.FoundIndex != 1)
         {
@@ -188,9 +191,6 @@ public sealed partial class UIAutomationService
                 }
                 else
                 {
-                    var normalizedScope = string.IsNullOrWhiteSpace(query.Scope)
-                        ? "window"
-                        : query.Scope.Trim().ToLowerInvariant();
                     if (normalizedScope is not ("window" or "active_dialog"))
                     {
                         return UIAutomationResult.CreateFailure(
@@ -201,17 +201,14 @@ public sealed partial class UIAutomationService
                     }
 
                     rootElement = normalizedScope == "active_dialog"
-                        ? GetActiveDialogRoot(query.WindowHandle)
+                        ? GetActiveDialogRoot(query.WindowHandle, checkDeadline)
                         : GetRootElement(query.WindowHandle);
                 }
 
                 checkDeadline?.Invoke();
                 if (rootElement == null)
                 {
-                    var requestedActiveDialog = string.Equals(
-                        query.Scope,
-                        "active_dialog",
-                        StringComparison.OrdinalIgnoreCase);
+                    var requestedActiveDialog = normalizedScope == "active_dialog";
                     return UIAutomationResult.CreateFailure(
                         "find",
                         UIAutomationErrorType.WindowNotFound,
@@ -269,7 +266,8 @@ public sealed partial class UIAutomationService
                 var maxResults = query.RequireUnique ? 2 : query.FoundIndex > 1 ? query.FoundIndex : 100;
 
                 // Detect framework and get optimal search strategy
-                var strategy = GetFrameworkStrategy(rootElement);
+                var detectedFramework = DetectFramework(rootElement, checkDeadline);
+                var strategy = GetFrameworkStrategy(detectedFramework);
                 checkDeadline?.Invoke();
 
                 // Resolve visibility filtering: explicit caller value wins; otherwise exclude
@@ -379,7 +377,7 @@ public sealed partial class UIAutomationService
                         $"Search incomplete: checked {elementsScanned} candidates within the {MaxElementsToScan}-element scan budget. " +
                         "The scan budget was reached or the provider changed before the search request was resolved. " +
                         "Remaining candidates were not checked.",
-                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
+                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView, checkDeadline, detectedFramework));
                 }
 
                 if (elementInfos.Count == 0)
@@ -388,7 +386,7 @@ public sealed partial class UIAutomationService
                         "find",
                         UIAutomationErrorType.ElementNotFound,
                         BuildNotFoundMessage(query),
-                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
+                        CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView, checkDeadline, detectedFramework));
                 }
 
                 // Sort by proximity to reference element if nearElement specified
@@ -428,7 +426,9 @@ public sealed partial class UIAutomationService
                             elementsScanned,
                             windowTitle,
                             query.WindowHandle,
-                            usedContentView) with
+                            usedContentView,
+                            checkDeadline,
+                            detectedFramework) with
                         {
                             MultipleMatches = elementInfos
                                 .Take(10)
@@ -446,7 +446,7 @@ public sealed partial class UIAutomationService
                 }
 
                 // Always use compact format for Find to reduce token count by ~70%
-                return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
+                return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView, checkDeadline, detectedFramework));
             }, cancellationToken);
         }
         catch (SearchDeadlineExceededException ex)
@@ -515,12 +515,12 @@ public sealed partial class UIAutomationService
                 if ((query.ExactDepth.HasValue &&
                      (depth != query.ExactDepth.Value ||
                       (depth > 0 && element.GetCachedPropertyValue(UIA3PropertyIds.IsControlElement) is not true))) ||
-                    !MatchesCondition(element, condition) || !MatchesAdvancedCriteriaCached(element, query))
+                    !MatchesCondition(element, condition, checkDeadline) || !MatchesAdvancedCriteriaCached(element, query))
                 {
                     return false;
                 }
 
-                var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, fromCachedElement: true);
+                var info = ConvertToElementInfo(element, rootElement, _coordinateConverter, fromCachedElement: true, checkDeadline: checkDeadline);
                 if (info is null || (visibleOnly && info.IsOffscreen) ||
                     (query.EnabledOnly == true && !info.IsEnabled) ||
                     (regionFilter is not null && !IntersectsRegion(info.BoundingRect, regionFilter)))
@@ -536,7 +536,7 @@ public sealed partial class UIAutomationService
 
                 if (query.IncludeChildren)
                 {
-                    info = info with { Children = GetChildren(element, rootElement) };
+                    info = info with { Children = GetChildren(element, rootElement, checkDeadline: checkDeadline) };
                 }
 
                 results.Add(info);
@@ -605,6 +605,14 @@ public sealed partial class UIAutomationService
                 throw new SearchDeadlineExceededException(timeoutMs);
             }
         };
+
+    internal static T ExecuteSearchProviderCall<T>(Func<T> providerCall, Action? checkDeadline)
+    {
+        checkDeadline?.Invoke();
+        var result = providerCall();
+        checkDeadline?.Invoke();
+        return result;
+    }
 
     /// <summary>
     /// Evaluates nameContains/namePattern/className against an element's cached properties.
@@ -685,12 +693,16 @@ public sealed partial class UIAutomationService
     }
 
     /// <summary>Tests only the candidate itself, never a provider-normalized ancestor.</summary>
-    private static bool MatchesCondition(UIA.IUIAutomationElement element, UIA.IUIAutomationCondition condition)
+    private static bool MatchesCondition(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationCondition condition,
+        Action? checkDeadline = null)
     {
         try
         {
-            var result = element.FindFirst(UIA.TreeScope.TreeScope_Element, condition);
-            return result != null && element.IsSameElement(result);
+            var result = ExecuteSearchProviderCall(
+                () => element.FindFirst(UIA.TreeScope.TreeScope_Element, condition), checkDeadline);
+            return result != null && element.IsSameElement(result, checkDeadline);
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
         {
@@ -735,35 +747,38 @@ public sealed partial class UIAutomationService
         return $"No element found matching: {string.Join(", ", criteria)}";
     }
 
-    private UIA.IUIAutomationElement? GetActiveDialogRoot(string? windowHandle)
+    private UIA.IUIAutomationElement? GetActiveDialogRoot(string? windowHandle, Action? checkDeadline = null)
     {
         if (!WindowHandleParser.TryParse(windowHandle, out var parentHandle))
         {
             return null;
         }
 
+        checkDeadline?.Invoke();
         var popupHandle = NativeMethods.GetWindow(parentHandle, NativeConstants.GW_ENABLEDPOPUP);
         if (popupHandle != IntPtr.Zero &&
             popupHandle != parentHandle &&
             NativeMethods.IsWindowVisible(popupHandle))
         {
-            return Uia.ElementFromHandle(popupHandle);
+            return ExecuteSearchProviderCall(() => Uia.ElementFromHandle(popupHandle), checkDeadline);
         }
 
-        var parent = Uia.ElementFromHandle(parentHandle);
+        var parent = ExecuteSearchProviderCall(() => Uia.ElementFromHandle(parentHandle), checkDeadline);
         if (parent == null)
         {
             return null;
         }
 
-        var windows = parent.FindAll(
-            UIA.TreeScope.TreeScope_Children,
-            Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window));
-        for (var index = 0; index < (windows?.Length ?? 0); index++)
+        var condition = Uia.CreatePropertyCondition(UIA3PropertyIds.ControlType, UIA3ControlTypeIds.Window);
+        var windows = ExecuteSearchProviderCall(
+            () => parent.FindAll(UIA.TreeScope.TreeScope_Children, condition), checkDeadline);
+        var count = ExecuteSearchProviderCall(() => windows?.Length ?? 0, checkDeadline);
+        for (var index = 0; index < count; index++)
         {
-            var candidate = windows!.GetElement(index);
-            var pattern = candidate.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window);
-            if (pattern?.CurrentIsModal != 0)
+            var candidate = ExecuteSearchProviderCall(() => windows!.GetElement(index), checkDeadline);
+            var pattern = ExecuteSearchProviderCall(
+                () => candidate.GetPattern<UIA.IUIAutomationWindowPattern>(UIA3PatternIds.Window), checkDeadline);
+            if (ExecuteSearchProviderCall(() => pattern?.CurrentIsModal != 0, checkDeadline))
             {
                 return candidate;
             }

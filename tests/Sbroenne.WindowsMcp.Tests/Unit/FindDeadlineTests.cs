@@ -222,4 +222,42 @@ public sealed class FindDeadlineTests
         Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
         Assert.Contains("No visible enabled dialog", result.ErrorMessage, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void ProviderCall_ExpiredBudget_DoesNotInvokeProvider()
+    {
+        Assert.Throws<TimeoutException>(() => UIAutomationService.ExecuteSearchProviderCall<bool>(
+            () => throw new InvalidOperationException("Expired search must not call the provider."),
+            () => throw new TimeoutException()));
+    }
+
+    [Fact]
+    public void ProviderCall_CrossingDeadline_DoesNotStartNextCall()
+    {
+        var expired = false;
+        var calls = 0;
+        Assert.Throws<TimeoutException>(() =>
+        {
+            UIAutomationService.ExecuteSearchProviderCall(() =>
+            {
+                calls++;
+                expired = true;
+                return true;
+            }, CheckDeadline);
+            UIAutomationService.ExecuteSearchProviderCall(() =>
+            {
+                calls++;
+                return true;
+            }, CheckDeadline);
+        });
+        Assert.Equal(1, calls);
+
+        void CheckDeadline()
+        {
+            if (expired)
+            {
+                throw new TimeoutException();
+            }
+        }
+    }
 }

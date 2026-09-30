@@ -30,31 +30,45 @@ public static class ElementIdGenerator
         Generate(element, rootElement, cached: false);
 
     /// <summary>Registers a live element using cached identity properties when available.</summary>
-    public static string GenerateFastId(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement) =>
-        Generate(element, rootElement, cached: true);
+    public static string GenerateFastId(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        Action? checkDeadline = null) =>
+        Generate(element, rootElement, cached: true, checkDeadline);
 
     /// <summary>Registers a live element when no property cache was requested.</summary>
-    public static string GenerateFastIdFromCurrent(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement) =>
-        Generate(element, rootElement, cached: false);
+    public static string GenerateFastIdFromCurrent(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        Action? checkDeadline = null) =>
+        Generate(element, rootElement, cached: false, checkDeadline);
 
-    private static string Generate(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, bool cached)
+    private static string Generate(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        bool cached,
+        Action? checkDeadline = null)
     {
         ArgumentNullException.ThrowIfNull(element);
         ArgumentNullException.ThrowIfNull(rootElement);
         try
         {
+            checkDeadline?.Invoke();
             nint handle;
             try
             {
                 handle = cached ? rootElement.GetCachedNativeWindowHandle() : rootElement.GetNativeWindowHandle();
+                checkDeadline?.Invoke();
             }
             catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
             {
+                checkDeadline?.Invoke();
                 handle = rootElement.GetNativeWindowHandle();
+                checkDeadline?.Invoke();
             }
             if (handle == nint.Zero)
             {
-                handle = GetTopLevelWindowHandle(element);
+                handle = GetTopLevelWindowHandle(element, checkDeadline);
             }
             else
             {
@@ -65,17 +79,23 @@ public static class ElementIdGenerator
             int providerProcessId;
             try
             {
+                checkDeadline?.Invoke();
                 runtimeId = cached
                     ? (int[]?)element.GetCachedPropertyValue(UIA3PropertyIds.RuntimeId)
                     : element.GetRuntimeId();
+                checkDeadline?.Invoke();
                 providerProcessId = cached
                     ? (int)element.GetCachedPropertyValue(UIA3PropertyIds.ProcessId)
                     : element.CurrentProcessId;
+                checkDeadline?.Invoke();
             }
             catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
             {
+                checkDeadline?.Invoke();
                 runtimeId = element.GetRuntimeId();
+                checkDeadline?.Invoke();
                 providerProcessId = element.CurrentProcessId;
+                checkDeadline?.Invoke();
             }
 
             var runtime = runtimeId is { Length: > 0 } ? string.Join(".", runtimeId) : "0";
@@ -133,19 +153,24 @@ public static class ElementIdGenerator
         return null;
     }
 
-    private static nint GetTopLevelWindowHandle(UIA.IUIAutomationElement element)
+    private static nint GetTopLevelWindowHandle(UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         var current = element;
+        checkDeadline?.Invoke();
         var desktop = UIA3Automation.Instance.RootElement;
-        while (current is not null && !current.IsSameElement(desktop))
+        checkDeadline?.Invoke();
+        while (current is not null && !current.IsSameElement(desktop, checkDeadline))
         {
+            checkDeadline?.Invoke();
             var currentHandle = current.GetNativeWindowHandle();
+            checkDeadline?.Invoke();
             if (currentHandle != nint.Zero)
             {
                 return NativeMethods.GetAncestor(currentHandle, NativeConstants.GA_ROOT);
             }
 
             current = current.GetParent();
+            checkDeadline?.Invoke();
         }
 
         return nint.Zero;

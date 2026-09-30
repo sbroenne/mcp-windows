@@ -249,6 +249,7 @@ public sealed partial class UIAutomationService
     /// <param name="children">Optional child elements.</param>
     /// <param name="fromCachedElement">If true, element was retrieved with a cache request (use cached properties). If false, use current properties.</param>
     /// <param name="detectSemanticLayoutActions">Whether to retain Chromium layout containers that expose a direct action.</param>
+    /// <param name="checkDeadline">Optional shared search deadline check.</param>
     /// <returns>The element info, or null if conversion fails.</returns>
     internal static UIElementInfo? ConvertToElementInfo(
         UIA.IUIAutomationElement element,
@@ -256,14 +257,16 @@ public sealed partial class UIAutomationService
         CoordinateConverter coordinateConverter,
         UIElementInfo[]? children = null,
         bool fromCachedElement = false,
-        bool detectSemanticLayoutActions = false)
+        bool detectSemanticLayoutActions = false,
+        Action? checkDeadline = null)
     {
         try
         {
+            checkDeadline?.Invoke();
             // Use cached rect for tree/find operations (elements may go stale), current for actions
             var rect = fromCachedElement
                 ? element.CachedBoundingRectangle
-                : element.CurrentBoundingRectangle;
+                : ExecuteSearchProviderCall(() => element.CurrentBoundingRectangle, checkDeadline);
 
             var boundingRect = new BoundingRect
             {
@@ -278,19 +281,19 @@ public sealed partial class UIAutomationService
 
             // Use centralized element ID generation with short IDs
             var elementId = fromCachedElement
-                ? ElementIdGenerator.GenerateFastId(element, rootElement)
-                : ElementIdGenerator.GenerateFastIdFromCurrent(element, rootElement);
+                ? ElementIdGenerator.GenerateFastId(element, rootElement, checkDeadline)
+                : ElementIdGenerator.GenerateFastIdFromCurrent(element, rootElement, checkDeadline);
 
             // Get properties - cached when tree walking/finding, current for actions
-            string? name = fromCachedElement ? element.GetCachedName() : element.GetName();
-            string? automationId = fromCachedElement ? element.GetCachedAutomationId() : element.GetAutomationId();
-            string? controlType = fromCachedElement ? element.GetCachedControlTypeName() : element.GetControlTypeName();
+            string? name = fromCachedElement ? element.GetCachedName() : ExecuteSearchProviderCall(element.GetName, checkDeadline);
+            string? automationId = fromCachedElement ? element.GetCachedAutomationId() : ExecuteSearchProviderCall(element.GetAutomationId, checkDeadline);
+            string? controlType = fromCachedElement ? element.GetCachedControlTypeName() : ExecuteSearchProviderCall(element.GetControlTypeName, checkDeadline);
             bool isEnabled = fromCachedElement
                 ? element.GetCachedIsEnabled()
-                : element.CurrentIsEnabled != 0;
+                : ExecuteSearchProviderCall(() => element.CurrentIsEnabled != 0, checkDeadline);
             bool isOffscreen = fromCachedElement
                 ? element.GetCachedIsOffscreen()
-                : element.CurrentIsOffscreen != 0;
+                : ExecuteSearchProviderCall(() => element.CurrentIsOffscreen != 0, checkDeadline);
             var isSemanticLayoutCandidate =
                 fromCachedElement &&
                 detectSemanticLayoutActions &&
@@ -309,25 +312,26 @@ public sealed partial class UIAutomationService
                 MonitorRelativeRect = monitorRelativeRect,
                 MonitorIndex = monitorIndex,
                 ClickablePoint = ClickablePoint.FromCenter(monitorRelativeRect, monitorIndex),
-                SupportedPatterns = fromCachedElement ? [] : element.GetSupportedPatternNames(),
+                SupportedPatterns = fromCachedElement ? [] : element.GetSupportedPatternNames(checkDeadline),
                 IsSemanticLayoutOnly = isSemanticLayoutCandidate &&
                     !isDirectlyActionable,
                 IsDirectlyActionable = isDirectlyActionable,
                 HasDeveloperIdentifier = !string.IsNullOrWhiteSpace(automationId),
                 Value = (!fromCachedElement || controlType is "Edit" or "Spinner") &&
-                    (controlType != "Edit" || CanReadDirectFieldValue(element))
-                    ? element.TryGetValue()
+                    (controlType != "Edit" || CanReadDirectFieldValue(element, checkDeadline))
+                    ? element.TryGetValue(checkDeadline)
                     : null,
                 ToggleState = string.Equals(controlType, "RadioButton", StringComparison.Ordinal)
-                    ? element.GetSelectionStateName()
+                    ? element.GetSelectionStateName(checkDeadline)
                     : !fromCachedElement || string.Equals(controlType, "CheckBox", StringComparison.Ordinal)
-                        ? element.GetToggleState()
+                        ? element.GetToggleState(checkDeadline)
                         : null,
                 IsEnabled = isEnabled,
                 IsOffscreen = isOffscreen,
                 Children = children
             };
 
+            checkDeadline?.Invoke();
             return info;
         }
 
@@ -349,25 +353,33 @@ public sealed partial class UIAutomationService
                element.GetCachedPropertyValue(UIA3PropertyIds.IsValuePatternAvailable) is true;
     }
 
-    private UIElementInfo[]? GetChildren(UIA.IUIAutomationElement element, UIA.IUIAutomationElement rootElement, int maxChildren = 100)
+    private UIElementInfo[]? GetChildren(
+        UIA.IUIAutomationElement element,
+        UIA.IUIAutomationElement rootElement,
+        int maxChildren = 100,
+        Action? checkDeadline = null)
     {
         var children = new List<UIElementInfo>();
         var walker = Uia.ControlViewWalker;
-        var child = walker.GetFirstChildElement(element);
+        var child = ExecuteSearchProviderCall(
+            () => walker.GetFirstChildElement(element), checkDeadline);
         var count = 0;
 
         while (child != null && count < maxChildren)
         {
             try
             {
-                var childInfo = ConvertToElementInfo(child, rootElement, _coordinateConverter);
+                var childInfo = ConvertToElementInfo(
+                    child, rootElement, _coordinateConverter, checkDeadline: checkDeadline);
                 if (childInfo != null)
                 {
                     children.Add(childInfo);
                 }
 
                 count++;
-                child = walker.GetNextSiblingElement(child);
+                child = count < maxChildren
+                    ? ExecuteSearchProviderCall(() => walker.GetNextSiblingElement(child), checkDeadline)
+                    : null;
             }
             catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
             {
@@ -435,7 +447,9 @@ public sealed partial class UIAutomationService
         int elementsScanned,
         string? windowTitle,
         string? windowHandle,
-        bool? usedContentView = null)
+        bool? usedContentView = null,
+        Action? checkDeadline = null,
+        string? detectedFramework = null)
     {
         return new UIAutomationDiagnostics
         {
@@ -444,7 +458,7 @@ public sealed partial class UIAutomationService
             ElementsScanned = elementsScanned,
             WindowTitle = windowTitle,
             WindowHandle = windowHandle,
-            DetectedFramework = DetectFramework(rootElement),
+            DetectedFramework = detectedFramework ?? DetectFramework(rootElement, checkDeadline),
             UsedContentView = usedContentView
         };
     }
@@ -452,12 +466,12 @@ public sealed partial class UIAutomationService
     /// <summary>
     /// Detects the UI framework of the given element.
     /// </summary>
-    private static string? DetectFramework(UIA.IUIAutomationElement element)
+    private static string? DetectFramework(UIA.IUIAutomationElement element, Action? checkDeadline = null)
     {
         try
         {
-            var frameworkId = element.GetFrameworkId();
-            var className = element.GetClassName();
+            var frameworkId = ExecuteSearchProviderCall(element.GetFrameworkId, checkDeadline);
+            var className = ExecuteSearchProviderCall(element.GetClassName, checkDeadline);
 
             // Check for Chromium-based apps (Electron, Chrome, Edge, etc.)
             if (className?.StartsWith("Chrome", StringComparison.OrdinalIgnoreCase) == true ||
@@ -487,7 +501,7 @@ public sealed partial class UIAutomationService
             if (frameworkId == "Win32" && className != null)
             {
                 var walker = UIA3Automation.Instance.ControlViewWalker;
-                var child = walker.GetFirstChildElement(element);
+                var child = ExecuteSearchProviderCall(() => walker.GetFirstChildElement(element), checkDeadline);
                 var maxChildren = 10; // Limit scan depth for performance
                 var childCount = 0;
 
@@ -495,8 +509,8 @@ public sealed partial class UIAutomationService
                 {
                     try
                     {
-                        var childClassName = child.GetClassName();
-                        var childFramework = child.GetFrameworkId();
+                        var childClassName = ExecuteSearchProviderCall(child.GetClassName, checkDeadline);
+                        var childFramework = ExecuteSearchProviderCall(child.GetFrameworkId, checkDeadline);
 
                         // Check for Chromium
                         if (childClassName?.StartsWith("Chrome", StringComparison.OrdinalIgnoreCase) == true ||
@@ -524,8 +538,10 @@ public sealed partial class UIAutomationService
                             return "WinUI";
                         }
 
-                        child = walker.GetNextSiblingElement(child);
                         childCount++;
+                        child = childCount < maxChildren
+                            ? ExecuteSearchProviderCall(() => walker.GetNextSiblingElement(child), checkDeadline)
+                            : null;
                     }
                     catch (Exception ex) when (COMExceptionHelper.IsExpectedElementFailure(ex))
                     {
@@ -549,8 +565,11 @@ public sealed partial class UIAutomationService
     /// <returns>A framework strategy with optimal search parameters.</returns>
     internal static FrameworkStrategy GetFrameworkStrategy(UIA.IUIAutomationElement element)
     {
-        var framework = DetectFramework(element);
+        return GetFrameworkStrategy(DetectFramework(element));
+    }
 
+    private static FrameworkStrategy GetFrameworkStrategy(string? framework)
+    {
         return framework switch
         {
             "Chromium/Electron" => FrameworkStrategy.Electron,
