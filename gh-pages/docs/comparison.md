@@ -60,10 +60,15 @@ task requires.
 
 ## What about tokens?
 
-**No current real-task results are published.** The next comparison will use
-controls-first and screenshot-only routes within Windows MCP with GPT-6.1 Sol
-and GPT-6 Luna. The 16 trials cover Notepad, Word, PowerPoint, and Chrome.
-Saved files and submitted values are checked independently.
+The 16-trial comparison used controls-first and screenshot-only routes within
+Windows MCP with GPT-6.1 Sol and GPT-6 Luna. Controls first completed **8 of
+8** tasks. Screenshots only completed **7 of 8**.
+
+Across the seven pairs where both routes completed, controls first used a
+median **34.9% fewer input tokens** and took a median **34.3% less framework
+session time**. Controls did not win every pair: GPT-6.1 Sol used more tokens
+and time with controls in PowerPoint. Saved files and submitted values were
+checked independently.
 
 **A short text reply can use fewer tokens than a screenshot.** If your assistant
 only needs to know whether a checkbox is ticked, Windows MCP can return that
@@ -85,8 +90,8 @@ high-detail images**, including the question and instructions. Screenshots
 worked at both detail settings; focused text returned the same answers with
 less input.
 
-The advantage is choosing the information the task needs. The pending
-real-task comparison includes tool definitions, repeated conversation
+The advantage is choosing the information the task needs. The real-task
+comparison includes tool definitions, repeated conversation
 history, and actions. The single-field comparison measures only a read.
 Neither is a price comparison or a direct test against separate products.
 

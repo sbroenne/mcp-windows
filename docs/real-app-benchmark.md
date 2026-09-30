@@ -6,12 +6,34 @@ conversation and its Windows actions, not just reading a saved image.
 
 ## Results
 
-**No current real-task results are published.** The next comparison will use
-the released pytest-skill-engineering framework and the two approved models:
-`gpt-6.1-sol` and `gpt-6-luna`.
+The 30 September 2026 run completed all 16 trials. The controls-first route
+completed **8 of 8** tasks. The screenshot-only route completed **7 of 8**.
+GPT-6 Luna reached the 80-call limit without saving the PowerPoint copy in its
+screenshot-only trial. That failure remains part of the result.
 
-Old results and evidence have been removed. Do not combine incomplete runs or
-results produced by the retired standalone runner with the new comparison.
+Across the seven app/model pairs where both routes completed, controls first
+used a median **34.9% fewer input tokens** and took a median **34.3% less
+framework session time**.
+
+| App | Model | Controls first | Screenshots only | Controls-first input tokens | Controls-first time |
+|-----|-------|----------------|------------------|-----------------------------|---------------------|
+| Notepad | GPT-6.1 Sol | Passed | Passed | 70.4% fewer | 51.5% less |
+| Notepad | GPT-6 Luna | Passed | Passed | 56.8% fewer | 42.3% less |
+| Word | GPT-6.1 Sol | Passed | Passed | 30.8% fewer | 9.4% less |
+| Word | GPT-6 Luna | Passed | Passed | 21.5% fewer | 5.9% less |
+| PowerPoint | GPT-6.1 Sol | Passed | Passed | 58.1% more | 35.0% more |
+| PowerPoint | GPT-6 Luna | Passed | Failed at 80 calls | Not compared | Not compared |
+| Chrome | GPT-6.1 Sol | Passed | Passed | 34.9% fewer | 34.3% less |
+| Chrome | GPT-6 Luna | Passed | Passed | 88.0% fewer | 79.0% less |
+
+This is one run per combination, not a general model ranking. PowerPoint with
+GPT-6.1 Sol is an important counterexample: controls completed the task but
+used more tokens and time than screenshots. Token counts measure model input,
+not price.
+
+[Download the privacy-safe evidence](../gh-pages/docs/assets/benchmarks/real-apps.json).
+It contains settings, counts, hashes, request-audit metadata, and stop reasons.
+Raw screenshots, messages, desktop text, and local paths remain private.
 
 ## Tasks
 

@@ -12,15 +12,20 @@ assistant both ways to save tokens, with screenshots available when it needs
 a picture.
 
 Tokens are the units AI services count when processing text and images.
-The real-task comparison is ready to run. Smaller published measurements cover
+The real-task comparison covers full tasks. Smaller measurements below cover
 reading a single field and sending only changes instead of repeating a
 window's controls.
 
 ## Real tasks in Notepad, Word, PowerPoint, and Chrome
 
-**No current real-task results are published.** The next run compares GPT-6.1
-Sol and GPT-6 Luna on Notepad, Word, PowerPoint, and Chrome. Both models use a
-controls-first route and a screenshot-only route, for 16 trials.
+The 16-trial run compares GPT-6.1 Sol and GPT-6 Luna on Notepad, Word,
+PowerPoint, and Chrome. Controls first completed **8 of 8** tasks. Screenshots
+only completed **7 of 8**.
+
+Across the seven app/model pairs where both routes completed, controls first
+used a median **34.9% fewer input tokens** and took a median **34.3% less
+framework session time**. The detailed table below includes the failed trial
+and the pair where controls used more.
 
 Saved files and submitted values are checked independently. The framework
 also checks actual model requests, tools, reasoning, image detail, usage, and
@@ -127,9 +132,11 @@ which view to request.
 
 ## Does it make tasks faster?
 
-The pending real-task comparison will measure full framework session time for
-both routes. The single-field test did not show a consistent speed advantage.
-An app's speed and the time the AI takes to decide also affect the task.
+The real-task comparison measures full framework session time for both routes.
+Its seven completed pairs had a median 34.3% reduction with controls first,
+but one PowerPoint pair took 35.0% more time. The single-field test did not
+show a consistent speed advantage. An app's speed and the time the AI takes to
+decide also affect the task.
 
 <span id="do-i-need-to-configure-this"></span>
 

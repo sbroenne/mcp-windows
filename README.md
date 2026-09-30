@@ -110,9 +110,18 @@ settings. Start with a test document rather than important work.
 
 ## Real tasks: controls first versus screenshots
 
-**No current real-task results are published.** The next comparison has 16
-trials: GPT-6.1 Sol and GPT-6 Luna use both controls-first and screenshot-only
-routes in Notepad, Word, PowerPoint, and Chrome.
+In 16 real-task trials, the controls-first route completed **8 of 8** tasks.
+The screenshot-only route completed **7 of 8**. Across the seven matching
+app/model pairs where both routes completed, controls first used a median
+**34.9% fewer input tokens** and took a median **34.3% less framework session
+time**.
+
+The comparison used GPT-6.1 Sol and GPT-6 Luna in Notepad, Word, PowerPoint,
+and Chrome. One screenshot-only PowerPoint trial reached the 80-call limit.
+Controls were not always cheaper or faster: in the completed GPT-6.1 Sol
+PowerPoint pair, controls used 58.1% more input tokens and 35.0% more time.
+
+[See every trial, the limits, and the method](docs/real-app-benchmark.md).
 
 Saved files and submitted values are checked independently, and original
 inputs must remain unchanged. The framework records actual model requests,

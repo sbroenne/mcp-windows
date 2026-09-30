@@ -22,7 +22,7 @@ from real_app_fixtures import (
 )
 
 
-MODELS = ("gpt-6-astra", "gpt-6-luna", "gpt-5.6-sol", "gpt-5.6-luna")
+MODELS = ("gpt-6.1-sol", "gpt-6-luna")
 ROUTES = ("controls", "screenshots")
 COMMON_TOOLS = {"window_management", "screenshot_control", "mouse_control", "keyboard_control"}
 WINDOW_ACTIONS = {

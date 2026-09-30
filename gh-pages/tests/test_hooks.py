@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,10 +13,23 @@ spec.loader.exec_module(hooks)
 
 
 class DocumentationHooksTests(unittest.TestCase):
-    def test_old_real_app_results_and_evidence_are_removed(self):
-        self.assertFalse(
-            (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").exists()
+    def test_current_real_app_results_and_evidence_are_published(self):
+        evidence_path = SITE / "docs" / "assets" / "benchmarks" / "real-apps.json"
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        trials = evidence["trials"]
+        self.assertEqual(16, len(trials))
+        self.assertEqual(
+            16, len({(row["app"], row["model"], row["route"]) for row in trials})
         )
+        self.assertEqual(["gpt-6.1-sol", "gpt-6-luna"], evidence["manifest"]["models"])
+        self.assertEqual("0.6.23", evidence["manifest"]["runtime"]["framework"])
+        self.assertEqual(8, evidence["summary"]["routes"]["controls"]["successes"])
+        self.assertEqual(7, evidence["summary"]["routes"]["screenshots"]["successes"])
+        self.assertEqual(7, evidence["summary"]["successful_pairs"])
+        self.assertTrue(all(row["evidence_complete"] for row in trials))
+        serialized = json.dumps(evidence).lower()
+        for private in ("c:\\\\", "stefa", "request_id", '"content"', '"prompt"', '"reply"'):
+            self.assertNotIn(private, serialized)
         for path in (
             SITE.parent / "README.md",
             SITE.parent / "docs" / "real-app-benchmark.md",
@@ -25,7 +39,7 @@ class DocumentationHooksTests(unittest.TestCase):
                 text = path.read_text(encoding="utf-8")
                 self.assertNotIn("11 of 16", text)
                 self.assertNotIn("51.1%", text)
-                self.assertIn("No current real-task results are published", text)
+                self.assertIn("34.9%", text)
 
     def test_docs_do_not_compare_assistant_screen_control_features(self):
         paths = [
@@ -80,6 +94,13 @@ class DocumentationHooksTests(unittest.TestCase):
 
     def test_measurement_links_keep_the_site_address(self):
         self.assertEqual(
+            "[Evidence](/assets/benchmarks/real-apps.json)",
+            hooks._rewrite_links(
+                "[Evidence](../gh-pages/docs/assets/benchmarks/real-apps.json)",
+                "docs/real-app-benchmark.md",
+            ),
+        )
+        self.assertEqual(
             "[Evidence](/assets/benchmarks/screenshot-readability.json)",
             hooks._rewrite_links(
                 "[Evidence](../gh-pages/docs/assets/benchmarks/screenshot-readability.json)",
@@ -109,11 +130,11 @@ class DocumentationHooksTests(unittest.TestCase):
             f"{hooks.GITHUB_BLOB}docs/screenshot-ui-automation-benchmark.md", page
         )
 
-    def test_real_app_method_is_included_without_old_evidence(self):
+    def test_real_app_method_is_included_with_current_evidence(self):
         page = (SITE / "docs" / "benchmark.md").read_text(encoding="utf-8")
         self.assertIn('--8<-- "_generated/real-app-benchmark.md"', page)
         self.assertIn('id="real-app-details"', page)
-        self.assertFalse(
+        self.assertTrue(
             (SITE / "docs" / "assets" / "benchmarks" / "real-apps.json").exists()
         )
 

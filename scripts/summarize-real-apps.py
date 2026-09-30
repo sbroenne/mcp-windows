@@ -16,6 +16,117 @@ benchmark = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(benchmark)
 
 
+def rows_from_framework(report, calls):
+    rows = []
+    runtime_values = []
+    source_revisions = set()
+    server_hashes = set()
+    for index, test in enumerate(report.get("tests", []), 1):
+        properties = dict(test.get("properties", []))
+        required = {"runtime", "comparison", "application", "verification", "cleanup"}
+        if not required.issubset(properties):
+            raise ValueError("Framework report is missing benchmark properties")
+        runtime = properties["runtime"]
+        comparison = properties["comparison"]
+        application = properties["application"]
+        verification = properties["verification"]
+        result = test["eval_result"]
+        directory = f"trial-{index:03d}"
+        if Path(comparison["directory"]).name != directory:
+            raise ValueError("Trial directory does not match framework order")
+        configuration = result["configuration"]
+        expected_configuration = {
+            "model": comparison["model"],
+            "reasoning_effort": "medium",
+            "image_detail": "high",
+            "max_tool_calls": comparison["max_tool_calls"],
+            "timeout_s": comparison["timeout_seconds"],
+            "max_retries": 0,
+            "audit_requests": True,
+            "client_mode": "empty",
+            "system_message_mode": "replace",
+        }
+        if any(configuration.get(key) != value for key, value in expected_configuration.items()):
+            raise ValueError("Framework configuration differs from the approved benchmark")
+        actual_calls = calls.get(directory)
+        if actual_calls is None:
+            raise ValueError("Tool-call evidence is missing")
+        totals = benchmark.sum_usage(result["usage"], comparison["model"])
+        output_check = verification["output"]
+        success = (
+            test["outcome"] == "passed"
+            and result["success"]
+            and output_check["success"]
+            and verification["source_unchanged"]
+            and result["stop_reason"] == "completed"
+        )
+        rows.append({
+            "app": comparison["app"],
+            "model": comparison["model"],
+            "route": comparison["route"],
+            "directory": directory,
+            "input_sha256": comparison["input_sha256"],
+            "source_unchanged": verification["source_unchanged"],
+            "output_sha256": verification["output_sha256"],
+            "success": success,
+            "verification": output_check,
+            "requests": result["request_audit"],
+            "usage": result["usage"],
+            **totals,
+            "seconds": result["duration_ms"] / 1000,
+            "tool_calls": len(actual_calls),
+            "tool_calls_admitted": result["tool_calls_admitted"],
+            "failed_tool_calls": sum(
+                bool(call.get("is_error") or call.get("error")) for call in actual_calls
+            ),
+            "screenshot_calls": sum(
+                call["name"] == "screenshot_control" for call in actual_calls
+            ),
+            "errors": result["capture_errors"],
+            "evidence_complete": result["evidence_complete"],
+            "stop_reason": result["stop_reason"],
+            "model_success": result["success"],
+            "test_outcome": test["outcome"],
+            "app_version": application["version"],
+            "initial_window_bounds": application["initial_bounds"],
+            "setup": properties.get("notepad_setup"),
+            "cleanup_recorded": isinstance(
+                properties["cleanup"].get("terminated_owned_pids"), list
+            ),
+        })
+        runtime_values.append(runtime)
+        source_revisions.add(comparison["source_revision"])
+        server_hashes.add(comparison["server_sha256"])
+    if not rows:
+        raise ValueError("Framework report contains no benchmark trials")
+    runtime_identity = {
+        key: runtime_values[0].get(key)
+        for key in ("framework", "framework_source", "sdk", "python", "platform")
+    }
+    if any(
+        any(runtime.get(key) != value for key, value in runtime_identity.items())
+        for runtime in runtime_values
+    ):
+        raise ValueError("Runtime changed during the benchmark")
+    if len(source_revisions) != 1 or len(server_hashes) != 1:
+        raise ValueError("Source revision or server build changed during the benchmark")
+    return {
+        "purpose": "benchmark",
+        "timestamp": report.get("timestamp"),
+        "models": list(benchmark.MODELS),
+        "apps": list(benchmark.APPS),
+        "routes": list(benchmark.ROUTES),
+        "input_sha256": {
+            app: next(row["input_sha256"] for row in rows if row["app"] == app)
+            for app in benchmark.APPS
+            if any(row["app"] == app for row in rows)
+        },
+        "source_revision": source_revisions.pop(),
+        "server_sha256": server_hashes.pop(),
+        "runtime": runtime_identity,
+    }, rows
+
+
 def validate_and_summarize(manifest, rows, calls):
     if manifest.get("purpose") != "benchmark":
         raise ValueError("Pilot runs cannot be published as the benchmark")
@@ -28,13 +139,22 @@ def validate_and_summarize(manifest, rows, calls):
         raise ValueError("Missing or duplicate trials")
     instructions = set()
     for row in rows:
-        if row["errors"] or not row["requests"]:
+        if row["errors"] or not row["requests"] or not row.get("evidence_complete", True):
             raise ValueError("Model transport errors or missing request audit")
+        if not row.get("cleanup_recorded", True):
+            raise ValueError("Owned-app cleanup was not recorded")
         if row["input_sha256"] != manifest["input_sha256"][row["app"]]:
             raise ValueError("Input files differ within an app")
         if row["app"] == "notepad" and not row.get("setup", {}).get("single_document_verified"):
             raise ValueError("Notepad tab isolation was not verified")
-        if row["success"] != bool(row["verification"]["success"] and row["source_unchanged"] and not row.get("stop_reason")):
+        execution_ok = (
+            row.get("model_success", not row.get("stop_reason"))
+            and row.get("test_outcome", "passed") == "passed"
+            and row.get("stop_reason", "completed") == "completed"
+        )
+        if row["success"] != bool(
+            row["verification"]["success"] and row["source_unchanged"] and execution_ok
+        ):
             raise ValueError("Recorded success disagrees with the independent checks")
         for key, total in benchmark.sum_usage(row["usage"], row["model"]).items():
             if row[key] != total:
@@ -43,14 +163,23 @@ def validate_and_summarize(manifest, rows, calls):
             if not isinstance(row[key], (int, float)) or not math.isfinite(row[key]) or row[key] < 0:
                 raise ValueError(f"Invalid metric: {key}")
         for request in row["requests"]:
-            if request["model"] != row["model"] or set(request["tools"]) != benchmark.allowed_tools(row["route"]):
+            if (
+                request["model"] != row["model"]
+                or set(request["tool_names"]) != benchmark.allowed_tools(row["route"])
+            ):
                 raise ValueError("Unexpected model or tools on an actual request")
-            if request["reasoning"].get("effort") != "medium" or request["image_detail"] != "high":
+            if (
+                request["reasoning_effort"] != "medium"
+                or request["image_count"] != len(request["image_details"])
+                or any(detail != "high" for detail in request["image_details"])
+            ):
                 raise ValueError("Mismatched model settings")
-            instructions.add(request["instruction_sha256"])
+            instructions.add(request["instructions_sha256"])
         actual = calls[row["directory"]]
         if row["tool_calls"] != len(actual):
             raise ValueError("Incorrect tool-call count")
+        if row.get("tool_calls_admitted", len(actual)) != len(actual):
+            raise ValueError("Admitted tool-call count differs from the tool log")
         if row["failed_tool_calls"] != sum(bool(call.get("is_error") or call.get("error")) for call in actual):
             raise ValueError("Incorrect failed-tool count")
         if row["screenshot_calls"] != sum(call["name"] == "screenshot_control" for call in actual):
@@ -82,7 +211,11 @@ def validate_and_summarize(manifest, rows, calls):
     for app, model in itertools.product(benchmark.APPS, benchmark.MODELS):
         pair = {row["route"]: row for row in rows if row["app"] == app and row["model"] == model}
         control, image = pair["controls"], pair["screenshots"]
-        if not (control["success"] and image["success"]) or control.get("stop_reason") or image.get("stop_reason"):
+        if (
+            not (control["success"] and image["success"])
+            or control.get("stop_reason", "completed") != "completed"
+            or image.get("stop_reason", "completed") != "completed"
+        ):
             continue
         if image["input_tokens"] <= 0 or image["seconds"] <= 0:
             raise ValueError("Successful screenshot trial has invalid denominators")
@@ -103,38 +236,57 @@ def public_evidence(manifest, rows, summary):
         "app", "model", "route", "started_at", "success", "source_unchanged", "input_sha256",
         "output_sha256", "seconds", "input_tokens", "output_tokens", "cache_read_tokens",
         "cache_write_tokens", "reasoning_tokens", "usage", "requests", "tool_calls",
-        "failed_tool_calls", "screenshot_calls", "stop_reason",
+        "failed_tool_calls", "screenshot_calls", "stop_reason", "evidence_complete",
+        "tool_calls_admitted",
         "app_version", "initial_window_bounds",
         "setup",
     }
+    request_fields = {
+        "model", "tool_names", "reasoning_effort", "image_count", "image_details",
+        "instructions_sha256",
+    }
+    public_rows = []
+    for row in rows:
+        public_row = {key: value for key, value in row.items() if key in allowed}
+        public_row["requests"] = [
+            {key: value for key, value in request.items() if key in request_fields}
+            for request in row["requests"]
+        ]
+        public_rows.append(public_row)
     return {
         "schema_version": 1, "manifest": manifest, "summary": summary,
-        "trials": [{key: value for key, value in row.items() if key in allowed} for row in rows],
+        "trials": public_rows,
     }
 
 
 def load_run(directory):
-    if not (directory / "report.md").is_file():
-        raise ValueError("The benchmark has not completed")
-    manifest = json.loads((directory / "manifest.json").read_text(encoding="utf-8"))
-    rows = json.loads((directory / "results.json").read_text(encoding="utf-8"))
-    for app, expected_hash in manifest["input_sha256"].items():
-        templates = list((directory / "templates" / app).glob("source.*"))
-        if len(templates) != 1 or benchmark.digest(templates[0]) != expected_hash:
-            raise ValueError("Input template hash differs")
+    report_path = directory / "framework.json"
+    if not report_path.is_file():
+        raise ValueError("The native framework report is missing")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    if len(report.get("tests", [])) != len(benchmark.APPS) * len(benchmark.MODELS) * len(benchmark.ROUTES):
+        raise ValueError("The native framework report is incomplete")
     calls = {}
-    for row in rows:
-        if not re.fullmatch(r"trial-\d{3}", row["directory"]):
-            raise ValueError("Unexpected trial directory")
+    for index in range(1, len(report["tests"]) + 1):
+        name = f"trial-{index:03d}"
+        trial = directory / name
+        calls[name] = json.loads((trial / "tool-calls.json").read_text(encoding="utf-8"))
+    manifest, rows = rows_from_framework(report, calls)
+    expected_trials = {f"trial-{index:03d}" for index in range(1, len(rows) + 1)}
+    actual_trials = {path.name for path in directory.glob("trial-*") if path.is_dir()}
+    if actual_trials != expected_trials:
+        raise ValueError("Unexpected or missing trial directories")
+    for row, test in zip(rows, report["tests"], strict=True):
         trial = directory / row["directory"]
-        if (trial / "incomplete.json").exists() or not (trial / "cleanup.json").is_file():
-            raise ValueError("Incomplete trial or cleanup")
-        saved = json.loads((trial / "result.json").read_text(encoding="utf-8"))
-        if saved != row:
-            raise ValueError("Per-trial evidence differs from the result matrix")
-        calls[row["directory"]] = json.loads((trial / "tool-calls.json").read_text(encoding="utf-8"))
+        comparison = dict(test["properties"])["comparison"]
+        if Path(comparison["directory"]).resolve() != trial.resolve():
+            raise ValueError("Framework trial path differs from the selected run")
         inputs = list(trial.glob("input-*"))
-        if len(inputs) != 1 or (benchmark.digest(inputs[0]) == row["input_sha256"]) != row["source_unchanged"]:
+        if (
+            len(inputs) != 1
+            or benchmark.digest(inputs[0]) != row["input_sha256"]
+            or not row["source_unchanged"]
+        ):
             raise ValueError("Original input hash check failed")
         output = trial / f"completed{inputs[0].suffix}"
         checked = benchmark.verify_output(row["app"], output)

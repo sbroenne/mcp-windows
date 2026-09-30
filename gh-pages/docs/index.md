@@ -62,13 +62,14 @@ an agent with command access can run the CLI for you.
 
 ## Real tasks: controls first versus screenshots
 
-**No current real-task results are published.** The next comparison uses
-GPT-6.1 Sol and GPT-6 Luna across Notepad, Word, PowerPoint, and Chrome. Each
-model uses both a controls-first route and a screenshot-only route, for 16
-trials in total.
+In 16 trials with GPT-6.1 Sol and GPT-6 Luna, controls first completed **8 of
+8** tasks. Screenshots only completed **7 of 8**. Across the seven matching
+pairs where both routes completed, controls first used a median **34.9% fewer
+input tokens** and took a median **34.3% less framework session time**.
 
 We check saved files and submitted values independently. The original input
-must remain unchanged, and incomplete request evidence stops the run.
+must remain unchanged, and incomplete request evidence stops the run. Controls
+did not win every pair: see the full table and limits before using the median.
 
 [See the tasks, safeguards, and full method](benchmark.md#real-tasks-in-notepad-word-powerpoint-and-chrome)
 

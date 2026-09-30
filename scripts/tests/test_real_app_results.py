@@ -27,9 +27,12 @@ def matrix():
                     "app": app, "model": model, "route": route, "directory": directory,
                     "input_sha256": app, "source_unchanged": True, "success": True,
                     "verification": {"success": True}, "requests": [{
-                        "model": model, "tools": sorted(results.benchmark.allowed_tools(route)),
-                        "image_detail": "high", "images": 0, "reasoning": {"effort": "medium"},
-                        "instruction_sha256": "same",
+                        "model": model,
+                        "tool_names": sorted(results.benchmark.allowed_tools(route)),
+                        "image_details": [],
+                        "image_count": 0,
+                        "reasoning_effort": "medium",
+                        "instructions_sha256": "same",
                     }],
                     "usage": [{"model": model, "input_tokens": count, "output_tokens": 10}],
                     "input_tokens": count, "output_tokens": 10, "cache_read_tokens": 0,
@@ -47,8 +50,8 @@ class RealAppResultTests(unittest.TestCase):
     def test_complete_matrix_and_successful_pair_savings(self):
         manifest, rows, calls = matrix()
         summary = results.validate_and_summarize(manifest, rows, calls)
-        self.assertEqual(32, summary["trial_count"])
-        self.assertEqual(16, summary["successful_pairs"])
+        self.assertEqual(16, summary["trial_count"])
+        self.assertEqual(8, summary["successful_pairs"])
         self.assertEqual(50, summary["median_paired_input_saving_percent"])
 
     def test_failed_tasks_are_retained_but_not_credited_as_token_savings(self):
@@ -56,9 +59,9 @@ class RealAppResultTests(unittest.TestCase):
         rows[0]["success"] = False
         rows[0]["verification"]["success"] = False
         summary = results.validate_and_summarize(manifest, rows, calls)
-        self.assertEqual(32, summary["trial_count"])
-        self.assertEqual(15, summary["successful_pairs"])
-        self.assertEqual(15, summary["routes"]["controls"]["successes"])
+        self.assertEqual(16, summary["trial_count"])
+        self.assertEqual(7, summary["successful_pairs"])
+        self.assertEqual(7, summary["routes"]["controls"]["successes"])
 
     def test_missing_duplicates_pilots_and_tampered_counts_are_rejected(self):
         for corruption in ("missing", "duplicate", "pilot", "tokens", "route", "score"):
@@ -73,7 +76,7 @@ class RealAppResultTests(unittest.TestCase):
                 elif corruption == "tokens":
                     rows[0]["input_tokens"] += 1
                 elif corruption == "route":
-                    rows[1]["requests"][0]["tools"].append("ui_read")
+                    rows[1]["requests"][0]["tool_names"].append("ui_read")
                 else:
                     rows[0]["success"] = False
                 with self.assertRaises(ValueError):
@@ -92,8 +95,84 @@ class RealAppResultTests(unittest.TestCase):
         rows[0]["stop_reason"] = "time_budget_exceeded"
         rows[0]["success"] = False
         summary = results.validate_and_summarize(manifest, rows, calls)
-        self.assertEqual(15, summary["routes"]["controls"]["successes"])
-        self.assertEqual(15, summary["successful_pairs"])
+        self.assertEqual(7, summary["routes"]["controls"]["successes"])
+        self.assertEqual(7, summary["successful_pairs"])
+
+    def test_native_framework_row_uses_properties_and_strips_private_content(self):
+        manifest, rows, calls = matrix()
+        source = rows[0]
+        report = {
+            "timestamp": "2026-09-30T12:00:00Z",
+            "tests": [
+                {
+                    "name": "test_real_app[notepad-gpt-6.1-sol-controls]",
+                    "outcome": "passed",
+                    "model": source["model"],
+                    "properties": [
+                        ["runtime", {
+                            "framework": "0.6.23",
+                            "framework_source": "framework-hash",
+                            "sdk": "1.0.15",
+                            "python": "3.14.6",
+                            "platform": "Windows",
+                        }],
+                        ["comparison", {
+                            "app": source["app"],
+                            "model": source["model"],
+                            "route": source["route"],
+                            "directory": r"C:\private\trial-001",
+                            "input_sha256": source["input_sha256"],
+                            "server_sha256": "server-hash",
+                            "source_revision": "revision",
+                            "timeout_seconds": 600,
+                            "max_tool_calls": 80,
+                            "reasoning_effort": "medium",
+                            "image_detail": "high",
+                        }],
+                        ["notepad_setup", {"single_document_verified": True}],
+                        ["application", {
+                            "version": "11.0",
+                            "initial_bounds": [0, 0, 100, 100],
+                        }],
+                        ["verification", {
+                            "output": {"success": True, "text": "private text"},
+                            "source_unchanged": True,
+                            "output_sha256": "output-hash",
+                        }],
+                        ["cleanup", {"terminated_owned_pids": [123]}],
+                    ],
+                    "eval_result": {
+                        "success": True,
+                        "evidence_complete": True,
+                        "stop_reason": "completed",
+                        "error": None,
+                        "capture_errors": [],
+                        "duration_ms": 10000,
+                        "tool_calls_admitted": 1,
+                        "usage": source["usage"],
+                        "request_audit": source["requests"],
+                        "configuration": {
+                            "model": source["model"],
+                            "reasoning_effort": "medium",
+                            "image_detail": "high",
+                            "max_tool_calls": 80,
+                            "timeout_s": 600,
+                            "max_retries": 0,
+                            "audit_requests": True,
+                            "client_mode": "empty",
+                            "system_message_mode": "replace",
+                        },
+                    },
+                }
+            ],
+        }
+
+        parsed_manifest, parsed_rows = results.rows_from_framework(report, {"trial-001": calls["trial-001"]})
+        self.assertEqual("benchmark", parsed_manifest["purpose"])
+        self.assertEqual("revision", parsed_manifest["source_revision"])
+        self.assertEqual("trial-001", parsed_rows[0]["directory"])
+        self.assertEqual("framework-hash", parsed_manifest["runtime"]["framework_source"])
+        self.assertNotIn("private text", str(results.public_evidence(parsed_manifest, parsed_rows, {})))
 
 
 if __name__ == "__main__":
