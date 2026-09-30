@@ -104,7 +104,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
     }
 
     [Fact]
-    public async Task Find_WithTimeout_PerformsFinalProbeAtDeadline()
+    public async Task Find_WithTimeout_DoesNotProbeAfterDeadline()
     {
         const string DelayedAutomationId = "DelayedSubmitButton";
 
@@ -135,13 +135,14 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
                     return observed;
                 },
-                (_, _) => throw new InvalidOperationException("The deadline has expired; probe without delay."),
+                (_, _) => throw new InvalidOperationException("The deadline has expired; do not delay."),
                 () => elapsed,
                 CancellationToken.None);
 
-            Assert.True(result.Success, result.ErrorMessage);
-            Assert.Single(result.Items!);
-            Assert.Equal(2, probes);
+            Assert.False(result.Success);
+            Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Null(result.Items);
+            Assert.Equal(1, probes);
         }
         finally
         {
@@ -152,7 +153,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
 
     [Fact]
     [Trait("Category", "RequiresDesktop")]
-    public async Task Disappear_FinalProbeObservesVisibilityChangeWithoutStructureSignal()
+    public async Task Disappear_DoesNotProbeVisibilityChangeAfterDeadline()
     {
         var query = new ElementQuery
         {
@@ -173,8 +174,7 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
                     if (probes == 1)
                     {
                         Assert.True(observed.Success, observed.ErrorMessage);
-                        // No event signal is wired to this wait. Visibility must be re-probed
-                        // even when the first provider call used the entire deadline.
+                        // A visibility change after the deadline must not trigger another scan.
                         _fixture.Form!.Invoke(() =>
                             _fixture.Form.SetSubmitButtonVisibleForTesting(false));
                         elapsed = 2001;
@@ -185,8 +185,9 @@ public sealed class UIAutomationAdvancedSearchTests : IDisposable
                 (_, _) => throw new InvalidOperationException("No sleep is allowed after the deadline."),
                 () => elapsed,
                 CancellationToken.None);
-            Assert.True(result.Success, result.ErrorMessage);
-            Assert.Equal(2, probes);
+            Assert.False(result.Success);
+            Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+            Assert.Equal(1, probes);
         }
         finally
         {

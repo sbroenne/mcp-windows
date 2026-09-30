@@ -13,7 +13,7 @@ public sealed partial class UIAutomationService
 {
     /// <summary>
     /// Shares the production deadline policy with deterministic clock/probe regressions.
-    /// One probe must start at/after the deadline, even if the preceding probe crossed it.
+    /// No new probe starts at or after the deadline.
     /// </summary>
     internal static Task<UIAutomationResult> WaitForFindResultAsync(
         ElementQuery query,
@@ -44,11 +44,51 @@ public sealed partial class UIAutomationService
     {
         var delay = 50;
         var action = disappear ? "wait_for_disappear" : "wait_for";
+        UIAutomationResult? lastResult = null;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var finalProbe = elapsedMilliseconds() >= timeoutMs;
+            if (elapsedMilliseconds() >= timeoutMs)
+            {
+                var elapsed = elapsedMilliseconds();
+                var message = lastResult switch
+                {
+                    null => $"Search timed out after {timeoutMs}ms before it could start. The expected UI state could not be checked.",
+                    { ErrorType: UIAutomationErrorType.WindowNotFound } =>
+                        $"{lastResult.ErrorMessage} Search timed out after {timeoutMs}ms.",
+                    _ when disappear =>
+                        $"Element still present after {timeoutMs}ms timeout. Expected it to disappear.",
+                    _ => $"Element not found within {timeoutMs}ms timeout."
+                };
+                return UIAutomationResult.CreateFailure(
+                    action,
+                    UIAutomationErrorType.Timeout,
+                    message,
+                    (lastResult?.Diagnostics ?? new UIAutomationDiagnostics { DurationMs = elapsed }) with
+                    {
+                        DurationMs = elapsed,
+                        Query = query,
+                        ElapsedBeforeTimeout = elapsed
+                    });
+            }
+
             var result = await probe().ConfigureAwait(false);
+            if (result.Diagnostics is not null)
+            {
+                var elapsed = elapsedMilliseconds();
+                result = result with
+                {
+                    Diagnostics = result.Diagnostics with
+                    {
+                        DurationMs = elapsed,
+                        Query = query,
+                        ElapsedBeforeTimeout = result.ErrorType == UIAutomationErrorType.Timeout
+                            ? elapsed
+                            : result.Diagnostics.ElapsedBeforeTimeout
+                    }
+                };
+            }
+            lastResult = result;
             if (disappear)
             {
                 if ((!result.Success && IsSatisfiedDisappearAbsence(result.ErrorType)) ||
@@ -68,23 +108,6 @@ public sealed partial class UIAutomationService
                 return result with { Action = action };
             }
 
-            if (finalProbe)
-            {
-                var elapsed = elapsedMilliseconds();
-                return UIAutomationResult.CreateFailure(
-                    action,
-                    UIAutomationErrorType.Timeout,
-                    disappear
-                        ? $"Element still present after {timeoutMs}ms timeout. Expected it to disappear."
-                        : $"Element not found within {timeoutMs}ms timeout.",
-                    new UIAutomationDiagnostics
-                    {
-                        DurationMs = elapsed,
-                        Query = query,
-                        ElapsedBeforeTimeout = elapsed
-                    });
-            }
-
             var remaining = timeoutMs - elapsedMilliseconds();
             if (remaining > 0)
             {
@@ -98,15 +121,6 @@ public sealed partial class UIAutomationService
     public async Task<UIAutomationResult> FindElementsAsync(ElementQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-
-        if (query.RequireUnique && query.FoundIndex != 1)
-        {
-            return UIAutomationResult.CreateFailure(
-                "find",
-                UIAutomationErrorType.InvalidParameter,
-                "requireUnique cannot be combined with foundIndex other than 1. Refine the selector instead.",
-                CreateDiagnostics(Stopwatch.StartNew(), query));
-        }
 
         if (query.TimeoutMs <= 0)
         {
@@ -129,14 +143,26 @@ public sealed partial class UIAutomationService
 
     private async Task<UIAutomationResult> FindElementsOnceAsync(
         ElementQuery query,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? checkDeadline = null)
     {
         var stopwatch = Stopwatch.StartNew();
+        var elementsScanned = 0;
+
+        if (query.RequireUnique && query.FoundIndex != 1)
+        {
+            return UIAutomationResult.CreateFailure(
+                "find",
+                UIAutomationErrorType.InvalidParameter,
+                "requireUnique cannot be combined with foundIndex other than 1. Refine the selector instead.",
+                CreateDiagnostics(stopwatch, query));
+        }
 
         try
         {
             return await _staThread.ExecuteAsync(() =>
             {
+                checkDeadline?.Invoke();
                 // Get root element
                 UIA.IUIAutomationElement? rootElement;
                 if (!string.IsNullOrEmpty(query.ParentElementId))
@@ -150,6 +176,7 @@ public sealed partial class UIAutomationService
 
                     rootElement = ElementIdGenerator.ResolveToAutomationElement(
                         query.ParentElementId);
+                    checkDeadline?.Invoke();
                     if (rootElement == null)
                     {
                         return UIAutomationResult.CreateFailure(
@@ -178,6 +205,7 @@ public sealed partial class UIAutomationService
                         : GetRootElement(query.WindowHandle);
                 }
 
+                checkDeadline?.Invoke();
                 if (rootElement == null)
                 {
                     var requestedActiveDialog = string.Equals(
@@ -235,13 +263,13 @@ public sealed partial class UIAutomationService
                 }
 
                 var elementInfos = new List<UIElementInfo>();
-                var elementsScanned = 0;
                 var matchCount = 0;
                 var scanLimitReached = false;
                 var maxResults = query.RequireUnique ? 2 : query.FoundIndex > 1 ? query.FoundIndex : 100;
 
                 // Detect framework and get optimal search strategy
                 var strategy = GetFrameworkStrategy(rootElement);
+                checkDeadline?.Invoke();
 
                 // Resolve visibility filtering: explicit caller value wins; otherwise exclude
                 // off-screen nodes for Chromium/Electron (huge hidden/virtualized trees), include elsewhere.
@@ -261,6 +289,7 @@ public sealed partial class UIAutomationService
                 // passes. Exact/native conditions must not bypass the provider traversal cap.
                 void RunScan(UIA.IUIAutomationCondition scanCondition)
                 {
+                    checkDeadline?.Invoke();
                     elementInfos.Clear();
                     matchCount = 0;
                     scanLimitReached = false;
@@ -269,7 +298,7 @@ public sealed partial class UIAutomationService
                         rootElement, scanCondition, query, elementInfos, ref elementsScanned,
                         ref matchCount, maxResults,
                         query.ExactDepth.HasValue ? effectiveMaxDepth : query.MaxDepth ?? int.MaxValue,
-                        visibleOnly, regionFilter, cancellationToken);
+                        visibleOnly, regionFilter, cancellationToken, checkDeadline);
 
                     // Exclude off-screen elements when visibility filtering is in effect.
                     if (visibleOnly && elementInfos.Count > 0)
@@ -300,10 +329,8 @@ public sealed partial class UIAutomationService
                     RunScan(condition);
                 }
 
-                stopwatch.Stop();
-                LogSearchPerformance(_logger, "find", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
-
                 string? windowTitle = rootElement.GetName();
+                checkDeadline?.Invoke();
 
                 // AUTO-RECOVERY: If exact name match failed, automatically try partial match
                 if (!scanLimitReached && elementInfos.Count == 0 &&
@@ -322,7 +349,7 @@ public sealed partial class UIAutomationService
                         rootElement, relaxedCondition, relaxedQuery, elementInfos, ref elementsScanned,
                         ref matchCount, maxResults,
                         query.ExactDepth.HasValue ? effectiveMaxDepth : query.MaxDepth ?? int.MaxValue,
-                        visibleOnly, regionFilter, cancellationToken);
+                        visibleOnly, regionFilter, cancellationToken, checkDeadline);
 
                     if (visibleOnly && elementInfos.Count > 0)
                     {
@@ -339,6 +366,9 @@ public sealed partial class UIAutomationService
                         LogSearchPerformance(_logger, "find (auto-relaxed to partial match)", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
                     }
                 }
+
+                checkDeadline?.Invoke();
+                LogSearchPerformance(_logger, "find", elementsScanned, stopwatch.ElapsedMilliseconds, elementInfos.Count);
 
                 if (scanLimitReached)
                 {
@@ -418,6 +448,19 @@ public sealed partial class UIAutomationService
                 return UIAutomationResult.CreateSuccessCompact("find", [.. elementInfos], CreateDiagnosticsWithContext(stopwatch, rootElement, query, elementsScanned, windowTitle, query.WindowHandle, usedContentView));
             }, cancellationToken);
         }
+        catch (SearchDeadlineExceededException ex)
+        {
+            return UIAutomationResult.CreateFailure(
+                "find",
+                UIAutomationErrorType.Timeout,
+                ex.Message,
+                CreateDiagnostics(stopwatch, query) with
+                {
+                    ElementsScanned = elementsScanned,
+                    WindowHandle = query.WindowHandle,
+                    ElapsedBeforeTimeout = stopwatch.ElapsedMilliseconds
+                });
+        }
         catch (COMException ex)
         {
             LogFindElementsError(_logger, ex);
@@ -453,12 +496,14 @@ public sealed partial class UIAutomationService
         int maxDepth,
         bool visibleOnly,
         BoundingRect? regionFilter,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? checkDeadline = null)
     {
         var scanned = 0;
         var matches = matchCount;
         try
         {
+            checkDeadline?.Invoke();
             var cacheRequest = Uia.CreateElementCacheRequest(UIA.TreeScope.TreeScope_Element);
             cacheRequest.AddProperty(UIA3PropertyIds.IsControlElement);
             cacheRequest.TreeFilter = Uia.TrueCondition;
@@ -504,12 +549,14 @@ public sealed partial class UIAutomationService
             if (query.ExactDepth.HasValue)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                checkDeadline?.Invoke();
                 if (elementsScanned >= MaxElementsToScan)
                 {
                     return true;
                 }
 
                 Visit(rootElement.BuildUpdatedCache(cacheRequest), 0);
+                checkDeadline?.Invoke();
                 if (query.ExactDepth.Value == 0)
                 {
                     return false; // Root-only scope is provably complete without navigation.
@@ -526,7 +573,8 @@ public sealed partial class UIAutomationService
                 query.ExactDepth.HasValue
                     ? Math.Min(query.ExactDepth.Value, maxDepth)
                     : Math.Max(1, maxDepth),
-                cancellationToken);
+                cancellationToken,
+                checkDeadline);
             return outcome.LimitReached;
         }
         catch (Exception ex) when (COMExceptionHelper.IsExpectedElementTraversalFailure(ex))
@@ -540,6 +588,22 @@ public sealed partial class UIAutomationService
             matchCount = matches;
         }
     }
+
+    private sealed class SearchDeadlineExceededException(int timeoutMs) : Exception(
+        $"Search stopped after {timeoutMs}ms before it completed. " +
+        "Absence or uniqueness could not be established. Narrow the search or increase timeoutMs.");
+
+    private static Action CreateSearchDeadlineCheck(
+        Stopwatch stopwatch,
+        int timeoutMs,
+        CancellationToken cancellationToken) => () =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (stopwatch.ElapsedMilliseconds >= timeoutMs)
+            {
+                throw new SearchDeadlineExceededException(timeoutMs);
+            }
+        };
 
     /// <summary>
     /// Evaluates nameContains/namePattern/className against an element's cached properties.

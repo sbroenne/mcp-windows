@@ -13,7 +13,8 @@ internal static class BoundedSearchTraversal
         Func<T, int, bool> visit,
         int maxNodes,
         int maxDepth,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? checkDeadline = null)
         where T : class
     {
         ArgumentNullException.ThrowIfNull(root);
@@ -23,6 +24,7 @@ internal static class BoundedSearchTraversal
         ArgumentNullException.ThrowIfNull(visit);
         ArgumentOutOfRangeException.ThrowIfNegative(maxNodes);
         cancellationToken.ThrowIfCancellationRequested();
+        checkDeadline?.Invoke();
         if (maxDepth <= 0)
         {
             return new(0, false);
@@ -35,14 +37,18 @@ internal static class BoundedSearchTraversal
 
         var ancestors = new Stack<(T Node, int ParentDepth)>();
         var current = firstChild(root);
+        checkDeadline?.Invoke();
         var parentDepth = 0;
         var scanned = 0;
         while (current is not null)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            checkDeadline?.Invoke();
             scanned++;
             var depth = parentDepth + (countsForDepth(current) ? 1 : 0);
-            if (visit(current, depth))
+            var satisfied = visit(current, depth);
+            checkDeadline?.Invoke();
+            if (satisfied)
             {
                 return new(scanned, false);
             }
@@ -55,7 +61,9 @@ internal static class BoundedSearchTraversal
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            checkDeadline?.Invoke();
             var child = depth < maxDepth ? firstChild(current) : null;
+            checkDeadline?.Invoke();
             if (child is not null)
             {
                 ancestors.Push((current, parentDepth));
@@ -67,7 +75,9 @@ internal static class BoundedSearchTraversal
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                checkDeadline?.Invoke();
                 var sibling = nextSibling(current);
+                checkDeadline?.Invoke();
                 if (sibling is not null)
                 {
                     current = sibling;

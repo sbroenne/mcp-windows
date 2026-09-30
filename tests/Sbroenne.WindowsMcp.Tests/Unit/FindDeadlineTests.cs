@@ -8,7 +8,7 @@ public sealed class FindDeadlineTests
     private static readonly int[] ExpectedDelays = [50, 75];
 
     [Fact]
-    public async Task ProbeCrossingDeadline_ReceivesOneFreshFinalProbe()
+    public async Task ProbeCrossingDeadline_DoesNotStartAnotherProbe()
     {
         long elapsed = 0;
         var probes = 0;
@@ -26,12 +26,13 @@ public sealed class FindDeadlineTests
             () => elapsed,
             CancellationToken.None);
 
-        Assert.True(result.Success);
-        Assert.Equal(2, probes);
+        Assert.False(result.Success);
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Equal(1, probes);
     }
 
     [Fact]
-    public async Task DelayIsClamped_AndFinalProbeStartsAtDeadline()
+    public async Task DelayIsClamped_AndNoProbeStartsAtDeadline()
     {
         long elapsed = 0;
         var probeTimes = new List<long>();
@@ -53,29 +54,34 @@ public sealed class FindDeadlineTests
             CancellationToken.None);
 
         Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
-        Assert.Equal(new long[] { 0, 50, 125 }, probeTimes);
+        Assert.Equal(new long[] { 0, 50 }, probeTimes);
         Assert.Equal(ExpectedDelays, delays);
     }
 
-    [Fact]
-    public async Task SlowFinalProbe_DoesNotStartAdditionalProbes()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AlreadyExpiredDeadline_DoesNotStartProviderCall(bool disappear)
     {
         long elapsed = 2000;
         var probes = 0;
-        var result = await UIAutomationService.WaitForFindResultAsync(
-            new ElementQuery(), 2000,
-            () =>
-            {
-                probes++;
-                elapsed += 500;
-                return Task.FromResult(Missing());
-            },
-            (_, _) => throw new InvalidOperationException("Must not delay after final probe."),
-            () => elapsed,
-            CancellationToken.None);
+        Task<UIAutomationResult> Probe()
+        {
+            probes++;
+            elapsed += 500;
+            return Task.FromResult(Missing());
+        }
+        Task Wait(int _, CancellationToken token) =>
+            throw new InvalidOperationException("Must not delay after deadline.");
+        var result = disappear
+            ? await UIAutomationService.WaitForDisappearResultAsync(
+                new ElementQuery(), 2000, Probe, Wait, () => elapsed, CancellationToken.None)
+            : await UIAutomationService.WaitForFindResultAsync(
+                new ElementQuery(), 2000, Probe, Wait, () => elapsed, CancellationToken.None);
 
         Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
-        Assert.Equal(1, probes);
+        Assert.Equal(0, probes);
+        Assert.Contains("before it could start", result.ErrorMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -115,7 +121,7 @@ public sealed class FindDeadlineTests
                 return Task.FromResult(UIAutomationResult.CreateFailure("find", errorType, "Stop."));
             },
             (_, _) => throw new InvalidOperationException("Must not retry this result."),
-            () => 2000,
+            () => 0,
             CancellationToken.None);
 
         Assert.Equal(errorType, result.ErrorType);
@@ -126,7 +132,7 @@ public sealed class FindDeadlineTests
         UIAutomationResult.CreateFailure("find", UIAutomationErrorType.ElementNotFound, "Not present.");
 
     [Fact]
-    public async Task Disappearance_FinalProbeObservesChangeWithoutEvent()
+    public async Task Disappearance_ObservesChangeBeforeDeadlineWithoutEvent()
     {
         long elapsed = 0;
         var probes = 0;
@@ -135,7 +141,7 @@ public sealed class FindDeadlineTests
             () =>
             {
                 probes++;
-                return Task.FromResult(elapsed < 125
+                return Task.FromResult(elapsed < 50
                     ? new UIAutomationResult
                     {
                         Success = true,
@@ -154,8 +160,8 @@ public sealed class FindDeadlineTests
 
         Assert.True(result.Success);
         Assert.Equal("wait_for_disappear", result.Action);
-        Assert.Equal(125, elapsed);
-        Assert.Equal(3, probes);
+        Assert.Equal(50, elapsed);
+        Assert.Equal(2, probes);
     }
 
     [Fact]
@@ -166,10 +172,54 @@ public sealed class FindDeadlineTests
             () => Task.FromResult(UIAutomationResult.CreateFailure(
                 "find", UIAutomationErrorType.SearchIncomplete, "Unknown remaining elements.")),
             (_, _) => throw new InvalidOperationException("Incomplete search must not be retried."),
-            () => 125,
+            () => 0,
             CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal(UIAutomationErrorType.SearchIncomplete, result.ErrorType);
+    }
+
+    [Fact]
+    public async Task Timeout_PreservesLastSearchDiagnostics()
+    {
+        long elapsed = 0;
+        var result = await UIAutomationService.WaitForFindResultAsync(
+            new ElementQuery(), 125,
+            () => Task.FromResult(UIAutomationResult.CreateFailure(
+                "find", UIAutomationErrorType.ElementNotFound, "Not present.",
+                new UIAutomationDiagnostics { DurationMs = 10, ElementsScanned = 42, WindowTitle = "Installer" })),
+            (delay, _) =>
+            {
+                elapsed += delay;
+                return Task.CompletedTask;
+            },
+            () => elapsed,
+            CancellationToken.None);
+
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Equal(125, result.Diagnostics?.DurationMs);
+        Assert.Equal(42, result.Diagnostics?.ElementsScanned);
+        Assert.Equal("Installer", result.Diagnostics?.WindowTitle);
+    }
+
+    [Fact]
+    public async Task Timeout_DistinguishesMissingDialogFromMissingElement()
+    {
+        long elapsed = 0;
+        var result = await UIAutomationService.WaitForFindResultAsync(
+            new ElementQuery { Scope = "active_dialog" }, 125,
+            () => Task.FromResult(UIAutomationResult.CreateFailure(
+                "find", UIAutomationErrorType.WindowNotFound,
+                "No visible enabled dialog is currently owned by the requested window.")),
+            (delay, _) =>
+            {
+                elapsed += delay;
+                return Task.CompletedTask;
+            },
+            () => elapsed,
+            CancellationToken.None);
+
+        Assert.Equal(UIAutomationErrorType.Timeout, result.ErrorType);
+        Assert.Contains("No visible enabled dialog", result.ErrorMessage, StringComparison.Ordinal);
     }
 }

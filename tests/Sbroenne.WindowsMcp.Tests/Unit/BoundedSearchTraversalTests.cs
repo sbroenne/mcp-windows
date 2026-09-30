@@ -193,5 +193,70 @@ public sealed class BoundedSearchTraversalTests
         Assert.False(outcome.LimitReached);
     }
 
+    [Fact]
+    public void ExpiredDeadline_DoesNotFetchAnyProviderNode()
+    {
+        Assert.Throws<TimeoutException>(() => BoundedSearchTraversal.Walk(
+            new Node(-1),
+            _ => throw new InvalidOperationException("Expired search must not fetch children."),
+            _ => throw new InvalidOperationException("Expired search must not fetch siblings."),
+            _ => true, (_, _) => false,
+            2000, 20, CancellationToken.None,
+            checkDeadline: () => throw new TimeoutException()));
+    }
+
+    [Fact]
+    public void SlowProvider_StopsBeforeVisitingOrFetchingMoreNodes()
+    {
+        var expired = false;
+        var fetched = 0;
+        Assert.Throws<TimeoutException>(() => BoundedSearchTraversal.Walk(
+            new Node(-1),
+            _ =>
+            {
+                fetched++;
+                expired = true;
+                return new Node(0);
+            },
+            _ => throw new InvalidOperationException("Expired search must not fetch siblings."),
+            _ => true,
+            (_, _) => throw new InvalidOperationException("Expired search must not visit a candidate."),
+            2000, 20, CancellationToken.None,
+            checkDeadline: CheckDeadline));
+        Assert.Equal(1, fetched);
+
+        void CheckDeadline()
+        {
+            if (expired)
+            {
+                throw new TimeoutException();
+            }
+        }
+    }
+
+    [Fact]
+    public void DeadlineDuringVisit_DoesNotReturnPartialSuccess()
+    {
+        var expired = false;
+        Assert.Throws<TimeoutException>(() => BoundedSearchTraversal.Walk(
+            new Node(-1),
+            _ => new Node(0),
+            _ => throw new InvalidOperationException("Expired search must not fetch siblings."),
+            _ => true,
+            (_, _) =>
+            {
+                expired = true;
+                return true;
+            },
+            2000, 20, CancellationToken.None,
+            checkDeadline: () =>
+            {
+                if (expired)
+                {
+                    throw new TimeoutException();
+                }
+            }));
+    }
+
     private sealed record Node(int Index, bool IsControl = true);
 }
