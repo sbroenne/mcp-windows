@@ -165,10 +165,15 @@ def require_single_notepad_tab(snapshot, source_name):
 
 async def isolate_notepad_window(mcp, owned, source):
     async def snapshot(handle):
-        result = await mcp.call_tool("ui_snapshot", {"windowHandle": handle, "maxDepth": 20})
-        if result.is_error:
-            raise RuntimeError(f"Notepad setup observation failed: {result.content}")
-        return json.loads(result.content[0].text)
+        for attempt in range(3):
+            result = await mcp.call_tool(
+                "ui_snapshot", {"windowHandle": handle, "maxDepth": 20}
+            )
+            if not result.is_error:
+                return json.loads(result.content[0].text)
+            if attempt < 2:
+                await asyncio.sleep(0.2)
+        raise RuntimeError(f"Notepad setup observation failed: {result.content}")
 
     observed = await snapshot(owned.root)
     tabs = [node for node in flatten_tree(observed.get("tree")) if node.get("type") == "TabItem"]

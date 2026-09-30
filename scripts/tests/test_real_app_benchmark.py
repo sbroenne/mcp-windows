@@ -149,6 +149,35 @@ class RealAppBenchmarkTests(unittest.TestCase):
 
 
 class RealAppBridgeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_notepad_setup_retries_a_transient_snapshot_failure(self):
+        calls = []
+        source = Path("input-test.txt")
+        target = {"type": "TabItem", "name": source.name, "click": [80, 40, 0]}
+
+        class Client:
+            async def call_tool(self, name, arguments):
+                calls.append((name, arguments))
+                if len(calls) == 1:
+                    return SimpleNamespace(is_error=True, content=["temporary UIA failure"])
+                return SimpleNamespace(
+                    is_error=False,
+                    content=[SimpleNamespace(text=json.dumps({"tree": [target]}))],
+                )
+
+        owned = SimpleNamespace(
+            root="123",
+            initial_bounds=(0, 0, 1280, 900),
+            excluded_windows=set(),
+            windows=lambda: [{"handle": "123", "title": source.name}],
+        )
+
+        with patch.object(benchmark.asyncio, "sleep", return_value=None):
+            result = await benchmark.isolate_notepad_window(Client(), owned, source)
+
+        self.assertTrue(result["single_document_verified"])
+        self.assertEqual(3, sum(name == "ui_snapshot" for name, _ in calls))
+        self.assertEqual(1, sum(name == "window_management" for name, _ in calls))
+
     async def test_cancellation_waits_for_an_inflight_mcp_action_before_cleanup(self):
         from mcp.types import CallToolResult, TextContent
 
