@@ -54,11 +54,10 @@ credentials in this project.
 
 ## Framework prerequisite
 
-The project pins published framework commit
-`e1ac73af1a0d2b210b74db980fb44daff507efc1`, including complete tool evidence,
-configuration-aware reports, recoverable paid summaries, and benchmark controls.
-It is published in `sbroenne/pytest-skill-engineering#103` (not yet merged).
-The exact commit remains pinned. Benchmark controls include tool-call limits,
+The project uses the public `pytest-skill-engineering==0.6.20` release, including
+complete tool evidence, configuration-aware reports, recoverable paid summaries,
+and benchmark controls. The release contains the work merged in
+`sbroenne/pytest-skill-engineering#103`. Benchmark controls include tool-call limits,
 fixed image detail, actual request records, and an isolated runtime.
 Request checks inspect supported HTTP requests and WebSocket `response.create`
 messages before forwarding them. They do not force a different connection type.
