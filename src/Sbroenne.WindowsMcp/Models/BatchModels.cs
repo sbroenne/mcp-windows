@@ -211,6 +211,16 @@ public sealed record BatchStepResult
     [JsonPropertyName("text")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Text { get; init; }
+
+    /// <summary>True when a snapshot step left controls unchecked.</summary>
+    [JsonPropertyName("snapshotIncomplete")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? SnapshotIncomplete { get; init; }
+
+    /// <summary>Narrowing guidance when a snapshot step is incomplete.</summary>
+    [JsonPropertyName("snapshotWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SnapshotWarning { get; init; }
 }
 
 /// <summary>Aggregate result of a ui_batch call.</summary>
@@ -261,7 +271,12 @@ public sealed record BatchResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SnapshotChange[]? PostActionChanges { get; init; }
 
-    /// <summary>Warning when an optional post-batch snapshot could not be captured.</summary>
+    /// <summary>True when an optional post-batch snapshot left controls unchecked.</summary>
+    [JsonPropertyName("postActionSnapshotIncomplete")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? PostActionSnapshotIncomplete { get; init; }
+
+    /// <summary>Warning when an optional post-batch snapshot is incomplete or could not be captured.</summary>
     [JsonPropertyName("postActionWarning")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PostActionWarning { get; init; }

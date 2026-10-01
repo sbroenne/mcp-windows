@@ -14,6 +14,106 @@ public sealed class SnapshotStateServiceTests
         MaxDepth: 5,
         ControlTypeFilter: null);
 
+    [Theory]
+    [InlineData("full")]
+    [InlineData("auto")]
+    [InlineData("reset")]
+    public async Task IncompleteCapture_ReturnsTreeAndInvalidatesComparison(string modeName)
+    {
+        Assert.True(SnapshotStateService.TryParseMode(modeName, out var mode));
+        using var service = new SnapshotStateService();
+        var complete = LargeResult("Window");
+        var first = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        var incomplete = complete with
+        {
+            SnapshotIncomplete = true,
+            SnapshotWarning = "Results are incomplete; narrow the search.",
+            Tree =
+            [
+                complete.Tree![0] with { Children = complete.Tree[0].Children![..^1] }
+            ]
+        };
+
+        for (var index = 0; index < 2; index++)
+        {
+            var partial = await service.CaptureAsync(Key, mode,
+                _ => Task.FromResult(incomplete), CancellationToken.None);
+            Assert.Equal("full", partial.Kind);
+            Assert.NotNull(partial.Tree);
+            Assert.Equal(incomplete.Tree, partial.Tree);
+            Assert.Null(partial.Changes);
+            Assert.Null(partial.SnapshotToken);
+            Assert.Null(partial.BaseSnapshotToken);
+            Assert.DoesNotContain("No UI changes", partial.UsageHint ?? "", StringComparison.Ordinal);
+            Assert.Equal(0, service.Count);
+        }
+
+        var recovered = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), false, CancellationToken.None, first.SnapshotToken);
+        Assert.Equal("full", recovered.Kind);
+        Assert.NotNull(recovered.SnapshotToken);
+        Assert.Null(recovered.BaseSnapshotToken);
+        var unchanged = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        Assert.Equal("diff", unchanged.Kind);
+        Assert.Empty(unchanged.Changes!);
+    }
+
+    [Fact]
+    public async Task IncompleteCapture_OnlyInvalidatesItsOwnTarget()
+    {
+        using var service = new SnapshotStateService();
+        var complete = LargeResult("Window");
+        var otherKey = Key with { ParentElementId = "another-container" };
+        _ = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        _ = await service.CaptureAsync(otherKey, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+
+        _ = await service.CaptureAsync(Key, SnapshotMode.Full,
+            _ => Task.FromResult(complete with
+            {
+                SnapshotIncomplete = true,
+                SnapshotWarning = "Results are incomplete."
+            }), CancellationToken.None);
+
+        Assert.Equal(1, service.Count);
+        var unchanged = await service.CaptureAsync(otherKey, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        Assert.Equal("diff", unchanged.Kind);
+        Assert.Empty(unchanged.Changes!);
+    }
+
+    [Theory]
+    [InlineData("full")]
+    [InlineData("auto")]
+    [InlineData("reset")]
+    public async Task FailedIncompleteCapture_InvalidatesPreviousBaseline(string modeName)
+    {
+        Assert.True(SnapshotStateService.TryParseMode(modeName, out var mode));
+        using var service = new SnapshotStateService();
+        var complete = LargeResult("Window");
+        var first = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        var failure = UIAutomationResult.CreateFailure(
+            "get_tree", UIAutomationErrorType.SearchIncomplete, "Scan ended before any matching controls were returned.") with
+        {
+            SnapshotIncomplete = true,
+            SnapshotWarning = "Results are incomplete; narrow the search."
+        };
+        var captured = await service.CaptureAsync(Key, mode,
+            _ => Task.FromResult(failure), CancellationToken.None);
+        Assert.False(captured.Success);
+        Assert.True(captured.SnapshotIncomplete);
+        Assert.Equal(failure.SnapshotWarning, captured.SnapshotWarning);
+        Assert.Equal(0, service.Count);
+        var recovered = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), false, CancellationToken.None, first.SnapshotToken);
+        Assert.Equal("full", recovered.Kind);
+        Assert.Null(recovered.BaseSnapshotToken);
+    }
+
     [Fact]
     public void RequestKey_ParentElementIdUsesItsWindowHandle()
     {

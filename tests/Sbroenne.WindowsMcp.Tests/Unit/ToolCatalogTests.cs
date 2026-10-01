@@ -10,6 +10,16 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class ToolCatalogTests
 {
     [Fact]
+    public void SharedInstructions_ExplainNarrowingAndIncompleteSnapshots()
+    {
+        var instructions = Sbroenne.WindowsMcp.Prompts.WindowsAutomationGuidance.ServerInstructions;
+        Assert.Contains("exactDepth=1", instructions, StringComparison.Ordinal);
+        Assert.Contains("parentElementId", instructions, StringComparison.Ordinal);
+        Assert.Contains("snapshotIncomplete", instructions, StringComparison.Ordinal);
+        Assert.Contains("unmatched nodes still count", instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetTools_DoesNotExposeRetiredMacro()
     {
         Assert.DoesNotContain(ToolCatalog.GetTools(), tool => tool.Name == "ui_macro");
@@ -120,6 +130,8 @@ public sealed class ToolCatalogTests
         Assert.Contains("use auto on the first check", snapshot.Description, StringComparison.Ordinal);
         Assert.Contains("full is not remembered", snapshot.Description, StringComparison.Ordinal);
         Assert.Contains("Use reset when starting a new comparison", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("snapshotIncomplete", snapshot.Description, StringComparison.Ordinal);
+        Assert.Contains("snapshotWarning", snapshot.Description, StringComparison.Ordinal);
 
         var mode = Parameter(snapshot, "mode");
         Assert.Equal("full", mode.GetProperty("default").GetString());

@@ -51,6 +51,21 @@ MCP connection or command-line service.
 If it only needs text from a known control, use `ui_read` with that control's
 `elementId` rather than another whole-window snapshot.
 
+## A snapshot returns an incomplete view
+
+A snapshot that reaches its scan limit reports `snapshotIncomplete=true`
+and `snapshotWarning`, even when diagnostics are off. The returned controls
+are still usable, but missing controls are not proof that they do not exist.
+`kind='full'` means the reply contains a tree rather than changes; it does not
+override the warning. Narrow to an observed container before checking again.
+If no matching controls were returned before the limit, the snapshot reports
+`search_incomplete` with the same warning. It does not claim they are missing.
+
+Incomplete snapshots have no comparison token and are not used to report
+changes or removals. The next complete automatic snapshot starts a fresh
+comparison. An attached snapshot carries the same warning in
+`postActionSnapshotIncomplete` and `postActionWarning`.
+
 ## PowerPoint shows its buttons but not slide text
 
 Windows MCP briefly subscribes to control changes while reading a PowerPoint

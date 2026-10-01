@@ -147,6 +147,8 @@ public sealed class WindowsToolsBaseSerializationTests
         Assert.True(root.TryGetProperty("tree", out _));
         Assert.False(root.TryGetProperty("elements", out _));
         Assert.Equal("full", root.GetProperty("kind").GetString());
+        Assert.False(root.TryGetProperty("snapshotIncomplete", out _));
+        Assert.False(root.TryGetProperty("snapshotWarning", out _));
         var treeElement = root.GetProperty("tree")[0];
         Assert.Equal("draft", treeElement.GetProperty("value").GetString());
         Assert.Equal("On", treeElement.GetProperty("toggle").GetString());
@@ -162,5 +164,67 @@ public sealed class WindowsToolsBaseSerializationTests
         }
 
         return count;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IncompleteSnapshot_SerializationKeepsWarningWithoutDiagnostics(bool includeDiagnostics)
+    {
+        var result = JsonSerializer.Deserialize<UIAutomationResult>(
+            """
+            {"success":true,"action":"get_tree","kind":"full","tree":[],
+             "snapshotIncomplete":true,"snapshotWarning":"Results are incomplete; use exactDepth=1.",
+             "diagnostics":{"durationMs":0,"warnings":["Results are incomplete; use exactDepth=1."]}}
+            """, WindowsToolsBase.JsonOptions)!;
+
+        var root = Parse(WindowsToolsBase.SerializeUIResult(result, includeDiagnostics));
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.True(root.GetProperty("snapshotIncomplete").GetBoolean());
+        Assert.Contains("exactDepth=1", root.GetProperty("snapshotWarning").GetString());
+        Assert.True(root.TryGetProperty("tree", out _));
+        Assert.Equal(includeDiagnostics, root.TryGetProperty("diagnostics", out _));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void BatchSnapshotWarnings_AreOptionalAndIndependentOfStepSuccess(bool incomplete)
+    {
+        var warning = incomplete ? "Results are incomplete; use parentElementId." : null;
+        var step = new BatchStepResult
+        {
+            Index = 0,
+            Action = "snapshot",
+            Success = true,
+            SnapshotIncomplete = incomplete ? true : null,
+            SnapshotWarning = warning
+        };
+        var batch = new BatchResult
+        {
+            Success = true,
+            StepsRun = 1,
+            StepsSucceeded = 1,
+            Steps = [step],
+            PostActionSnapshotIncomplete = incomplete ? true : null,
+            PostActionWarning = warning
+        };
+        var root = Parse(JsonSerializer.Serialize(batch, WindowsToolsBase.JsonOptions));
+        var serializedStep = root.GetProperty("steps")[0];
+
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.True(serializedStep.GetProperty("success").GetBoolean());
+        Assert.Equal(incomplete, serializedStep.TryGetProperty("snapshotIncomplete", out _));
+        Assert.Equal(incomplete, serializedStep.TryGetProperty("snapshotWarning", out _));
+        Assert.Equal(incomplete, root.TryGetProperty("postActionSnapshotIncomplete", out _));
+        Assert.Equal(incomplete, root.TryGetProperty("postActionWarning", out _));
+        if (incomplete)
+        {
+            Assert.True(serializedStep.GetProperty("snapshotIncomplete").GetBoolean());
+            Assert.Equal(warning, serializedStep.GetProperty("snapshotWarning").GetString());
+            Assert.True(root.GetProperty("postActionSnapshotIncomplete").GetBoolean());
+            Assert.Equal(warning, root.GetProperty("postActionWarning").GetString());
+        }
     }
 }

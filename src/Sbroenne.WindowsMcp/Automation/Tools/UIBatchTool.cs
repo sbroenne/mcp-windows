@@ -37,6 +37,9 @@ public static partial class UIBatchTool
     /// - wait:     mode (appear/disappear/state), selectors or elementId+desiredState, optional timeoutMs.
     /// - read:     elementId (omit only for an explicit whole-window read), optional includeChildren.
     /// - snapshot: capture the window element tree (optional maxDepth).
+    /// Snapshot steps report snapshotIncomplete and snapshotWarning when the scan limit leaves
+    /// controls unchecked. Attached snapshots report postActionSnapshotIncomplete and postActionWarning.
+    /// Incomplete snapshots cannot prove absence or no changes and are not used for diffs.
     /// - key:      key (e.g. enter, tab, f5) with optional modifiers (ctrl,shift,alt,win) and repeat.
     /// - mouse:    mouseAction (move/click/double_click/right_click/middle_click/drag/polyline/scroll) plus x,y
     ///             (and endX,endY for drag), optional button, modifiers, direction, amount.
@@ -161,11 +164,8 @@ public static partial class UIBatchTool
                     includeDiagnostics: false,
                     cancellationToken,
                     snapshotSince);
-                if (snapshot.Success)
-                {
-                    postSnapshot = snapshot;
-                }
-                else
+                postSnapshot = snapshot;
+                if (!snapshot.Success)
                 {
                     postSnapshotWarning = snapshot.ErrorMessage ??
                         "The batch succeeded, but its optional follow-up snapshot failed.";
@@ -190,7 +190,8 @@ public static partial class UIBatchTool
             PostActionChanges = postSnapshot?.Changes,
             PostActionSnapshotToken = postSnapshot?.SnapshotToken,
             PostActionBaseSnapshotToken = postSnapshot?.BaseSnapshotToken,
-            PostActionWarning = postSnapshotWarning
+            PostActionSnapshotIncomplete = postSnapshot?.SnapshotIncomplete,
+            PostActionWarning = postSnapshot?.SnapshotWarning ?? postSnapshotWarning
         };
 
         var json = JsonSerializer.Serialize(batchResult, WindowsToolsBase.JsonOptions);
@@ -346,8 +347,14 @@ public static partial class UIBatchTool
                     var depth = step.MaxDepth > 0 ? step.MaxDepth : 5;
                     var result = await service.GetTreeAsync(windowHandle, null, depth, null, cancellationToken);
                     return Step(index, action, result.Success,
-                        result.Success ? $"snapshot ({result.Tree?.Length ?? 0} root node(s))" : null,
-                        result.ErrorMessage);
+                        result.Success
+                            ? $"{(result.SnapshotIncomplete == true ? "incomplete snapshot" : "snapshot")} ({result.Tree?.Length ?? 0} root node(s))"
+                            : null,
+                        result.ErrorMessage) with
+                    {
+                        SnapshotIncomplete = result.SnapshotIncomplete,
+                        SnapshotWarning = result.SnapshotWarning
+                    };
                 }
 
             case "key":
