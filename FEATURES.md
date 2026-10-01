@@ -246,6 +246,17 @@ For smaller replies, use `ui_snapshot` with a known `parentElementId`, or use
 Snapshot `maxDepth` and `controlTypeFilter` reduce the returned content, but do
 not necessarily reduce the work done by the app to provide its controls.
 
+When the snapshot scan limit leaves controls unchecked, the reply keeps the
+partial tree and reports `snapshotIncomplete=true` and `snapshotWarning`,
+even without diagnostics. `kind='full'` means a tree reply, not that every
+control was checked. Missing controls do not prove absence. Partial snapshots
+have no comparison token and are not used for changes-only replies; the next
+complete automatic snapshot starts a fresh comparison.
+
+Attached snapshots use `postActionSnapshotIncomplete` and `postActionWarning`.
+Snapshot steps in a batch use `snapshotIncomplete` and `snapshotWarning`.
+These warnings do not change the result of the preceding action.
+
 With a positive `timeoutMs` (default: 5,000), retries and scans share one time
 budget. No new scan starts at or after the deadline, and scanning stops between
 Windows accessibility calls when time runs out. A Windows call already in

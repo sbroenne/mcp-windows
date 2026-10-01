@@ -43,12 +43,16 @@ public static partial class UISnapshotTool
     /// or controlTypeFilter to retain matching controls and the ancestors needed to reach them.
     /// maxDepth and controlTypeFilter reduce the reply, not necessarily the work done by the app's
     /// accessibility provider. Prefer parentElementId to reduce the area read.
+    /// A scan-limited tree reports snapshotIncomplete=true and snapshotWarning even without diagnostics.
+    /// Its observed controls remain usable, but missing controls are not proof of absence.
+    /// kind='full' means a tree reply, not a guarantee of completeness. Incomplete captures have no
+    /// comparison token and are never used for diffs; the next complete auto capture starts a fresh baseline.
     /// </remarks>
     /// <param name="windowHandle">Window handle as decimal string (from window_management 'find'/'list' or app). If omitted, the foreground window is used.</param>
     /// <param name="parentElementId">Revisit a known subtree using an element id from an earlier snapshot or find. Use only after discovering that id; omit it to inspect the whole window.</param>
     /// <param name="maxDepth">Maximum returned tree depth. Default (5) uses a framework-aware recommendation; explicit values are capped at 20. Limits the reply, not necessarily provider work.</param>
     /// <param name="controlTypeFilter">Comma-separated control types to keep in the reply (e.g. 'Button,Edit,MenuItem'), with their ancestors. Does not narrow the area read. Omit to keep all.</param>
-    /// <param name="mode">REQUIRED for before/after or other repeated checks: explicitly use auto on BOTH the first and later snapshots of the same window or subtree. Never omit mode or use full for repeated checks. Use reset first only when replacing an older comparison, then auto. Use full only for a one-time complete inspection (default); full is not remembered.</param>
+    /// <param name="mode">REQUIRED for before/after or other repeated checks: explicitly use auto on BOTH the first and later snapshots of the same window or subtree. Never omit mode or use full for repeated checks. Use reset first only when replacing an older comparison, then auto. Use full only for a one-time inspection (default); full is not remembered.</param>
     /// <param name="includeDiagnostics">Include diagnostics (timing, elements scanned, detected framework) in response. Default: false.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <param name="since">Previous snapshotToken for this window and capture settings. Required for CLI diffs; a missing or mismatched token returns a full snapshot. No sessions or histories are created.</param>

@@ -125,11 +125,103 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         Assert.Equal("Quality sentinel", target.GetProperty("name").GetString());
         Assert.InRange(scopedJson.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32(), 1, 10);
 
+        var focusedSnapshot = await UISnapshotTool.ExecuteAsync(
+            fixture.WindowHandle, id, 20, null, "auto", false, CancellationToken.None);
+        Assert.False(focusedSnapshot.IsError);
+        using var focusedJson = Parse(focusedSnapshot);
+        Assert.False(focusedJson.RootElement.TryGetProperty("snapshotIncomplete", out _));
+        Assert.False(focusedJson.RootElement.TryGetProperty("snapshotWarning", out _));
+        Assert.True(focusedJson.RootElement.TryGetProperty("snapshotToken", out _));
+
         var focusedBytes = ReplyBytes(shallow) + ReplyBytes(scoped);
         var broadBytes = ReplyBytes(broad);
         output.WriteLine($"Shallow discovery and scoped find: {focusedBytes} bytes; broad snapshot: {broadBytes} bytes.");
         Assert.True(focusedBytes < broadBytes / 10,
             $"Shallow discovery and scoped find returned {focusedBytes} bytes; the broad snapshot returned {broadBytes} bytes.");
+    }
+
+    [Theory]
+    [InlineData("full", false)]
+    [InlineData("full", true)]
+    [InlineData("auto", false)]
+    [InlineData("reset", false)]
+    public async Task Snapshot_TruncatedTreeAlwaysReportsIncomplete(string mode, bool diagnostics)
+    {
+        var result = await UISnapshotTool.ExecuteAsync(
+            fixture.WindowHandle, null, 20, null, mode, diagnostics, CancellationToken.None);
+        Assert.False(result.IsError);
+        using var json = Parse(result);
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("snapshotIncomplete").GetBoolean());
+        Assert.Contains("exactDepth=1", root.GetProperty("snapshotWarning").GetString());
+        Assert.Contains("parentElementId", root.GetProperty("snapshotWarning").GetString());
+        Assert.Equal("full", root.GetProperty("kind").GetString());
+        Assert.NotEmpty(root.GetProperty("tree").EnumerateArray());
+        Assert.False(root.TryGetProperty("snapshotToken", out _));
+        Assert.False(root.TryGetProperty("changes", out _));
+        Assert.Equal(diagnostics, root.TryGetProperty("diagnostics", out _));
+    }
+
+    [Fact]
+    public async Task Cli_SnapshotWithoutDiagnostics_ReportsIncomplete()
+    {
+        try
+        {
+            var result = await CliIntegrationTests.RunSeparateProcessAsync(
+                "ui", "snapshot", "--window", fixture.WindowHandle, "--max-depth", "20");
+            Assert.Equal(0, result.Code);
+            Assert.Empty(result.Stderr);
+            using var json = JsonDocument.Parse(result.Stdout);
+            Assert.True(json.RootElement.GetProperty("snapshotIncomplete").GetBoolean());
+            Assert.Contains("exactDepth=1", json.RootElement.GetProperty("snapshotWarning").GetString());
+            Assert.False(json.RootElement.TryGetProperty("diagnostics", out _));
+        }
+        finally
+        {
+            var stopped = await CliIntegrationTests.RunSeparateProcessAsync("service", "stop");
+            Assert.Equal(0, stopped.Code);
+        }
+    }
+
+    [Fact]
+    public async Task AttachedSnapshot_ReportsIncompleteWithoutChangingActionOutcome()
+    {
+        var action = new UIAutomationResult
+        {
+            Success = true,
+            Action = "click",
+            ActionDispatched = true,
+            OutcomeVerified = false
+        };
+        var result = await WindowsToolsBase.WithPostActionSnapshotAsync(
+            action, fixture.WindowHandle, true, CancellationToken.None);
+        using var json = JsonDocument.Parse(WindowsToolsBase.SerializeUIResult(result, false));
+        var root = json.RootElement;
+        Assert.True(root.GetProperty("success").GetBoolean());
+        Assert.True(root.GetProperty("actionDispatched").GetBoolean());
+        Assert.False(root.GetProperty("outcomeVerified").GetBoolean());
+        Assert.True(root.GetProperty("postActionSnapshotIncomplete").GetBoolean());
+        Assert.Contains("exactDepth=1", root.GetProperty("postActionWarning").GetString());
+        Assert.NotEmpty(root.GetProperty("postActionTree").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Batch_SnapshotStepAndAttachedSnapshot_ReportIncomplete()
+    {
+        var result = await UIBatchTool.ExecuteAsync(
+            fixture.WindowHandle, """[{"action":"snapshot","maxDepth":20}]""",
+            true, true, "auto", false, CancellationToken.None);
+        Assert.False(result.IsError);
+        using var json = Parse(result);
+        var root = json.RootElement;
+        var step = Assert.Single(root.GetProperty("steps").EnumerateArray());
+        Assert.True(step.GetProperty("success").GetBoolean());
+        Assert.True(step.GetProperty("snapshotIncomplete").GetBoolean());
+        Assert.Contains("parentElementId", step.GetProperty("snapshotWarning").GetString());
+        Assert.True(root.GetProperty("postActionSnapshotIncomplete").GetBoolean());
+        Assert.Contains("exactDepth=1", root.GetProperty("postActionWarning").GetString());
+        Assert.NotEmpty(root.GetProperty("postActionTree").EnumerateArray());
+        Assert.False(root.TryGetProperty("postActionChanges", out _));
     }
 
     [Theory]
@@ -163,9 +255,10 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
                 ControlType = "Text",
                 ContentViewOnly = false,
                 VisibleOnly = false
-            }, 5000);
+            }, 60000);
         Assert.False(result.Success);
         Assert.Equal("search_incomplete", result.ErrorType);
+        Assert.Equal(2000, result.Diagnostics?.ElementsScanned);
     }
 
     [Theory]
@@ -324,11 +417,13 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
     {
         var (code, stdout, stderr) = await CliIntegrationTests.RunSeparateProcessAsync(
             "ui", "find", "--window", fixture.WindowHandle, "--name-contains", "Quality sentinel",
-            "--control-type", "Text", "--visible-only", "false", "--content-view-only", "false");
+            "--control-type", "Text", "--visible-only", "false", "--content-view-only", "false",
+            "--timeout-ms", "0", "--include-diagnostics");
         Assert.Equal(1, code);
         Assert.Empty(stderr);
         using var json = JsonDocument.Parse(stdout);
         Assert.Equal("search_incomplete", json.RootElement.GetProperty("errorType").GetString());
+        Assert.Equal(2000, json.RootElement.GetProperty("diagnostics").GetProperty("elementsScanned").GetInt32());
     }
 
     [Fact]

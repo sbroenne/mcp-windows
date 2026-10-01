@@ -111,13 +111,16 @@ internal static class HelpText
                      --x --y --width --height --timeout-ms --target --monitor-index
                      --state --exclude-title --discard-changes
 
-        ui snapshot --window <h> [--max-depth <n>] [--control-type <t>]
+        ui snapshot --window <h> [--parent-element-id <id>] [--max-depth <n>] [--control-type <t>]
                     [--mode full|auto|reset] [--since <snapshot-token>]
-            Use full for one complete inspection (default). For repeated checks of the same window
+            Use full for one inspection (default). For repeated checks of the same window
             use auto from the first check; full is not remembered. Use reset,
             then auto, to begin a new comparison within a persistent MCP connection.
             CLI auto without --since returns a full baseline. Pass the returned token with --since
             for a later diff; a missing/mismatched baseline safely returns a full view.
+            snapshotIncomplete=true and snapshotWarning mark a partial tree even without diagnostics.
+            A full reply is not proof of completeness. Partial trees have no comparison token;
+            the next complete auto snapshot starts a fresh baseline. Narrow with --parent-element-id.
         ui find     --window <h> [--name|--name-contains|--name-pattern|--control-type|
                      --automation-id|--class-name ...] [--found-index <n>] [--include-children]
                      [--sort-by-prominence] [--in-region x,y,w,h]
@@ -143,6 +146,7 @@ internal static class HelpText
                      [--continue-on-error] [--with-snapshot] [--snapshot-mode full|auto|reset]
             For --with-snapshot, use full once, auto for repeated checks, or reset to begin a new comparison.
             Add --since <token> for checked post-action diffs on click/type/select/batch.
+            Partial attached views report postActionSnapshotIncomplete and postActionWarning.
             selectors: --name --name-contains --name-pattern --control-type --automation-id --class-name
 
         keyboard <action> --window <h> [options]

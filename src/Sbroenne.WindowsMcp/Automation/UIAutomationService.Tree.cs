@@ -102,20 +102,24 @@ public sealed partial class UIAutomationService
                 }
 
                 var diagnostics = CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle);
+                string? snapshotWarning = null;
                 if (wasTruncated)
                 {
+                    snapshotWarning =
+                        $"Tree truncated at {MaxElementsToScan} elements (scanned {elementsScanned}). " +
+                        "Results are incomplete - scope to a known parentElementId. If none is known, use ui_find " +
+                        "exactDepth=1 to discover immediate children, then inspect an observed container.";
                     diagnostics = diagnostics with
                     {
-                        Warnings =
-                        [
-                            $"Tree truncated at {MaxElementsToScan} elements (scanned {elementsScanned}). " +
-                            "Results are incomplete — scope to a known parentElementId. If none is known, use ui_find " +
-                            "exactDepth=1 to discover immediate children, then inspect an observed container."
-                        ]
+                        Warnings = [snapshotWarning]
                     };
                 }
 
-                return UIAutomationResult.CreateSuccessCompactTree("get_tree", trees, diagnostics);
+                return UIAutomationResult.CreateSuccessCompactTree("get_tree", trees, diagnostics) with
+                {
+                    SnapshotIncomplete = wasTruncated ? true : null,
+                    SnapshotWarning = snapshotWarning
+                };
             }, cancellationToken);
         }
         catch (COMException ex)

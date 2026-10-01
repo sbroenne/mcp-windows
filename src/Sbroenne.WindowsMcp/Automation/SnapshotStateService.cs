@@ -204,16 +204,16 @@ internal sealed class SnapshotStateService : IDisposable
     {
         ArgumentNullException.ThrowIfNull(capture);
 
-        if (mode == SnapshotMode.Full)
-        {
-            return EnsureFull(await capture(cancellationToken).ConfigureAwait(false));
-        }
-
         // A PID and window handle can both be reused after a process exits. Without the process
         // start time, there is no safe way to know that a remembered tree belongs to this process.
         if (key.ProcessStartTimeUtcTicks <= 0)
         {
             var unidentifiedCapture = await capture(cancellationToken).ConfigureAwait(false);
+            if (mode == SnapshotMode.Full || unidentifiedCapture.SnapshotIncomplete == true)
+            {
+                return EnsureFull(unidentifiedCapture);
+            }
+
             return unidentifiedCapture.Success && unidentifiedCapture.Tree is not null
                 ? EnsureSemanticFull(
                     unidentifiedCapture,
@@ -235,6 +235,22 @@ internal sealed class SnapshotStateService : IDisposable
 
             var captured = await capture(cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
+            if (captured.SnapshotIncomplete == true)
+            {
+                // A partial view cannot establish absence or safely extend a comparison baseline.
+                lock (_stateLock)
+                {
+                    _entries.Remove(key);
+                }
+
+                return EnsureFull(captured);
+            }
+
+            if (mode == SnapshotMode.Full)
+            {
+                return EnsureFull(captured);
+            }
+
             if (!captured.Success || captured.Tree is null)
             {
                 return captured;
@@ -304,7 +320,17 @@ internal sealed class SnapshotStateService : IDisposable
 
     private static UIAutomationResult EnsureFull(UIAutomationResult result) =>
         result.Success && result.Tree is not null
-            ? result with { Kind = "full", Changes = null, Elements = null }
+            ? result with
+            {
+                Kind = "full",
+                Changes = null,
+                Elements = null,
+                SnapshotToken = result.SnapshotIncomplete == true ? null : result.SnapshotToken,
+                BaseSnapshotToken = null,
+                UsageHint = result.SnapshotIncomplete == true
+                    ? "Partial tree; missing controls are not proof of absence."
+                    : result.UsageHint
+            }
             : result;
 
     private static UIAutomationResult EnsureSemanticFull(

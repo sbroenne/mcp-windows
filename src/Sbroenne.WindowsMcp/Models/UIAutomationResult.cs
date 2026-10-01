@@ -79,11 +79,22 @@ public sealed record UIAutomationResult
     public UIElementInfo[]? FullTree { get; init; }
 
     /// <summary>
-    /// Snapshot response form: full for a complete tree or diff for changes from the remembered tree.
+    /// Snapshot response form: full for a tree or diff for changes from the remembered tree.
+    /// A full tree can be incomplete when <see cref="SnapshotIncomplete"/> is true.
     /// </summary>
     [JsonPropertyName("kind")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Kind { get; init; }
+
+    /// <summary>True when the snapshot scan limit left controls unchecked.</summary>
+    [JsonPropertyName("snapshotIncomplete")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? SnapshotIncomplete { get; init; }
+
+    /// <summary>Always-visible explanation and recovery guidance for an incomplete snapshot.</summary>
+    [JsonPropertyName("snapshotWarning")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? SnapshotWarning { get; init; }
 
     /// <summary>Opaque token for the latest automatic snapshot of this target and capture settings.</summary>
     [JsonPropertyName("snapshotToken")]
@@ -132,7 +143,12 @@ public sealed record UIAutomationResult
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public SnapshotChange[]? PostActionChanges { get; init; }
 
-    /// <summary>Warning when an optional post-action snapshot could not be captured.</summary>
+    /// <summary>True when an optional post-action snapshot left controls unchecked.</summary>
+    [JsonPropertyName("postActionSnapshotIncomplete")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? PostActionSnapshotIncomplete { get; init; }
+
+    /// <summary>Warning when an optional post-action snapshot is incomplete or could not be captured.</summary>
     [JsonPropertyName("postActionWarning")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? PostActionWarning { get; init; }

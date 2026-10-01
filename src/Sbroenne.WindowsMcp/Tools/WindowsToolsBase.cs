@@ -376,7 +376,9 @@ public static class WindowsToolsBase
                     PostActionTree = snapshot.Tree,
                     PostActionChanges = snapshot.Changes,
                     PostActionSnapshotToken = snapshot.SnapshotToken,
-                    PostActionBaseSnapshotToken = snapshot.BaseSnapshotToken
+                    PostActionBaseSnapshotToken = snapshot.BaseSnapshotToken,
+                    PostActionSnapshotIncomplete = snapshot.SnapshotIncomplete,
+                    PostActionWarning = snapshot.SnapshotWarning
                 };
             }
 
