@@ -253,6 +253,10 @@ control was checked. Missing controls do not prove absence. Partial snapshots
 have no comparison token and are not used for changes-only replies; the next
 complete automatic snapshot starts a fresh comparison.
 
+If the scan limit is reached before any matching controls are returned, the
+snapshot fails with `search_incomplete`, not a claim that the controls are
+missing. Its incomplete status and warning remain visible.
+
 Attached snapshots use `postActionSnapshotIncomplete` and `postActionWarning`.
 Snapshot steps in a batch use `snapshotIncomplete` and `snapshotWarning`.
 These warnings do not change the result of the preceding action.

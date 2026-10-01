@@ -384,7 +384,9 @@ public static class WindowsToolsBase
 
             return result with
             {
-                PostActionWarning = snapshot.ErrorMessage ?? "The action succeeded, but its optional follow-up snapshot failed."
+                PostActionSnapshotIncomplete = snapshot.SnapshotIncomplete,
+                PostActionWarning = snapshot.SnapshotWarning ?? snapshot.ErrorMessage ??
+                    "The action succeeded, but its optional follow-up snapshot failed."
             };
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)

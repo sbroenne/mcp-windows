@@ -164,11 +164,8 @@ public static partial class UIBatchTool
                     includeDiagnostics: false,
                     cancellationToken,
                     snapshotSince);
-                if (snapshot.Success)
-                {
-                    postSnapshot = snapshot;
-                }
-                else
+                postSnapshot = snapshot;
+                if (!snapshot.Success)
                 {
                     postSnapshotWarning = snapshot.ErrorMessage ??
                         "The batch succeeded, but its optional follow-up snapshot failed.";

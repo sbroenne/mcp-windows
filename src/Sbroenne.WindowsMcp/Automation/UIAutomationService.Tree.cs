@@ -92,26 +92,34 @@ public sealed partial class UIAutomationService
 
                 string? windowTitle = rootElement.GetName();
 
-                if (trees is null || trees.Length == 0)
-                {
-                    return UIAutomationResult.CreateFailure(
-                        "get_tree",
-                        UIAutomationErrorType.ElementNotFound,
-                        "Could not build element tree.",
-                        CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle));
-                }
-
                 var diagnostics = CreateDiagnosticsWithContext(stopwatch, rootElement, null, elementsScanned, windowTitle, windowHandle);
                 string? snapshotWarning = null;
                 if (wasTruncated)
                 {
                     snapshotWarning =
                         $"Tree truncated at {MaxElementsToScan} elements (scanned {elementsScanned}). " +
-                        "Results are incomplete - scope to a known parentElementId. If none is known, use ui_find " +
-                        "exactDepth=1 to discover immediate children, then inspect an observed container.";
+                        "Results are incomplete - scope to a known parentElementId (CLI: --parent-element-id <id>). " +
+                        "If none is known, use ui_find exactDepth=1 " +
+                        "(CLI: wincli ui find --window <handle> --exact-depth 1) to discover immediate children, " +
+                        "then inspect an observed container.";
                     diagnostics = diagnostics with
                     {
                         Warnings = [snapshotWarning]
+                    };
+                }
+
+                if (trees is null || trees.Length == 0)
+                {
+                    return UIAutomationResult.CreateFailure(
+                        "get_tree",
+                        wasTruncated ? UIAutomationErrorType.SearchIncomplete : UIAutomationErrorType.ElementNotFound,
+                        wasTruncated
+                            ? "The snapshot scan reached its limit before returning any matching controls. Their absence could not be established."
+                            : "Could not build element tree.",
+                        diagnostics) with
+                    {
+                        SnapshotIncomplete = wasTruncated ? true : null,
+                        SnapshotWarning = snapshotWarning
                     };
                 }
 

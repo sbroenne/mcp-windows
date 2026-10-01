@@ -46,6 +46,12 @@ public sealed class SearchLimitHarnessFixture : IDisposable
                 AccessibleName = "Quality sentinel",
                 AutoSize = true
             });
+            scope.Controls.Add(new TrackBar
+            {
+                Name = "SearchLimitLateSlider",
+                AccessibleName = "Late slider",
+                Bounds = new System.Drawing.Rectangle(0, 25, 180, 10)
+            });
             panel.ResumeLayout();
             form.Controls.Add(panel);
             panel.BringToFront();
@@ -162,6 +168,41 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
         Assert.Equal(diagnostics, root.TryGetProperty("diagnostics", out _));
     }
 
+    [Theory]
+    [InlineData("full", false)]
+    [InlineData("full", true)]
+    [InlineData("auto", false)]
+    [InlineData("reset", false)]
+    public async Task Snapshot_FilteredEmptyScan_ReportsIncompleteInsteadOfAbsence(string mode, bool diagnostics)
+    {
+        var result = await UISnapshotTool.ExecuteAsync(
+            fixture.WindowHandle, null, 20, "Slider", mode, diagnostics, CancellationToken.None);
+        Assert.True(result.IsError);
+        using var json = Parse(result);
+        var root = json.RootElement;
+        Assert.Equal(UIAutomationErrorType.SearchIncomplete, root.GetProperty("errorType").GetString());
+        Assert.True(root.GetProperty("snapshotIncomplete").GetBoolean());
+        Assert.Contains("exactDepth=1", root.GetProperty("snapshotWarning").GetString());
+        Assert.Equal(diagnostics, root.TryGetProperty("diagnostics", out _));
+        Assert.False(root.TryGetProperty("snapshotToken", out _));
+
+        var parent = await WindowsToolsBase.UIAutomationService.FindElementsAsync(new ElementQuery
+        {
+            WindowHandle = fixture.WindowHandle,
+            AutomationId = "SentinelScope",
+            ExactDepth = 1
+        });
+        Assert.True(parent.Success, parent.ErrorMessage);
+        var id = Assert.Single(parent.Items!).Id;
+        var scoped = await UISnapshotTool.ExecuteAsync(
+            fixture.WindowHandle, id, 20, "Slider", "full", false, CancellationToken.None);
+        Assert.False(scoped.IsError);
+        using var scopedJson = Parse(scoped);
+        Assert.Equal("Late slider", Assert.Single(scopedJson.RootElement.GetProperty("tree").EnumerateArray())
+            .GetProperty("name").GetString());
+        Assert.False(scopedJson.RootElement.TryGetProperty("snapshotIncomplete", out _));
+    }
+
     [Fact]
     public async Task Cli_SnapshotWithoutDiagnostics_ReportsIncomplete()
     {
@@ -174,6 +215,8 @@ public sealed class UISearchLimitIntegrationTests(SearchLimitHarnessFixture fixt
             using var json = JsonDocument.Parse(result.Stdout);
             Assert.True(json.RootElement.GetProperty("snapshotIncomplete").GetBoolean());
             Assert.Contains("exactDepth=1", json.RootElement.GetProperty("snapshotWarning").GetString());
+            Assert.Contains("--exact-depth 1", json.RootElement.GetProperty("snapshotWarning").GetString());
+            Assert.Contains("--parent-element-id", json.RootElement.GetProperty("snapshotWarning").GetString());
             Assert.False(json.RootElement.TryGetProperty("diagnostics", out _));
         }
         finally

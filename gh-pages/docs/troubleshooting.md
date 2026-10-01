@@ -58,6 +58,8 @@ and `snapshotWarning`, even when diagnostics are off. The returned controls
 are still usable, but missing controls are not proof that they do not exist.
 `kind='full'` means the reply contains a tree rather than changes; it does not
 override the warning. Narrow to an observed container before checking again.
+If no matching controls were returned before the limit, the snapshot reports
+`search_incomplete` with the same warning. It does not claim they are missing.
 
 Incomplete snapshots have no comparison token and are not used to report
 changes or removals. The next complete automatic snapshot starts a fresh

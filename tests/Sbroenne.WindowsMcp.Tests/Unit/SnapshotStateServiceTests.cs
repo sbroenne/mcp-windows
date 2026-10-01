@@ -85,6 +85,35 @@ public sealed class SnapshotStateServiceTests
         Assert.Empty(unchanged.Changes!);
     }
 
+    [Theory]
+    [InlineData("full")]
+    [InlineData("auto")]
+    [InlineData("reset")]
+    public async Task FailedIncompleteCapture_InvalidatesPreviousBaseline(string modeName)
+    {
+        Assert.True(SnapshotStateService.TryParseMode(modeName, out var mode));
+        using var service = new SnapshotStateService();
+        var complete = LargeResult("Window");
+        var first = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), CancellationToken.None);
+        var failure = UIAutomationResult.CreateFailure(
+            "get_tree", UIAutomationErrorType.SearchIncomplete, "Scan ended before any matching controls were returned.") with
+        {
+            SnapshotIncomplete = true,
+            SnapshotWarning = "Results are incomplete; narrow the search."
+        };
+        var captured = await service.CaptureAsync(Key, mode,
+            _ => Task.FromResult(failure), CancellationToken.None);
+        Assert.False(captured.Success);
+        Assert.True(captured.SnapshotIncomplete);
+        Assert.Equal(failure.SnapshotWarning, captured.SnapshotWarning);
+        Assert.Equal(0, service.Count);
+        var recovered = await service.CaptureAsync(Key, SnapshotMode.Auto,
+            _ => Task.FromResult(complete), false, CancellationToken.None, first.SnapshotToken);
+        Assert.Equal("full", recovered.Kind);
+        Assert.Null(recovered.BaseSnapshotToken);
+    }
+
     [Fact]
     public void RequestKey_ParentElementIdUsesItsWindowHandle()
     {
