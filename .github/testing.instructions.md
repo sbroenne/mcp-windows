@@ -180,6 +180,14 @@ Do not equate successful `SendInput` with delivered text: retain independent exa
 The Notepad tests preserve trailing spaces and blank lines in that comparison. Failures log
 readback before the success assertion; production errors report lengths and focus, not document text.
 
+For an individual-call failure, retain the call number, UTF-16 offset and requested code units,
+elapsed time, foreground window, independent text readback, and an owned-window screenshot before
+cleanup. The generated document is test data; do not add its text to production errors.
+Compare the original one-code-unit calls with separate complete-Unicode-character calls, which
+keep an emoji's two UTF-16 units in one call. Keep the original case and exact readback checks.
+Use fresh owned documents for repeated checks, not retries in a document where input already failed.
+Successful cases also compare the saved file with the requested text.
+
 Typing verification normalizes CR, LF, and CRLF because RichEdit reports different line endings.
 It must not trim extra lines, spaces, or altered characters. A failed post-input check reports
 `verification_failed` and asks for readback before retrying, not a blind repeat.

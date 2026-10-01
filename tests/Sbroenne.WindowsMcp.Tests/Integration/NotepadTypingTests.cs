@@ -16,26 +16,47 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [Trait("Category", "RequiresDesktop")]
 public sealed class NotepadTypingTests(ITestOutputHelper output)
 {
-    public static TheoryData<string, string> TypingCases => new()
+    public static TheoryData<string, string> TypingCases
     {
-        { "Project: Aurora", "tool" },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "tool" },
-        { "Project: Aurora\nStatus: Draft\nOwner: Taylor", "tool" },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "individual" },
-        { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "tool" },
-        { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "individual" },
-        { "Name\tValue\nAurora\t42", "tool" },
-        { "  Aurora  ", "tool" },
-        { "Line one\r\n\r\n", "tool" },
-        { string.Concat(Enumerable.Repeat("Ab9 ", 249)) + "XyZ\U0001f680\nEnd: 0123456789", "tool" },
-        { string.Concat(Enumerable.Repeat("\u03a9\u4e2d\U0001f680", 30)), "tool" },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "keyboard" },
-        { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "keyboard" },
-        { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "value" },
-        { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "value" },
-        { "Save a copy without changing the original", "save_as" },
-        { "Project: Aurora", "replace_selection" },
-    };
+        get
+        {
+            var cases = new TheoryData<string, string>
+            {
+                { "Project: Aurora", "tool" },
+                { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "tool" },
+                { "Project: Aurora\nStatus: Draft\nOwner: Taylor", "tool" },
+                { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "individual" },
+                { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "tool" },
+                { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "individual" },
+                { "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done", "individual_characters" },
+                { "Name\tValue\nAurora\t42", "tool" },
+                { "  Aurora  ", "tool" },
+                { "Line one\r\n\r\n", "tool" },
+                { string.Concat(Enumerable.Repeat("Ab9 ", 249)) + "XyZ\U0001f680\nEnd: 0123456789", "tool" },
+                { string.Concat(Enumerable.Repeat("\u03a9\u4e2d\U0001f680", 30)), "tool" },
+                { string.Concat(Enumerable.Repeat("\u03a9\u4e2d\U0001f680", 30)), "individual_characters" },
+                { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "keyboard" },
+                { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "keyboard" },
+                { "Project: Aurora\r\nStatus: Ready\r\nOwner: Morgan", "value" },
+                { "Project: Aurora\nStatus: Ready\nOwner: Morgan", "value" },
+                { "Save a copy without changing the original", "save_as" },
+                { "Project: Aurora", "replace_selection" },
+            };
+            for (var attempt = 1; attempt <= 3; attempt++)
+            {
+                var text = $"caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done {attempt}";
+                cases.Add(text, "tool");
+                cases.Add(text, "individual");
+                cases.Add(text, "individual_characters");
+            }
+            return cases;
+        }
+    }
+
+    internal static IEnumerable<string> GetIndividualInputs(string text, bool wholeCharacters) =>
+        wholeCharacters
+            ? text.EnumerateRunes().Select(character => character.ToString())
+            : text.Select(character => character.ToString());
 
     [SkippableTheory]
     [MemberData(nameof(TypingCases))]
@@ -120,17 +141,36 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             Assert.True(focus.Success, focus.ErrorMessage);
             var select = await keyboard.PressKeyAsync("a", ModifierKey.Ctrl, 1, handle);
             Assert.True(select.Success, select.Error);
-            if (inputMode == "individual")
+            if (inputMode is "individual" or "individual_characters")
             {
-                foreach (var character in text)
+                var offset = 0;
+                var callNumber = 0;
+                foreach (var input in GetIndividualInputs(text, inputMode == "individual_characters"))
                 {
-                    var typed = await keyboard.TypeTextAsync(character.ToString(), handle);
+                    callNumber++;
+                    var elapsed = Stopwatch.StartNew();
+                    var typed = await keyboard.TypeTextAsync(input, handle);
+                    elapsed.Stop();
+                    if (!typed.Success)
+                    {
+                        output.WriteLine(
+                            $"Failed {inputMode} call {callNumber}, UTF-16 offset {offset}, " +
+                            $"requested units {string.Join(" ", input.Select(unit => $"U+{(int)unit:X4}"))}, " +
+                            $"elapsed {elapsed.ElapsedMilliseconds} ms: {System.Text.Json.JsonSerializer.Serialize(typed)}");
+                        await RecordTypingFailureAsync(automation, editor.Id, window);
+                    }
                     Assert.True(typed.Success, typed.Error);
+                    offset += input.Length;
                 }
             }
             else if (inputMode is "keyboard" or "value")
             {
                 var typed = await automation.TypeIntoElementAsync(editor.Id, text, true, window, inputMode);
+                if (!typed.Success)
+                {
+                    output.WriteLine($"Failed {inputMode} typing: {System.Text.Json.JsonSerializer.Serialize(typed)}");
+                    await RecordTypingFailureAsync(automation, editor.Id, window);
+                }
                 Assert.True(typed.Success, typed.ErrorMessage);
             }
             else
@@ -140,8 +180,8 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                     CancellationToken.None);
                 if (typed.IsError == true)
                 {
-                    var failedRead = await automation.GetTextAsync(editor.Id, window, false);
-                    output.WriteLine($"Failed typing readback: {System.Text.Json.JsonSerializer.Serialize(failedRead)}");
+                    output.WriteLine($"Failed {inputMode} typing: {System.Text.Json.JsonSerializer.Serialize(typed)}");
+                    await RecordTypingFailureAsync(automation, editor.Id, window);
                 }
                 if (inputMode == "replace_selection")
                 {
@@ -160,10 +200,14 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                     && read.Text?.ReplaceLineEndings("\n") == expectedText,
                 timeout: TimeSpan.FromSeconds(3));
             output.WriteLine($"Readback: {System.Text.Json.JsonSerializer.Serialize(read)}");
+            if (read is not { Success: true } || read.Text?.ReplaceLineEndings("\n") != expectedText)
+            {
+                await RecordTypingFailureAsync(automation, editor.Id, window);
+            }
             Assert.NotNull(read);
             Assert.True(read.Success, read.ErrorMessage);
             Assert.Equal(expectedText, read.Text?.ReplaceLineEndings("\n"));
-            if (inputMode == "replace_selection")
+            if (inputMode != "save_as")
             {
                 var saved = await automation.SaveAsync(window, path);
                 Assert.True(saved.Success, saved.ErrorMessage);
@@ -190,6 +234,33 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             }
             File.Delete(path);
             File.Delete(path + ".copy.txt");
+        }
+    }
+
+    private async Task RecordTypingFailureAsync(UIAutomationService automation, string editorId, string window)
+    {
+        output.WriteLine($"Foreground window after failure: {NativeMethods.GetForegroundWindow()}; expected: {window}");
+        var focused = await automation.GetFocusedElementAsync();
+        output.WriteLine($"Focused element after failure: {System.Text.Json.JsonSerializer.Serialize(focused)}");
+        var read = await automation.GetTextAsync(editorId, window, false);
+        output.WriteLine($"Failed typing readback: {System.Text.Json.JsonSerializer.Serialize(read)}");
+        var screenshot = await new ScreenshotService(
+            new MonitorService(), new SecureDesktopDetector(), new ImageProcessor())
+            .ExecuteAsync(new ScreenshotControlRequest
+            {
+                Action = ScreenshotAction.Capture,
+                Target = CaptureTarget.Window,
+                WindowHandle = window,
+                ImageFormat = ImageFormat.Png,
+            });
+        output.WriteLine($"Failure screenshot: {screenshot.Success}, {screenshot.Message}");
+        if (screenshot.Success && screenshot.ImageData is not null)
+        {
+            var directory = Path.Combine(AppContext.BaseDirectory, "TestResults");
+            Directory.CreateDirectory(directory);
+            var path = Path.Combine(directory, $"notepad-typing-{Guid.NewGuid():N}.png");
+            await File.WriteAllBytesAsync(path, Convert.FromBase64String(screenshot.ImageData));
+            output.WriteLine($"Failure screenshot saved: {path}");
         }
     }
 }

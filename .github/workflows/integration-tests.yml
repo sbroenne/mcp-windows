@@ -297,6 +297,7 @@ jobs:
           path: |
             **/TestResults/*.trx
             **/TestResults/editor-focus-*.png
+            **/TestResults/notepad-typing-*.png
           if-no-files-found: warn
           retention-days: 14
 
