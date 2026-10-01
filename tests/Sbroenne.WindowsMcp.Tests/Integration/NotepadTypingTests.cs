@@ -96,7 +96,7 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             start.ArgumentList.Add(path);
             using var launcher = Process.Start(start);
             nint handle = nint.Zero;
-            Assert.True(await TestWait.UntilAsync(() =>
+            var appeared = await TestWait.UntilAsync(() =>
             {
                 NativeMethods.EnumWindows((candidate, _) =>
                 {
@@ -110,7 +110,12 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
                     return true;
                 }, nint.Zero);
                 return handle != nint.Zero;
-            }, TimeSpan.FromSeconds(20)), "The unique Notepad document window did not appear.");
+            }, TimeSpan.FromSeconds(20));
+            if (!appeared)
+            {
+                RecordStartupFailure();
+            }
+            Assert.True(appeared, "The unique Notepad document window did not appear.");
             NativeMethods.GetWindowThreadProcessId(handle, out var pid);
             owned = Process.GetProcessById((int)pid);
             created = owned.StartTime;
@@ -235,6 +240,33 @@ public sealed class NotepadTypingTests(ITestOutputHelper output)
             File.Delete(path);
             File.Delete(path + ".copy.txt");
         }
+    }
+
+    private void RecordStartupFailure()
+    {
+        using var current = Process.GetCurrentProcess();
+        output.WriteLine($"Test process session: {current.SessionId}; secure desktop: {new SecureDesktopDetector().IsSecureDesktopActive()}");
+        foreach (var process in Process.GetProcessesByName("notepad"))
+        {
+            using (process)
+            {
+                output.WriteLine(
+                    $"Notepad process: {process.Id}; session: {process.SessionId}; " +
+                    $"started: {process.StartTime:O}; main window: {process.MainWindowHandle}; " +
+                    $"version: {process.MainModule?.FileVersionInfo.FileVersion}");
+            }
+        }
+        NativeMethods.EnumWindows((candidate, _) =>
+        {
+            if (NativeMethods.IsWindowVisible(candidate))
+            {
+                NativeMethods.GetWindowThreadProcessId(candidate, out var pid);
+                var title = new char[1024];
+                var length = NativeMethods.GetWindowText(candidate, title, title.Length);
+                output.WriteLine($"Visible window: {candidate}; process: {pid}; title: {new string(title, 0, length)}");
+            }
+            return true;
+        }, nint.Zero);
     }
 
     private async Task RecordTypingFailureAsync(UIAutomationService automation, string editorId, string window)
