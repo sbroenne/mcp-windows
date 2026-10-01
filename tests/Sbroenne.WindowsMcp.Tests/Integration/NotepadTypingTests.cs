@@ -12,7 +12,7 @@ using Xunit.Abstractions;
 
 namespace Sbroenne.WindowsMcp.Tests.Integration;
 
-[Collection("WindowManagement")]
+[Collection("NotepadTyping")]
 [Trait("Category", "RequiresDesktop")]
 public sealed class NotepadTypingTests(ITestOutputHelper output)
 {

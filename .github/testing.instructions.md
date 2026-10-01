@@ -183,6 +183,8 @@ readback before the success assertion; production errors report lengths and focu
 For an individual-call failure, retain the call number, UTF-16 offset and requested code units,
 elapsed time, foreground window, independent text readback, and an owned-window screenshot before
 cleanup. The generated document is test data; do not add its text to production errors.
+The exclusive `NotepadTyping` collection has no shared window fixture, so targeted Notepad checks
+do not start an unrelated test harness before opening their owned document.
 Compare the original one-code-unit calls with separate complete-Unicode-character calls, which
 keep an emoji's two UTF-16 units in one call. Keep the original case and exact readback checks.
 Use fresh owned documents for repeated checks, not retries in a document where input already failed.

@@ -5,6 +5,20 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 public sealed class NotepadTypingEvidenceTests
 {
     [Fact]
+    public void NotepadCollection_IsExclusiveAndDoesNotLaunchAHarness()
+    {
+        var collection = Assert.Single(typeof(NotepadTypingTests).CustomAttributes,
+            attribute => attribute.AttributeType == typeof(CollectionAttribute));
+        Assert.Equal("NotepadTyping", collection.ConstructorArguments[0].Value);
+        var definition = Assert.Single(typeof(NotepadTypingTestGroup).CustomAttributes,
+            attribute => attribute.AttributeType == typeof(CollectionDefinitionAttribute));
+        Assert.Equal("NotepadTyping", definition.ConstructorArguments[0].Value);
+        Assert.Contains(definition.NamedArguments,
+            argument => argument.MemberName == "DisableParallelization" && argument.TypedValue.Value is true);
+        Assert.Empty(typeof(NotepadTypingTestGroup).GetInterfaces());
+    }
+
+    [Fact]
     public void IndividualInputs_PreserveOriginalCodeUnitCalls()
     {
         const string text = "caf\u00e9 \u03a9 \u4e2d\u6587 \U0001f680 done";
