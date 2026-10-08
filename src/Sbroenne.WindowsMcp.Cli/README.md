@@ -70,7 +70,7 @@ wincli <group> [<action>] [--option value] [--flag]
 | `wincli tools` | Every command with its options |
 | `wincli tools --json` | Shared MCP tool manifest, not a CLI flag schema; use `wincli tools` for CLI spellings and limitations |
 | `wincli guidance` | CLI ownership rules followed by the shared MCP automation guide |
-| `wincli --version` | Version |
+| `wincli --version` | Windows MCP version and source revision |
 
 Help is handled before required arguments or automation. For example,
 `wincli keyboard press --help` shows the key/modifier syntax, and

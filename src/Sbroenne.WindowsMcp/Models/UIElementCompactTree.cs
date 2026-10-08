@@ -5,7 +5,6 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Compact representation of a UI element for tree responses (with children).
 /// Reduces token count compared to full UIElementInfo while preserving hierarchy.
-/// Use get_element_details action to fetch full details when needed.
 /// </summary>
 public sealed record UIElementCompactTree
 {
@@ -29,6 +28,13 @@ public sealed record UIElementCompactTree
     /// </summary>
     [JsonPropertyName("name")]
     public string? Name { get; init; }
+
+    /// <summary>
+    /// Developer-assigned automation ID, when it is non-empty and not purely numeric.
+    /// </summary>
+    [JsonPropertyName("automationId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AutomationId { get; init; }
 
     /// <summary>
     /// Control type (Button, Edit, Text, etc.).
@@ -86,6 +92,7 @@ public sealed record UIElementCompactTree
             IsDirectlyActionable = full.IsDirectlyActionable,
             HasDeveloperIdentifier = full.HasDeveloperIdentifier,
             Name = full.Name,
+            AutomationId = CompactAutomationId.From(full.AutomationId),
             Type = full.ControlType,
             Click = full.ClickablePoint != null
                 ? [full.ClickablePoint.X, full.ClickablePoint.Y, full.ClickablePoint.MonitorIndex]

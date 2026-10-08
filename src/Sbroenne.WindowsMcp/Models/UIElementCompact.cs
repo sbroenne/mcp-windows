@@ -5,7 +5,6 @@ namespace Sbroenne.WindowsMcp.Models;
 /// <summary>
 /// Compact representation of a UI element for list responses.
 /// Reduces token count by ~75% compared to full UIElementInfo.
-/// Use get_element_details action to fetch full details when needed.
 /// </summary>
 public sealed record UIElementCompact
 {
@@ -20,6 +19,13 @@ public sealed record UIElementCompact
     /// </summary>
     [JsonPropertyName("name")]
     public string? Name { get; init; }
+
+    /// <summary>
+    /// Developer-assigned automation ID, when it is non-empty and not purely numeric.
+    /// </summary>
+    [JsonPropertyName("automationId")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? AutomationId { get; init; }
 
     /// <summary>
     /// Control type (Button, Edit, Text, etc.).
@@ -53,6 +59,7 @@ public sealed record UIElementCompact
         {
             Id = full.ElementId,
             Name = full.Name,
+            AutomationId = CompactAutomationId.From(full.AutomationId),
             Type = full.ControlType,
             Click = [full.ClickablePoint.X, full.ClickablePoint.Y, full.ClickablePoint.MonitorIndex],
             Enabled = full.IsEnabled

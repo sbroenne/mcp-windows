@@ -71,4 +71,21 @@ public static class WindowsAutomationGuidance
         "### 5. VERIFICATION\n" +
         "screenshot_control(annotate=true) - see current state with element positions\n" +
         "ui_find(...) - confirm expected elements are present after an action";
+
+    /// <summary>
+    /// Adds the connected server's enabled tool set and deployment refresh guidance.
+    /// </summary>
+    /// <param name="enabledTools">The tools registered for this server session.</param>
+    /// <returns>Server instructions with an authoritative capability list.</returns>
+    public static string ForEnabledTools(IEnumerable<string> enabledTools)
+    {
+        ArgumentNullException.ThrowIfNull(enabledTools);
+        var names = enabledTools.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+        return ServerInstructions + "\n\n" +
+            "### Active tool capabilities\n" +
+            $"Tools available in this server session: {string.Join(", ", names)}.\n" +
+            "This list and tools/list are authoritative for this connection. Other examples above describe capabilities that may be disabled in this deployment. " +
+            "Do not call an unavailable tool or route around a disabled tool; use only the tools listed by tools/list. " +
+            "If a tool or parameter is missing or outdated, check the running server build and tool-filter configuration. Restart the server and reconnect the MCP client to load changed tool definitions.";
+    }
 }
