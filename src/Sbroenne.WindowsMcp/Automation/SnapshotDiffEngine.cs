@@ -261,6 +261,7 @@ internal static class SnapshotDiffEngine
     {
         if (!string.Equals(left.Id, right.Id, StringComparison.Ordinal) ||
             !string.Equals(left.Name, right.Name, StringComparison.Ordinal) ||
+            !string.Equals(left.AutomationId, right.AutomationId, StringComparison.Ordinal) ||
             !string.Equals(left.Type, right.Type, StringComparison.Ordinal) ||
             left.Enabled != right.Enabled ||
             !string.Equals(left.Value, right.Value, StringComparison.Ordinal) ||
@@ -294,6 +295,11 @@ internal static class SnapshotDiffEngine
         if (!string.Equals(before.Id, after.Id, StringComparison.Ordinal))
         {
             updated["id"] = after.Id;
+        }
+
+        if (!string.Equals(before.AutomationId, after.AutomationId, StringComparison.Ordinal))
+        {
+            updated["automationId"] = after.AutomationId;
         }
 
         if (!NullableSequenceEqual(before.Click, after.Click))

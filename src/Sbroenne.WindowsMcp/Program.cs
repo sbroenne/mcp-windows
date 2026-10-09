@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Catalog;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
@@ -16,17 +17,11 @@ if (!Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) &&
 
 // Single source of truth for the server version: read it from the assembly so it always
 // matches the <Version> the release workflow stamps into the .csproj (never a hardcoded literal).
+var serverAssembly = Assembly.GetExecutingAssembly();
 var serverVersion =
-    Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-    ?? Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
+    serverAssembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? serverAssembly.GetName().Version?.ToString(3)
     ?? "0.0.0";
-
-// InformationalVersion can carry build metadata (e.g. "1.2.3+abc123"); trim it for a clean semver.
-var plusIndex = serverVersion.IndexOf('+', StringComparison.Ordinal);
-if (plusIndex >= 0)
-{
-    serverVersion = serverVersion[..plusIndex];
-}
 
 // Handle --version/-v flag for startup testing
 if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
@@ -92,6 +87,11 @@ var excludeTools = ParseToolList(
 
 // Always enforce the advertised argument contract, including without an allow/deny list.
 var filter = ToolFilter.Apply(builder.Services, includeTools, excludeTools);
+builder.Services.Configure<McpServerOptions>(options =>
+{
+    options.ServerInstructions = WindowsAutomationGuidance.ForEnabledTools(filter.Kept);
+});
+
 if (includeTools.Count > 0 || excludeTools.Count > 0)
 {
     Console.Error.WriteLine(

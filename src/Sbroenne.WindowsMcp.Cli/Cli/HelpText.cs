@@ -1,4 +1,5 @@
 using System.Reflection;
+using Sbroenne.WindowsMcp.Catalog;
 
 namespace Sbroenne.WindowsMcp.Cli;
 
@@ -38,8 +39,11 @@ internal static class HelpText
     {
         get
         {
-            var v = Assembly.GetExecutingAssembly().GetName().Version;
-            return $"wincli {v?.ToString(3) ?? "1.0.0"}";
+            var assembly = typeof(ToolCatalog).Assembly;
+            var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? assembly.GetName().Version?.ToString(3)
+                ?? "1.0.0";
+            return $"wincli (Windows MCP {version})";
         }
     }
 

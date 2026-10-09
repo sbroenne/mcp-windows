@@ -20,6 +20,17 @@ public sealed class ToolCatalogTests
     }
 
     [Fact]
+    public void FilteredInstructions_IdentifyAvailableToolsAndRefreshRequirements()
+    {
+        var instructions = Sbroenne.WindowsMcp.Prompts.WindowsAutomationGuidance.ForEnabledTools(
+            ["ui_read", "ui_snapshot"]);
+
+        Assert.Contains("Tools available in this server session: ui_read, ui_snapshot", instructions, StringComparison.Ordinal);
+        Assert.Contains("Do not call an unavailable tool", instructions, StringComparison.Ordinal);
+        Assert.Contains("Restart the server and reconnect the MCP client", instructions, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void GetTools_DoesNotExposeRetiredMacro()
     {
         Assert.DoesNotContain(ToolCatalog.GetTools(), tool => tool.Name == "ui_macro");

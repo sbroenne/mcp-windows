@@ -50,23 +50,21 @@ public sealed record UIAutomationResult
     public string? PostActionElementWarning { get; init; }
 
     /// <summary>
-    /// Full element details. Only populated for single-element results or get_element_details.
+    /// Full element details returned by actions that request the complete element model.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementInfo[]? Elements { get; init; }
 
     /// <summary>
     /// Compact element list for Find actions (token-optimized, flat list).
-    /// Use elementId from this list with get_element_details to fetch full info.
-    /// Format: id, name, type, click:[x,y,monitor], enabled.
+    /// Format: id, name, automationId (when meaningful), type, click:[x,y,monitor], enabled.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompact[]? Items { get; init; }
 
     /// <summary>
     /// Compact tree structure for GetTree actions (token-optimized, with hierarchy).
-    /// Use elementId from this list with get_element_details to fetch full info.
-    /// Format: id, name, type, click:[x,y,monitor], enabled, children.
+    /// Format: id, name, automationId (when meaningful), type, click:[x,y,monitor], enabled, value, toggle, children.
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public UIElementCompactTree[]? Tree { get; init; }
@@ -117,7 +115,8 @@ public sealed record UIAutomationResult
     /// Post-action window snapshot ("perceive/act fusion"). When an interactive tool is called
     /// with withSnapshot=true, this carries the window's element tree captured immediately after
     /// the action succeeded, so agents can verify the new state without a separate ui_snapshot call.
-    /// Same shape as <see cref="Tree"/>: id, name, type, click:[x,y,monitor], enabled, children.
+    /// Same shape as <see cref="Tree"/>: id, name, automationId (when meaningful), type,
+    /// click:[x,y,monitor], enabled, value, toggle, children.
     /// </summary>
     [JsonPropertyName("postActionTree")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

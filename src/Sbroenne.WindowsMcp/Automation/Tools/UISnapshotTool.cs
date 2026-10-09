@@ -18,9 +18,9 @@ public static partial class UISnapshotTool
     /// after a change, you MUST explicitly pass mode='auto' on BOTH snapshot calls (or reset first,
     /// then auto). Never omit mode or choose full for a repeated check: a full call is not remembered.
     /// Orient primitive: capture a compact element tree ("snapshot") of a window without guessing
-    /// selectors first. Returns a hierarchy of elements (id, name, type, click coordinates, enabled)
-    /// so you can see what's on screen, then act with ui_click/ui_type/ui_select using an element's
-    /// returned id.
+    /// selectors first. Returns a hierarchy of elements (id, name, meaningful automation ID, type,
+    /// click coordinates, enabled) so you can see what's on screen, then act with ui_click/ui_type/ui_select
+    /// using an element's returned id.
     /// For large windows, inspect a known parentElementId instead of repeating whole-window snapshots.
     /// If no parent is known, ui_find exactDepth=1 discovers immediate children without visiting deeper controls.
     /// Use ui_read with an observed elementId when only that element's text is needed.

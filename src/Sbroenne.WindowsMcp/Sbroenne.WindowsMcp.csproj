@@ -21,6 +21,7 @@
     <Description>Give AI agents Windows controls, not just screenshots - named buttons, field values, table rows, and changes-only views through MCP.</Description>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
     <InvariantGlobalization>true</InvariantGlobalization>
 
     <!-- Version properties - updated by release workflow -->

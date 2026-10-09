@@ -18,6 +18,7 @@
     <!-- Share the server's DPI-awareness manifest so screen coordinates are correct. -->
     <ApplicationManifest>..\Sbroenne.WindowsMcp\app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <IncludeSourceRevisionInInformationalVersion>true</IncludeSourceRevisionInInformationalVersion>
 
     <RootNamespace>Sbroenne.WindowsMcp.Cli</RootNamespace>
     <AssemblyName>wincli</AssemblyName>

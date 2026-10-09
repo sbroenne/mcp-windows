@@ -14,7 +14,7 @@ namespace Sbroenne.WindowsMcp.Automation.Tools;
 public static partial class UIFindTool
 {
     /// <summary>
-    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns observed IDs for elementId targeting with ui_click/ui_type, plus names, types, and coordinates.
+    /// Find UI elements. REQUIRED before clicking elements you haven't located yet. Returns observed IDs for elementId targeting with ui_click/ui_type, plus names, meaningful automation IDs, types, and coordinates.
     /// Each bounded scan has a budget of 2000 visited UIA nodes, including nonmatching nodes.
     /// For a large or incomplete search, use exactDepth=1 to discover immediate children, then
     /// use an observed container id as parentElementId to search inside it. Repeat shallow discovery
@@ -23,7 +23,7 @@ public static partial class UIFindTool
     /// element by name, control, accessibility tree, where is.
     /// </summary>
     /// <remarks>
-    /// Finds UI elements by name, type, ID, or other criteria. Returns observed IDs, names, types, and click coordinates.
+    /// Finds UI elements by name, type, ID, or other criteria. Returns observed IDs, names, meaningful automation IDs, types, and click coordinates.
     /// To act on a result, pass its returned id as elementId to ui_click or ui_type. Selectors and foundIndex are discovery-only; use them here to disambiguate before acting.
     /// Use coordinates with mouse_control only as a fallback.
     /// You MUST call this tool or ui_click for every UI operation - never skip tool calls.
