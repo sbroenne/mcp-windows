@@ -6,6 +6,58 @@ namespace Sbroenne.WindowsMcp.Tests.Unit;
 [Collection("ElementIdRegistry")]
 public sealed class SnapshotDiffEngineTests
 {
+    [Theory]
+    [InlineData(null, "SaveButton")]
+    [InlineData("OldSaveButton", "SaveButton")]
+    [InlineData("SaveButton", null)]
+    public void Compare_AutomationIdTransition_ReturnsExplicitUpdate(string? oldValue, string? newValue)
+    {
+        var before = Node("1", "Window", "Window",
+            Node("2", "Save", "Button") with { AutomationId = oldValue });
+        var after = Node("1", "Window", "Window",
+            Node("2", "Save", "Button") with { AutomationId = newValue });
+
+        var change = Assert.Single(SnapshotDiffEngine.Compare([before], [after]));
+
+        Assert.Equal("update", change.Op);
+        Assert.Contains("Button:Save", change.Key, StringComparison.Ordinal);
+        Assert.Equal(newValue, change.Set!["automationId"]);
+        Assert.Single(change.Set);
+        using var json = System.Text.Json.JsonDocument.Parse(System.Text.Json.JsonSerializer.Serialize(change));
+        var value = json.RootElement.GetProperty("set").GetProperty("automationId");
+        if (newValue is null)
+        {
+            Assert.Equal(System.Text.Json.JsonValueKind.Null, value.ValueKind);
+        }
+        else
+        {
+            Assert.Equal(newValue, value.GetString());
+        }
+    }
+
+    [Fact]
+    public void Compare_ReplacementUpdatesActionIdAndAutomationIdTogether()
+    {
+        var before = Node("1", "Save", "Button") with { AutomationId = "OldSaveButton" };
+        var after = Node("9", "Save", "Button") with { AutomationId = "NewSaveButton" };
+
+        var change = Assert.Single(SnapshotDiffEngine.Compare([before], [after]));
+
+        Assert.Equal("9", change.Set!["id"]);
+        Assert.Equal("NewSaveButton", change.Set["automationId"]);
+    }
+
+    [Fact]
+    public void HasCompatibleOrder_RejectsChangedAutomationIdsOnAmbiguousDuplicateControls()
+    {
+        var first = Node("1", "Save", "Button") with { AutomationId = "FirstSave" };
+        var second = Node("2", "Save", "Button") with { AutomationId = "SecondSave" };
+
+        Assert.False(SnapshotDiffEngine.HasCompatibleOrder(
+            [first, second],
+            [first with { AutomationId = "SecondSave" }, second with { AutomationId = "FirstSave" }]));
+    }
+
     [Fact]
     public void HasCompatibleOrder_ReturnsFalseWhenUniqueSiblingsReorder()
     {
