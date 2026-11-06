@@ -69,7 +69,7 @@
     "@types/node": "^26.6.6",
     "@types/vscode": "1.125.0",
     "@vscode/vsce": "^4.1.0",
-    "oxlint": "^1.88.0",
+    "oxlint": "^1.90.0",
     "typescript": "^7.0.2"
   }
 }
