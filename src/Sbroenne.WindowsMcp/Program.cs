@@ -7,6 +7,7 @@ using Sbroenne.WindowsMcp.Catalog;
 using Sbroenne.WindowsMcp.Prompts;
 using Sbroenne.WindowsMcp.Resources;
 using Sbroenne.WindowsMcp.Tools;
+using Sbroenne.WindowsMcp.Utilities;
 
 if (!Application.SetHighDpiMode(HighDpiMode.PerMonitorV2) &&
     Application.HighDpiMode != HighDpiMode.PerMonitorV2)
@@ -48,7 +49,7 @@ if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
     return 0;
 }
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateApplicationBuilder(ServerHostSettings.Create(args));
 
 // Configure logging to stderr for MCP protocol compliance (stdout is reserved for MCP)
 // Only log warnings and errors to avoid noise in VS Code output panel
