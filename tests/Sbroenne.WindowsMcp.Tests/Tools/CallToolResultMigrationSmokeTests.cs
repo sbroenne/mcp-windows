@@ -27,6 +27,7 @@ public sealed class CallToolResultMigrationSmokeTests
             handle: null,
             title: null,
             processName: null,
+            processId: null,
             filter: "___no_such_window_should_match___",
             regex: false,
             includeAllDesktops: false,

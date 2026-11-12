@@ -35,24 +35,45 @@ public sealed class WindowEnumerator
         string? filter = null,
         bool useRegex = false,
         bool includeAllDesktops = false,
+        int? processId = null,
         CancellationToken cancellationToken = default)
     {
-        return EnumerateWindowsCoreAsync(filter, null, useRegex, includeAllDesktops, cancellationToken);
+        // The single list filter is documented as matching the title *or* the process name,
+        // so the same value is applied to both with OR semantics.
+        return EnumerateWindowsCoreAsync(
+            filter,
+            filter,
+            processId,
+            useRegex,
+            includeAllDesktops,
+            cancellationToken,
+            titleOrProcessName: true);
     }
 
     internal Task<IReadOnlyList<WindowInfo>> EnumerateLaunchWindowsAsync(CancellationToken cancellationToken) =>
-        EnumerateWindowsCoreAsync(null, null, false, true, cancellationToken, includeUntitled: true);
+        EnumerateWindowsCoreAsync(null, null, null, false, true, cancellationToken, includeUntitled: true);
 
     /// <summary>
-    /// Core enumeration with separate title and processName filters.
+    /// Core enumeration with separate title, process name, and process id filters.
     /// </summary>
+    /// <param name="titleFilter">Substring or regex pattern matched against the window title.</param>
+    /// <param name="processNameFilter">Substring or regex pattern matched against the owning process name.</param>
+    /// <param name="processIdFilter">When set, only windows owned by this process id are returned.</param>
+    /// <param name="useRegex">Treat the title and process name filters as regular expressions.</param>
+    /// <param name="includeAllDesktops">Include windows hosted on other virtual desktops.</param>
+    /// <param name="cancellationToken">Token used to cancel the enumeration.</param>
+    /// <param name="includeUntitled">Include windows without a title.</param>
+    /// <param name="titleOrProcessName">When true a window matches if either the title or the process name matches;
+    /// when false every supplied filter must match.</param>
     private Task<IReadOnlyList<WindowInfo>> EnumerateWindowsCoreAsync(
         string? titleFilter,
         string? processNameFilter,
+        int? processIdFilter,
         bool useRegex,
         bool includeAllDesktops,
         CancellationToken cancellationToken,
-        bool includeUntitled = false)
+        bool includeUntitled = false,
+        bool titleOrProcessName = false)
     {
         return Task.Run(() =>
         {
@@ -77,34 +98,39 @@ public sealed class WindowEnumerator
                     return false;
                 }
 
-                var info = GetWindowInfoCore(hwnd, includeAllDesktops, includeUntitled);
+                // Resolve the owning process before the expensive per-window queries so a
+                // process-id filter can reject non-matching windows early.
+                _ = NativeMethods.GetWindowThreadProcessId(hwnd, out uint processId);
+
+                if (processIdFilter is not null && processId != unchecked((uint)processIdFilter.Value))
+                {
+                    return true; // Continue enumeration
+                }
+
+                var info = GetWindowInfoCore(hwnd, includeAllDesktops, includeUntitled, processId);
 
                 if (info is null)
                 {
                     return true; // Continue enumeration
                 }
 
-                // Apply title filter if specified
-                if (!string.IsNullOrEmpty(titleFilter))
-                {
-                    bool titleMatches = titleRegex is not null
-                        ? titleRegex.IsMatch(info.Title)
-                        : info.Title.Contains(titleFilter, StringComparison.OrdinalIgnoreCase);
+                // The combined list filter matches substrings, while a dedicated processName
+                // filter keeps its documented exact, case-insensitive comparison.
+                bool titleMatches = MatchesFilter(info.Title, titleFilter, titleRegex, exact: false);
+                bool processMatches = MatchesFilter(info.ProcessName, processNameFilter, processRegex, exact: !titleOrProcessName);
 
-                    if (!titleMatches)
+                if (titleOrProcessName)
+                {
+                    var hasFilter = !string.IsNullOrEmpty(titleFilter) || !string.IsNullOrEmpty(processNameFilter);
+                    if (hasFilter && !titleMatches && !processMatches)
                     {
                         return true; // Continue but don't add
                     }
                 }
-
-                // Apply processName filter if specified (exact match, case-insensitive)
-                if (!string.IsNullOrEmpty(processNameFilter))
+                else
                 {
-                    bool processMatches = processRegex is not null
-                        ? processRegex.IsMatch(info.ProcessName ?? "")
-                        : string.Equals(info.ProcessName, processNameFilter, StringComparison.OrdinalIgnoreCase);
-
-                    if (!processMatches)
+                    if ((!string.IsNullOrEmpty(titleFilter) && !titleMatches) ||
+                        (!string.IsNullOrEmpty(processNameFilter) && !processMatches))
                     {
                         return true; // Continue but don't add
                     }
@@ -121,10 +147,40 @@ public sealed class WindowEnumerator
         }, cancellationToken);
     }
 
+    /// <summary>
+    /// Applies a single text filter. An empty filter always matches. Process names compare
+    /// exactly (case-insensitive) unless a regex was supplied, titles match as substrings.
+    /// </summary>
+    private static bool MatchesFilter(string? value, string? filter, Regex? regex, bool exact)
+    {
+        if (string.IsNullOrEmpty(filter))
+        {
+            return true;
+        }
+
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        if (regex is not null)
+        {
+            return regex.IsMatch(value);
+        }
+
+        return exact
+            ? string.Equals(value, filter, StringComparison.OrdinalIgnoreCase)
+            : value.Contains(filter, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <inheritdoc/>
     public Task<WindowInfo?> GetWindowInfoAsync(nint handle, CancellationToken cancellationToken = default)
     {
-        return Task.Run(() => GetWindowInfoCore(handle, includeAllDesktops: true, includeUntitled: true), cancellationToken);
+        return Task.Run(() =>
+        {
+            _ = NativeMethods.GetWindowThreadProcessId(handle, out uint processId);
+            return GetWindowInfoCore(handle, includeAllDesktops: true, includeUntitled: true, processId);
+        }, cancellationToken);
     }
 
     /// <inheritdoc/>
@@ -132,12 +188,13 @@ public sealed class WindowEnumerator
         string? title,
         string? processName = null,
         bool useRegex = false,
+        int? processId = null,
         CancellationToken cancellationToken = default)
     {
-        return EnumerateWindowsCoreAsync(title, processName, useRegex, includeAllDesktops: false, cancellationToken);
+        return EnumerateWindowsCoreAsync(title, processName, processId, useRegex, includeAllDesktops: false, cancellationToken);
     }
 
-    private WindowInfo? GetWindowInfoCore(nint hwnd, bool includeAllDesktops, bool includeUntitled = false)
+    private WindowInfo? GetWindowInfoCore(nint hwnd, bool includeAllDesktops, bool includeUntitled, uint processId)
     {
         // Check if window is visible
         if (!NativeMethods.IsWindowVisible(hwnd))
@@ -170,8 +227,7 @@ public sealed class WindowEnumerator
             return null;
         }
 
-        // Get process information
-        _ = NativeMethods.GetWindowThreadProcessId(hwnd, out uint processId);
+        // Get process information (the id is resolved by the caller so filters can run early)
         string? processName = GetProcessName(processId);
 
         // Get window bounds (prefer DWM extended bounds for accuracy)

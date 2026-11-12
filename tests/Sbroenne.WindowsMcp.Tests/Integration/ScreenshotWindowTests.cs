@@ -100,6 +100,40 @@ public sealed class ScreenshotWindowTests
     }
 
     [Fact]
+    public async Task CaptureWindow_UsesPhysicalBounds_WhenCallingThreadIsDpiUnaware()
+    {
+        var previousContext = NativeMethods.SetThreadDpiAwarenessContext(
+            new nint(NativeConstants.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+        Assert.NotEqual(IntPtr.Zero, previousContext);
+
+        try
+        {
+            var windowHandle = GetDesktopWindow();
+            Assert.True(NativeMethods.GetWindowRect(windowHandle, out var physicalRect));
+
+            Assert.NotEqual(IntPtr.Zero, NativeMethods.SetThreadDpiAwarenessContext(new nint(-1)));
+
+            var result = await _screenshotService.ExecuteAsync(new ScreenshotControlRequest
+            {
+                Action = ScreenshotAction.Capture,
+                Target = CaptureTarget.Window,
+                WindowHandle = WindowHandleParser.Format(windowHandle),
+                ImageFormat = ImageFormat.Png
+            });
+
+            Assert.True(result.Success, $"Window capture failed: {result.Message}");
+            Assert.Equal(physicalRect.Left, result.CaptureBounds?.X);
+            Assert.Equal(physicalRect.Top, result.CaptureBounds?.Y);
+            Assert.Equal(physicalRect.Right - physicalRect.Left, result.CaptureBounds?.Width);
+            Assert.Equal(physicalRect.Bottom - physicalRect.Top, result.CaptureBounds?.Height);
+        }
+        finally
+        {
+            Assert.NotEqual(IntPtr.Zero, NativeMethods.SetThreadDpiAwarenessContext(previousContext));
+        }
+    }
+
+    [Fact]
     public async Task CaptureWindow_InvalidHandle_ReturnsInvalidWindowHandleError()
     {
         // Arrange
