@@ -840,8 +840,8 @@ Control windows on the Windows desktop. Use `app` tool to launch applications, t
 
 | Action | Description | Required Parameters |
 |--------|-------------|---------------------|
-| `list` | List all visible windows | none |
-| `find` | Find windows by title or process name | `title` or `processName` |
+| `list` | List all visible windows | none, optional `filter`, `processId` |
+| `find` | Find windows by title, process name, or process id | `title`, `processName` or `processId` |
 | `activate` | Bring window to foreground | `handle` |
 | `get_foreground` | Get current foreground window | none |
 | `get_state` | Get current window state (normal, minimized, maximized, hidden) | `handle` |
@@ -858,6 +858,22 @@ Control windows on the Windows desktop. Use `app` tool to launch applications, t
 | `move_and_activate` | Move to position and activate atomically | `handle`, optional `x`, `y` |
 | `ensure_visible` | Ensure window is visible (restore if minimized, activate) | `handle` |
 
+### Windows of one process
+
+Some applications run more than one instance at the same time, for example two Visual Studio
+windows. A process name then matches too many windows, so filter by the process id instead:
+
+```
+window_management(action='list', processId=1234)
+window_management(action='find', processId=1234)
+```
+
+The `list` action returns `pid`, `state`, and `bounds` for every window. Collect the handles of one
+application, then capture each window with `screenshot_control(target='window', windowHandle=...)`.
+
+The `filter` option of `list` matches the title **or** the process name
+(case-insensitive substring, or a regular expression when `regex=true`).
+
 ### Close with discardChanges
 
 Use `discardChanges=true` to automatically dismiss "Save?" dialogs when closing:
@@ -870,8 +886,8 @@ window_management(action='close', handle='123456', discardChanges=true)
 
 ### Capabilities
 
-- List all visible top-level windows with titles, handles, process info, and bounds
-- Locate windows by title (substring or regex matching)
+- List all visible top-level windows with titles, handles, process name, process id, state, and bounds
+- Locate windows by title (substring or regex matching), process name, or process id
 - Bring windows to foreground with focus
 - Minimize, maximize, restore, and close windows
 - Position and size windows with move, resize, or set_bounds

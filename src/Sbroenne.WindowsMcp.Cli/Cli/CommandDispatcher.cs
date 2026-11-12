@@ -76,7 +76,7 @@ internal static class CommandDispatcher
         var options = args.Group switch
         {
             "app" => "path program program-path args arguments working-dir cwd working-directory no-wait wait-for-window timeout-ms timeout",
-            "window" or "window-management" => $"{WindowOptions} title process process-name filter regex include-all-desktops all-desktops x y width height timeout-ms timeout target monitor-index monitor state exclude-title discard-changes",
+            "window" or "window-management" => $"{WindowOptions} title process process-name pid filter regex include-all-desktops all-desktops x y width height timeout-ms timeout target monitor-index monitor state exclude-title discard-changes",
             "keyboard" => $"{WindowOptions} text key modifiers repeat sequence inter-key-delay-ms delay-ms delay clear-first clear",
             "mouse" => $"{WindowOptions} target x y end-x endx end-y endy direction amount modifiers button monitor-index monitor expected-window-title expected-title expected-process-name expected-process points",
             "screenshot" => $"{WindowOptions} action no-annotate annotate target monitor-index monitor region-x region-y region-width region-height include-cursor cursor image-format format quality output-mode output-path out include-image",
@@ -130,6 +130,7 @@ internal static class CommandDispatcher
             a.GetString("handle", "window"),
             a.GetString("title"),
             a.GetString("process", "process-name"),
+            a.GetInt("pid"),
             a.GetString("filter"),
             a.GetBool("regex"),
             a.GetFlag("include-all-desktops", "all-desktops"),

@@ -79,18 +79,20 @@ public sealed class WindowService
         string? filter = null,
         bool useRegex = false,
         bool includeAllDesktops = false,
+        int? processId = null,
         CancellationToken cancellationToken = default)
     {
-        return ListWindowsCoreAsync(filter, useRegex, includeAllDesktops, includeUntitled: false, cancellationToken);
+        return ListWindowsCoreAsync(filter, useRegex, includeAllDesktops, processId, includeUntitled: false, cancellationToken);
     }
 
     internal Task<WindowManagementResult> ListLaunchWindowsAsync(CancellationToken cancellationToken) =>
-        ListWindowsCoreAsync(null, false, true, includeUntitled: true, cancellationToken);
+        ListWindowsCoreAsync(null, false, true, null, includeUntitled: true, cancellationToken);
 
     private async Task<WindowManagementResult> ListWindowsCoreAsync(
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
+        int? processId,
         bool includeUntitled,
         CancellationToken cancellationToken)
     {
@@ -98,7 +100,7 @@ public sealed class WindowService
         {
             var windows = includeUntitled
                 ? await _enumerator.EnumerateLaunchWindowsAsync(cancellationToken)
-                : await _enumerator.EnumerateWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
+                : await _enumerator.EnumerateWindowsAsync(filter, useRegex, includeAllDesktops, processId, cancellationToken);
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -114,11 +116,12 @@ public sealed class WindowService
         string? title,
         string? processName = null,
         bool useRegex = false,
+        int? processId = null,
         CancellationToken cancellationToken = default)
     {
         try
         {
-            var windows = await _enumerator.FindWindowsAsync(title, processName, useRegex, cancellationToken);
+            var windows = await _enumerator.FindWindowsAsync(title, processName, useRegex, processId, cancellationToken);
             return WindowManagementResult.CreateListSuccess(windows);
         }
         catch (System.Text.RegularExpressions.RegexParseException ex)
@@ -635,7 +638,7 @@ public sealed class WindowService
 
             try
             {
-                var windows = await _enumerator.FindWindowsAsync(title, null, useRegex, cancellationToken);
+                var windows = await _enumerator.FindWindowsAsync(title, null, useRegex, null, cancellationToken);
                 if (windows.Count > 0)
                 {
                     return WindowManagementResult.CreateWindowSuccess(windows[0]);
