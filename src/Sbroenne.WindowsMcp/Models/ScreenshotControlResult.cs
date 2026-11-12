@@ -18,7 +18,8 @@ public sealed record ScreenshotControlResult
     /// Gets the error classification.
     /// </summary>
     [JsonPropertyName("errorCode")]
-    public required string ErrorCode { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)]
+    public string? ErrorCode { get; init; } = null;
 
     /// <summary>
     /// Gets a human-readable description.
@@ -165,7 +166,7 @@ public sealed record ScreenshotControlResult
         return new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = message,
             ImageData = filePath is null ? Convert.ToBase64String(processed.Data) : null,
             Width = processed.Width,
@@ -185,7 +186,7 @@ public sealed record ScreenshotControlResult
         new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = $"Captured {width}x{height} {format}",
             ImageData = imageData,
             Width = width,
@@ -213,7 +214,7 @@ public sealed record ScreenshotControlResult
         return new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = message,
             ImageData = filePath is null ? Convert.ToBase64String(processed.Data) : null,
             Width = processed.Width,
@@ -239,7 +240,7 @@ public sealed record ScreenshotControlResult
         return new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = message,
             ImageData = imageData,
             Width = metadata.ImageWidth,
@@ -259,7 +260,7 @@ public sealed record ScreenshotControlResult
         new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = message,
             Monitors = monitors,
             VirtualScreen = virtualScreen
@@ -303,7 +304,7 @@ public sealed record ScreenshotControlResult
         return new()
         {
             Success = true,
-            ErrorCode = ToSnakeCase(ScreenshotErrorCode.Success),
+            ErrorCode = null, //ToSnakeCase(ScreenshotErrorCode.Success),
             Message = $"Captured {sizeInfo} {format} with {elementCount} annotated elements",
             ImageData = imageData,
             Width = width,
