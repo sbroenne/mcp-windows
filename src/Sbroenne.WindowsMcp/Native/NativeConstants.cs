@@ -641,6 +641,16 @@ internal static class NativeConstants
 
     #endregion
 
+    #region DPI Awareness Contexts
+
+    /// <summary>Per-monitor DPI awareness value returned by GetAwarenessFromDpiAwarenessContext.</summary>
+    public const int DPI_AWARENESS_PER_MONITOR_AWARE = 2;
+
+    /// <summary>Per-monitor DPI awareness context version 2.</summary>
+    public const int DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4;
+
+    #endregion
+
     #region GetAncestor Flags (GA_*)
 
     /// <summary>Retrieves the parent window. This does not include the owner, as it does with the GetParent function.</summary>
