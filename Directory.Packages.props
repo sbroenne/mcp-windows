@@ -5,7 +5,7 @@
   <ItemGroup>
     <!-- Main application packages -->
     <PackageVersion Include="ModelContextProtocol" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.AI.Abstractions" Version="11.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="11.0.0" />
@@ -14,18 +14,18 @@
     <PackageVersion Include="Bogus" Version="35.6.5" />
     <PackageVersion Include="coverlet.collector" Version="10.1.1" />
     <PackageVersion Include="SharpToken" Version="2.0.6" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageVersion Include="NSubstitute" Version="6.2.0" />
     <PackageVersion Include="xunit" Version="2.9.3" />
-    <PackageVersion Include="xunit.analyzers" Version="2.0.0" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <PackageVersion Include="xunit.analyzers" Version="2.3.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.1" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.85" />
     <!-- WinUI 3 / Windows App SDK -->
-    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.4.0" />
-    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
-    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.260610101" />
-    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
-    <PackageVersion Include="Microsoft.Windows.AI.MachineLearning" Version="2.3.42" />
-    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.12" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2957" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools.MSIX" Version="1.7.261102100" />
+    <PackageVersion Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+    <PackageVersion Include="Microsoft.Windows.AI.MachineLearning" Version="2.5.96" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="11.0.0" />
   </ItemGroup>
 </Project>
