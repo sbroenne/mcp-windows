@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using Sbroenne.WindowsMcp.Automation;
@@ -14,6 +16,7 @@ namespace Sbroenne.WindowsMcp.Tests.Integration;
 [SupportedOSPlatform("windows")]
 public class WindowListTests : IClassFixture<WindowTestFixture>
 {
+    private readonly WindowTestFixture _fixture;
     private readonly WindowService _windowService;
 
     /// <summary>
@@ -23,6 +26,7 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
     public WindowListTests(WindowTestFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
+        _fixture = fixture;
         _windowService = fixture.WindowService;
     }
 
@@ -165,6 +169,61 @@ public class WindowListTests : IClassFixture<WindowTestFixture>
             Assert.True(matchesTitle || matchesProcess,
                 $"Window '{window.Title}' (process: {window.ProcessName}) doesn't match filter '{filter}'");
         }
+    }
+
+    [Fact]
+    public async Task ListWindows_FilterMatchesProcessName_ReturnsWindowsOfCurrentProcess()
+    {
+        // Arrange - the fixture window belongs to this test process, so filtering by the
+        // process name must find it even though the title does not contain the name.
+        var processName = Process.GetCurrentProcess().ProcessName;
+
+        // Act
+        var result = await _windowService.ListWindowsAsync(filter: processName);
+
+        // Assert
+        Assert.True(result.Success, $"List operation failed: {result.Error}");
+        Assert.NotNull(result.Windows);
+        Assert.NotEmpty(result.Windows);
+        Assert.Contains(result.Windows, w => w.Handle == _fixture.TestWindowHandle.ToString(CultureInfo.InvariantCulture));
+        Assert.All(result.Windows, w => Assert.Equal(processName, w.ProcessName));
+    }
+
+    [Fact]
+    public async Task ListWindows_WithProcessId_ReturnsOnlyWindowsOfThatProcess()
+    {
+        // Act
+        var result = await _windowService.ListWindowsAsync(processId: Environment.ProcessId);
+
+        // Assert
+        Assert.True(result.Success, $"List operation failed: {result.Error}");
+        Assert.NotNull(result.Windows);
+        Assert.Contains(result.Windows, w => w.Handle == _fixture.TestWindowHandle.ToString(CultureInfo.InvariantCulture));
+        Assert.All(result.Windows, w => Assert.Equal(Environment.ProcessId, w.ProcessId));
+    }
+
+    [Fact]
+    public async Task ListWindows_WithUnknownProcessId_ReturnsNoWindows()
+    {
+        // Act - int.MaxValue is never assignable to a running process
+        var result = await _windowService.ListWindowsAsync(processId: int.MaxValue);
+
+        // Assert
+        Assert.True(result.Success, $"List operation failed: {result.Error}");
+        Assert.NotNull(result.Windows);
+        Assert.Empty(result.Windows);
+    }
+
+    [Fact]
+    public async Task ListWindows_IncludesProcessId()
+    {
+        // Act
+        var result = await _windowService.ListWindowsAsync();
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.Windows);
+        Assert.All(result.Windows, w => Assert.True(w.ProcessId > 0, $"Window '{w.Title}' has no process id"));
     }
 
     [Fact]

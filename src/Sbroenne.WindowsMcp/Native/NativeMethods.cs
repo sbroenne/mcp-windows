@@ -260,6 +260,30 @@ internal static partial class NativeMethods
     internal static partial bool GetWindowRect(nint hWnd, out RECT lpRect);
 
     /// <summary>
+    /// Retrieves the DPI awareness context of the specified window.
+    /// </summary>
+    /// <param name="hWnd">Handle to the window.</param>
+    /// <returns>The window's DPI awareness context.</returns>
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetWindowDpiAwarenessContext(nint hWnd);
+
+    /// <summary>
+    /// Retrieves the DPI awareness from a DPI awareness context.
+    /// </summary>
+    /// <param name="dpiContext">The DPI awareness context.</param>
+    /// <returns>0 for unaware, 1 for system-aware, 2 for per-monitor-aware, or -1 on failure.</returns>
+    [LibraryImport("user32.dll")]
+    internal static partial int GetAwarenessFromDpiAwarenessContext(nint dpiContext);
+
+    /// <summary>
+    /// Sets the DPI awareness context for the current thread.
+    /// </summary>
+    /// <param name="dpiContext">The DPI awareness context to apply.</param>
+    /// <returns>The previous thread context, or zero if the operation failed.</returns>
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint SetThreadDpiAwarenessContext(nint dpiContext);
+
+    /// <summary>
     /// Retrieves the show state and positions of a window.
     /// </summary>
     /// <param name="hWnd">Handle to the window.</param>

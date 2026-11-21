@@ -14,7 +14,9 @@ The skill itself does not install or configure the server.
 
 ## Preferred workflow
 
-1. Use `window_management` to find or activate the target window.
+1. Use `window_management` to find or activate the target window. When several instances of the same
+   app run, call `list` (it returns `pid`, `state`, and `bounds` per window) and then filter with
+   `processId` to select the windows of one process.
 2. Discover with `ui_find` or `ui_snapshot`; pass the returned IDs to `ui_read`, `ui_click`, and `ui_type`.
 3. Use `ui_read_table` to extract a grid, table, or details-view list into structured rows + headers in one call instead of scraping cells with repeated `ui_read`.
 4. Use `file_save` for supported Save / Save As dialogs and `file_open` for Open flows.

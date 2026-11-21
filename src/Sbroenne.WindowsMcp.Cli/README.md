@@ -45,6 +45,21 @@ them after restarting the CLI service.
 For an agent with shell access, start with `wincli guidance`. For the full
 command list, run `wincli tools`.
 
+## Windows of one application
+
+Some programs run more than one window at the same time. Use a process id to see
+only the windows of one running program:
+
+```powershell
+wincli window list --pid 1234
+wincli window find --pid 1234
+```
+
+`wincli window list` returns the handle, title, process name, process id, state,
+and size of each window. Use the handle with the other commands. To search by
+name instead, `--filter <text>` matches the title or the process name of every
+window.
+
 ## Smaller responses
 
 Automatic snapshots can return just the changes since the last view. Pass the

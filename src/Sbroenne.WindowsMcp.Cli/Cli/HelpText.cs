@@ -111,7 +111,7 @@ internal static class HelpText
             actions: list, find, activate, get_foreground, minimize, maximize, restore, close,
                      move, resize, set_bounds, wait_for, move_to_monitor, get_state,
                      wait_for_state, move_and_activate, ensure_visible
-            options: --handle --title --process --filter --regex --include-all-desktops
+            options: --handle --title --process --process-name --pid --filter --regex --include-all-desktops
                      --x --y --width --height --timeout-ms --target --monitor-index
                      --state --exclude-title --discard-changes
 
