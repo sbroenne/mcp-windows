@@ -4,7 +4,8 @@ using ModelContextProtocol.Server;
 namespace Sbroenne.WindowsMcp.Catalog;
 
 /// <summary>
-/// Applies an allow/deny filter, dependency checks, and strict argument validation to MCP tools.
+/// Applies an allow/deny filter, dependency checks, strict argument validation, and single-type
+/// property schemas to MCP tools.
 /// </summary>
 /// <remarks>
 /// The MCP SDK's <c>WithToolsFromAssembly()</c> registers every discovered tool as an
@@ -85,6 +86,7 @@ public static class ToolFilter
         var permissions = new ToolPermissionPolicy(kept);
         foreach (var tool in survivors)
         {
+            tool.ProtocolTool.InputSchema = ToolCatalog.WithSingleTypeProperties(tool.ProtocolTool.InputSchema);
             services.AddSingleton<McpServerTool>(new StrictArgumentTool(tool, permissions));
         }
 

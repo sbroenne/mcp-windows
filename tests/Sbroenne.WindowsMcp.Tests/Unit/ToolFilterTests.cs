@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 using Sbroenne.WindowsMcp.Catalog;
@@ -97,5 +98,35 @@ public sealed class ToolFilterTests
 
         Assert.Contains("does_not_exist", result.Unknown);
         Assert.DoesNotContain("ui_click", result.Unknown);
+    }
+
+    // Claude clients drop a "type" array and then send a numeric window handle as a JSON number.
+    [Fact]
+    public void Apply_AdvertisesOptionalPropertiesWithSingleType()
+    {
+        var services = BuildToolServices();
+
+        ToolFilter.Apply(services, include: null, exclude: null);
+
+        using var provider = services.BuildServiceProvider();
+        var tools = provider.GetServices<McpServerTool>().ToList();
+        foreach (var tool in tools)
+        {
+            foreach (var property in tool.ProtocolTool.InputSchema.GetProperty("properties").EnumerateObject())
+            {
+                Assert.True(
+                    !property.Value.TryGetProperty("type", out var type) || type.ValueKind == JsonValueKind.String,
+                    $"{tool.ProtocolTool.Name}.{property.Name} advertises more than one type.");
+            }
+        }
+
+        var snapshot = tools.Single(tool => tool.ProtocolTool.Name == "ui_snapshot");
+        var windowHandle = snapshot.ProtocolTool.InputSchema.GetProperty("properties").GetProperty("windowHandle");
+        Assert.Equal("string", windowHandle.GetProperty("type").GetString());
+        Assert.DoesNotContain(
+            "windowHandle",
+            snapshot.ProtocolTool.InputSchema.TryGetProperty("required", out var required)
+                ? required.EnumerateArray().Select(name => name.GetString())
+                : []);
     }
 }
