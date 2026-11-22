@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
@@ -42,8 +43,9 @@ public static class ToolCatalog
 
         return provider.GetServices<McpServerTool>()
             .Select(tool => tool.ProtocolTool)
-            // Clone() detaches the schema from the provider we are about to dispose.
-            .Select(tool => new ToolCatalogEntry(tool.Name, tool.Title, tool.Description, tool.InputSchema.Clone()))
+            // The rewritten schema is detached from the provider we are about to dispose.
+            .Select(tool => new ToolCatalogEntry(
+                tool.Name, tool.Title, tool.Description, WithSingleTypeProperties(tool.InputSchema)))
             .OrderBy(entry => entry.Name, StringComparer.Ordinal)
             .ToList();
     }
@@ -68,6 +70,36 @@ public static class ToolCatalog
         };
 
         return JsonSerializer.Serialize(manifest, indented ? IndentedJson : CompactJson);
+    }
+
+    // Collapses an optional property's "type", such as ["string", "null"], to its single non-null type.
+    // Claude clients drop a "type" given as an array and then send a numeric string, such as a window
+    // handle, as a JSON number, which a string parameter rejects before the tool runs.
+    // The property stays optional because it is not in "required", and an explicit null still binds.
+    // ToolFilter applies the same rewrite to the server's tools, so the catalog matches tools/list.
+    internal static JsonElement WithSingleTypeProperties(JsonElement inputSchema)
+    {
+        var schema = JsonNode.Parse(inputSchema.GetRawText())!;
+        if (schema["properties"] is JsonObject properties)
+        {
+            foreach (var (_, property) in properties)
+            {
+                if (property is JsonObject propertySchema && propertySchema["type"] is JsonArray { Count: 2 } types)
+                {
+                    var nonNullTypes = types
+                        .Select(type => type?.GetValue<string>())
+                        .Where(type => type != "null")
+                        .ToList();
+                    if (nonNullTypes.Count == 1)
+                    {
+                        propertySchema["type"] = nonNullTypes[0];
+                    }
+                }
+            }
+        }
+
+        using var document = JsonDocument.Parse(schema.ToJsonString());
+        return document.RootElement.Clone();
     }
 }
 

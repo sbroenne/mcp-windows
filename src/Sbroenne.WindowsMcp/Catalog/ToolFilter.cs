@@ -1,5 +1,3 @@
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol.Server;
 
@@ -88,7 +86,7 @@ public static class ToolFilter
         var permissions = new ToolPermissionPolicy(kept);
         foreach (var tool in survivors)
         {
-            tool.ProtocolTool.InputSchema = WithSingleTypeProperties(tool.ProtocolTool.InputSchema);
+            tool.ProtocolTool.InputSchema = ToolCatalog.WithSingleTypeProperties(tool.ProtocolTool.InputSchema);
             services.AddSingleton<McpServerTool>(new StrictArgumentTool(tool, permissions));
         }
 
@@ -128,35 +126,6 @@ public static class ToolFilter
     // Tool names are lower_snake_case; accept hyphens and casing differences from the CLI/env.
     private static string NormalizeName(string name) =>
         name.Trim().Replace('-', '_').ToLowerInvariant();
-
-    // Collapses an optional property's "type", such as ["string", "null"], to its single non-null type.
-    // Claude clients drop a "type" given as an array and then send a numeric string, such as a window
-    // handle, as a JSON number, which a string parameter rejects before the tool runs.
-    // The property stays optional because it is not in "required", and an explicit null still binds.
-    private static JsonElement WithSingleTypeProperties(JsonElement inputSchema)
-    {
-        var schema = JsonNode.Parse(inputSchema.GetRawText())!;
-        if (schema["properties"] is JsonObject properties)
-        {
-            foreach (var (_, property) in properties)
-            {
-                if (property is JsonObject propertySchema && propertySchema["type"] is JsonArray { Count: 2 } types)
-                {
-                    var nonNullTypes = types
-                        .Select(type => type?.GetValue<string>())
-                        .Where(type => type != "null")
-                        .ToList();
-                    if (nonNullTypes.Count == 1)
-                    {
-                        propertySchema["type"] = nonNullTypes[0];
-                    }
-                }
-            }
-        }
-
-        using var document = JsonDocument.Parse(schema.ToJsonString());
-        return document.RootElement.Clone();
-    }
 }
 
 /// <summary>The outcome of a <see cref="ToolFilter.Apply"/> call.</summary>
