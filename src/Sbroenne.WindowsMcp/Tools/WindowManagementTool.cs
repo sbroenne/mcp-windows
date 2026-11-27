@@ -28,6 +28,10 @@ public static partial class WindowManagementTool
     /// Some apps, including modern Notepad, can have multiple tabs/windows in one process; closing one handle may leave
     /// another visible window behind.
     ///
+    /// WINDOWS OF ONE PROCESS: pass processId to 'list' or 'find' to get every window owned by a single process,
+    /// each with handle, title, class, bounds, state, and monitor. Prefer processId over processName when several
+    /// processes share a name (Edge, Chrome, Visual Studio) or when you already have a PID from the app or process tool.
+    ///
     /// CLOSE WITHOUT SAVING: Use close action with discardChanges=true to automatically dismiss 'Save?' dialogs.
     /// NOTE: discardChanges only works on English Windows (looks for 'Don't Save' button text).
     /// Example: window_management(action='close', handle='123', discardChanges=true)
@@ -40,7 +44,8 @@ public static partial class WindowManagementTool
     /// <param name="handle">Window handle for actions that target a specific window. Get the handle from the list or find action.</param>
     /// <param name="title">Window title to search for (for find and wait_for). Uses substring match unless regex=true.</param>
     /// <param name="processName">Process name to search for (for find action). More reliable than title - matches 'Notepad', 'chrome', etc. Case-insensitive.</param>
-    /// <param name="filter">Filter windows by title or process name (for list action).</param>
+    /// <param name="processId">Process id (PID) restricting 'list' or 'find' to one process, for example the PID returned by the app or process tool. Use it when several processes share one name.</param>
+    /// <param name="filter">Filter windows by title or process name (for list action). Case-insensitive substring.</param>
     /// <param name="regex">Use regex matching for title/filter (default: false).</param>
     /// <param name="includeAllDesktops">Include windows on other virtual desktops (default: false).</param>
     /// <param name="x">X-coordinate for move or set_bounds action.</param>
@@ -61,6 +66,7 @@ public static partial class WindowManagementTool
         [DefaultValue(null)] string? handle,
         [DefaultValue(null)] string? title,
         [DefaultValue(null)] string? processName,
+        [DefaultValue(null)] int? processId,
         [DefaultValue(null)] string? filter,
         [DefaultValue(false)] bool regex,
         [DefaultValue(false)] bool includeAllDesktops,
@@ -83,10 +89,10 @@ public static partial class WindowManagementTool
             switch (action)
             {
                 case WindowAction.List:
-                    return await HandleListSerializedAsync(filter, regex, includeAllDesktops, excludeTitle, cancellationToken);
+                    return await HandleListSerializedAsync(filter, regex, includeAllDesktops, excludeTitle, processId, cancellationToken);
 
                 case WindowAction.Find:
-                    operationResult = await HandleFindAsync(title, processName, regex, cancellationToken);
+                    operationResult = await HandleFindAsync(title, processName, processId, regex, cancellationToken);
                     break;
 
                 case WindowAction.Activate:
@@ -193,17 +199,24 @@ public static partial class WindowManagementTool
         };
 
     /// <summary>
-    /// Handles the list action, returning a slim JSON response with only
-    /// handle, title, and process name per window to minimize token usage.
+    /// Handles the list action, returning one compact record per window: handle, title, process
+    /// name and id, state, bounds, and monitor index.
     /// </summary>
     private static async Task<CallToolResult> HandleListSerializedAsync(
         string? filter,
         bool useRegex,
         bool includeAllDesktops,
         string? excludeTitle,
+        int? processId,
         CancellationToken cancellationToken)
     {
-        var result = await WindowsToolsBase.WindowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, cancellationToken);
+        var processIdError = ValidateProcessId(processId);
+        if (processIdError is not null)
+        {
+            return ToCallToolResult(processIdError);
+        }
+
+        var result = await WindowsToolsBase.WindowService.ListWindowsAsync(filter, useRegex, includeAllDesktops, processId, cancellationToken);
 
         if (!result.Success)
         {
@@ -222,7 +235,16 @@ public static partial class WindowManagementTool
         var slimResult = new
         {
             success = true,
-            windows = windows.Select(w => new { handle = w.Handle, title = w.Title, processName = w.ProcessName, monitorIndex = w.MonitorIndex }),
+            windows = windows.Select(w => new
+            {
+                handle = w.Handle,
+                title = w.Title,
+                processName = w.ProcessName,
+                pid = w.ProcessId,
+                state = w.State,
+                bounds = w.Bounds,
+                monitorIndex = w.MonitorIndex
+            }),
             count = windows.Count
         };
 
@@ -233,20 +255,37 @@ public static partial class WindowManagementTool
         };
     }
 
+    /// <summary>
+    /// Rejects a supplied process id that cannot name a real process.
+    /// </summary>
+    private static WindowManagementResult? ValidateProcessId(int? processId) =>
+        processId is <= 0
+            ? WindowManagementResult.CreateFailure(
+                WindowManagementErrorCode.MissingRequiredParameter,
+                $"'processId' must be a positive process id, got: {processId}")
+            : null;
+
     private static async Task<WindowManagementResult> HandleFindAsync(
         string? title,
         string? processName,
+        int? processId,
         bool useRegex,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(processName))
+        var processIdError = ValidateProcessId(processId);
+        if (processIdError is not null)
+        {
+            return processIdError;
+        }
+
+        if (string.IsNullOrEmpty(title) && string.IsNullOrEmpty(processName) && processId is null)
         {
             return WindowManagementResult.CreateFailure(
                 WindowManagementErrorCode.MissingRequiredParameter,
-                "'title' or 'processName' is required for find action. Use processName for exact app matching (e.g., processName='Notepad').");
+                "'title', 'processName', or 'processId' is required for find action. Use processId for one process (e.g., processId=1234) or processName for exact app matching (e.g., processName='Notepad').");
         }
 
-        return await WindowsToolsBase.WindowService.FindWindowAsync(title, processName, useRegex, cancellationToken);
+        return await WindowsToolsBase.WindowService.FindWindowAsync(title, processName, useRegex, processId, cancellationToken);
     }
 
     private static async Task<WindowManagementResult> HandleActivateAsync(

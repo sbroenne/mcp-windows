@@ -27,6 +27,9 @@ MCP instances have separate owners; never transfer their IDs to the CLI.
 ## Preferred workflow
 
 1. Observe existing windows with `wincli window find --title <part>` or launch with `wincli app --path <exe>`.
+   `wincli window list` returns `pid`, `state`, and `bounds` per window; `--filter <text>` matches the title
+   or the process name, and `--pid <id>` limits the result to one running process (useful when the same app
+   runs several times).
    Inspect `launchStatus` and `window`/`windows`: the handle may be missing or ambiguous.
    Inspect candidates or rediscover with `window find`; do not continue with handle-based commands
    until the intended target is identified. `possibleHandoff` does not confirm delivery or loaded

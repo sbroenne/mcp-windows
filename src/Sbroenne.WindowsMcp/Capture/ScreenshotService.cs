@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using Sbroenne.WindowsMcp.Native;
 
 namespace Sbroenne.WindowsMcp.Capture;
@@ -211,6 +213,7 @@ public sealed class ScreenshotService
                 "Valid window_handle (decimal string) is required for window capture"));
         }
 
+        using var dpiAwarenessScope = new PerMonitorDpiAwarenessScope();
 
         // Check if window exists
         if (!NativeMethods.IsWindow(windowHandle))
@@ -254,17 +257,30 @@ public sealed class ScreenshotService
                 $"Window has invalid dimensions: {width}x{height}"));
         }
 
+
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Try PrintWindow first (can capture occluded windows)
+        var region = new CaptureRegion(windowRect.Left, windowRect.Top, width, height);
+        var windowDpiContext = NativeMethods.GetWindowDpiAwarenessContext(windowHandle);
+        var windowDpiAwareness = windowDpiContext != 0
+            ? NativeMethods.GetAwarenessFromDpiAwarenessContext(windowDpiContext)
+            : -1;
+
+        // PrintWindow can return success while rendering DPI-unaware or system-aware
+        // windows only into part of the target bitmap. Capture their visible pixels instead.
+        if (windowDpiAwareness != NativeConstants.DPI_AWARENESS_PER_MONITOR_AWARE)
+        {
+            return CaptureRegionInternalAsync(region, request, cancellationToken);
+        }
+
+        // Try PrintWindow first for per-monitor-aware windows (it can capture occluded windows).
         var result = CaptureWindowUsingPrintWindow(windowHandle, width, height, request, windowRect);
         if (result.Success)
         {
             return Task.FromResult(result);
         }
 
-        // Fallback to screen region capture (works when PrintWindow fails, but window must be visible)
-        var region = new CaptureRegion(windowRect.Left, windowRect.Top, width, height);
+        // Fallback to screen region capture when PrintWindow fails (requires the window to be visible).
         return CaptureRegionInternalAsync(region, request, cancellationToken);
     }
 
@@ -616,6 +632,40 @@ public sealed class ScreenshotService
         catch
         {
             // Cursor capture is optional; ignore failures
+        }
+    }
+
+    private sealed class PerMonitorDpiAwarenessScope : IDisposable
+    {
+        private readonly nint _previousContext;
+        private bool _disposed;
+
+        public PerMonitorDpiAwarenessScope()
+        {
+            _previousContext = NativeMethods.SetThreadDpiAwarenessContext(
+                new nint(NativeConstants.DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2));
+            if (_previousContext == 0)
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to set the screenshot thread to per-monitor DPI awareness.");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            if (NativeMethods.SetThreadDpiAwarenessContext(_previousContext) == 0)
+            {
+                throw new Win32Exception(
+                    Marshal.GetLastWin32Error(),
+                    "Failed to restore the screenshot thread DPI awareness context.");
+            }
         }
     }
 }
